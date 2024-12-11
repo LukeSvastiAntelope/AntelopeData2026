@@ -15,31 +15,16 @@ import toast from "react-hot-toast";
 const EditAgentProfile = () => {
   const [agent, setAgent] = useState<IAgentProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const fetch = useFetch();
+  const fetchData = useFetch();
   const [newInterest, setNewInterest] = useState('');
-
-  useEffect(() => {
-    const fetchAgentProfile = async () => {
-      try {
-        const response = await fetch.get('/api/getAgentProfile');
-        if (response.status) {
-          setAgent(response.agent);
-        } else {
-          toast.error(response.message);
-        }
-      } catch (error) {
-        console.log(error);
-        toast.error('Failed to fetch agent profile');
-      }
-      setIsLoading(false);
-    };
-    fetchAgentProfile();
-  }, []);
+  const fileRef = useRef<HTMLInputElement | null>(null);
 
   const updatePrinciple = (index: number, field: 'title' | 'description', value: string) => {
-    setAgent(agent ? { ...agent, principles: agent.principles.map((principle, i) =>
-      i === index ? { ...principle, [field]: value } : principle
-    ) } : null);
+    setAgent(agent ? {
+      ...agent, principles: agent.principles.map((principle, i) =>
+        i === index ? { ...principle, [field]: value } : principle
+      )
+    } : null);
   };
 
   const addPrinciple = () => {
@@ -57,6 +42,61 @@ const EditAgentProfile = () => {
     }
   };
 
+  const saveAgentProfile = async () => {
+    console.log(agent);
+    if (!agent) return;
+    const formData = new FormData();
+    formData.append('name', agent.name);
+    formData.append('description', agent.description);
+    formData.append('maxBetSize', agent.maxBetSize.toString());
+    formData.append('interests', agent.interests.join(','));
+    formData.append('riskLevel', agent.riskLevel);
+    formData.append('conservativeBetSize', agent.conservativeBetSize.toString());
+    formData.append('moderateBetSize', agent.moderateBetSize.toString());
+    formData.append('aggressiveBetSize', agent.aggressiveBetSize.toString());
+    formData.append('principles', JSON.stringify(agent.principles));
+    formData.append('avatar', fileRef?.current?.files?.[0]!);
+    formData.append('image', agent.image);
+
+    try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem("token") ?? "" : "";
+      const response = await fetch('/api/saveAgentProfile', {
+        method: 'POST',
+        body: formData,
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        }
+      });
+      const data = await response.json();
+      if (data.status) {
+        toast.success(data.message);
+      } else {
+        toast.error(data.message);
+      }
+    } catch (error) {
+      console.log(error);
+      toast.error('Failed to save agent profile');
+    }
+  }
+
+  useEffect(() => {
+    const fetchAgentProfile = async () => {
+      try {
+        const response = await fetchData.get('/api/getAgentProfile');
+        if (response.status) {
+          setAgent(response.agent);
+        } else {
+          toast.error(response.message);
+        }
+      } catch (error) {
+        console.log(error);
+        toast.error('Failed to fetch agent profile');
+      }
+      setIsLoading(false);
+    };
+    fetchAgentProfile();
+  }, []);
+
   return (
     <div className="min-h-screen bg-background min-w-[625px]">
       <header className="bg-primary-500 text-white py-8 rounded-b-2xl">
@@ -69,7 +109,7 @@ const EditAgentProfile = () => {
       {
         !isLoading && agent && (
           <main className="container mx-auto px-4 py-8">
-            <ImageUpload />
+            <ImageUpload fileRef={fileRef} avatar={agent.image} />
             <Card className="mb-8">
               <CardHeader className="text-xl font-semibold">Basic Settings</CardHeader>
               <CardBody className="space-y-6">
@@ -203,7 +243,7 @@ const EditAgentProfile = () => {
               </Button>
               <Button
                 color="primary"
-                onPress={() => console.log('Save Agent Profile:')}
+                onPress={saveAgentProfile}
                 startContent={<IoSave size={20} />}
               >
                 Save Changes
@@ -217,9 +257,8 @@ const EditAgentProfile = () => {
 };
 
 
-const ImageUpload = () => {
-  const [image, setImage] = useState<string | null>(null);
-  const fileRef = useRef<HTMLInputElement | null>(null);
+const ImageUpload = ({ fileRef, avatar }: { fileRef: React.RefObject<HTMLInputElement>, avatar: string }) => {
+  const [image, setImage] = useState<string | null>(avatar);
 
   const handleImageUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];

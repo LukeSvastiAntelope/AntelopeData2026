@@ -9,7 +9,8 @@ export const UserRepo = {
     verifyAccount,
     getUserById,
     getAgentByUserId,
-    createAgent
+    createAgent,
+    updateAgent
 }
 
 async function authenticate({ username, password }: { username: string, password: string }) {
@@ -71,4 +72,12 @@ async function createAgent(id: string) {
     const db = await openDb();
     await db.run('INSERT INTO agents (user_id, riskLevel, conservativeBetSize, moderateBetSize, aggressiveBetSize) VALUES (?, ?, ?, ?, ?)', Number(id), AGENT_RISK_LEVEL[0], 0, 0, 0);
     return await getAgentByUserId(id);
+}
+
+async function updateAgent(id: string, params: any) {
+    const db = await openDb();
+    await db.run(
+        'UPDATE agents SET name = ?, description = ?, maxBetSize = ?, interests = ?, riskLevel = ?, conservativeBetSize = ?, moderateBetSize = ?, aggressiveBetSize = ?, principles = ?, image = ? WHERE user_id = ?', 
+        params.name, params.description, params.maxBetSize, params.interests, params.riskLevel, params.conservativeBetSize, params.moderateBetSize, params.aggressiveBetSize, params.principles, params.image, id
+    );
 }

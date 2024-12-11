@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
             agent = await UserRepo.createAgent(jwtPayload.email as string);
         }
         agent.interests = agent.interests ? agent.interests.split(',') : [];
-        agent.profile = agent.profile ? JSON.parse(agent.profile) : {};
+        agent.principles = agent.principles ? JSON.parse(agent.principles) : {};
         return Response.json({status: true, agent: agent});
     } catch (error) {
         console.error("Error in getAgentProfile: ", error);
