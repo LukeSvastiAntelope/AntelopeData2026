@@ -46,17 +46,17 @@ const EditAgentProfile = () => {
     console.log(agent);
     if (!agent) return;
     const formData = new FormData();
-    formData.append('name', agent.name);
-    formData.append('description', agent.description);
-    formData.append('maxBetSize', agent.maxBetSize.toString());
-    formData.append('interests', agent.interests.join(','));
+    formData.append('name', agent.name || "");
+    formData.append('description', agent.description || "");
+    formData.append('maxBetSize', agent.maxBetSize.toString() || "0");
+    formData.append('interests', agent.interests.join(',') || "");
     formData.append('riskLevel', agent.riskLevel);
     formData.append('conservativeBetSize', agent.conservativeBetSize.toString());
     formData.append('moderateBetSize', agent.moderateBetSize.toString());
     formData.append('aggressiveBetSize', agent.aggressiveBetSize.toString());
     formData.append('principles', JSON.stringify(agent.principles));
     formData.append('avatar', fileRef?.current?.files?.[0]!);
-    formData.append('image', agent.image);
+    formData.append('image', agent.image || "");
 
     try {
       const token = typeof window !== 'undefined' ? localStorage.getItem("token") ?? "" : "";
