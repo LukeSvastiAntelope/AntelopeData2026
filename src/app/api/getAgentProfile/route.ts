@@ -14,10 +14,20 @@ export async function GET(req: NextRequest) {
             agent = await UserRepo.createAgent(jwtPayload.email as string);
         }
         agent.interests = agent.interests ? agent.interests.split(',') : [];
-        agent.principles = agent.principles ? JSON.parse(agent.principles) : [];
+        try {
+            agent.principles = agent.principles ? JSON.parse(agent.principles) : [];
+            if (!Array.isArray(agent.principles)) {
+                agent.principles = [];
+            }
+        } catch (e) {
+            agent.principles = [];
+        }
         return Response.json({status: true, agent: agent});
     } catch (error) {
         console.error("Error in getAgentProfile: ", error);
-        return Response.json({ status: false, message: error instanceof Error ? error.message : 'Internal server error' });
+        return Response.json({ 
+            status: false, 
+            message: error instanceof Error ? error.message : 'Internal server error' 
+        });
     }
 }
