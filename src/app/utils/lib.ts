@@ -74,10 +74,8 @@ export function useFetch() {
   function request(method: string) {
     return (url: string, body?: any) => {
       const token = typeof window !== 'undefined' ? localStorage.getItem("token") ?? "" : "";
-      const userId = typeof window !== 'undefined' ? localStorage.getItem("userId") ?? "" : "";
       const headers: { [key: string]: string | undefined } = {
         'Authorization': `Bearer ${token}`,
-        'UserId': userId,
         'Content-Type': body ? 'application/json' : undefined
       };
 

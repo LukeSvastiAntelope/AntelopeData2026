@@ -1,17 +1,21 @@
 import bcrypt from "bcryptjs";
 import { openDb } from "./db";
 import { generateConfirmationToken } from "../api/token";
+import { AGENT_RISK_LEVEL } from "../const";
 
 export const UserRepo = {
     authenticate,
     registerPassword,
-    verifyAccount
+    verifyAccount,
+    getUserById,
+    getAgentByUserId,
+    createAgent
 }
 
 async function authenticate({ username, password }: { username: string, password: string }) {
     const db = await openDb();
     const user = await db.get('SELECT * FROM users WHERE username = ?', username);
-    
+
     if (!(user && bcrypt.compareSync(password, user.password))) {
         throw 'Username or password is incorrect';
     }
@@ -20,7 +24,7 @@ async function authenticate({ username, password }: { username: string, password
         throw 'User is not verified yet. Pls check your telegram for the confirmation link.';
     }
 
-    const token = await generateConfirmationToken(user.username);
+    const token = await generateConfirmationToken(user.id);
 
     return {
         user: user,
@@ -44,10 +48,27 @@ async function registerPassword({ username, password }: { username: string, pass
 
     const hashedPassword = bcrypt.hashSync(password, 10);
     await db.run('UPDATE users SET password = ? WHERE username = ?', hashedPassword, username);
-    return {token, chatId: user.telegram_id};
+    return { token, chatId: user.telegram_id };
 }
 
 async function verifyAccount(username: string) {
     const db = await openDb();
     await db.run('UPDATE users SET is_verified = 1 WHERE username = ?', username);
+}
+
+async function getUserById(id: string) {
+    const db = await openDb();
+    return await db.get('SELECT * FROM users WHERE id = ?', id);
+}
+
+async function getAgentByUserId(id: string) {
+    const db = await openDb();
+    return await db.get('SELECT * FROM agents WHERE user_id = ?', id);
+}
+
+async function createAgent(id: string) {
+    console.log(id);
+    const db = await openDb();
+    await db.run('INSERT INTO agents (user_id, riskLevel, conservativeBetSize, moderateBetSize, aggressiveBetSize) VALUES (?, ?, ?, ?, ?)', Number(id), AGENT_RISK_LEVEL[0], 0, 0, 0);
+    return await getAgentByUserId(id);
 }
