@@ -129,7 +129,6 @@ const EditAgentProfile = () => {
               <CardBody className="space-y-6">
                 <Select
                   label="Default Risk Level"
-                  defaultSelectedKeys={["moderate"]}
                   variant="bordered"
                   value={agent?.riskLevel}
                   onChange={(e) => setAgent({ ...agent, riskLevel: e.target.value as 'conservative' | 'moderate' | 'aggressive' })}
