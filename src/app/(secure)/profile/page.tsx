@@ -42,7 +42,7 @@ const ProfileSkeleton = () => {
 
                 {/* Interests Skeleton */}
                 <Card className="mb-8">
-                    <CardHeader className="text-xl font-semibold">
+                    <CardHeader className="text-xl font-regular">
                         <Skeleton className="h-6 w-32 rounded-lg" />
                     </CardHeader>
                     <Divider />
@@ -57,7 +57,7 @@ const ProfileSkeleton = () => {
 
                 {/* Principles Skeleton */}
                 <Card className="mb-8">
-                    <CardHeader className="text-xl font-semibold">
+                    <CardHeader className="text-xl font-regular">
                         <Skeleton className="h-6 w-40 rounded-lg" />
                     </CardHeader>
                     <Divider />
@@ -77,7 +77,7 @@ const ProfileSkeleton = () => {
 
                 {/* Risk Profile Skeleton */}
                 <Card>
-                    <CardHeader className="text-xl font-semibold">
+                    <CardHeader className="text-xl font-regular">
                         <Skeleton className="h-6 w-32 rounded-lg" />
                     </CardHeader>
                     <Divider />
@@ -180,7 +180,7 @@ const AgentProfile = () => {
 
                 {/* Interests Section */}
                 <Card className="mb-8">
-                    <CardHeader className="text-xl font-semibold">Core Interests</CardHeader>
+                    <CardHeader className="text-xl font-regular">Core Interests</CardHeader>
                     <Divider />
                     <CardBody>
                         <div className="flex flex-wrap gap-2">
@@ -198,11 +198,11 @@ const AgentProfile = () => {
                 </Card>
 
                 {/* Betting Principles */}
-                <Card className="mb-8">
-                    <CardHeader className="text-xl font-semibold">Betting Principles</CardHeader>
+                <Card className="mb-8 max-w-[1024px]">
+                    <CardHeader className="text-xl font-regular">Betting Principles</CardHeader>
                     <Divider />
                     <CardBody>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
                             {
                                 agent?.principles && agent?.principles.length > 0 && agent?.principles.map((principle) => (
                                     <PrincipleCard
@@ -218,7 +218,7 @@ const AgentProfile = () => {
 
                 {/* Risk Profile */}
                 <Card>
-                    <CardHeader className="text-xl font-semibold">Risk Profile</CardHeader>
+                    <CardHeader className="text-xl font-regular">Risk Profile</CardHeader>
                     <Divider />
                     <CardBody>
                         <div className="space-y-6">
@@ -260,7 +260,7 @@ const StatCard = ({ icon, title, value }: StatCardProps) => (
             <div className="text-primary text-2xl">{icon}</div>
             <div>
                 <p className="text-default-500">{title}</p>
-                <p className="text-2xl font-semibold">{value}</p>
+                <p className="text-2xl font-regular">{value}</p>
             </div>
         </CardBody>
     </Card>
@@ -274,7 +274,7 @@ interface PrincipleCardProps {
 const PrincipleCard = ({ title, description }: PrincipleCardProps) => (
     <Card shadow="sm">
         <CardBody>
-            <h3 className="font-semibold mb-2">{title}</h3>
+            <h3 className="font-regular mb-2">{title}</h3>
             <p className="text-default-500">{description}</p>
         </CardBody>
     </Card>
@@ -290,7 +290,7 @@ interface RiskItemProps {
 const RiskItem = ({ level, description, value, color }: RiskItemProps) => (
     <div className="space-y-2">
         <div className="flex justify-between items-center">
-            <span className="font-semibold">{level}</span>
+            <span className="font-regular">{level}</span>
             <span className="text-default-500">{description}</span>
         </div>
         <Progress

@@ -111,7 +111,7 @@ const EditAgentProfile = () => {
           <main className="container mx-auto px-4 py-8">
             <ImageUpload fileRef={fileRef} avatar={agent.image} />
             <Card className="mb-8">
-              <CardHeader className="text-xl font-semibold">Basic Settings</CardHeader>
+              <CardHeader className="text-xl font-regular">Basic Settings</CardHeader>
               <CardBody className="space-y-6">
                 <Input
                   label="Agent Name"
@@ -138,7 +138,7 @@ const EditAgentProfile = () => {
             </Card>
 
             <Card className="mb-8">
-              <CardHeader className="text-xl font-semibold">Interests</CardHeader>
+              <CardHeader className="text-xl font-regular">Interests</CardHeader>
               <CardBody>
                 <div className="flex flex-wrap gap-2 mb-4">
                   {agent.interests.length > 0 && agent.interests.map((interest) => (
@@ -165,7 +165,7 @@ const EditAgentProfile = () => {
             </Card>
 
             <Card className="mb-8">
-              <CardHeader className="text-xl font-semibold">Risk Settings</CardHeader>
+              <CardHeader className="text-xl font-regular">Risk Settings</CardHeader>
               <CardBody className="space-y-6">
                 <Select
                   label="Default Risk Level"
@@ -207,7 +207,7 @@ const EditAgentProfile = () => {
 
             <Card className="mb-8">
               <CardHeader className="flex justify-between items-center">
-                <h2 className="text-xl font-semibold">Betting Principles</h2>
+                <h2 className="text-xl font-regular">Betting Principles</h2>
                 <Button
                   color="primary"
                   size="sm"
@@ -217,7 +217,7 @@ const EditAgentProfile = () => {
                 </Button>
               </CardHeader>
               <CardBody>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
                   {agent.principles.length > 0 && agent.principles.map((principle, index) => (
                     <EditablePrincipleCard
                       key={index}
@@ -235,6 +235,7 @@ const EditAgentProfile = () => {
               <Button
                 color="danger"
                 variant="flat"
+                className="w-full"
                 href="/profile"
                 as="a"
                 startContent={<IoArrowBack size={20} />}
@@ -244,6 +245,7 @@ const EditAgentProfile = () => {
               <Button
                 color="primary"
                 onPress={saveAgentProfile}
+                className="w-full"
                 startContent={<IoSave size={20} />}
               >
                 Save Changes
@@ -273,7 +275,7 @@ const ImageUpload = ({ fileRef, avatar }: { fileRef: React.RefObject<HTMLInputEl
 
   return (
     <Card className="mb-8">
-      <CardHeader className="text-xl font-semibold">Profile Image</CardHeader>
+      <CardHeader className="text-xl font-regular">Profile Image</CardHeader>
       <CardBody>
         <div className="flex flex-col items-center gap-4">
           <div className="relative w-32 h-32 rounded-full overflow-hidden bg-default-100 cursor-pointer" onClick={() => fileRef && fileRef.current?.click()}>
