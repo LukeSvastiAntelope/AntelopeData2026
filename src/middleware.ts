@@ -1,7 +1,7 @@
 import { verifyConfirmationToken } from '@/app/utils/api/token';
 import { NextRequest, NextResponse } from 'next/server'
 
-const publicRoutes = ['/api/signin', '/api/signup', '/api/verify']
+const publicRoutes = ['/api/signin', '/api/signup', '/api/verify', '/api/createAgentPrediction', '/api/createAgentBet']
 
 export default async function middleware(req: NextRequest) {
     const path = req.nextUrl.pathname;

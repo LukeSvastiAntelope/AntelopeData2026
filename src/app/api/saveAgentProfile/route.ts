@@ -31,7 +31,9 @@ export async function POST(req: NextRequest) {
             moderateBetSize: formData.get("moderateBetSize"),
             aggressiveBetSize: formData.get("aggressiveBetSize"),
             principles: formData.get("principles"),
-            image: formData.get("avatar") != "undefined" ? `/uploads/${file.name}` : formData.get("image")
+            image: formData.get("avatar") != "undefined" ? `/uploads/${file.name}` : formData.get("image"),
+            maxTimelineLimit: formData.get("maxTimelineLimit"),
+            category: formData.get("category")
         }
 
         await UserRepo.updateAgent(jwtPayload.email as string, updateParams);

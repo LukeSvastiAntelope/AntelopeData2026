@@ -12,6 +12,8 @@ import toast from "react-hot-toast";
 import { useFetch } from "@/app/utils/lib";
 import Image from "next/image";
 import { IAgentProfile } from "@/app/utils/interface";
+import { convertDaysToYMD } from "@/app/utils/lib";
+import { CATEGORIES } from "@/app/utils/const";
 
 const ProfileSkeleton = () => {
     return (
@@ -39,6 +41,26 @@ const ProfileSkeleton = () => {
                         </Card>
                     ))}
                 </div>
+
+                {/* Betting Settings Skeleton */}
+                <Card className="mb-8">
+                    <CardHeader className="text-xl font-semibold">
+                        <Skeleton className="h-6 w-36 rounded-lg" />
+                    </CardHeader>
+                    <Divider />
+                    <CardBody>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <Skeleton className="h-4 w-32 rounded-lg mb-2" />
+                                <Skeleton className="h-8 w-24 rounded-full" />
+                            </div>
+                            <div>
+                                <Skeleton className="h-4 w-40 rounded-lg mb-2" />
+                                <Skeleton className="h-8 w-48 rounded-lg" />
+                            </div>
+                        </div>
+                    </CardBody>
+                </Card>
 
                 {/* Interests Skeleton */}
                 <Card className="mb-8">
@@ -103,6 +125,7 @@ const ProfileSkeleton = () => {
 const AgentProfile = () => {
 
     const [agent, setAgent] = useState<IAgentProfile | null>(null);
+    const [resolutionDate, setResolutionDate] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const fetch = useFetch();
 
@@ -112,6 +135,8 @@ const AgentProfile = () => {
                 const response = await fetch.get('/api/getAgentProfile');
                 if (response.status) {
                     setAgent(response.agent);
+                    const { years, months, days } = convertDaysToYMD(response.agent.maxTimelineLimit);
+                    setResolutionDate(`${years ? `${years} years ` : ''} ${months ? `${months} months ` : ''} ${days ? `${days} days` : ''}`);
                 } else {
                     toast.error(response.message);
                 }
@@ -177,6 +202,34 @@ const AgentProfile = () => {
                         value={`${agent?.maxBetSize || 0} credits`}
                     />
                 </div>
+
+                {/* Add Category and Resolution Date Display */}
+                <Card className="mb-8">
+                    <CardHeader className="text-xl font-semibold">Betting Settings</CardHeader>
+                    <Divider />
+                    <CardBody>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <h3 className="text-default-500 mb-2">Preferred Category</h3>
+                                <Chip color="primary" variant="flat">
+                                    {
+                                        agent?.category ?
+                                            CATEGORIES.find(category =>
+                                                category.toLowerCase() === agent?.category.toLowerCase()
+                                            ) :
+                                            'General'
+                                    }
+                                </Chip>
+                            </div>
+                            <div>
+                                <h3 className="text-default-500 mb-2">Maximum Resolution Time</h3>
+                                <p className="text-lg font-semibold">
+                                    {resolutionDate}
+                                </p>
+                            </div>
+                        </div>
+                    </CardBody>
+                </Card>
 
                 {/* Interests Section */}
                 <Card className="mb-8">

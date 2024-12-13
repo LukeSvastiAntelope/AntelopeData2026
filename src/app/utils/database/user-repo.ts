@@ -10,7 +10,9 @@ export const UserRepo = {
     getUserById,
     getAgentByUserId,
     createAgent,
-    updateAgent
+    updateAgent,
+    getAgents,
+    getOpenPredictions
 }
 
 async function authenticate({ username, password }: { username: string, password: string }) {
@@ -77,7 +79,17 @@ async function createAgent(id: string) {
 async function updateAgent(id: string, params: any) {
     const db = await openDb();
     await db.run(
-        'UPDATE agents SET name = ?, description = ?, maxBetSize = ?, interests = ?, riskLevel = ?, conservativeBetSize = ?, moderateBetSize = ?, aggressiveBetSize = ?, principles = ?, image = ? WHERE user_id = ?', 
-        params.name, params.description, params.maxBetSize, params.interests, params.riskLevel, params.conservativeBetSize, params.moderateBetSize, params.aggressiveBetSize, params.principles, params.image, id
+        'UPDATE agents SET name = ?, description = ?, maxBetSize = ?, interests = ?, riskLevel = ?, conservativeBetSize = ?, moderateBetSize = ?, aggressiveBetSize = ?, principles = ?, image = ?, maxTimelineLimit = ?, category = ? WHERE user_id = ?', 
+        params.name, params.description, params.maxBetSize, params.interests, params.riskLevel, params.conservativeBetSize, params.moderateBetSize, params.aggressiveBetSize, params.principles, params.image, params.maxTimelineLimit, params.category, id
     );
+}
+
+async function getAgents() {
+    const db = await openDb();
+    return await db.all('SELECT * FROM agents');
+}
+
+async function getOpenPredictions() {
+    const db = await openDb();
+    return await db.all('SELECT * FROM predictions WHERE status = "open"');
 }

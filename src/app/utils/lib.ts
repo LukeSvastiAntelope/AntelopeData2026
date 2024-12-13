@@ -34,6 +34,20 @@ export const decryptObj = (ciphertext: string) => {
   return JSON.parse(decryptedData);
 };
 
+export function convertDaysToYMD(totalDays: number) {
+  const years = Math.floor(totalDays / 365);
+  const remainingDaysAfterYears = totalDays % 365;
+
+  const months = Math.floor(remainingDaysAfterYears / 30);
+  const days = Math.round(remainingDaysAfterYears % 30);
+
+  return {
+    years,
+    months,
+    days
+  };
+}
+
 export const convertDateToPostDate = (time: string): string => {
   const date = new Date(time);
 
