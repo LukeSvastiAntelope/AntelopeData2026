@@ -29,7 +29,7 @@ export default function RootLayout({
           reverseOrder={true}
         />
         <Providers>
-          <main className="min-h-screen">
+          <main className="min-h-screen bg-mainGradient">
             {children}
           </main>
         </Providers>
