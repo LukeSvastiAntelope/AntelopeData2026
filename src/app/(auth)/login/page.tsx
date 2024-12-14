@@ -78,17 +78,17 @@ const LoginPage = () => {
     return (
         <div className="flex flex-col items-center justify-center h-screen">
             <Image
-                src={"/assets/images/background.jpg"}
+                src={"/assets/images/logo.svg"}
                 alt="Hero Image"
                 width={160}
                 height={160}
                 className="rounded-full"
             />
-            <h1 className="text-[2em] font-bold my-[0.67em] text-white">Market Maker</h1>
+            {/* <h1 className="text-[2em] font-bold my-[0.67em] text-white">Antelope</h1> */}
             <form className="flex flex-col w-80 gap-3 items-center justify-center" onSubmit={handleSubmit}>
-                <Input type="text" name="username" className="text-white" value={formData.username} placeholder={"Username"} onChange={handleChange} required={true} variant="bordered" />
-                <Input type="password" name="password" className="text-white" value={formData.password} placeholder={"Password"} onChange={handleChange} required={true} variant="bordered" />
-                <Button type="submit" className="bg-none p-2 rounded-md text-xs w-full" color="secondary">Login</Button>
+                <Input type="text" name="username" className="text-white" value={formData.username} placeholder={"Username"} onChange={handleChange} required={true} variant="bordered" classNames={{ inputWrapper: 'border-small border-default-200 rounded-sm' }} />
+                <Input type="password" name="password" className="text-white" value={formData.password} placeholder={"Password"} onChange={handleChange} required={true} variant="bordered" classNames={{ inputWrapper: 'border-small border-default-200 rounded-sm' }} />
+                <Button type="submit" className="bg-none p-2 rounded-sm text-xs w-full" color="primary">Login</Button>
             </form>
             <p className="my-[1em] text-white">Don&apos;t have an account? <Link href="/register" className="underline">Register</Link></p>
         </div>
