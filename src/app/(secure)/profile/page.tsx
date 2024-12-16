@@ -17,7 +17,7 @@ import { CATEGORIES } from "@/app/utils/const";
 
 const ProfileSkeleton = () => {
     return (
-        <div className="min-h-screen bg-background">
+        <div className="flex">
             {/* Header Skeleton */}
             <div className="bg-primary-500 text-white py-8">
                 <div className="container mx-auto px-4">
@@ -152,33 +152,44 @@ const AgentProfile = () => {
     if (isLoading) return <ProfileSkeleton />;
 
     return (
-        <div className="min-h-screen bg-background">
-            {/* Header */}
-            <div className="bg-primary-500 text-white py-8 flex justify-between items-center px-2 rounded-b-2xl">
-                <div className="container mx-auto px-4">
-                    <h1 className="text-3xl font-bold">{agent?.name || 'Agent Name'}</h1>
-                    <p className="mt-2 opacity-80">{agent?.description || 'Agent Description'}</p>
-                    <Button
-                        color="default"
-                        variant="flat"
-                        className="mt-4"
-                        href="/editProfile"
-                        as="a"
-                    >
-                        Edit Profile
-                    </Button>
-                </div>
+        <div className="min-h-screen flex">
+            <div className="fixed top-0 left-0">
                 <Image
-                    src={agent?.image || '/assets/images/default-agent.png'}
-                    alt="Agent Image"
-                    className="w-[100px] h-[100px] rounded-full"
-                    width={100}
-                    height={100}
+                    src={"/assets/images/logo-simple.svg"}
+                    alt="Hero Image"
+                    width={80}
+                    height={80}
+                    className="rounded-full"
                 />
             </div>
-
-            {/* Main Content */}
+           
             <div className="container mx-auto px-4 py-8">
+                 {/* Header */}
+            <div className="text-white py-8 flex justify-between items-center px-2 rounded-b-2xl flex-col">
+            
+            <div className="container mx-auto px-4">
+                <h1 className="text-3xl font-bold">{agent?.name || 'Agent Name'}</h1>
+                <p className="mt-2 opacity-80">{agent?.description || 'Agent Description'}</p>
+                <Button
+                    color="default"
+                    variant="flat"
+                    className="mt-4"
+                    href="/editProfile"
+                    as="a"
+                >
+                    Edit Profile
+                </Button>
+            </div>
+            <Image
+                src={agent?.image || '/assets/images/default-agent.png'}
+                alt="Agent Image"
+                className="w-[100px] h-[100px] rounded-full"
+                width={100}
+                height={100}
+            />
+        </div>
+
+        {/* Main Content */}
                 {/* Stats Overview */}
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
                     <StatCard
@@ -205,7 +216,7 @@ const AgentProfile = () => {
 
                 {/* Add Category and Resolution Date Display */}
                 <Card className="mb-8">
-                    <CardHeader className="text-xl font-semibold">Betting Settings</CardHeader>
+                    <CardHeader className="text-medium font-regular">Betting Settings</CardHeader>
                     <Divider />
                     <CardBody>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -305,12 +316,13 @@ interface StatCardProps {
     icon: React.ReactNode;
     title: string;
     value: string;
+    className?: string;
 }
 
-const StatCard = ({ icon, title, value }: StatCardProps) => (
-    <Card>
+const StatCard = ({ icon, title, value, className }: StatCardProps) => (
+    <Card className={`bg-content0 shadow-md hover:shadow-lg transition-shadow duration-300 ${className}`}>
         <CardBody className="flex flex-row items-center gap-4">
-            <div className="text-primary text-2xl">{icon}</div>
+            <div className="text-primary text-xl">{icon}</div>
             <div>
                 <p className="text-default-500">{title}</p>
                 <p className="text-2xl font-regular">{value}</p>
