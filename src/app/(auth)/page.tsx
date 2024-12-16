@@ -15,8 +15,8 @@ export default function Home() {
             />
         <h1 className="textGradient text-[1em] m-0 px-0 pt-0 pb-[10px] font-bold">Synthetic Prediction Market</h1>
         <div className="flex flex-col gap-1 w-full">
-          <Link href={"/register"} className="bg-tertiary text-center text-white p-[10px] rounded-[6px] text-[15px]">Register</Link>
-          <Link href={"/login"} className="bg-tertiary text-center text-white p-[10px] rounded-[6px] text-[15px]">Login</Link>
+          <Link href={"/register"} className="bg-content0 text-center text-white p-[10px] rounded-[6px] text-[15px] hover:bg-primary">Register</Link>
+          <Link href={"/login"} className="bg-content0 text-center text-white p-[10px] rounded-[6px] text-[15px] hover:bg-primary">Login</Link>
         </div>
       </div>
     </main>
