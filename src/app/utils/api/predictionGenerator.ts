@@ -1,6 +1,6 @@
 import OpenAI from 'openai';
 import { Pinecone } from '@pinecone-database/pinecone';
-import { IAgentProfile } from '../interface';
+import { IAgentProfile, ILeague } from '../interface';
 import { getJson } from 'serpapi';
 import { AutomatedPrediction, SportsEvent, PredictionImage, NewsItem } from '../interface';
 
@@ -11,6 +11,7 @@ export class AIEnhancedPredictionGenerator {
     private SPORTS_API_KEY = process.env.SPORTS_DB_API_KEY || '3';
     private SERPAPI_API_KEY = process.env.SERPAPI_API_KEY!;
     private VECTOR_DIMENSION = 1536;
+    private CURRENT_DATE = new Date();
 
     constructor(agent: IAgentProfile) {
         this.agent = agent;
@@ -45,7 +46,7 @@ export class AIEnhancedPredictionGenerator {
     private async validatePrediction(prediction: AutomatedPrediction): Promise<boolean> {
         const currentDate = new Date();
         const maxEndDate = new Date(currentDate);
-        maxEndDate.setMonth(currentDate.getMonth() + 3);
+        maxEndDate.setDate(maxEndDate.getDate() + this.agent.maxTimelineLimit);
         const predictionDate = new Date(prediction.endDate);
 
         // Check date validity
@@ -153,8 +154,8 @@ export class AIEnhancedPredictionGenerator {
         try {
             // Determine search topic based on prediction type
             let searchTopic = prediction.question;
-            if (prediction.category === 'Sports' && prediction.event) {
-                searchTopic = `${prediction.event.name} ${prediction.event.venue}`;
+            if (prediction.category === 'sportDB' && prediction.event) {
+                searchTopic = `${prediction.event.strEvent} ${prediction.event.strVenue}`;
             }
 
             const images = await this.getImagesForPrediction(searchTopic);
@@ -206,28 +207,34 @@ export class AIEnhancedPredictionGenerator {
 
     private async evaluatePredictionAgainstPrinciples(prediction: AutomatedPrediction): Promise<number> {
         try {
-            const prompt = `
-    Given these betting principles:
+            const prompt = `Analyze this prediction against these betting principles:
+    
+    PRINCIPLES:
     ${this.agent.principles.map(p => `- ${p.title}: ${p.description}`).join('\n')}
     
-    And this prediction:
+    PREDICTION:
     Question: ${prediction.question}
     Description: ${prediction.description}
     Reasoning: ${prediction.reasoning}
     
-    Rate how well this prediction aligns with our principles on a scale of 0-1.
-    Provide a JSON response with:
+    RESPOND WITH ONLY A JSON OBJECT in this exact format:
     {
-      "score": 0.8,
-      "reasoning": "Explanation of how the prediction aligns with each principle..."
-    }`;
+        "score": 0.8,
+        "reasoning": "Brief explanation of score"
+    }
+    
+    Rules:
+    1. Score must be between 0 and 1
+    2. DO NOT include any explanation or additional text
+    3. DO NOT use markdown formatting
+    4. ONLY return the JSON object`;
 
             const completion = await this.openai.chat.completions.create({
                 model: "gpt-4",
                 messages: [
                     {
                         role: "system",
-                        content: "You are an AI specialized in evaluating predictions against betting principles."
+                        content: "You are a JSON-only response generator. Never include explanations or additional text. Only output valid JSON objects."
                     },
                     {
                         role: "user",
@@ -237,8 +244,26 @@ export class AIEnhancedPredictionGenerator {
                 temperature: 0.3
             });
 
-            const response = JSON.parse(completion.choices[0].message.content!);
-            return response.score;
+            const content = completion.choices[0].message.content?.trim() || "{}";
+
+            // Remove any potential markdown formatting or extra text
+            const jsonContent = content.replace(/```json\n?|\n?```/g, '').trim();
+
+            try {
+                const response = JSON.parse(jsonContent);
+
+                // Validate the score is within bounds
+                if (typeof response.score !== 'number' || response.score < 0 || response.score > 1) {
+                    console.warn('Invalid score received, using default score of 0.5');
+                    return 0.5;
+                }
+
+                return response.score;
+            } catch (jsonError) {
+                console.error('Failed to parse AI response:', jsonError);
+                console.log('Raw AI response:', content);
+                return 0.5; // Default middle score if parsing fails
+            }
         } catch (error) {
             console.error('Failed to evaluate prediction against principles:', error);
             return 0.5; // Default middle score if evaluation fails
@@ -330,6 +355,7 @@ export class AIEnhancedPredictionGenerator {
                 sources: prediction.sources || []
             };
             const isSimilar = await this.checkSimilarity(formattedPrediction);
+            console.log("isSimilar", isSimilar);
             if (isSimilar) {
                 console.log('Similar prediction found, retrying...');
                 return this.generateGeneralPrediction();
@@ -388,7 +414,7 @@ export class AIEnhancedPredictionGenerator {
     private createPromptWithNews(news: NewsItem[]): string {
         const currentDate = new Date();
         const maxEndDate = new Date(currentDate);
-        maxEndDate.setMonth(currentDate.getMonth() + 3);
+        maxEndDate.setDate(maxEndDate.getDate() + this.agent.maxTimelineLimit);
 
         return `Current date: ${currentDate.toISOString().split('T')[0]}
     
@@ -398,17 +424,17 @@ export class AIEnhancedPredictionGenerator {
     Generate a realistic and verifiable prediction that:
     1. MUST be about events occurring between now and ${maxEndDate.toISOString().split('T')[0]}
     2. MUST be based on current news and ongoing developments
-    3. MUST be realistically achievable within 3 months
+    3. MUST be realistically achievable within ${this.agent.maxTimelineLimit} days
     4. MUST NOT include predictions about:
        - Long-term space missions
        - Major infrastructure projects
-       - Product launches more than 3 months away
+       - Product launches more than ${this.agent.maxTimelineLimit} days away
        - Multi-year developments
     
     Good examples:
-    - "Will [Company] release their quarterly earnings above [specific target] by [date within 3 months]?"
+    - "Will [Company] release their quarterly earnings above [specific target] by [date within ${this.agent.maxTimelineLimit} days]?"
     - "Will [Team] win their next [specific match] against [opponent] on [actual scheduled date]?"
-    - "Will [Company] complete their announced [specific short-term milestone] by [date within 3 months]?"
+    - "Will [Company] complete their announced [specific short-term milestone] by [date within ${this.agent.maxTimelineLimit} days]?"
     
     Bad examples:
     - "Will SpaceX launch a Mars mission by [date]?" (too long-term)
@@ -421,36 +447,41 @@ export class AIEnhancedPredictionGenerator {
     
     Format the response as:
     {
-        "question": "Will [specific event] happen by [date within next 3 months]?",
+        "question": "Will [specific event] happen by [date within next ${this.agent.maxTimelineLimit} days]?",
         "description": "Detailed context...",
         "category": "Category",
         "reasoning": "Why this prediction is realistic and verifiable...",
+        "endDate": [date],
         "sources": ["relevant news links..."],
         "confidence": 0.7
     }`;
     }
 
     private hasSportsInterest(): boolean {
-        const sportsKeywords = ['sports', 'football', 'soccer', 'basketball', 'baseball', 'nba', 'nfl', 'mlb'];
-        return this.agent.interests.some(interest =>
-            sportsKeywords.some(keyword =>
-                interest.toLowerCase().includes(keyword)
-            )
+        const sportsCategories = ['premierleague', 'soccer', 'nba', 'nfl'];
+
+        return sportsCategories.some(category =>
+            category == this.agent.category
         );
     }
 
     private async generateSportsPrediction(): Promise<AutomatedPrediction> {
         try {
             const events = await this.getUpcomingSportsEvents();
-            const prompt = this.createSportsPrompt(events);
+            if (events.length === 0) {
+                console.log("no events found, retrying...");
+                throw new Error("no events found");
+            }
+            const randomEvents = this.shuffleArray(events).slice(0, 10);
+            const prompt = this.createSportsPrompt(randomEvents);
             const prediction = await this.generateWithAI(prompt);
 
             // Ensure the response matches our interface
             const formattedPrediction: AutomatedPrediction = {
                 question: prediction.question,
                 description: prediction.description,
-                category: 'Sports',
-                endDate: new Date(prediction.event?.date || ''),
+                category: 'sportDB',
+                endDate: new Date(prediction.endDate),
                 initialStake: this.calculateStakeBasedOnConfidence(prediction.confidence),
                 choice: prediction.choice || 'Yes',
                 confidence: prediction.confidence,
@@ -473,7 +504,12 @@ export class AIEnhancedPredictionGenerator {
 
     private async getUpcomingSportsEvents(): Promise<SportsEvent[]> {
         try {
-            const sportTypes = this.determineSportTypes();
+            const sportTypes = await this.determineSportTypes();
+            console.log("sportTypes", sportTypes);
+
+            if (sportTypes.length === 0) {
+                return [];
+            }
             const events: SportsEvent[] = [];
 
             for (const sport of sportTypes) {
@@ -487,10 +523,10 @@ export class AIEnhancedPredictionGenerator {
             }
 
             return events.filter(event => {
-                const eventDate = new Date(event.date);
-                const threeDaysFromNow = new Date();
-                threeDaysFromNow.setDate(threeDaysFromNow.getDate() + 3);
-                return eventDate <= threeDaysFromNow;
+                const eventDate = new Date(event.dateEvent);
+                const endDaysFromNow = new Date();
+                endDaysFromNow.setDate(endDaysFromNow.getDate() + this.agent.maxTimelineLimit);
+                return eventDate <= endDaysFromNow && eventDate >= this.CURRENT_DATE;
             });
         } catch (error) {
             console.error('Failed to fetch sports events:', error);
@@ -498,29 +534,91 @@ export class AIEnhancedPredictionGenerator {
         }
     }
 
-    private determineSportTypes(): string[] {
+    private async determineSportTypes(): Promise<string[]> {
         // Map interests to league IDs from TheSportsDB
-        const sportLeagueMap: Record<string, string> = {
-            'nba': '4387',
-            'nfl': '4391',
-            'mlb': '4424',
-            'soccer': '4328',  // Premier League
-            'football': '4328',
-            'basketball': '4387'
-        };
+        const response = await fetch(
+            `https://www.thesportsdb.com/api/v1/json/3/all_leagues.php`
+        );
+        const data = await response.json();
+        const leagues = data.leagues;
+        const matchedLeagues = leagues.filter((league: ILeague) => league.strSport.toLowerCase() == this.agent.category);
+        const availableLeagues = await this.generateInterestLeaguesWithAI(matchedLeagues);
+        return availableLeagues.map((league: ILeague) => league.idLeague);
+    }
 
-        return this.agent.interests
-            .map(interest => sportLeagueMap[interest.toLowerCase()])
-            .filter(Boolean);
+    private async generateInterestLeaguesWithAI(matchedLeagues: ILeague[]): Promise<ILeague[]> {
+        const interests = this.agent.interests;
+        const prompt = `Given these leagues: 
+        ${JSON.stringify(matchedLeagues, null, 2)}
+        
+        And these interests: ${interests.join(', ')}
+    
+        Return a JSON array containing only the leagues that best match the interests.
+        Each league should include only the idLeague and strLeague.
+        
+        Format your response EXACTLY like this example:
+        {
+          "leagues": [
+            {
+              "idLeague": "4328",
+              "strLeague": "English Premier League"
+            }
+          ]
+        }
+    
+        Only include leagues that are actually in the provided leagues list.
+        Ensure the response is valid JSON.`;
+
+        const completion = await this.openai.chat.completions.create({
+            model: "gpt-4",
+            messages: [
+                {
+                    role: "system",
+                    content: `You are an AI specialized in matching sports leagues to user interests. 
+                    Always return a valid JSON object with a 'leagues' array.
+                    Only include leagues from the provided list.
+                    Ensure each league has idLeague and strLeague fields.
+                    ONLY respond with the JSON object, nothing else.`
+                },
+                {
+                    role: "user",
+                    content: prompt
+                }
+            ],
+            temperature: 0.3, // Lower temperature for more consistent output
+            max_tokens: 1000
+        });
+
+        try {
+            const response = JSON.parse(completion.choices[0].message.content!);
+
+            // Validate that returned leagues exist in matchedLeagues
+            const validLeagues = response.leagues.filter((league: ILeague) =>
+                matchedLeagues.some(ml => ml.idLeague === league.idLeague)
+            );
+
+            if (validLeagues.length === 0) {
+                console.warn('No matching leagues found');
+                return [];
+            }
+
+            return validLeagues;
+        } catch (error) {
+            console.error('Failed to parse AI response:', error);
+            // Fallback to first league if parsing fails
+            return [];
+        }
     }
 
     private createSportsPrompt(events: SportsEvent[]): string {
         const eventsContext = events
             .map(event => `
-            Event: ${event.name}
-            Date: ${event.date}
-            Venue: ${event.venue}
-            League: ${event.league}
+                Event_ID: ${event.idEvent}
+            Event: ${event.strEvent}
+            Date: ${event.dateEvent}
+            Venue: ${event.strVenue}
+            League: ${event.strLeague}
+            League_ID: ${event.idLeague}
           `).join('\n');
 
         return `Based on these upcoming sports events:
@@ -528,23 +626,24 @@ export class AIEnhancedPredictionGenerator {
     ${eventsContext}
     
     Generate a prediction with these criteria:
-    - Should be about one of the listed events
-    - Should be verifiable within 3 days
+    - Should be about random one of the listed events
+    - Should be verifiable within ${this.agent.maxTimelineLimit} days
     - Should be specific and measurable
     - Should include clear win/loss/score prediction
-    - Should consider team performance history
+    ${this.agent.principles.map(principle => `- ${principle.title}: ${principle.description}`).join('\n')
+            }
     
     Format:
     {
-      "question": "Will [Team] win against [Team] on [Date]?",
-      "description": "Detailed analysis...",
-      "category": "Sports",
+      "question": "[Team] vs [Team] on [Date]",
       "event": {
-        "name": "Event name",
-        "date": "Event date",
-        "venue": "Venue"
+        "winner": "Team",
+        "event_id": "Event_ID",
+        "league_id": "League_ID",
+        "home_team": "Home_Team",
+        "away_team": "Away_Team"
       },
-      "reasoning": "Analysis of team performance, history...",
+      "endDate": "Date",
       "confidence": 0.7
     }`;
     }
@@ -553,7 +652,7 @@ export class AIEnhancedPredictionGenerator {
         try {
             const currentDate = new Date();
             const maxEndDate = new Date(currentDate);
-            maxEndDate.setMonth(currentDate.getMonth() + 3);
+            maxEndDate.setDate(maxEndDate.getDate() + this.agent.maxTimelineLimit);
             const formattedMaxDate = maxEndDate.toISOString().split('T')[0];
 
             const completion = await this.openai.chat.completions.create({
@@ -565,36 +664,46 @@ export class AIEnhancedPredictionGenerator {
                         Today's date is ${currentDate.toISOString().split('T')[0]}. 
                         All predictions MUST end before ${formattedMaxDate}.
                         NEVER generate dates beyond ${formattedMaxDate}.
-                        Use date format YYYY-MM-DD in the question.
-                        The endDate in the response must match exactly with the date in the question.`
+                        ONLY respond with a valid JSON object.
+                        DO NOT include any explanations or additional text.`
                     },
                     {
                         role: "user",
                         content: prompt
                     }
                 ],
-                temperature: 0.7,
-                max_tokens: 1000
+                temperature: 0.3
             });
 
-            const response = JSON.parse(completion.choices[0].message.content!);
+            const content = completion.choices[0].message.content?.trim() || "{}";
 
-            // Extract date from question
-            const dateMatch = response.question.match(/by\s+([\d]{4}-[\d]{2}-[\d]{2})/);
-            if (!dateMatch) {
-                throw new Error('No valid date format found in question');
+            // Remove any potential markdown formatting or extra text
+            const jsonContent = content.replace(/```json\n?|\n?```/g, '').trim();
+
+            try {
+                const response = JSON.parse(jsonContent);
+
+                // Extract date from question
+                const dateMatch = response.endDate;
+                if (!dateMatch) {
+                    throw new Error('No valid date format found in question');
+                }
+
+                const questionDate = new Date(dateMatch);
+                if (!this.isValidPredictionDate(questionDate)) {
+                    throw new Error('Invalid prediction date');
+                }
+
+                return {
+                    ...response,
+                    endDate: questionDate,
+                    initialStake: this.calculateStakeBasedOnConfidence(response.confidence)
+                };
+            } catch (jsonError) {
+                console.error('Failed to parse AI response:', jsonError);
+                console.log('Raw AI response:', content);
+                throw new Error('Failed to generate valid prediction format');
             }
-
-            const questionDate = new Date(dateMatch[1]);
-            if (!this.isValidPredictionDate(questionDate)) {
-                throw new Error('Invalid prediction date');
-            }
-
-            return {
-                ...response,
-                endDate: questionDate,
-                initialStake: this.calculateStakeBasedOnConfidence(response.confidence)
-            };
         } catch (error) {
             console.error('Failed to generate prediction with OpenAI:', error);
             throw error;
@@ -661,76 +770,175 @@ export class AIEnhancedPredictionGenerator {
 
     private async checkSimilarity(prediction: AutomatedPrediction): Promise<boolean> {
         try {
-            // Normalize the prediction text for comparison
-            const normalizedText = this.normalizePredictionText(prediction.question);
-
-            // Get embedding for the normalized prediction
-            const embedding = await this.getEmbedding(normalizedText);
-
-            // Calculate date range for similarity check
-            const thirtyDaysAgo = new Date();
-            thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-            const minTimestamp = Math.floor(thirtyDaysAgo.getTime() / 1000);
-
-            // Query Pinecone
-            const index = this.pinecone.Index('predictions');
-            const queryResponse = await index.query({
-                vector: embedding,
-                topK: 5, // Increased to check more predictions
-                includeMetadata: true,
-                filter: {
-                    createdAt: {
-                        $gte: minTimestamp
-                    }
-                }
-            });
-
-            // Check for similar predictions
-            if (queryResponse.matches && queryResponse.matches.length > 0) {
-                for (const match of queryResponse.matches) {
-                    const similarityScore = match.score!;
-                    const metadata = match.metadata;
-
-                    // Check for numeric patterns
-                    const currentNumbers = this.extractNumbers(normalizedText);
-                    const existingNumbers = this.extractNumbers(metadata?.question.toString() || '');
-
-                    // Calculate numeric similarity
-                    const numericSimilarity = this.calculateNumericSimilarity(
-                        currentNumbers,
-                        existingNumbers
-                    );
-
-                    // Log for debugging
-                    console.log('Similarity check:', {
-                        current: normalizedText,
-                        existing: metadata?.question,
-                        vectorSimilarity: similarityScore,
-                        numericSimilarity,
-                        currentNumbers,
-                        existingNumbers
-                    });
-
-                    // Consider both vector similarity and numeric patterns
-                    if (similarityScore > 0.90 || numericSimilarity > 0.85) {
-                        return true;
-                    }
-                }
+            // Special handling for sports predictions
+            if (prediction.category === 'Sports' && prediction.event) {
+                return await this.checkSportsPredictionSimilarity(prediction);
             }
 
-            return false;
+            // Regular similarity check for non-sports predictions
+            return await this.checkGeneralPredictionSimilarity(prediction);
         } catch (error) {
             console.error('Failed to check similarity:', error);
             return false;
         }
     }
 
-    private normalizePredictionText(text: string): string {
-        return text
-            .toLowerCase()
-            .replace(/[^\w\s\d]/g, '') // Remove special characters
-            .replace(/\s+/g, ' ')      // Normalize whitespace
-            .trim();
+    private async checkSportsPredictionSimilarity(prediction: AutomatedPrediction): Promise<boolean> {
+        try {
+            const predictionEvent = prediction.event;
+            if (!predictionEvent) return false;
+
+            // Get recent predictions from Pinecone
+            const index = this.pinecone.Index('predictions');
+            const queryResponse = await index.query({
+                vector: await this.getEmbedding(prediction.question),
+                topK: 5,
+                includeMetadata: true,
+                filter: {
+                    category: "Sports"
+                }
+            });
+
+            if (!queryResponse.matches || queryResponse.matches.length === 0) {
+                return false;
+            }
+
+            for (const match of queryResponse.matches) {
+                if (!match.metadata?.event) continue;
+
+                try {
+                    const existingEvent = JSON.parse(match.metadata.event as string);
+
+                    // Check if it's the same event
+                    if (existingEvent.idEvent === predictionEvent.idEvent) {
+                        console.log('Same event found:', {
+                            new: predictionEvent.strEvent,
+                            existing: existingEvent.strEvent
+                        });
+                        return true;
+                    }
+
+                    // Check if it's the same teams playing on the same date
+                    if (existingEvent.dateEvent === predictionEvent.dateEvent &&
+                        existingEvent.strEvent === predictionEvent.strEvent) {
+                        console.log('Same match found:', {
+                            new: predictionEvent.strEvent,
+                            existing: existingEvent.strEvent
+                        });
+                        return true;
+                    }
+                } catch (error) {
+                    console.error('Error parsing event metadata:', error);
+                    continue;
+                }
+            }
+
+            return false;
+        } catch (error) {
+            console.error('Failed to check sports prediction similarity:', error);
+            return false;
+        }
+    }
+
+    private async checkGeneralPredictionSimilarity(prediction: AutomatedPrediction): Promise<boolean> {
+        try {
+            const predictionText = `${prediction.question} ${prediction.description}`.toLowerCase();
+            const embedding = await this.getEmbedding(predictionText);
+
+            // Calculate date range for similarity check (last 30 days)
+            const thirtyDaysAgo = new Date();
+            thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+            const index = this.pinecone.Index('predictions');
+            const queryResponse = await index.query({
+                vector: embedding,
+                topK: 5,
+                includeMetadata: true,
+                filter: {
+                    timestamp: { $gte: Math.floor(thirtyDaysAgo.getTime() / 1000) },
+                    category: prediction.category
+                }
+            });
+
+            if (!queryResponse.matches || queryResponse.matches.length === 0) {
+                return false;
+            }
+
+            for (const match of queryResponse.matches) {
+                if (!match.metadata) continue;
+
+                const similarityScore = match.score || 0;
+                const existingQuestion = match.metadata.question?.toString().toLowerCase() || '';
+
+                // Text-based similarity check
+                const questionSimilarity = this.calculateTextSimilarity(
+                    prediction.question.toLowerCase(),
+                    existingQuestion
+                );
+
+                console.log('General prediction similarity check:', {
+                    vectorSimilarity: similarityScore,
+                    textSimilarity: questionSimilarity,
+                    newPrediction: prediction.question,
+                    existingPrediction: existingQuestion
+                });
+
+                // Stricter thresholds for general predictions
+                if (similarityScore > 0.92 || questionSimilarity > 0.9) {
+                    console.log('Similar general prediction found:', {
+                        new: prediction.question,
+                        existing: existingQuestion
+                    });
+                    return true;
+                }
+            }
+
+            return false;
+        } catch (error) {
+            console.error('Failed to check general prediction similarity:', error);
+            return false;
+        }
+    }
+
+    private calculateTextSimilarity(str1: string, str2: string): number {
+        const longer = str1.length > str2.length ? str1 : str2;
+        const shorter = str1.length > str2.length ? str2 : str1;
+
+        if (longer.length === 0) {
+            return 1.0;
+        }
+
+        const editDistance = this.levenshteinDistance(longer, shorter);
+        return (longer.length - editDistance) / longer.length;
+    }
+
+    private levenshteinDistance(str1: string, str2: string): number {
+        const matrix: number[][] = [];
+
+        // Initialize matrix
+        for (let i = 0; i <= str1.length; i++) {
+            matrix[i] = [i];
+        }
+        for (let j = 0; j <= str2.length; j++) {
+            matrix[0][j] = j;
+        }
+
+        // Fill in the rest of the matrix
+        for (let i = 1; i <= str1.length; i++) {
+            for (let j = 1; j <= str2.length; j++) {
+                if (str1[i - 1] === str2[j - 1]) {
+                    matrix[i][j] = matrix[i - 1][j - 1];
+                } else {
+                    matrix[i][j] = Math.min(
+                        matrix[i - 1][j - 1] + 1, // substitution
+                        matrix[i][j - 1] + 1,     // insertion
+                        matrix[i - 1][j] + 1      // deletion
+                    );
+                }
+            }
+        }
+
+        return matrix[str1.length][str2.length];
     }
 
     private extractNumbers(text: string): number[] {
@@ -769,9 +977,8 @@ export class AIEnhancedPredictionGenerator {
 
     private async storePrediction(prediction: AutomatedPrediction) {
         try {
-            const embedding = await this.getEmbedding(
-                `${prediction.question} ${prediction.description}`
-            );
+            const normalizedText = `${prediction.question} ${prediction.description}`.toLowerCase();
+            const embedding = await this.getEmbedding(normalizedText);
 
             const index = this.pinecone.Index('predictions');
             await index.upsert([{
@@ -781,9 +988,9 @@ export class AIEnhancedPredictionGenerator {
                     question: prediction.question,
                     description: prediction.description,
                     category: prediction.category,
-                    createdAt: new Date().toISOString(),
+                    timestamp: Math.floor(new Date().getTime() / 1000),
                     creator_choice: prediction.choice,
-                    created_timestamp: new Date().getTime() / 1000,
+                    event: prediction.event ? JSON.stringify(prediction.event) : ""
                 }
             }]);
         } catch (error) {

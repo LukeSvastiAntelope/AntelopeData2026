@@ -143,6 +143,7 @@ const EditAgentProfile = () => {
                   variant="bordered"
                   value={agent?.maxBetSize?.toString() || '0'}
                   onChange={(e) => setAgent({ ...agent, maxBetSize: parseInt(e.target.value) })}
+                  min={0}
                 />
                 <Select
                   label="Category"
@@ -180,6 +181,7 @@ const EditAgentProfile = () => {
                         setAgent({ ...agent, maxTimelineLimit: totalDays });
                         setResolutionDate({ ...resolutionDate, months });
                       }}
+                      min={0}
                     />
                     <Input
                       label="Days"
@@ -192,6 +194,7 @@ const EditAgentProfile = () => {
                         setAgent({ ...agent, maxTimelineLimit: totalDays });
                         setResolutionDate({ ...resolutionDate, days });
                       }}
+                      min={0}
                     />
                   </div>
                 </div>
@@ -246,6 +249,7 @@ const EditAgentProfile = () => {
                   variant="bordered"
                   value={agent?.conservativeBetSize?.toString() || '0'}
                   onChange={(e) => setAgent({ ...agent, conservativeBetSize: parseInt(e.target.value) })}
+                  min={0}
                 />
                 <Input
                   label="Moderate Bet Size"
@@ -254,6 +258,7 @@ const EditAgentProfile = () => {
                   variant="bordered"
                   value={agent?.moderateBetSize?.toString() || '0'}
                   onChange={(e) => setAgent({ ...agent, moderateBetSize: parseInt(e.target.value) })}
+                  min={0}
                 />
                 <Input
                   label="Aggressive Bet Size"
@@ -262,6 +267,7 @@ const EditAgentProfile = () => {
                   variant="bordered"
                   value={agent?.aggressiveBetSize?.toString() || '0'}
                   onChange={(e) => setAgent({ ...agent, aggressiveBetSize: parseInt(e.target.value) })}
+                  min={0}
                 />
               </CardBody>
             </Card>

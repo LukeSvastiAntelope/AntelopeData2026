@@ -24,8 +24,10 @@ export class AutomaticBettingAgent {
     async analyzePredictions(predictions: Prediction[]): Promise<BetDecision[]> {
         try {
             const openPredictions = predictions.filter(p => p.creator_id !== this.agent.user_id);
-            const interestingPredictions = openPredictions.filter(p =>
-                this.isInterestingPrediction(p)
+            const isSportsCategory = this.isSportsCategory();
+            const categoryPredictions = openPredictions.filter(p => isSportsCategory ? p.source == "sportDB" : p.source == "google_news");
+            const interestingPredictions = categoryPredictions.filter(p =>
+                this.isInterestingPredictionWithAI(p)
             );
 
             if (interestingPredictions.length === 0) {
@@ -51,11 +53,28 @@ export class AutomaticBettingAgent {
         }
     }
 
-    private isInterestingPrediction(prediction: Prediction): boolean {
-        const description = prediction.description.toLowerCase();
-        return this.agent.interests.some(interest =>
-            description.includes(interest.toLowerCase())
+    private isSportsCategory(): boolean {
+        const sportsCategories = ['premierleague', 'soccer', 'nba', 'nfl'];
+
+        return sportsCategories.some(category =>
+            category == this.agent.category
         );
+    }
+
+    private async isInterestingPredictionWithAI(prediction: Prediction): Promise<boolean> {
+        const description = prediction.description.toLowerCase();
+        const prompt = `
+        This is the agents interests:
+        ${this.agent.interests.map(interest => interest.toLowerCase()).join(', ')}
+        Determine if this prediction is interesting for a betting agent based on the agents interests:
+        ${description}
+        `;
+        const response = await this.openai.chat.completions.create({
+            model: "gpt-4",
+            messages: [{ role: "user", content: prompt }],
+            temperature: 0.3
+        });
+        return response.choices[0].message.content?.toLowerCase().includes('yes') || false;
     }
 
     private groupPredictionsByTopic(predictions: Prediction[]): GroupedPredictions {

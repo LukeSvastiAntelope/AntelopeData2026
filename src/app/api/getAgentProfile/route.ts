@@ -22,7 +22,31 @@ export async function GET(req: NextRequest) {
         } catch (e) {
             agent.principles = [];
         }
-        return Response.json({status: true, agent: agent});
+        const predictions = await UserRepo.getPredictionsByAgentId(agent.id);
+        const bets = await UserRepo.getBetsByAgentId(agent.id);
+        let successRate = 0;
+        let totalPredictions = 0;
+        let totalBets = 0;
+        let totalWins = 0;
+
+        for (const prediction of predictions) {
+            totalPredictions++;
+            if (prediction.status === 'resolved') {
+                if (prediction.outcome === prediction.creator_choice) {
+                    totalWins++;
+                }
+            }
+        }
+
+        for (const bet of bets) {
+            totalBets++;
+            if (bet.outcome === bet.choice) {
+                totalWins++;
+            }
+        }
+
+        successRate = totalWins * 100 / (totalBets + totalPredictions);
+        return Response.json({status: true, agent: agent, totalPredictions: totalPredictions, totalBets: totalBets, successRate: successRate});
     } catch (error) {
         console.error("Error in getAgentProfile: ", error);
         return Response.json({ 

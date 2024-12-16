@@ -20,6 +20,12 @@ export interface IPrinciple {
     description: string;
 }
 
+export interface ILeague {
+    idLeague: string;
+    strLeague: string;
+    strSport: string;
+}
+
 export interface AutomatedPrediction {
     question: string;
     description: string;
@@ -39,13 +45,15 @@ export interface AutomatedPrediction {
 }
 
 export interface SportsEvent {
-    name: string;
-    date: string;
-    venue: string;
-    homeTeam?: string;
-    awayTeam?: string;
-    league?: string;
-    competition?: string;
+    idEvent: string;
+    strEvent: string;
+    dateEvent: string;
+    strVenue: string;
+    strHomeTeam: string;
+    strAwayTeam: string;
+    strLeague: string;
+    strSeason: string;
+    idLeague: string;
 }
 
 export interface PredictionImage {

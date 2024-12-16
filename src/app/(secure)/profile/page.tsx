@@ -14,28 +14,36 @@ import Image from "next/image";
 import { IAgentProfile } from "@/app/utils/interface";
 import { convertDaysToYMD } from "@/app/utils/lib";
 import { CATEGORIES } from "@/app/utils/const";
+import Link from "next/link";
 
 const ProfileSkeleton = () => {
     return (
-        <div className="flex">
-            {/* Header Skeleton */}
-            <div className="bg-primary-500 text-white py-8">
-                <div className="container mx-auto px-4">
-                    <Skeleton className="h-8 w-64 rounded-lg mb-2" />
-                    <Skeleton className="h-4 w-48 rounded-lg" />
-                </div>
+        <div className="min-h-screen">
+            {/* Logo Skeleton */}
+            <div className="fixed top-0 left-0">
+                <Skeleton className="w-[80px] h-[80px] rounded-full" />
             </div>
 
             <div className="container mx-auto px-4 py-8">
+                {/* Header Skeleton */}
+                <div className="py-8 flex justify-between items-center px-2 rounded-b-2xl flex-row">
+                    <div className="container mx-auto px-4">
+                        <Skeleton className="h-10 w-64 rounded-lg mb-2" />
+                        <Skeleton className="h-4 w-48 rounded-lg mb-4" />
+                        <Skeleton className="h-9 w-28 rounded-lg" />
+                    </div>
+                    <Skeleton className="w-[100px] h-[100px] rounded-full" />
+                </div>
+
                 {/* Stats Skeleton */}
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
                     {[...Array(4)].map((_, i) => (
-                        <Card key={i}>
+                        <Card key={i} className="bg-content0">
                             <CardBody className="flex flex-row items-center gap-4">
-                                <Skeleton className="w-8 h-8 rounded-lg" />
-                                <div className="flex-1">
-                                    <Skeleton className="h-3 w-20 rounded-lg mb-2" />
-                                    <Skeleton className="h-6 w-16 rounded-lg" />
+                                <Skeleton className="w-6 h-6 rounded-lg" />
+                                <div>
+                                    <Skeleton className="h-4 w-24 rounded-lg mb-2" />
+                                    <Skeleton className="h-6 w-20 rounded-lg" />
                                 </div>
                             </CardBody>
                         </Card>
@@ -44,7 +52,7 @@ const ProfileSkeleton = () => {
 
                 {/* Betting Settings Skeleton */}
                 <Card className="mb-8">
-                    <CardHeader className="text-xl font-semibold">
+                    <CardHeader>
                         <Skeleton className="h-6 w-36 rounded-lg" />
                     </CardHeader>
                     <Divider />
@@ -56,7 +64,7 @@ const ProfileSkeleton = () => {
                             </div>
                             <div>
                                 <Skeleton className="h-4 w-40 rounded-lg mb-2" />
-                                <Skeleton className="h-8 w-48 rounded-lg" />
+                                <Skeleton className="h-6 w-48 rounded-lg" />
                             </div>
                         </div>
                     </CardBody>
@@ -64,27 +72,27 @@ const ProfileSkeleton = () => {
 
                 {/* Interests Skeleton */}
                 <Card className="mb-8">
-                    <CardHeader className="text-xl font-regular">
+                    <CardHeader>
                         <Skeleton className="h-6 w-32 rounded-lg" />
                     </CardHeader>
                     <Divider />
                     <CardBody>
                         <div className="flex flex-wrap gap-2">
                             {[...Array(5)].map((_, i) => (
-                                <Skeleton key={i} className="h-6 w-24 rounded-full" />
+                                <Skeleton key={i} className="h-8 w-24 rounded-full" />
                             ))}
                         </div>
                     </CardBody>
                 </Card>
 
                 {/* Principles Skeleton */}
-                <Card className="mb-8">
-                    <CardHeader className="text-xl font-regular">
+                <Card className="mb-8 max-w-[1024px]">
+                    <CardHeader>
                         <Skeleton className="h-6 w-40 rounded-lg" />
                     </CardHeader>
                     <Divider />
                     <CardBody>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-4">
                             {[...Array(2)].map((_, i) => (
                                 <Card key={i} shadow="sm">
                                     <CardBody>
@@ -99,7 +107,7 @@ const ProfileSkeleton = () => {
 
                 {/* Risk Profile Skeleton */}
                 <Card>
-                    <CardHeader className="text-xl font-regular">
+                    <CardHeader>
                         <Skeleton className="h-6 w-32 rounded-lg" />
                     </CardHeader>
                     <Divider />
@@ -127,6 +135,9 @@ const AgentProfile = () => {
     const [agent, setAgent] = useState<IAgentProfile | null>(null);
     const [resolutionDate, setResolutionDate] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(true);
+    const [totalPredictions, setTotalPredictions] = useState(0);
+    const [totalBets, setTotalBets] = useState(0);
+    const [successRate, setSuccessRate] = useState(0);
     const fetch = useFetch();
 
     useEffect(() => {
@@ -137,6 +148,9 @@ const AgentProfile = () => {
                     setAgent(response.agent);
                     const { years, months, days } = convertDaysToYMD(response.agent.maxTimelineLimit);
                     setResolutionDate(`${years ? `${years} years ` : ''} ${months ? `${months} months ` : ''} ${days ? `${days} days` : ''}`);
+                    setTotalPredictions(response.totalPredictions);
+                    setTotalBets(response.totalBets);
+                    setSuccessRate(response.successRate);
                 } else {
                     toast.error(response.message);
                 }
@@ -162,50 +176,54 @@ const AgentProfile = () => {
                     className="rounded-full"
                 />
             </div>
-           
-            <div className="container mx-auto px-4 py-8">
-                 {/* Header */}
-            <div className="text-white py-8 flex justify-between items-center px-2 rounded-b-2xl flex-row">
-            
-            <div className="container mx-auto px-4">
-                <h1 className="text-3xl font-bold">{agent?.name || 'Agent Name'}</h1>
-                <p className="mt-2 opacity-80">{agent?.description || 'Agent Description'}</p>
-                <Button
-                    color="default"
-                    variant="flat"
-                    className="mt-4"
-                    href="/editProfile"
-                    as="a"
-                >
-                    Edit Profile
-                </Button>
-            </div>
-            <Image
-                src={agent?.image || '/assets/images/default-agent.png'}
-                alt="Agent Image"
-                className="w-[100px] h-[100px] rounded-full"
-                width={100}
-                height={100}
-            />
-        </div>
 
-        {/* Main Content */}
+            <div className="container mx-auto px-4 py-8">
+                {/* Header */}
+                <div className="text-white py-8 flex justify-between items-center px-2 rounded-b-2xl flex-row">
+
+                    <div className="container mx-auto px-4">
+                        <h1 className="text-3xl font-bold">{agent?.name || 'Agent Name'}</h1>
+                        <p className="mt-2 opacity-80">{agent?.description || 'Agent Description'}</p>
+                        <Button
+                            color="default"
+                            variant="flat"
+                            className="mt-4"
+                            href="/editProfile"
+                            as="a"
+                        >
+                            Edit Profile
+                        </Button>
+                    </div>
+                    <Image
+                        src={agent?.image || '/assets/images/default-agent.png'}
+                        alt="Agent Image"
+                        className="w-[100px] h-[100px] rounded-full"
+                        width={100}
+                        height={100}
+                    />
+                </div>
+
+                {/* Main Content */}
                 {/* Stats Overview */}
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-                    <StatCard
-                        icon={<FaRocket />}
-                        title="Active Bets"
-                        value="23"
-                    />
-                    <StatCard
-                        icon={<FaDatabase />}
-                        title="Total Predictions"
-                        value="156"
-                    />
+                    <Link href="/bets">
+                        <StatCard
+                            icon={<FaRocket />}
+                            title="Total Bets"
+                            value={totalBets.toString()}
+                        />
+                    </Link>
+                    <Link href="/predictions">
+                        <StatCard
+                            icon={<FaDatabase />}
+                            title="Total Predictions"
+                            value={totalPredictions.toString()}
+                        />
+                    </Link>
                     <StatCard
                         icon={<FaChartLine />}
                         title="Success Rate"
-                        value="76%"
+                        value={`${successRate.toFixed(2)}%`}
                     />
                     <StatCard
                         icon={<FaShieldAlt />}

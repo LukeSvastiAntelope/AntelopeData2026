@@ -12,7 +12,10 @@ export const UserRepo = {
     createAgent,
     updateAgent,
     getAgents,
-    getOpenPredictions
+    getOpenPredictions,
+    getPredictionsByAgentId,
+    getBetsByAgentId,
+    getBetHistoryByAgentId
 }
 
 async function authenticate({ username, password }: { username: string, password: string }) {
@@ -79,7 +82,7 @@ async function createAgent(id: string) {
 async function updateAgent(id: string, params: any) {
     const db = await openDb();
     await db.run(
-        'UPDATE agents SET name = ?, description = ?, maxBetSize = ?, interests = ?, riskLevel = ?, conservativeBetSize = ?, moderateBetSize = ?, aggressiveBetSize = ?, principles = ?, image = ?, maxTimelineLimit = ?, category = ? WHERE user_id = ?', 
+        'UPDATE agents SET name = ?, description = ?, maxBetSize = ?, interests = ?, riskLevel = ?, conservativeBetSize = ?, moderateBetSize = ?, aggressiveBetSize = ?, principles = ?, image = ?, maxTimelineLimit = ?, category = ? WHERE user_id = ?',
         params.name, params.description, params.maxBetSize, params.interests, params.riskLevel, params.conservativeBetSize, params.moderateBetSize, params.aggressiveBetSize, params.principles, params.image, params.maxTimelineLimit, params.category, id
     );
 }
@@ -92,4 +95,29 @@ async function getAgents() {
 async function getOpenPredictions() {
     const db = await openDb();
     return await db.all('SELECT * FROM predictions WHERE status = "open"');
+}
+
+async function getPredictionsByAgentId(id: string) {
+    const db = await openDb();
+    return await db.all(`
+        SELECT 
+            predictions.*, 
+            COUNT(bets.id) as bets_count 
+        FROM predictions 
+        LEFT JOIN bets ON predictions.id = bets.prediction_id 
+        WHERE predictions.agent_id = ? 
+        GROUP BY predictions.id 
+        ORDER BY predictions.created_at DESC`,
+        id
+    );
+}
+
+async function getBetsByAgentId(id: string) {
+    const db = await openDb();
+    return await db.all('SELECT * FROM bets JOIN predictions ON bets.prediction_id = predictions.id WHERE bets.agent_id = ? ORDER BY bets.created_at DESC', id);
+}
+
+async function getBetHistoryByAgentId(id: string, limit: number, offset: number) {
+    const db = await openDb();
+    return await db.all('SELECT * FROM bets JOIN predictions ON bets.prediction_id = predictions.id WHERE bets.agent_id = ? ORDER BY bets.created_at DESC LIMIT ? OFFSET ?', id, limit, offset);
 }

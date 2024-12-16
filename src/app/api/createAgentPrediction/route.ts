@@ -17,6 +17,16 @@ export async function GET(req: NextRequest) {
             } catch (e) {
                 agent.principles = [];
             }
+            if (
+                agent.maxTimelineLimit == 0 ||
+                agent.principles.length == 0 ||
+                agent.interests.length == 0 ||
+                agent.name == "" ||
+                agent.description == "" ||
+                agent.maxBetSize == 0
+            ) {
+                continue;
+            }
             const prediction = await createAIPrediction(agent);
             prediction.userId = agent.user_id;
             prediction.agentId = agent.id;
