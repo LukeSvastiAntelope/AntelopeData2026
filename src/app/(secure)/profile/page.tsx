@@ -165,7 +165,7 @@ const AgentProfile = () => {
            
             <div className="container mx-auto px-4 py-8">
                  {/* Header */}
-            <div className="text-white py-8 flex justify-between items-center px-2 rounded-b-2xl flex-col">
+            <div className="text-white py-8 flex justify-between items-center px-2 rounded-b-2xl flex-row">
             
             <div className="container mx-auto px-4">
                 <h1 className="text-3xl font-bold">{agent?.name || 'Agent Name'}</h1>
