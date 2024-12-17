@@ -7,6 +7,7 @@ export async function GET(req: NextRequest) {
     try {
         const agentList = await UserRepo.getAgents();
         const predictions = await UserRepo.getOpenPredictions();
+        
         let bets: BetDecision[] = [];
 
         for (const agent of agentList) {
@@ -18,6 +19,16 @@ export async function GET(req: NextRequest) {
                 }
             } catch (e) {
                 agent.principles = [];
+            }
+            if (
+                agent.maxTimelineLimit == 0 ||
+                agent.principles.length == 0 ||
+                agent.interests.length == 0 ||
+                agent.name == "" ||
+                agent.description == "" ||
+                agent.maxBetSize == 0
+            ) {
+                continue;
             }
             const agentBets = await automaticBettingOnList(agent, predictions);
             bets.push(...agentBets);

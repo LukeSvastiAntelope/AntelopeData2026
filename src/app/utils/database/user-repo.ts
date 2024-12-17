@@ -94,7 +94,24 @@ async function getAgents() {
 
 async function getOpenPredictions() {
     const db = await openDb();
-    return await db.all('SELECT * FROM predictions WHERE status = "open"');
+    return await db.all(`
+        SELECT 
+            predictions.*, 
+            COALESCE(SUM(CASE 
+                WHEN bets.choice = predictions.creator_choice THEN bets.amount
+                ELSE 0
+            END), 0) as match_total_amount,
+            COALESCE(SUM(CASE 
+                WHEN bets.choice != predictions.creator_choice THEN bets.amount
+                ELSE 0
+            END), 0) as not_match_total_amount,
+            COUNT(bets.id) as bets_count
+        FROM predictions 
+        LEFT JOIN bets ON predictions.id = bets.prediction_id 
+        WHERE predictions.status = "open" AND predictions.group_info == ""
+        GROUP BY predictions.id
+        ORDER BY predictions.created_at DESC`
+    );
 }
 
 async function getPredictionsByAgentId(id: string) {

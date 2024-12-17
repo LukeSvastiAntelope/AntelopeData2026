@@ -21,6 +21,17 @@ export class AutomaticBettingAgent {
         });
     }
 
+    async initialize() {
+        // Initialize any necessary resources or configurations
+        console.log('AutomaticBettingAgent initialized');
+        // await this.pinecone.createIndex({
+        //     name: 'prediction-results',
+        //     dimension: 1536,
+        //     metric: 'cosine',
+        //     spec: { serverless: { cloud: 'aws', region: 'us-east-1' } }
+        // });
+    }
+
     async analyzePredictions(predictions: Prediction[]): Promise<BetDecision[]> {
         try {
             const openPredictions = predictions.filter(p => p.creator_id !== this.agent.user_id);
@@ -46,6 +57,7 @@ export class AutomaticBettingAgent {
                 });
 
             const groupResults = await Promise.all(betDecisionsPromises);
+            console.log("Group Results: ", groupResults);
             return this.validateAndAdjustBets(groupResults.flat());
         } catch (error) {
             console.error('Error in batch prediction analysis:', error);
@@ -74,6 +86,7 @@ export class AutomaticBettingAgent {
             messages: [{ role: "user", content: prompt }],
             temperature: 0.3
         });
+        console.log("Prediction is interesting: ", response.choices[0].message.content);
         return response.choices[0].message.content?.toLowerCase().includes('yes') || false;
     }
 
@@ -95,16 +108,19 @@ export class AutomaticBettingAgent {
         try {
             const descriptions = predictions.map(p => p.description).join(' ');
             const embedding = await this.getEmbedding(descriptions);
-            const index = this.pinecone.Index('predictions');
+            const index = this.pinecone.Index('prediction-results');
 
             const queryResponse = await index.query({
                 vector: embedding,
                 topK: 5,
                 includeMetadata: true,
                 filter: {
-                    status: { $eq: 'resolved' }
+                    status: { $eq: 'resolved' },
+                    agent_id: { $eq: this.agent.id }  // Add filter for agent's predictions
                 }
             });
+
+            console.log("Similar predictions found: ", queryResponse.matches);
 
             return queryResponse.matches;
         } catch (error) {
@@ -149,8 +165,10 @@ export class AutomaticBettingAgent {
     ${batchPredictions.map(p =>
                 `ID: ${p.id}
          Description: ${p.description}
-         Choice: ${p.creator_choice}
-         Amount: ${p.bet_amount}`
+         Creator Choice: ${p.source == "sportDB" ? p.predicted_outcome : p.creator_choice}
+         Creator Betting Amount: ${p.bet_amount}
+         Match Total Bet Amount: ${p.match_total_amount}
+         Not Match Total Bet Amount: ${p.not_match_total_amount}`
             ).join('\n')}
     
     Key News:
@@ -158,13 +176,19 @@ export class AutomaticBettingAgent {
     
     Similar History:
     ${relevantSimilar.map(p =>
-                `- ${p.metadata?.description?.substring(0, 100) || 'N/A'}`
+                `- Description: ${p.metadata?.description?.substring(0, 100) || 'N/A'}
+                - Choice: ${p.metadata?.choice || 'N/A'}
+                - Amount: ${p.metadata?.amount || 'N/A'}
+                - Result: ${p.metadata?.result || 'N/A'}`
             ).join('\n')}
     
     Agent Principles:
+    - Consider Betting odds: based on the match total bet amount and not match total bet amount
+    - You can bet for making odds more favorable
+    - You can bet for creating odds if not any bets have been made yet
     ${this.agent.principles
                     .slice(0, 3)
-                    .map(p => `- ${p.title}`)
+                    .map(p => `- ${p.title}: ${p.description}`)
                     .join('\n')}`;
 
             try {
@@ -551,5 +575,6 @@ export class AutomaticBettingAgent {
 
 export async function automaticBettingOnList(agent: IAgentProfile, predictions: Prediction[]): Promise<BetDecision[]> {
     const betAgent = new AutomaticBettingAgent(agent);
+    await betAgent.initialize();
     return betAgent.analyzePredictions(predictions);
 }

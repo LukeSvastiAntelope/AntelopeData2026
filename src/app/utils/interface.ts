@@ -99,6 +99,9 @@ export interface Prediction {
     resolution_date: string;
     bet_amount: number;
     creator_choice: 'yes' | 'no';
+    predicted_outcome: "";
+    match_total_amount: number;
+    not_match_total_amount: number;
 }
 
 export interface GroupAnalysis {

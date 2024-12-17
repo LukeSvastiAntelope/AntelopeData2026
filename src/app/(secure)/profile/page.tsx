@@ -327,19 +327,19 @@ const AgentProfile = () => {
                         <div className="space-y-6">
                             <RiskItem
                                 level="Conservative"
-                                description="Timeline-based predictions"
+                                description={agent?.conservativeBetSize.toString() || '0'}
                                 value={agent?.conservativeBetSize || 0}
                                 color="success"
                             />
                             <RiskItem
                                 level="Moderate"
-                                description="Interest-aligned bets"
+                                description={agent?.moderateBetSize.toString() || '0'}
                                 value={agent?.moderateBetSize || 0}
                                 color="warning"
                             />
                             <RiskItem
                                 level="Strategic"
-                                description="Underdog positioning"
+                                description={agent?.aggressiveBetSize.toString() || '0'}
                                 value={agent?.aggressiveBetSize || 0}
                                 color="danger"
                             />
