@@ -16,7 +16,7 @@ import { useEffect, useState } from "react";
 import { useFetch } from "@/app/utils/lib";
 import { formatDate } from "date-fns";
 import { useRouter } from "next/navigation";
-
+import Link from "next/link";
 interface IPrediction {
     id: string;
     description: string;
@@ -94,17 +94,50 @@ const Predictions = () => {
 
     return (
         predictions && predictions.length > 0 &&
+
+        <div className="min-h-screen flex text-align:center;">
+        <div className="fixed top-0 left-0">
+            <Link href="/">
+                <Image
+                    src={"/assets/images/logo-simple.svg"}
+                    alt="Hero Image"
+                    width={80}
+                    height={80}
+                    className="rounded-full"
+                />
+            </Link>
+            <Link href="/bets" className="flex justify-center pb-4">
+                <Image
+                    src={"/assets/images/bet.svg"}
+                    alt="Hero Image"
+                    width={32}
+                    height={32}
+                    className="rounded-full"
+                />
+            </Link>
+            <Link href="/predictions" className="flex justify-center">
+                <Image
+                    src={"/assets/images/predict.svg"}
+                    alt="Hero Image"
+                    width={32}
+                    height={32}
+                    className="rounded-full"
+                />
+            </Link>
+            </div>
+
+        
         <div className="container mx-auto py-6 min-h-screen">
-            <button
+            {/* <button
                 onClick={() => router.back()}
                 className="mb-4 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
             >
                 ← Back
-            </button>
+            </button> */}
             <h1 className="text-2xl font-bold mb-6">Active Predictions</h1>
 
             <div className="grid gap-6 md:grid-cols-3 mb-6">
-                <Card>
+                <Card className="bg-content0">
                     <CardHeader className="text-sm font-medium">Total Active Predictions</CardHeader>
                     <CardBody>
                         <p className="text-2xl font-bold">
@@ -113,7 +146,7 @@ const Predictions = () => {
                     </CardBody>
                 </Card>
 
-                <Card>
+                <Card className="bg-content0">
                     <CardHeader className="text-sm font-medium">Total Bets Placed</CardHeader>
                     <CardBody>
                         <p className="text-2xl font-bold">
@@ -122,7 +155,7 @@ const Predictions = () => {
                     </CardBody>
                 </Card>
 
-                <Card>
+                <Card className="bg-content0">
                     <CardHeader className="text-sm font-medium">Win Rate</CardHeader>
                     <CardBody>
                         <p className="text-2xl font-bold">
@@ -139,8 +172,8 @@ const Predictions = () => {
                             <TableColumn>Image</TableColumn>
                             <TableColumn maxWidth={300}>Description</TableColumn>
                             <TableColumn>Source</TableColumn>
-                            <TableColumn>Creator Choice</TableColumn>
-                            <TableColumn>Bet Amount</TableColumn>
+                            <TableColumn>Bet</TableColumn>
+                            <TableColumn>Amount</TableColumn>
                             <TableColumn>Resolution Date</TableColumn>
                             <TableColumn>Bets Count</TableColumn>
                             <TableColumn>Status</TableColumn>
@@ -151,7 +184,7 @@ const Predictions = () => {
                                     <TableCell>
                                         <Image src={prediction.str_thumb} alt={prediction.description} width={40} height={40} />
                                     </TableCell>
-                                    <TableCell>{prediction.description}</TableCell>
+                                    <TableCell className="max-w-[300px]">{prediction.description}</TableCell>
                                     <TableCell>{prediction.source}</TableCell>
                                     <TableCell>{prediction.predicted_outcome ? prediction.predicted_outcome : prediction.creator_choice}</TableCell>
                                     <TableCell>{prediction.bet_amount}</TableCell>
@@ -184,6 +217,7 @@ const Predictions = () => {
                     <p className="text-gray-500">No more predictions to load</p>
                 )}
             </div>
+        </div>
         </div>
     );
 }

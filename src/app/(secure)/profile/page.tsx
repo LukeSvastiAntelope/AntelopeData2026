@@ -16,6 +16,7 @@ import { convertDaysToYMD } from "@/app/utils/lib";
 import { CATEGORIES } from "@/app/utils/const";
 import Link from "next/link";
 
+
 const ProfileSkeleton = () => {
     return (
         <div className="min-h-screen">
@@ -166,8 +167,9 @@ const AgentProfile = () => {
     if (isLoading) return <ProfileSkeleton />;
 
     return (
-        <div className="min-h-screen flex">
+        <div className="min-h-screen flex text-align:center;">
             <div className="fixed top-0 left-0">
+            <Link href="/">
                 <Image
                     src={"/assets/images/logo-simple.svg"}
                     alt="Hero Image"
@@ -175,6 +177,25 @@ const AgentProfile = () => {
                     height={80}
                     className="rounded-full"
                 />
+            </Link>
+            <Link href="/bets" className="flex justify-center pb-4">
+                <Image
+                    src={"/assets/images/bet.svg"}
+                    alt="Hero Image"
+                    width={32}
+                    height={32}
+                    className="rounded-full"
+                />
+            </Link>
+            <Link href="/predictions" className="flex justify-center">
+                <Image
+                    src={"/assets/images/predict.svg"}
+                    alt="Hero Image"
+                    width={32}
+                    height={32}
+                    className="rounded-full"
+                />
+            </Link>
             </div>
 
             <div className="container mx-auto px-4 py-8">
@@ -233,7 +254,7 @@ const AgentProfile = () => {
                 </div>
 
                 {/* Add Category and Resolution Date Display */}
-                <Card className="mb-8">
+                <Card className="mb-8 bg-content0">
                     <CardHeader className="text-medium font-regular">Betting Settings</CardHeader>
                     <Divider />
                     <CardBody>
@@ -261,8 +282,8 @@ const AgentProfile = () => {
                 </Card>
 
                 {/* Interests Section */}
-                <Card className="mb-8">
-                    <CardHeader className="text-xl font-regular">Core Interests</CardHeader>
+                <Card className="mb-8 bg-content0">
+                    <CardHeader className="text-medium font-regular">Core Interests</CardHeader>
                     <Divider />
                     <CardBody>
                         <div className="flex flex-wrap gap-2">
@@ -280,8 +301,8 @@ const AgentProfile = () => {
                 </Card>
 
                 {/* Betting Principles */}
-                <Card className="mb-8 max-w-[1024px]">
-                    <CardHeader className="text-xl font-regular">Betting Principles</CardHeader>
+                <Card className="mb-8 max-w-[1024px] bg-content0">
+                    <CardHeader className="text-medium font-regular">Betting Principles</CardHeader>
                     <Divider />
                     <CardBody>
                         <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
@@ -299,8 +320,8 @@ const AgentProfile = () => {
                 </Card>
 
                 {/* Risk Profile */}
-                <Card>
-                    <CardHeader className="text-xl font-regular">Risk Profile</CardHeader>
+                <Card className="bg-content0">
+                    <CardHeader className="text-medium font-regular">Risk Profile</CardHeader>
                     <Divider />
                     <CardBody>
                         <div className="space-y-6">

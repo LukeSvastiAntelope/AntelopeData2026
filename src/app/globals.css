@@ -26,6 +26,18 @@ background-clip: text;
 -webkit-text-fill-color: transparent;
 }
 
+.predict-active:hover {
+  background: url('/assets/images/predict.svg');
+  background-size: 32px 32px;
+  background-repeat: no-repeat;
+  background-position: center;
+  width: 32px;
+  height: 32px;
+}
+
+.bg-divider {
+  background-color:hsl(240deg 35.04% 28.98% / 50%)
+}
 
 @media (prefers-color-scheme: dark) {
   :root {

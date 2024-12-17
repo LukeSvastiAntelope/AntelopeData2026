@@ -345,7 +345,7 @@ const ImageUpload = ({ fileRef, avatar }: { fileRef: React.RefObject<HTMLInputEl
       <CardHeader className="text-xl font-regular">Profile Image</CardHeader>
       <CardBody>
         <div className="flex flex-col items-center gap-4">
-          <div className="relative w-32 h-32 rounded-full overflow-hidden bg-default-100 cursor-pointer" onClick={() => fileRef && fileRef.current?.click()}>
+          <div className="relative w-32 h-32 rounded-full overflow-hidden bg-content0 cursor-pointer" onClick={() => fileRef && fileRef.current?.click()}>
             {image ? (
               <Image
                 src={image}

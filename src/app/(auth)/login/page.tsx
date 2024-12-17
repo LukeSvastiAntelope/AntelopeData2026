@@ -82,9 +82,9 @@ const LoginPage = () => {
                 alt="Hero Image"
                 width={160}
                 height={160}
-                className="rounded-full"
+                className=""
             />
-            {/* <h1 className="text-[2em] font-bold my-[0.67em] text-white">Antelope</h1> */}
+            <h2 className="text-[1em] m-0 px-0 pt-0 pb-[10px] font-regular">Access Agent Account</h2>
             <form className="flex flex-col w-80 gap-3 items-center justify-center" onSubmit={handleSubmit}>
                 <Input type="text" name="username" className="text-white" value={formData.username} placeholder={"Username"} onChange={handleChange} required={true} variant="bordered" classNames={{ inputWrapper: 'border-small border-default-200 rounded-sm' }} />
                 <Input type="password" name="password" className="text-white" value={formData.password} placeholder={"Password"} onChange={handleChange} required={true} variant="bordered" classNames={{ inputWrapper: 'border-small border-default-200 rounded-sm' }} />

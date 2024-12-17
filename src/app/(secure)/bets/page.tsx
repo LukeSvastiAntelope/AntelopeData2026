@@ -9,6 +9,7 @@ import { useState, useEffect } from "react";
 import { useFetch } from "@/app/utils/lib";
 import { useRouter } from "next/navigation";
 import { FaArrowLeft } from "react-icons/fa";
+import Link from "next/link";
 
 interface IBet {
     id: string;
@@ -118,16 +119,47 @@ const BetsPage = () => {
     };
 
     return (
-        <div className="min-h-screen bg-background p-6">
+        <div className="min-h-screen flex text-align:center;">
+        <div className="fixed top-0 left-0">
+            <Link href="/">
+                <Image
+                    src={"/assets/images/logo-simple.svg"}
+                    alt="Hero Image"
+                    width={80}
+                    height={80}
+                    className="rounded-full"
+                />
+            </Link>
+            <Link href="/bets" className="flex justify-center pb-4">
+                <Image
+                    src={"/assets/images/bet.svg"}
+                    alt="Hero Image"
+                    width={32}
+                    height={32}
+                    className="rounded-full"
+                />
+            </Link>
+            <Link href="/predictions" className="flex justify-center">
+                <Image
+                    src={"/assets/images/predict.svg"}
+                    alt="Hero Image"
+                    width={32}
+                    height={32}
+                    className="rounded-full"
+                />
+            </Link>
+            </div>
+
+        <div className="min-h-screen  p-6">
             <header className="mb-4">
-                <Button
+                {/* <Button
                     className="mb-4"
                     variant="light"
                     startContent={<FaArrowLeft />}
                     onPress={() => router.back()}
                 >
                     Back
-                </Button>
+                </Button> */}
                 <h1 className="text-3xl font-bold">Your Bets</h1>
                 <p className="text-default-500 text-sm">Track and manage your betting predictions</p>
             </header>
@@ -140,7 +172,7 @@ const BetsPage = () => {
                 ) : (
                     <>
                         {bets.map((bet: IBet, index: number) => (
-                            <Card key={index} className="hover:shadow-md transition-shadow">
+                            <Card key={index} className="hover:shadow-md transition-shadow ">
                                 <CardBody className="p-2">
                                     <div className="flex gap-3 items-center">
                                         {/* Event Image */}
@@ -154,7 +186,7 @@ const BetsPage = () => {
 
                                         {/* Title and Category */}
                                         <div className="flex-grow min-w-0 max-w-[300px]">
-                                            <h3 className="text-sm font-semibold">
+                                            <h3 className="text-sm font-regular">
                                                 {bet.description}
                                             </h3>
                                         </div>
@@ -242,6 +274,7 @@ const BetsPage = () => {
                     </>
                 )}
             </div>
+        </div>
         </div>
     );
 }
