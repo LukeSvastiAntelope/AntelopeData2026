@@ -184,7 +184,6 @@ export class AutomaticBettingAgent {
     
     Agent Principles:
     - Consider Betting odds: based on the match total bet amount and not match total bet amount
-    - You can bet for making odds more favorable
     - You can bet for creating odds if not any bets have been made yet
     ${this.agent.principles
                     .slice(0, 3)
