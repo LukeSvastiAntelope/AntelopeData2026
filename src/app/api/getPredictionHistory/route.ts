@@ -9,7 +9,7 @@ export async function GET(req: NextRequest) {
         if (!jwtPayload) {
             return Response.json({ error: 'Invalid token' }, { status: 401 });
         }        
-        let agent = await UserRepo.getAgentByUserId(jwtPayload.email as string);
+        const agent = await UserRepo.getAgentByUserId(jwtPayload.email as string);
         if (!agent) {
             return Response.json({ error: 'Agent not found' }, { status: 404 });
         }

@@ -2,7 +2,8 @@ import OpenAI from 'openai';
 import { Pinecone } from '@pinecone-database/pinecone';
 import { IAgentProfile, ILeague } from '../interface';
 import { getJson } from 'serpapi';
-import { AutomatedPrediction, SportsEvent, PredictionImage, NewsItem } from '../interface';
+import { AutomatedPrediction, SportsEvent, PredictionImage, NewsItem, SerpApiNewsResult } from '../interface';
+import { AIResponse } from '../types/sports';
 
 export class AIEnhancedPredictionGenerator {
     private agent: IAgentProfile;
@@ -92,6 +93,19 @@ export class AIEnhancedPredictionGenerator {
 
     private async getSportsDBImages(topic: string): Promise<PredictionImage[]> {
         try {
+            interface SportsDBTeam {
+                strTeam: string;
+                strTeamBadge: string;
+                strTeamLogo: string;
+                strTeamFanart1: string;
+            }
+
+            interface SportsDBEvent {
+                strEvent: string;
+                strThumb: string;
+                strBanner: string;
+            }
+
             // Extract team names or event names
             const teamSearch = await fetch(
                 `https://www.thesportsdb.com/api/v1/json/${this.SPORTS_API_KEY}/searchteams.php?t=${encodeURIComponent(topic)}`
@@ -99,7 +113,7 @@ export class AIEnhancedPredictionGenerator {
             const teamData = await teamSearch.json();
 
             if (teamData.teams) {
-                return teamData.teams.map((team: any) => ({
+                return teamData.teams.map((team: SportsDBTeam) => ({
                     url: team.strTeamBadge || team.strTeamLogo || team.strTeamFanart1,
                     source: 'TheSportsDB',
                     title: team.strTeam
@@ -113,7 +127,7 @@ export class AIEnhancedPredictionGenerator {
             const eventData = await eventSearch.json();
 
             if (eventData.events) {
-                return eventData.events.map((event: any) => ({
+                return eventData.events.map((event: SportsDBEvent) => ({
                     url: event.strThumb || event.strBanner,
                     source: 'TheSportsDB',
                     title: event.strEvent
@@ -129,6 +143,12 @@ export class AIEnhancedPredictionGenerator {
 
     private async getGoogleImages(topic: string): Promise<PredictionImage[]> {
         try {
+            interface GoogleImageResult {
+                original: string;
+                source: string;
+                title: string;
+            }
+
             const result = await getJson({
                 engine: "google_images",
                 q: topic,
@@ -139,7 +159,7 @@ export class AIEnhancedPredictionGenerator {
 
             return (result.images_results || [])
                 .slice(0, 5)
-                .map((img: any) => ({
+                .map((img: GoogleImageResult) => ({
                     url: img.original,
                     source: img.source,
                     title: img.title
@@ -385,9 +405,9 @@ export class AIEnhancedPredictionGenerator {
 
                 const news_results = result.news_results || [];
                 // Randomly select 3 news items from the results
-                const randomNews = this.shuffleArray(news_results).slice(0, 3);
+                const randomNews = this.shuffleArray(news_results) as SerpApiNewsResult[];
 
-                newsItems.push(...randomNews.map((item: any) => ({
+                newsItems.push(...randomNews.map((item: SerpApiNewsResult) => ({
                     title: item.title,
                     link: item.link,
                     snippet: item.snippet,
@@ -681,7 +701,7 @@ export class AIEnhancedPredictionGenerator {
             const jsonContent = content.replace(/```json\n?|\n?```/g, '').trim();
 
             try {
-                const response = JSON.parse(jsonContent);
+                const response: AIResponse = JSON.parse(jsonContent);
 
                 // Extract date from question
                 const dateMatch = response.endDate;
@@ -745,27 +765,6 @@ export class AIEnhancedPredictionGenerator {
         return date >= currentDate &&
             date <= maxEndDate &&
             !isNaN(date.getTime());
-    }
-
-    private async enrichWithTeamStats(prediction: any): Promise<any> {
-        try {
-            // Extract team names from the prediction
-            const teamNames = prediction.event.name.split(' vs ');
-            const stats = await Promise.all(
-                teamNames.map((team: any) =>
-                    fetch(`https://www.thesportsdb.com/api/v1/json/${this.SPORTS_API_KEY}/searchteams.php?t=${team}`)
-                        .then(res => res.json())
-                )
-            );
-
-            return {
-                ...prediction,
-                teamStats: stats
-            };
-        } catch (error) {
-            console.error('Failed to enrich with team stats:', error);
-            return prediction;
-        }
     }
 
     private async checkSimilarity(prediction: AutomatedPrediction): Promise<boolean> {

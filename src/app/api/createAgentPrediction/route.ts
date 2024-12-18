@@ -1,12 +1,13 @@
-import { NextRequest } from "next/server";
+export const dynamic = 'force-dynamic'
+
 import { UserRepo } from "@/app/utils/database/user-repo";
 import { createAIPrediction } from "@/app/utils/api/predictionGenerator";
 import { AutomatedPrediction } from "@/app/utils/interface";
 
-export async function GET(req: NextRequest) {
+export async function GET() {
     try {
         const agentList = await UserRepo.getAgents();
-        let predictions: AutomatedPrediction[] = [];
+        const predictions: AutomatedPrediction[] = [];
         for (const agent of agentList) {
             agent.interests = agent.interests ? agent.interests.split(',') : [];
             try {
@@ -15,6 +16,7 @@ export async function GET(req: NextRequest) {
                     agent.principles = [];
                 }
             } catch (e) {
+                console.log("Error in principles: ", e);
                 agent.principles = [];
             }
             if (

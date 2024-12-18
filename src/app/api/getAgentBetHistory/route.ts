@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
             return Response.json({ error: 'Invalid token' }, { status: 401 });
         }        
 
-        let agent = await UserRepo.getAgentByUserId(jwtPayload.email as string);
+        const agent = await UserRepo.getAgentByUserId(jwtPayload.email as string);
         if (!agent) {
             return Response.json({ status: false, message: 'Agent not found' });
         }

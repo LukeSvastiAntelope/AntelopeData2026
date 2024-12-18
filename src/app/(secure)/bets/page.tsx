@@ -7,24 +7,8 @@ import { Skeleton } from "@nextui-org/skeleton";
 import { Button } from "@nextui-org/button";
 import { useState, useEffect } from "react";
 import { useFetch } from "@/app/utils/lib";
-import { useRouter } from "next/navigation";
-import { FaArrowLeft } from "react-icons/fa";
+import { IBet } from "@/app/utils/interface";
 import Link from "next/link";
-
-interface IBet {
-    id: string;
-    description: string;
-    choice: string;
-    amount: number;
-    status: string;
-    created_at: string;
-    str_thumb: string;
-    source: string;
-    predicted_outcome: string;
-    outcome: string;
-    resolution_date: string;
-    creator_choice: string;
-}
 
 const BetsSkeleton = () => (
     <Card className="hover:shadow-md transition-shadow">
@@ -75,12 +59,11 @@ const BetsSkeleton = () => (
 );
 
 const BetsPage = () => {
-    const router = useRouter();
-    const [bets, setBets] = useState<any[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
-    const [page, setPage] = useState(1);
-    const [hasMore, setHasMore] = useState(true);
-    const [isLoadingMore, setIsLoadingMore] = useState(false);
+    const [bets, setBets] = useState<IBet[]>([]);
+    const [isLoading, setIsLoading] = useState<boolean>(true);
+    const [page, setPage] = useState<number>(1);
+    const [hasMore, setHasMore] = useState<boolean>(true);
+    const [isLoadingMore, setIsLoadingMore] = useState<boolean>(false);
     const ITEMS_PER_PAGE = 10;
     const fetch = useFetch();
 

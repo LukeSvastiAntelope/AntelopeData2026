@@ -2,7 +2,46 @@
 import OpenAI from 'openai';
 import { Pinecone } from '@pinecone-database/pinecone';
 import { getJson } from 'serpapi';
-import { IAgentProfile, Prediction, BetDecision, NewsItem, PredictionAnalysis, GroupedPredictions } from '../interface';
+import { IAgentProfile, Prediction, BetDecision, NewsItem, GroupedPredictions } from '../interface';
+import { PineconeRecord } from '@pinecone-database/pinecone';
+
+interface SimilarPredictionMetadata {
+    description: string;
+    choice: string;
+    amount: number;
+    result: string;
+    created_at: string;
+    [key: string]: string | number;
+}
+
+type PineconePredictionMatch = PineconeRecord<SimilarPredictionMetadata>;
+
+interface NewsSearchResult {
+    news_results: {
+        title: string;
+        link: string;
+        snippet: string;
+        source: string;
+        date: string;
+    }[];
+}
+
+interface SerpApiNewsResult {
+    title: string;
+    link: string;
+    snippet: string;
+    source: string;
+    date: string;
+}
+
+interface PredictionAnalysis {
+    id: number;
+    shouldBet: boolean;
+    recommendedChoice: 'Yes' | 'No';
+    confidence: number;
+    reasoning: string;
+    riskAssessment: string;
+}
 
 export class AutomaticBettingAgent {
     private agent: IAgentProfile;
@@ -50,6 +89,7 @@ export class AutomaticBettingAgent {
 
             const betDecisionsPromises = Object.entries(groupedPredictions)
                 .map(async ([topic, topicPredictions]) => {
+                    console.log("Topic: ", topic);
                     // Pass predictions instead of topic string
                     const news = await this.gatherRelevantNews(topicPredictions);
                     const similarPredictions = await this.findSimilarPredictions(topicPredictions);
@@ -102,7 +142,7 @@ export class AutomaticBettingAgent {
         return groups;
     }
 
-    private async findSimilarPredictions(predictions: Prediction[]) {
+    private async findSimilarPredictions(predictions: Prediction[]): Promise<PineconePredictionMatch[]> {
         try {
             const descriptions = predictions.map(p => p.description).join(' ');
             const embedding = await this.getEmbedding(descriptions);
@@ -120,7 +160,7 @@ export class AutomaticBettingAgent {
 
             console.log("Similar predictions found: ", queryResponse.matches);
 
-            return queryResponse.matches;
+            return queryResponse.matches as PineconePredictionMatch[];
         } catch (error) {
             console.error('Error finding similar predictions:', error);
             return [];
@@ -130,7 +170,7 @@ export class AutomaticBettingAgent {
     private async analyzeGroupWithGPT(
         predictions: Prediction[],
         news: NewsItem[],
-        similarPredictions: any[]
+        similarPredictions: PineconePredictionMatch[]
     ): Promise<BetDecision[]> {
         // Process predictions in smaller batches
         const BATCH_SIZE = 3;
@@ -233,10 +273,10 @@ export class AutomaticBettingAgent {
     }
 
     private filterSimilarPredictions(
-        similar: any[],
+        similar: PineconePredictionMatch[],
         predictions: Prediction[],
         limit: number
-    ): any[] {
+    ): PineconePredictionMatch[] {
         // Sort by relevance and recency
         return similar
             .sort((a, b) => {
@@ -247,7 +287,7 @@ export class AutomaticBettingAgent {
             .slice(0, limit);
     }
 
-    private calculateRelevanceScore(similar: any, predictions: Prediction[]): number {
+    private calculateRelevanceScore(similar: PineconePredictionMatch, predictions: Prediction[]): number {
         let score = 0;
         const description = similar.metadata?.description?.toLowerCase() || '';
 
@@ -382,10 +422,10 @@ export class AutomaticBettingAgent {
                     api_key: this.SERPAPI_API_KEY,
                     time: "1d",
                     num: 3
-                });
+                }) as NewsSearchResult;
 
                 if (result.news_results) {
-                    const news: NewsItem[] = result.news_results.map((item: any) => ({
+                    const news: NewsItem[] = result.news_results.map((item: SerpApiNewsResult) => ({
                         title: item.title,
                         link: item.link,
                         snippet: item.snippet,
@@ -480,9 +520,15 @@ export class AutomaticBettingAgent {
 
     private async analyzeWithGPT(
         prediction: Prediction,
-        news: any[],
-        similarPredictions: any[]
-    ) {
+        news: NewsItem[],
+        similarPredictions: PineconePredictionMatch[]
+    ): Promise<{
+        shouldBet: boolean;
+        recommendedChoice: 'Yes' | 'No';
+        confidence: number;
+        reasoning: string;
+        riskAssessment: string;
+    }> {
         const prompt = `
         Analyze this prediction based on available data:
         
@@ -495,7 +541,7 @@ export class AutomaticBettingAgent {
         
         Similar Past Predictions:
         ${similarPredictions.map(p =>
-            `- ${p.metadata.description} (Result: ${p.metadata.result})`
+            `- ${p.metadata?.description} (Result: ${p.metadata?.result})`
         ).join('\n')}
         
         Agent's Principles:

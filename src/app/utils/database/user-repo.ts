@@ -2,6 +2,7 @@ import bcrypt from "bcryptjs";
 import { openDb } from "./db";
 import { generateConfirmationToken } from "../api/token";
 import { AGENT_RISK_LEVEL } from "../const";
+import { IFormDataAgentProfile } from "../interface";
 
 export const UserRepo = {
     authenticate,
@@ -75,11 +76,11 @@ async function getAgentByUserId(id: string) {
 async function createAgent(id: string) {
     console.log(id);
     const db = await openDb();
-    await db.run('INSERT INTO agents (user_id, riskLevel, conservativeBetSize, moderateBetSize, aggressiveBetSize) VALUES (?, ?, ?, ?, ?)', Number(id), AGENT_RISK_LEVEL[0], 0, 0, 0);
+    await db.run('INSERT INTO agents (user_id, riskLevel, conservativeBetSize, moderateBetSize, aggressiveBetSize, wallet_balance) VALUES (?, ?, ?, ?, ?, ?)', Number(id), AGENT_RISK_LEVEL[0], 0, 0, 0, 10000);
     return await getAgentByUserId(id);
 }
 
-async function updateAgent(id: string, params: any) {
+async function updateAgent(id: string, params: IFormDataAgentProfile) {
     const db = await openDb();
     await db.run(
         'UPDATE agents SET name = ?, description = ?, maxBetSize = ?, interests = ?, riskLevel = ?, conservativeBetSize = ?, moderateBetSize = ?, aggressiveBetSize = ?, principles = ?, image = ?, maxTimelineLimit = ?, category = ? WHERE user_id = ?',

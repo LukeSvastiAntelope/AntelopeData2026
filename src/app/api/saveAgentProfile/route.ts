@@ -2,7 +2,8 @@ import { NextRequest } from "next/server";
 import { revalidatePath } from "next/cache";
 import fs from "node:fs/promises";
 import { UserRepo } from "@/app/utils/database/user-repo";
-import { verifyConfirmationToken } from "@/app/utils/api/token";
+import { verifyConfirmationToken } from "@/app/utils/api/token"
+import { IFormDataAgentProfile } from "@/app/utils/interface";
 
 export async function POST(req: NextRequest) {
     const token = req.headers.get('Authorization')?.split(' ')[1];
@@ -21,25 +22,27 @@ export async function POST(req: NextRequest) {
             revalidatePath("/");
         }
 
-        const updateParams = {
-            name: formData.get("name"),
-            description: formData.get("description"),
-            maxBetSize: formData.get("maxBetSize"),
-            interests: formData.get("interests"),
-            riskLevel: formData.get("riskLevel"),
-            conservativeBetSize: formData.get("conservativeBetSize"),
-            moderateBetSize: formData.get("moderateBetSize"),
-            aggressiveBetSize: formData.get("aggressiveBetSize"),
-            principles: formData.get("principles"),
-            image: formData.get("avatar") != "undefined" ? `/uploads/${file.name}` : formData.get("image"),
-            maxTimelineLimit: formData.get("maxTimelineLimit"),
-            category: formData.get("category")
-        }
+        const updateParams: Partial<IFormDataAgentProfile> = {
+            id: parseInt(formData.get("id") as string),
+            user_id: parseInt(formData.get("user_id") as string),
+            name: formData.get("name") as string,
+            description: formData.get("description") as string,
+            maxBetSize: parseInt(formData.get("maxBetSize") as string),
+            interests: formData.get("interests") as string,
+            riskLevel: formData.get("riskLevel") as string,
+            conservativeBetSize: parseInt(formData.get("conservativeBetSize") as string),
+            moderateBetSize: parseInt(formData.get("moderateBetSize") as string),
+            aggressiveBetSize: parseInt(formData.get("aggressiveBetSize") as string),
+            principles: formData.get("principles") as string,
+            image: formData.get("avatar") != "undefined" ? `/uploads/${file.name}` : formData.get("image") as string,
+            maxTimelineLimit: parseInt(formData.get("maxTimelineLimit") as string),
+            category: formData.get("category") as string
+        };
 
-        await UserRepo.updateAgent(jwtPayload.email as string, updateParams);
+        await UserRepo.updateAgent(jwtPayload.email as string, updateParams as IFormDataAgentProfile);
         return Response.json({ status: true, message: "update profile successfully" });
-    } catch (error: any) {
-        console.log(error);
-        return Response.json({ status: false, message: error.toString() });
+    } catch (error) {
+        console.log("Error in saveAgentProfile: ", error);
+        return Response.json({ status: false, message: error });
     }
 };

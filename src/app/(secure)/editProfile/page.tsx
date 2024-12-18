@@ -62,7 +62,10 @@ const EditAgentProfile = () => {
     formData.append('moderateBetSize', agent.moderateBetSize.toString());
     formData.append('aggressiveBetSize', agent.aggressiveBetSize.toString());
     formData.append('principles', JSON.stringify(agent.principles));
-    formData.append('avatar', fileRef?.current?.files?.[0]!);
+    const avatarFile = fileRef?.current?.files?.[0];
+    if (avatarFile) {
+        formData.append('avatar', avatarFile);
+    }
     formData.append('image', agent.image || "");
     formData.append('maxTimelineLimit', agent.maxTimelineLimit.toString());
     formData.append('category', agent.category || "");
@@ -152,7 +155,7 @@ const EditAgentProfile = () => {
                   onChange={(e) => setAgent({ ...agent, category: e.target.value })}
                 >
                   {CATEGORIES.map((category, _index: number) => (
-                    <SelectItem key={category.toLowerCase()}>{category}</SelectItem>
+                    <SelectItem key={_index}>{category}</SelectItem>
                   ))}
                 </Select>
 

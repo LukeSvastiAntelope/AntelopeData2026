@@ -15,7 +15,6 @@ import { Spinner } from "@nextui-org/spinner";
 import { useEffect, useState } from "react";
 import { useFetch } from "@/app/utils/lib";
 import { formatDate } from "date-fns";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 interface IPrediction {
     id: string;
@@ -40,7 +39,6 @@ const Predictions = () => {
     const [page, setPage] = useState(1);
     const [hasMore, setHasMore] = useState(true);
     const fetch = useFetch();
-    const router = useRouter();
 
     useEffect(() => {
         const fetchPredictions = async () => {

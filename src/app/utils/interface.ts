@@ -6,13 +6,30 @@ export interface IAgentProfile {
     maxBetSize: number;
     interests: string[];
     principles: IPrinciple[];
-    riskLevel: 'conservative' | 'moderate' | 'aggressive';
+    riskLevel: string;
     conservativeBetSize: number;
     moderateBetSize: number;
     aggressiveBetSize: number;
     user_id: number;
     category: string;
     maxTimelineLimit: number;
+}
+
+export interface IFormDataAgentProfile {
+    id: number;
+    user_id: number;
+    name: string;
+    description: string;
+    maxBetSize: number;
+    interests: string;
+    riskLevel: string;
+    conservativeBetSize: number;
+    moderateBetSize: number;
+    aggressiveBetSize: number;
+    principles: string;
+    image: string;
+    maxTimelineLimit: number;
+    category: string;
 }
 
 export interface IPrinciple {
@@ -32,7 +49,7 @@ export interface AutomatedPrediction {
     category: string;
     endDate: Date;
     initialStake: number;
-    choice: 'Yes' | 'No';
+    choice: string;
     confidence: number;
     reasoning: string;
     event?: SportsEvent;  // Optional for sports predictions
@@ -140,4 +157,27 @@ export interface PredictionAnalysis {
 
 export interface GroupedPredictions {
     [topic: string]: Prediction[];
+}
+
+export interface IBet {
+    id: string;
+    description: string;
+    choice: string;
+    amount: number;
+    status: string;
+    created_at: string;
+    str_thumb: string;
+    source: string;
+    predicted_outcome: string;
+    outcome: string;
+    resolution_date: string;
+    creator_choice: string;
+}
+
+export interface SerpApiNewsResult {
+    title: string;
+    link: string;
+    snippet: string;
+    date: string;
+    source?: string;
 }

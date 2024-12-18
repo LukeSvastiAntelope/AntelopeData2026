@@ -1,14 +1,13 @@
-import { NextRequest } from "next/server";
 import { UserRepo } from "@/app/utils/database/user-repo";
 import { BetDecision } from "@/app/utils/interface";
 import { automaticBettingOnList } from "@/app/utils/api/automaticBetting";
 
-export async function GET(req: NextRequest) {
+export async function GET() {
     try {
         const agentList = await UserRepo.getAgents();
         const predictions = await UserRepo.getOpenPredictions();
         
-        let bets: BetDecision[] = [];
+        const bets: BetDecision[] = [];
 
         for (const agent of agentList) {
             agent.interests = agent.interests ? agent.interests.split(',') : [];
@@ -18,6 +17,7 @@ export async function GET(req: NextRequest) {
                     agent.principles = [];
                 }
             } catch (e) {
+                console.log("Error in principles: ", e);
                 agent.principles = [];
             }
             if (

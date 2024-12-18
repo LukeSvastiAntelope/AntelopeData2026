@@ -20,6 +20,7 @@ export async function GET(req: NextRequest) {
                 agent.principles = [];
             }
         } catch (e) {
+            console.log("Error in principles: ", e);
             agent.principles = [];
         }
         const predictions = await UserRepo.getPredictionsByAgentId(agent.id);

@@ -57,6 +57,7 @@ const RegisterPage = () => {
             console.log(data);
             if (data.status) {
                 toast.success(data.message);
+                router.push("/login");
             } else {
                 toast.error(data.message.toString());
             }

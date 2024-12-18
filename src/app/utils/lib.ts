@@ -86,7 +86,7 @@ export function useFetch() {
   };
 
   function request(method: string) {
-    return (url: string, body?: any) => {
+    return (url: string, body?: unknown) => {
       const token = typeof window !== 'undefined' ? localStorage.getItem("token") ?? "" : "";
       const headers: { [key: string]: string | undefined } = {
         'Authorization': `Bearer ${token}`,
@@ -95,8 +95,8 @@ export function useFetch() {
 
       const requestOptions: RequestInit = {
         method,
-        headers: Object.fromEntries(Object.entries(headers).filter(([, value]) => value !== undefined)), // Filter out undefined headers
-        ...body && { body: JSON.stringify(body) } // Spread body if it exists
+        headers: Object.fromEntries(Object.entries(headers).filter(([, value]) => value !== undefined)) as Record<string, string>,
+        ...(body ? { body: JSON.stringify(body) } : {})
       };
 
       return fetch(url, requestOptions).then(handleResponse);
@@ -105,7 +105,7 @@ export function useFetch() {
 
   // helper functions
 
-  async function handleResponse(response: any) {
+  async function handleResponse(response: Response) {
     const isJson = response.headers?.get('content-type')?.includes('application/json');
     const data = isJson ? await response.json() : null;
 

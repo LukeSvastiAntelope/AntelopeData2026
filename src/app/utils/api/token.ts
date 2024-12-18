@@ -20,7 +20,8 @@ export async function verifyConfirmationToken(token: string) {
     console.log(payload);
     
     return payload;
-  } catch (error) {
+  } catch (e) {
+    console.log(e);
     return null;
   }
 }
