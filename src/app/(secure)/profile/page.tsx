@@ -244,7 +244,7 @@ const AgentProfile = () => {
                     <StatCard
                         icon={<FaChartLine />}
                         title="Success Rate"
-                        value={`${successRate.toFixed(2)}%`}
+                        value={`${successRate || 0}%`}
                     />
                     <StatCard
                         icon={<FaShieldAlt />}
