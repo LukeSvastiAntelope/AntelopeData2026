@@ -57,7 +57,6 @@ export class AutomaticBettingAgent {
                 });
 
             const groupResults = await Promise.all(betDecisionsPromises);
-            console.log("Group Results: ", groupResults);
             return this.validateAndAdjustBets(groupResults.flat());
         } catch (error) {
             console.error('Error in batch prediction analysis:', error);
@@ -86,7 +85,6 @@ export class AutomaticBettingAgent {
             messages: [{ role: "user", content: prompt }],
             temperature: 0.3
         });
-        console.log("Prediction is interesting: ", response.choices[0].message.content);
         return response.choices[0].message.content?.toLowerCase().includes('yes') || false;
     }
 
@@ -168,7 +166,8 @@ export class AutomaticBettingAgent {
          Creator Choice: ${p.source == "sportDB" ? p.predicted_outcome : p.creator_choice}
          Creator Betting Amount: ${p.bet_amount}
          Match Total Bet Amount: ${p.match_total_amount}
-         Not Match Total Bet Amount: ${p.not_match_total_amount}`
+         Not Match Total Bet Amount: ${p.not_match_total_amount}
+         You Are Already Bet: ${p.agent_bets ? this.parseAgentBets(p.agent_bets)[this.agent.id] ? `${this.parseAgentBets(p.agent_bets)[this.agent.id].amount} to ${this.parseAgentBets(p.agent_bets)[this.agent.id].choice}` : 'No bets made yet' : 'No bets made yet'}`
             ).join('\n')}
     
     Key News:
@@ -183,12 +182,20 @@ export class AutomaticBettingAgent {
             ).join('\n')}
     
     Agent Principles:
-    - Consider Betting odds: based on the match total bet amount and not match total bet amount
-    - You can bet for creating odds if not any bets have been made yet
+    - Betting Strategy:
+  1. If no previous bet exists, make initial bet with small amount
+  2. If previous bet exists:
+     - Only bet additional amount if odds are favorable
+     - Ensure total bet doesn't exceed maximum limit
+     - Consider adjusting choice if odds significantly changed
+- Consider risk/reward ratio based on current betting amounts
+- Adjust bet size based on odds discrepancy
     ${this.agent.principles
                     .slice(0, 3)
                     .map(p => `- ${p.title}: ${p.description}`)
                     .join('\n')}`;
+
+            console.log("Prompt: ", prompt);
 
             try {
                 const completion = await this.openai.chat.completions.create({
@@ -304,6 +311,20 @@ export class AutomaticBettingAgent {
 
                     if (!isValid) {
                         console.error('Invalid prediction format:', p);
+                    }
+
+                    const prediction = predictions.find(pred => pred.id === p.id);
+                    const existingBet = prediction?.agent_bets ?
+                        this.parseAgentBets(prediction.agent_bets)[this.agent.id] :
+                        null;
+
+                    // Validate bet amount doesn't exceed remaining limit
+                    if (existingBet) {
+                        const totalBetAmount = existingBet.amount + this.calculateBetAmount(p.confidence);
+                        if (totalBetAmount > this.agent.maxBetSize) {
+                            console.error(`Total bet amount ${totalBetAmount} exceeds max limit ${this.agent.maxBetSize}`);
+                            return false;
+                        }
                     }
 
                     return isValid && p.shouldBet && p.confidence > 0;
@@ -569,6 +590,17 @@ export class AutomaticBettingAgent {
         }
 
         return decisions;
+    }
+
+    private parseAgentBets(agentBetsStr: string | null): Record<string, { amount: number, choice: string }> {
+        if (!agentBetsStr) return {};
+
+        const result: Record<string, { amount: number, choice: string }> = {};
+        agentBetsStr.split(',').forEach(bet => {
+            const [agentId, amount, choice] = bet.split(':');
+            result[agentId] = { amount: Number(amount), choice };
+        });
+        return result;
     }
 }
 

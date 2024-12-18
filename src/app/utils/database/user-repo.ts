@@ -105,7 +105,8 @@ async function getOpenPredictions() {
                 WHEN bets.choice != predictions.creator_choice THEN bets.amount
                 ELSE 0
             END), 0) as not_match_total_amount,
-            COUNT(bets.id) as bets_count
+            COUNT(bets.id) as bets_count,
+            GROUP_CONCAT(bets.agent_id || ':' || bets.amount || ':' || bets.choice) as agent_bets
         FROM predictions 
         LEFT JOIN bets ON predictions.id = bets.prediction_id 
         WHERE predictions.status = "open" AND predictions.group_info == ""

@@ -102,6 +102,7 @@ export interface Prediction {
     predicted_outcome: "";
     match_total_amount: number;
     not_match_total_amount: number;
+    agent_bets?: string;
 }
 
 export interface GroupAnalysis {
