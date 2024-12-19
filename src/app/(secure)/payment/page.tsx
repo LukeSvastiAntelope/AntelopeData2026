@@ -147,7 +147,7 @@ const PaymentPage = () => {
     const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const value = e.target.value;
         setAmount(value);
-        setCreditAmount(Number(value) * 1000000);
+        setCreditAmount(Number(value) * Number(process.env.CREDIT_BALANCE));
         updatePaymentAmount(value, paymentMethod);
     };
 
