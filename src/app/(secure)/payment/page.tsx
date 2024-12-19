@@ -95,7 +95,7 @@ const PaymentPage = () => {
                 // First get a payment intent from the server
                 const intentResponse = await fetchData.post('/api/createPaymentIntent', {
                     amount: Number(paymentAmount),
-                    creditAmount: Number(amount),
+                    creditAmount: Number(creditAmount),
                     paymentMethod,
                     walletAddress: wallet.publicKey?.toString()
                 });
@@ -275,7 +275,7 @@ const PaymentPage = () => {
                             color="primary"
                             size="lg"
                             className="w-full"
-                            onClick={handleBuyCredits}
+                            onPress={handleBuyCredits}
                             isDisabled={isLoading}
                         >
                             Buy Credits
