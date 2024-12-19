@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { useWallet } from '@solana/wallet-adapter-react';
+import { useEffect, useState } from 'react';
+import { useConnection, useWallet } from '@solana/wallet-adapter-react';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import {
     Card,
@@ -12,23 +12,129 @@ import { Input } from '@nextui-org/input';
 import { Button } from '@nextui-org/button';
 import { Select, SelectItem } from '@nextui-org/select';
 import { IconWallet, IconCreditCard, IconNft } from "@/app/components/icons"; // You'll need to create these icons
+import { IAgentProfile } from '@/app/utils/interface';
+import { useFetch } from '@/app/utils/lib';
+import { toast } from 'react-hot-toast';
+import { Skeleton } from '@nextui-org/skeleton';
+import {
+    Modal,
+    ModalContent,
+    ModalHeader,
+    ModalBody,
+    ModalFooter,
+    useDisclosure
+} from "@nextui-org/modal";
+import { CircularProgress } from '@nextui-org/progress';
+import { buyTransaction } from '@/app/utils/buyTransaction';
+import { loadStripe } from '@stripe/stripe-js';
 
 const PaymentPage = () => {
-    const { publicKey } = useWallet();
+    const wallet = useWallet();
+    const { connection } = useConnection();
     const [amount, setAmount] = useState('');
+    const [, setAgent] = useState<IAgentProfile | null>(null);
+    const [agentBalance, setAgentBalance] = useState(0);
+    const [solPrice, setSolPrice] = useState(0);
     const [paymentMethod, setPaymentMethod] = useState('sol');
     const [withdrawMethod, setWithdrawMethod] = useState('sol');
-    const [availableBalance] = useState(0);
+    const [availableBalance, ] = useState(0);
     const [withdrawAmount, setWithdrawAmount] = useState('');
+    const [isLoading, setIsLoading] = useState(true);
+    const [creditAmount, setCreditAmount] = useState(0);
+    const [paymentAmount, setPaymentAmount] = useState('');
+    const fetchData = useFetch();
+    const { isOpen, onOpen, onClose } = useDisclosure();
+    const [isProcessing, setIsProcessing] = useState(false);
 
     const isWithdrawDisabled = () => {
         return true;
     };
 
     const handleBuyCredits = async () => {
-        if (!amount) return;
-        // Implement payment logic
+        if (!amount || !paymentAmount || !paymentMethod) {
+            toast.error("Please fill all fields");
+            return;
+        }
+        onOpen();
     };
+
+    const confirmPurchase = async () => {
+        setIsProcessing(true);
+        if (!amount || !paymentAmount || !paymentMethod) {
+            toast.error("Please fill all fields");
+            return;
+        }
+        if (paymentMethod === 'stripe') {
+            const stripe = await loadStripe(
+                process.env.STRIPE_PUBLIC_KEY!
+            );
+            if (!stripe) {
+                console.log("stripe is not defined");
+                toast.error("stripe is not defined");
+                setIsProcessing(false);
+                return;
+            }
+            try {
+                const response = await fetchData.post('/api/stripeCheckout', {
+                    amount: Number(paymentAmount)
+                });
+                if (!response.status) {
+                    toast.error(response.message);
+                    setIsProcessing(false);
+                    return;
+                }
+                await stripe.redirectToCheckout({
+                    sessionId: response.result.id
+                });
+            } catch (error: unknown) {
+                console.log(error);
+                toast.error(error instanceof Error ? error.message : 'Unknown error occurred');
+            }
+        } else {
+            try {
+                // First get a payment intent from the server
+                const intentResponse = await fetchData.post('/api/createPaymentIntent', {
+                    amount: Number(paymentAmount),
+                    creditAmount: Number(amount),
+                    paymentMethod,
+                    walletAddress: wallet.publicKey?.toString()
+                });
+
+                if (!intentResponse.status) {
+                    throw new Error('Failed to create payment intent');
+                }
+
+                const paymentId = intentResponse.paymentId;
+
+                // Execute the blockchain transaction with the payment ID
+                const signature = await buyTransaction(
+                    wallet,
+                    connection,
+                    Number(paymentAmount),
+                    paymentMethod,
+                    paymentId
+                );
+
+                // Verify the transaction and update credits in one atomic operation
+                const verifyResponse = await fetchData.post('/api/verifyAndCredit', {
+                    paymentId,
+                    signature
+                });
+
+                if (verifyResponse.status) {
+                    setAgentBalance(agentBalance + Number(amount));
+                    toast.success("Credits purchased successfully");
+                } else {
+                    throw new Error(verifyResponse.message || 'Failed to process credit purchase');
+                }
+            } catch (error: unknown) {
+                const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+                toast.error(`Failed to purchase credits: ${errorMessage}`);
+            }
+        }
+        setIsProcessing(false);
+        onClose();
+    }
 
     const handleWithdraw = async () => {
         // Implement withdrawal logic
@@ -37,6 +143,65 @@ const PaymentPage = () => {
     const handleMintNFT = async () => {
         // Implement NFT minting logic
     };
+
+    const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const value = e.target.value;
+        setAmount(value);
+        setCreditAmount(Number(value) * 1000000);
+        updatePaymentAmount(value, paymentMethod);
+    };
+
+    const handlePaymentMethodChange = (value: string) => {
+        setPaymentMethod(value);
+        updatePaymentAmount(amount, value);
+    };
+
+    const updatePaymentAmount = (value: string, method: string) => {
+        if (!value) {
+            setPaymentAmount('');
+            return;
+        }
+
+        const usdAmount = Number(value);
+        switch (method) {
+            case 'sol':
+                setPaymentAmount((usdAmount / Number(solPrice)).toFixed(4));
+                break;
+            case 'usdt':
+                setPaymentAmount(usdAmount.toFixed(2));
+                break;
+            case 'stripe':
+                setPaymentAmount(usdAmount.toFixed(2));
+                break;
+            default:
+                setPaymentAmount('');
+        }
+    };
+
+    useEffect(() => {
+        const fetchAgentProfile = async () => {
+            try {
+                const response = await fetchData.get('/api/getAgentProfile');
+                if (response.status) {
+                    setAgent(response.agent);
+                    setAgentBalance(response.agent.wallet_balance);
+                } else {
+                    toast.error(response.message);
+                }
+            } catch (error) {
+                console.log(error);
+                toast.error('Failed to fetch agent profile');
+            }
+            await getSolPrice();
+            setIsLoading(false);
+        };
+        const getSolPrice = async () => {
+            const response = await fetch('https://data-api.binance.vision/api/v3/ticker/price?symbol=SOLUSDT');
+            const data = await response.json();
+            setSolPrice(data.price);
+        }
+        fetchAgentProfile();
+    }, []);
 
     return (
         <div className="max-w-6xl mx-auto p-6 space-y-6">
@@ -57,25 +222,36 @@ const PaymentPage = () => {
                     <CardBody className="space-y-6">
                         <div className="text-center bg-default-100 p-4 rounded-lg">
                             <p className="text-xl mb-2">Current Balance</p>
-                            <p className="text-3xl font-bold text-primary">0.00 Credits</p>
+                            {
+                                isLoading ?
+                                    <Skeleton className="w-full h-10" /> :
+                                    <p className="text-3xl font-bold text-primary">{agentBalance?.toLocaleString() || 0} Credits</p>
+                            }
                         </div>
                         <Input
                             type="number"
                             label="Amount"
                             placeholder="Enter amount"
                             value={amount}
-                            onChange={(e) => setAmount(e.target.value)}
+                            onChange={handleAmountChange}
+                            isDisabled={isLoading}
                             startContent={
                                 <div className="pointer-events-none flex items-center">
                                     <span className="text-default-400 text-small">$</span>
                                 </div>
                             }
+                            description={amount ? `You will receive ${creditAmount.toLocaleString()} Credits` : ""}
                         />
                         <Select
                             label="Payment Method"
                             placeholder="Select payment method"
                             value={paymentMethod}
-                            onChange={(e) => setPaymentMethod(e.target.value)}
+                            onChange={(e) => handlePaymentMethodChange(e.target.value)}
+                            isDisabled={isLoading}
+                            description={amount && paymentAmount ?
+                                `You will pay ${paymentAmount} ${paymentMethod.toUpperCase()}` :
+                                ""}
+                            defaultSelectedKeys={['sol']}
                         >
                             <SelectItem key="sol" value="sol" startContent={<IconWallet />}>
                                 Pay with SOL
@@ -92,6 +268,7 @@ const PaymentPage = () => {
                             size="lg"
                             className="w-full"
                             onClick={handleBuyCredits}
+                            isDisabled={isLoading}
                         >
                             Buy Credits
                         </Button>
@@ -117,7 +294,7 @@ const PaymentPage = () => {
                             placeholder="Enter amount to withdraw"
                             value={withdrawAmount}
                             onChange={(e) => setWithdrawAmount(e.target.value)}
-                            isDisabled={!publicKey || availableBalance <= 0}
+                            isDisabled={!wallet.publicKey || availableBalance <= 0}
                             startContent={
                                 <div className="pointer-events-none flex items-center">
                                     <span className="text-default-400 text-small">$</span>
@@ -134,7 +311,7 @@ const PaymentPage = () => {
                             placeholder="Select withdrawal method"
                             value={withdrawMethod}
                             onChange={(e) => setWithdrawMethod(e.target.value)}
-                            isDisabled={!publicKey || availableBalance <= 0}
+                            isDisabled={!wallet.publicKey || availableBalance <= 0}
                         >
                             <SelectItem key="sol" value="sol" startContent={<IconWallet />}>
                                 Withdraw as SOL
@@ -153,9 +330,9 @@ const PaymentPage = () => {
                             onClick={handleWithdraw}
                             isDisabled={isWithdrawDisabled()}
                         >
-                            {!publicKey 
+                            {!wallet.publicKey
                                 ? "Connect Wallet to Withdraw"
-                                : availableBalance <= 0 
+                                : availableBalance <= 0
                                     ? "No Funds Available"
                                     : "Withdraw Funds"
                             }
@@ -200,6 +377,35 @@ const PaymentPage = () => {
                     </div>
                 </CardBody>
             </Card>
+
+            <Modal
+                isOpen={isOpen}
+                onClose={onClose}
+                isDismissable={false}
+                isKeyboardDismissDisabled={true}
+            >
+                <ModalContent>
+                    {(onClose) => (
+                        <>
+                            <ModalHeader className="flex flex-col gap-1">Confirm Purchase</ModalHeader>
+                            <ModalBody>
+                                <p>You are about to purchase:</p>
+                                <p className="font-bold">{creditAmount.toLocaleString()} Credits</p>
+                                <p>Payment details:</p>
+                                <p className="font-bold">{paymentAmount} {paymentMethod.toUpperCase()}</p>
+                            </ModalBody>
+                            <ModalFooter>
+                                <Button color="danger" variant="light" onPress={onClose} isDisabled={isProcessing}>
+                                    Cancel
+                                </Button>
+                                <Button color="primary" onPress={confirmPurchase} isDisabled={isProcessing}>
+                                    {isProcessing ? <CircularProgress size="sm" color="primary" /> : "Confirm Purchase"}
+                                </Button>
+                            </ModalFooter>
+                        </>
+                    )}
+                </ModalContent>
+            </Modal>
         </div>
     );
 };

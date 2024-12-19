@@ -3,6 +3,7 @@ import "./globals.css";
 import { Rubik } from 'next/font/google';
 import { Toaster } from "react-hot-toast";
 import { Providers } from "./components/provider/mainProvider";
+import { SolProvider } from "./components/provider/solProvider";
 
 export const metadata: Metadata = {
   title: "Market Maker Agent",
@@ -29,9 +30,11 @@ export default function RootLayout({
           reverseOrder={true}
         />
         <Providers>
-          <main className="min-h-screen bg-mainGradient">
-            {children}
-          </main>
+          <SolProvider>
+            <main className="min-h-screen bg-mainGradient">
+              {children}
+            </main>
+          </SolProvider>
         </Providers>
       </body>
     </html>

@@ -8,6 +8,6 @@ export async function POST(req: NextRequest) {
         return Response.json({status: true, message: "User Logined successfully!", token: result.token, user: result.user})
     } catch (err) {
         console.log(err);
-        return Response.json({status: false, message: err})
+        return Response.json({status: false, message: err instanceof Error ? err.message : 'Internal server error'})
     }
 }

@@ -16,7 +16,11 @@ export const UserRepo = {
     getOpenPredictions,
     getPredictionsByAgentId,
     getBetsByAgentId,
-    getBetHistoryByAgentId
+    getBetHistoryByAgentId,
+    createPaymentIntent,
+    getPaymentIntent,
+    updatePaymentIntent,
+    updateAgentBalance
 }
 
 async function authenticate({ username, password }: { username: string, password: string }) {
@@ -139,4 +143,24 @@ async function getBetsByAgentId(id: string) {
 async function getBetHistoryByAgentId(id: string, limit: number, offset: number) {
     const db = await openDb();
     return await db.all('SELECT * FROM bets JOIN predictions ON bets.prediction_id = predictions.id WHERE bets.agent_id = ? ORDER BY bets.created_at DESC LIMIT ? OFFSET ?', id, limit, offset);
+}
+
+async function createPaymentIntent(paymentId: string, userId: string, agentId: string, amount: number, creditAmount: number, paymentMethod: string, fromAddress: string) {
+    const db = await openDb();
+    await db.run('INSERT INTO payment_intents (payment_id, user_id, agent_id, amount, credit_amount, payment_method, from_address, status, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', paymentId, userId, agentId, amount, creditAmount, paymentMethod, fromAddress, 'pending', new Date(Date.now() + 30 * 60 * 1000));
+}
+
+async function getPaymentIntent(paymentId: string) {
+    const db = await openDb();
+    return await db.get('SELECT * FROM payment_intents WHERE payment_id = ?', paymentId);
+}
+
+async function updatePaymentIntent(paymentId: string, status: string) {
+    const db = await openDb();
+    await db.run('UPDATE payment_intents SET status = ? WHERE payment_id = ?', status, paymentId);
+}
+
+async function updateAgentBalance(agentId: string, creditAmount: number) {
+    const db = await openDb();
+    await db.run('UPDATE agents SET wallet_balance = wallet_balance + ? WHERE id = ?', creditAmount, agentId);
 }
