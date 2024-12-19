@@ -39,8 +39,7 @@ export async function POST(request: NextRequest) {
         const amount = data.amount_total;
         console.log(userId, amount);
         const agent = await UserRepo.getAgentByUserId(userId);
-        agent.wallet_balance = agent.wallet_balance + Number(amount) * credit_balance / 100;
-        await UserRepo.updateAgentBalance(agent.id, agent.wallet_balance);
+        await UserRepo.updateAgentBalance(agent.id, Number(amount) * credit_balance / 100);
         // database update here
         return new Response('Virtual Credits added', {
             status: 200
