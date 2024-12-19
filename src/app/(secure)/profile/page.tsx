@@ -6,7 +6,7 @@ import { Progress } from "@nextui-org/progress";
 import { Divider } from "@nextui-org/divider";
 import { Skeleton } from "@nextui-org/skeleton";
 import { Button } from "@nextui-org/button";
-import { FaRocket, FaDatabase, FaChartLine, FaShieldAlt } from 'react-icons/fa';
+import { FaRocket, FaDatabase, FaChartLine, FaShieldAlt, FaCoins } from 'react-icons/fa';
 import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
 import { useFetch } from "@/app/utils/lib";
@@ -15,7 +15,6 @@ import { IAgentProfile } from "@/app/utils/interface";
 import { convertDaysToYMD } from "@/app/utils/lib";
 import { CATEGORIES } from "@/app/utils/const";
 import Link from "next/link";
-
 
 const ProfileSkeleton = () => {
     return (
@@ -169,33 +168,54 @@ const AgentProfile = () => {
     return (
         <div className="min-h-screen flex text-align:center;">
             <div className="fixed top-0 left-0">
-            <Link href="/">
-                <Image
-                    src={"/assets/images/logo-simple.svg"}
-                    alt="Hero Image"
-                    width={80}
-                    height={80}
-                    className="rounded-full"
-                />
-            </Link>
-            <Link href="/bets" className="flex justify-center pb-4">
-                <Image
-                    src={"/assets/images/bet.svg"}
-                    alt="Hero Image"
-                    width={32}
-                    height={32}
-                    className="rounded-full"
-                />
-            </Link>
-            <Link href="/predictions" className="flex justify-center">
-                <Image
-                    src={"/assets/images/predict.svg"}
-                    alt="Hero Image"
-                    width={32}
-                    height={32}
-                    className="rounded-full"
-                />
-            </Link>
+                <Link href="/">
+                    <Image
+                        src={"/assets/images/logo-simple.svg"}
+                        alt="Hero Image"
+                        width={80}
+                        height={80}
+                        className="rounded-full"
+                    />
+                </Link>
+                <Link href="/bets" className="flex justify-center pb-4">
+                    <Image
+                        src={"/assets/images/bet.svg"}
+                        alt="Hero Image"
+                        width={32}
+                        height={32}
+                        className="rounded-full"
+                    />
+                </Link>
+                <Link href="/predictions" className="flex justify-center">
+                    <Image
+                        src={"/assets/images/predict.svg"}
+                        alt="Hero Image"
+                        width={32}
+                        height={32}
+                        className="rounded-full"
+                    />
+                </Link>
+            </div>
+            <div className="fixed top-0 right-0 p-4">
+                <Card className="bg-content0 hover:shadow-lg transition-all duration-300 border border-primary/20">
+                    <CardBody className="p-2">
+                        <Button
+                            variant="light" 
+                            className="flex flex-col items-start gap-2 p-2 hover:bg-primary/10 rounded-xl"
+                            href="/payment"
+                            as={Link}
+                        >
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-primary/10 rounded-lg">
+                                    <FaCoins className="text-basic text-primary" />
+                                </div>
+                                <span className="text-xl font-bold text-primary">
+                                    {agent?.wallet_balance?.toLocaleString() || 0}
+                                </span>
+                            </div>
+                        </Button>
+                    </CardBody>
+                </Card>
             </div>
 
             <div className="container mx-auto px-4 py-8">

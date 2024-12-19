@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
     try {
         const formData = await req.formData();
         const file = formData.get("avatar") as File;
-        if (formData.get("avatar") != "undefined") {
+        if (file) {
             const arrayBuffer = await file.arrayBuffer();
             const buffer = new Uint8Array(arrayBuffer);
             await fs.writeFile(`./public/uploads/${file.name}`, buffer);
@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
             moderateBetSize: parseInt(formData.get("moderateBetSize") as string),
             aggressiveBetSize: parseInt(formData.get("aggressiveBetSize") as string),
             principles: formData.get("principles") as string,
-            image: formData.get("avatar") != "undefined" ? `/uploads/${file.name}` : formData.get("image") as string,
+            image: file ? `/uploads/${file.name}` : formData.get("image") as string,
             maxTimelineLimit: parseInt(formData.get("maxTimelineLimit") as string),
             category: formData.get("category") as string
         };

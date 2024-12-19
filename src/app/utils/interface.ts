@@ -13,6 +13,7 @@ export interface IAgentProfile {
     user_id: number;
     category: string;
     maxTimelineLimit: number;
+    wallet_balance: number;
 }
 
 export interface IFormDataAgentProfile {
