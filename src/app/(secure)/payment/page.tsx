@@ -37,7 +37,7 @@ const PaymentPage = () => {
     const [solPrice, setSolPrice] = useState(0);
     const [paymentMethod, setPaymentMethod] = useState('sol');
     const [withdrawMethod, setWithdrawMethod] = useState('sol');
-    const [availableBalance, ] = useState(0);
+    const [availableBalance,] = useState(0);
     const [withdrawAmount, setWithdrawAmount] = useState('');
     const [isLoading, setIsLoading] = useState(true);
     const [creditAmount, setCreditAmount] = useState(0);
@@ -201,6 +201,14 @@ const PaymentPage = () => {
             setSolPrice(data.price);
         }
         fetchAgentProfile();
+        const query = new URLSearchParams(window.location.search);
+        if (query.get('success')) {
+            toast.success('Order placed! You will receive an email confirmation.');
+        }
+
+        if (query.get('canceled')) {
+            toast.error('Order canceled -- continue to buy credits when you are ready.');
+        }
     }, []);
 
     return (

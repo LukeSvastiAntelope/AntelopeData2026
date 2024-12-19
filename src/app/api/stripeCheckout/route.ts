@@ -29,8 +29,8 @@ export async function POST(req: NextRequest) {
                     }
                 ],
                 mode: 'payment',
-                success_url: `${host}/credit?success=true`,
-                cancel_url: `${host}/credit?canceled=false`,
+                success_url: `${host}/payment?success=true`,
+                cancel_url: `${host}/payment?canceled=false`,
                 metadata: {
                     userId
                 }
