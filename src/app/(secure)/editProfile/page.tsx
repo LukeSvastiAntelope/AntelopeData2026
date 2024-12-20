@@ -155,7 +155,7 @@ const EditAgentProfile = () => {
                   onChange={(e) => setAgent({ ...agent, category: e.target.value })}
                 >
                   {CATEGORIES.map((category) => (
-                    <SelectItem key={category}>{category}</SelectItem>
+                    <SelectItem key={category.toLowerCase()}>{category}</SelectItem>
                   ))}
                 </Select>
 
