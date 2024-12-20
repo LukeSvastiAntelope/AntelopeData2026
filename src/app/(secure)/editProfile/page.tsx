@@ -154,8 +154,8 @@ const EditAgentProfile = () => {
                   defaultSelectedKeys={[agent?.category]}
                   onChange={(e) => setAgent({ ...agent, category: e.target.value })}
                 >
-                  {CATEGORIES.map((category, _index: number) => (
-                    <SelectItem key={_index}>{category}</SelectItem>
+                  {CATEGORIES.map((category) => (
+                    <SelectItem key={category}>{category}</SelectItem>
                   ))}
                 </Select>
 
