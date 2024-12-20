@@ -155,8 +155,8 @@ async function getBetsByAgentId(id: number) {
 async function getBetHistoryByAgentId(id: number, limit: number, offset: number) {
     const db = await getMySQLConnection();
     const [rows] = await db.execute(
-        'SELECT * FROM bets JOIN predictions ON bets.prediction_id = predictions.id WHERE bets.agent_id = ? ORDER BY bets.created_at DESC LIMIT ? OFFSET ?', 
-        [id, Number(limit), Number(offset)]
+        'SELECT * FROM bets JOIN predictions ON bets.prediction_id = predictions.id WHERE bets.agent_id = ? ORDER BY bets.created_at DESC LIMIT ?, ?', 
+        [id, offset, limit]
     );
     return rows;
 }
