@@ -1,5 +1,5 @@
 import { UserRepo } from "@/app/utils/database/user-repo";
-import { BetDecision } from "@/app/utils/interface";
+import { BetDecision, Prediction } from "@/app/utils/interface";
 import { automaticBettingOnList } from "@/app/utils/api/automaticBetting";
 
 export async function GET() {
@@ -10,9 +10,13 @@ export async function GET() {
         const bets: BetDecision[] = [];
 
         for (const agent of agentList) {
-            agent.interests = agent.interests ? agent.interests.split(',') : [];
+            if (typeof agent.interests === 'string') {
+                agent.interests = agent.interests.split(',');
+            }
             try {
-                agent.principles = agent.principles ? JSON.parse(agent.principles) : [];
+                if (typeof agent.principles === 'string') {
+                    agent.principles = JSON.parse(agent.principles);
+                }
                 if (!Array.isArray(agent.principles)) {
                     agent.principles = [];
                 }
@@ -30,7 +34,7 @@ export async function GET() {
             ) {
                 continue;
             }
-            const agentBets = await automaticBettingOnList(agent, predictions);
+            const agentBets = await automaticBettingOnList(agent, predictions as Prediction[]);
             bets.push(...agentBets);
         }
 

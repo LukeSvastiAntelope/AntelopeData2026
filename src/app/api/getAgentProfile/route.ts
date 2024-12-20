@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { UserRepo } from "@/app/utils/database/user-repo";
 import { verifyConfirmationToken } from "@/app/utils/api/token";
+import { Prediction, IBet } from "@/app/utils/interface";
 
 export async function GET(req: NextRequest) {
     const token = req.headers.get('Authorization')?.split(' ')[1];
@@ -13,9 +14,13 @@ export async function GET(req: NextRequest) {
         if (!agent) {
             agent = await UserRepo.createAgent(jwtPayload.email as string);
         }
-        agent.interests = agent.interests ? agent.interests.split(',') : [];
+        if (typeof agent.interests === 'string') {
+            agent.interests = agent.interests.split(',');
+        }
         try {
-            agent.principles = agent.principles ? JSON.parse(agent.principles) : [];
+            if (typeof agent.principles === 'string') {
+                agent.principles = JSON.parse(agent.principles);
+            }
             if (!Array.isArray(agent.principles)) {
                 agent.principles = [];
             }
@@ -30,7 +35,7 @@ export async function GET(req: NextRequest) {
         let totalBets = 0;
         let totalWins = 0;
 
-        for (const prediction of predictions) {
+        for (const prediction of predictions as unknown as Prediction[]) {
             totalPredictions++;
             if (prediction.status === 'resolved') {
                 if (prediction.outcome === prediction.creator_choice) {
@@ -39,7 +44,7 @@ export async function GET(req: NextRequest) {
             }
         }
 
-        for (const bet of bets) {
+        for (const bet of bets as unknown as IBet[]) {
             totalBets++;
             if (bet.outcome === bet.choice) {
                 totalWins++;

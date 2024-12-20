@@ -121,6 +121,7 @@ export interface Prediction {
     match_total_amount: number;
     not_match_total_amount: number;
     agent_bets?: string;
+    outcome: string;
 }
 
 export interface GroupAnalysis {
@@ -181,4 +182,48 @@ export interface SerpApiNewsResult {
     snippet: string;
     date: string;
     source?: string;
+}
+
+export interface UserDB {
+    id: number;
+    telegram_id: string;
+    username: string;
+    wallet_balance: number;
+    total_winnings: number;
+    escrow_balance: number;
+    password: string;
+    is_verified: number;
+}
+
+export interface AgentDB {
+    id: number;
+    user_id: number;
+    name: string;
+    image: string;
+    description: string;
+    interests: string | string[];
+    principles: string | string[];
+    maxBetSize: number;
+    conservativeBetSize: number;
+    moderateBetSize: number;
+    aggressiveBetSize: number;
+    riskLevel: string;
+    maxTimelineLimit: number;
+    category: string;
+    wallet_balance: number;
+    escrow_balance: number;
+    nft_address: string;
+}
+
+export interface PaymentIntentDB {
+    id: number;
+    payment_id: string;
+    user_id: number;
+    agent_id: number;
+    amount: number;
+    credit_amount: number;
+    payment_method: string;
+    from_address: string;
+    status: string;
+    expires_at: string;
 }

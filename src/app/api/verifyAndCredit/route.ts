@@ -6,7 +6,7 @@ export async function POST(request: NextRequest) {
     const { paymentId, signature } = await request.json();
     try {
         const paymentIntent = await UserRepo.getPaymentIntent(paymentId);
-        if (!paymentIntent || paymentIntent.status != 'pending' || paymentIntent.expires_at < new Date()) {
+        if (!paymentIntent || paymentIntent.status != 'pending' || new Date(paymentIntent.expires_at) < new Date()) {
             return Response.json({ status: false, message: "Invalid or expired payment intent" });
         }
 

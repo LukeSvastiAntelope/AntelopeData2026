@@ -2,16 +2,20 @@ export const dynamic = 'force-dynamic'
 
 import { UserRepo } from "@/app/utils/database/user-repo";
 import { createAIPrediction } from "@/app/utils/api/predictionGenerator";
-import { AutomatedPrediction } from "@/app/utils/interface";
+import { AutomatedPrediction, IAgentProfile } from "@/app/utils/interface";
 
 export async function GET() {
     try {
         const agentList = await UserRepo.getAgents();
         const predictions: AutomatedPrediction[] = [];
         for (const agent of agentList) {
-            agent.interests = agent.interests ? agent.interests.split(',') : [];
+            if (typeof agent.interests === 'string') {
+                agent.interests = agent.interests.split(',');
+            }
             try {
-                agent.principles = agent.principles ? JSON.parse(agent.principles) : [];
+                if (typeof agent.principles === 'string') {
+                    agent.principles = JSON.parse(agent.principles);
+                }
                 if (!Array.isArray(agent.principles)) {
                     agent.principles = [];
                 }
@@ -29,7 +33,7 @@ export async function GET() {
             ) {
                 continue;
             }
-            const prediction = await createAIPrediction(agent);
+            const prediction = await createAIPrediction(agent as unknown as IAgentProfile);
             prediction.userId = agent.user_id;
             prediction.agentId = agent.id;
             predictions.push(prediction);

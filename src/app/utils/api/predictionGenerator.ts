@@ -250,7 +250,7 @@ export class AIEnhancedPredictionGenerator {
     4. ONLY return the JSON object`;
 
             const completion = await this.openai.chat.completions.create({
-                model: "gpt-4",
+                model: "gpt-4o",
                 messages: [
                     {
                         role: "system",
@@ -590,7 +590,7 @@ export class AIEnhancedPredictionGenerator {
         Ensure the response is valid JSON.`;
 
         const completion = await this.openai.chat.completions.create({
-            model: "gpt-4",
+            model: "gpt-4o",
             messages: [
                 {
                     role: "system",
@@ -676,7 +676,7 @@ export class AIEnhancedPredictionGenerator {
             const formattedMaxDate = maxEndDate.toISOString().split('T')[0];
 
             const completion = await this.openai.chat.completions.create({
-                model: "gpt-4",
+                model: "gpt-4o",
                 messages: [
                     {
                         role: "system",

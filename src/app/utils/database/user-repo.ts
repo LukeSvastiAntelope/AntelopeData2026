@@ -1,8 +1,10 @@
 import bcrypt from "bcryptjs";
-import { openDb } from "./db";
+import { openSql as getMySQLConnection } from "./db";
 import { generateConfirmationToken } from "../api/token";
 import { AGENT_RISK_LEVEL } from "../const";
 import { IFormDataAgentProfile } from "../interface";
+import { UserDB, AgentDB, PaymentIntentDB } from "../interface";
+import { RowDataPacket } from 'mysql2/promise';
 
 export const UserRepo = {
     authenticate,
@@ -24,8 +26,9 @@ export const UserRepo = {
 }
 
 async function authenticate({ username, password }: { username: string, password: string }) {
-    const db = await openDb();
-    const user = await db.get('SELECT * FROM users WHERE username = ?', username);
+    const db = await getMySQLConnection();
+    const [rows] = await db.execute<(UserDB & RowDataPacket)[]>('SELECT * FROM users WHERE username = ?', [username]);
+    const user = rows[0];
 
     if (!(user && bcrypt.compareSync(password, user.password))) {
         throw 'Username or password is incorrect';
@@ -35,7 +38,7 @@ async function authenticate({ username, password }: { username: string, password
         throw 'User is not verified yet. Pls check your telegram for the confirmation link.';
     }
 
-    const token = await generateConfirmationToken(user.id);
+    const token = await generateConfirmationToken(user.id.toString());
 
     return {
         user: user,
@@ -44,9 +47,10 @@ async function authenticate({ username, password }: { username: string, password
 }
 
 async function registerPassword({ username, password }: { username: string, password: string }) {
-    // validate
-    const db = await openDb();
-    const user = await db.get('SELECT * FROM users WHERE username = ?', username);
+    const db = await getMySQLConnection();
+    const [rows] = await db.execute<(UserDB & RowDataPacket)[]>('SELECT * FROM users WHERE username = ?', [username]);
+    const user = rows[0];
+
     if (!user) {
         throw 'Username "' + username + '" is not registered yet. Pls join the telegram bot to register. ' + process.env.TELEGRAM_BOT_USERNAME;
     }
@@ -58,48 +62,53 @@ async function registerPassword({ username, password }: { username: string, pass
     const token = await generateConfirmationToken(username);
 
     const hashedPassword = bcrypt.hashSync(password, 10);
-    await db.run('UPDATE users SET password = ? WHERE username = ?', hashedPassword, username);
+    await db.execute('UPDATE users SET password = ? WHERE username = ?', [hashedPassword, username]);
     return { token, chatId: user.telegram_id };
 }
 
 async function verifyAccount(username: string) {
-    const db = await openDb();
-    await db.run('UPDATE users SET is_verified = 1 WHERE username = ?', username);
+    const db = await getMySQLConnection();
+    await db.execute('UPDATE users SET is_verified = 1 WHERE username = ?', [username]);
 }
 
 async function getUserById(id: string) {
-    const db = await openDb();
-    return await db.get('SELECT * FROM users WHERE id = ?', id);
+    const db = await getMySQLConnection();
+    const [rows] = await db.execute<(UserDB & RowDataPacket)[]>('SELECT * FROM users WHERE id = ?', [id]);
+    return rows[0];
 }
 
 async function getAgentByUserId(id: string) {
-    const db = await openDb();
-    return await db.get('SELECT * FROM agents WHERE user_id = ?', id);
+    const db = await getMySQLConnection();
+    const [rows] = await db.execute<(AgentDB & RowDataPacket)[]>('SELECT * FROM agents WHERE user_id = ?', [id]);
+    return rows[0];
 }
 
 async function createAgent(id: string) {
-    console.log(id);
-    const db = await openDb();
-    await db.run('INSERT INTO agents (user_id, riskLevel, conservativeBetSize, moderateBetSize, aggressiveBetSize, wallet_balance) VALUES (?, ?, ?, ?, ?, ?)', Number(id), AGENT_RISK_LEVEL[0], 0, 0, 0, 10000);
+    const db = await getMySQLConnection();
+    await db.execute(
+        'INSERT INTO agents (user_id, riskLevel, conservativeBetSize, moderateBetSize, aggressiveBetSize, wallet_balance) VALUES (?, ?, ?, ?, ?, ?)',
+        [Number(id), AGENT_RISK_LEVEL[0], 0, 0, 0, 10000]
+    );
     return await getAgentByUserId(id);
 }
 
 async function updateAgent(id: string, params: IFormDataAgentProfile) {
-    const db = await openDb();
-    await db.run(
+    const db = await getMySQLConnection();
+    await db.execute(
         'UPDATE agents SET name = ?, description = ?, maxBetSize = ?, interests = ?, riskLevel = ?, conservativeBetSize = ?, moderateBetSize = ?, aggressiveBetSize = ?, principles = ?, image = ?, maxTimelineLimit = ?, category = ? WHERE user_id = ?',
-        params.name, params.description, params.maxBetSize, params.interests, params.riskLevel, params.conservativeBetSize, params.moderateBetSize, params.aggressiveBetSize, params.principles, params.image, params.maxTimelineLimit, params.category, id
+        [params.name, params.description, params.maxBetSize, params.interests, params.riskLevel, params.conservativeBetSize, params.moderateBetSize, params.aggressiveBetSize, params.principles, params.image, params.maxTimelineLimit, params.category, id]
     );
 }
 
 async function getAgents() {
-    const db = await openDb();
-    return await db.all('SELECT * FROM agents');
+    const db = await getMySQLConnection();
+    const [rows] = await db.execute<(AgentDB & RowDataPacket)[]>('SELECT * FROM agents');
+    return rows;
 }
 
 async function getOpenPredictions() {
-    const db = await openDb();
-    return await db.all(`
+    const db = await getMySQLConnection();
+    const [rows] = await db.execute(`
         SELECT 
             predictions.*, 
             COALESCE(SUM(CASE 
@@ -111,56 +120,61 @@ async function getOpenPredictions() {
                 ELSE 0
             END), 0) as not_match_total_amount,
             COUNT(bets.id) as bets_count,
-            GROUP_CONCAT(bets.agent_id || ':' || bets.amount || ':' || bets.choice) as agent_bets
+            GROUP_CONCAT(CONCAT(bets.agent_id, ':', bets.amount, ':', bets.choice)) as agent_bets
         FROM predictions 
         LEFT JOIN bets ON predictions.id = bets.prediction_id 
-        WHERE predictions.status = "open" AND predictions.group_info == ""
+        WHERE predictions.status = "open" AND predictions.group_info = ""
         GROUP BY predictions.id
         ORDER BY predictions.created_at DESC`
     );
+    return rows;
 }
 
-async function getPredictionsByAgentId(id: string) {
-    const db = await openDb();
-    return await db.all(`
+async function getPredictionsByAgentId(id: number) {
+    const db = await getMySQLConnection();
+    const [rows] = await db.execute(`
         SELECT 
             predictions.*, 
             COUNT(bets.id) as bets_count 
         FROM predictions 
-        LEFT JOIN bets ON predictions.id = bets.prediction_id 
+        LEFT JOIN bets ON predictions.id = bets.prediction_id
         WHERE predictions.agent_id = ? 
         GROUP BY predictions.id 
         ORDER BY predictions.created_at DESC`,
-        id
+        [id]
     );
+    return rows;
 }
 
-async function getBetsByAgentId(id: string) {
-    const db = await openDb();
-    return await db.all('SELECT * FROM bets JOIN predictions ON bets.prediction_id = predictions.id WHERE bets.agent_id = ? ORDER BY bets.created_at DESC', id);
+async function getBetsByAgentId(id: number) {
+    const db = await getMySQLConnection();
+    const [rows] = await db.execute('SELECT * FROM bets JOIN predictions ON bets.prediction_id = predictions.id WHERE bets.agent_id = ? ORDER BY bets.created_at DESC', [id]);
+    return rows;
 }
 
-async function getBetHistoryByAgentId(id: string, limit: number, offset: number) {
-    const db = await openDb();
-    return await db.all('SELECT * FROM bets JOIN predictions ON bets.prediction_id = predictions.id WHERE bets.agent_id = ? ORDER BY bets.created_at DESC LIMIT ? OFFSET ?', id, limit, offset);
+async function getBetHistoryByAgentId(id: number, limit: number, offset: number) {
+    const db = await getMySQLConnection();
+    const [rows] = await db.execute('SELECT * FROM bets JOIN predictions ON bets.prediction_id = predictions.id WHERE bets.agent_id = ? ORDER BY bets.created_at DESC LIMIT ? OFFSET ?', [id, limit, offset]);
+    return rows;
 }
 
-async function createPaymentIntent(paymentId: string, userId: string, agentId: string, amount: number, creditAmount: number, paymentMethod: string, fromAddress: string) {
-    const db = await openDb();
-    await db.run('INSERT INTO payment_intents (payment_id, user_id, agent_id, amount, credit_amount, payment_method, from_address, status, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', paymentId, userId, agentId, amount, creditAmount, paymentMethod, fromAddress, 'pending', new Date(Date.now() + 30 * 60 * 1000));
+async function createPaymentIntent(paymentId: string, userId: string, agentId: number, amount: number, creditAmount: number, paymentMethod: string, fromAddress: string) {
+    const db = await getMySQLConnection();
+    await db.execute('INSERT INTO payment_intents (payment_id, user_id, agent_id, amount, credit_amount, payment_method, from_address, status, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', [paymentId, userId, agentId, amount, creditAmount, paymentMethod, fromAddress, 'pending', new Date(Date.now() + 30 * 60 * 1000)]);
 }
 
 async function getPaymentIntent(paymentId: string) {
-    const db = await openDb();
-    return await db.get('SELECT * FROM payment_intents WHERE payment_id = ?', paymentId);
+    const db = await getMySQLConnection();
+    const [rows] = await db.execute<(PaymentIntentDB & RowDataPacket)[]>('SELECT * FROM payment_intents WHERE payment_id = ?', [paymentId]);
+    return rows[0];
 }
 
 async function updatePaymentIntent(paymentId: string, status: string) {
-    const db = await openDb();
-    await db.run('UPDATE payment_intents SET status = ? WHERE payment_id = ?', status, paymentId);
+    const db = await getMySQLConnection();
+    await db.execute('UPDATE payment_intents SET status = ? WHERE payment_id = ?', [status, paymentId]);
 }
 
-async function updateAgentBalance(agentId: string, creditAmount: number) {
-    const db = await openDb();
-    await db.run('UPDATE agents SET wallet_balance = wallet_balance + ? WHERE id = ?', creditAmount, agentId);
+async function updateAgentBalance(agentId: number, creditAmount: number) {
+    const db = await getMySQLConnection();
+    await db.execute('UPDATE agents SET wallet_balance = wallet_balance + ? WHERE id = ?', [creditAmount, agentId]);
 }

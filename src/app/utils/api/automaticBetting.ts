@@ -121,10 +121,11 @@ export class AutomaticBettingAgent {
         ${description}
         `;
         const response = await this.openai.chat.completions.create({
-            model: "gpt-4",
+            model: "gpt-4o",
             messages: [{ role: "user", content: prompt }],
             temperature: 0.3
         });
+        console.log("Interesting Prediction Response: ", response.choices[0].message.content);
         return response.choices[0].message.content?.toLowerCase().includes('yes') || false;
     }
 
@@ -235,11 +236,9 @@ export class AutomaticBettingAgent {
                     .map(p => `- ${p.title}: ${p.description}`)
                     .join('\n')}`;
 
-            console.log("Prompt: ", prompt);
-
             try {
                 const completion = await this.openai.chat.completions.create({
-                    model: "gpt-4",
+                    model: "gpt-4o",
                     messages: [
                         {
                             role: "system",
@@ -487,7 +486,7 @@ export class AutomaticBettingAgent {
 
         try {
             const completion = await this.openai.chat.completions.create({
-                model: "gpt-4",
+                model: "gpt-4o",
                 messages: [
                     {
                         role: "system",
@@ -559,7 +558,7 @@ export class AutomaticBettingAgent {
         }`;
 
         const completion = await this.openai.chat.completions.create({
-            model: "gpt-4",
+            model: "gpt-4o",
             messages: [
                 {
                     role: "system",
@@ -650,8 +649,8 @@ export class AutomaticBettingAgent {
     }
 }
 
-export async function automaticBettingOnList(agent: IAgentProfile, predictions: Prediction[]): Promise<BetDecision[]> {
-    const betAgent = new AutomaticBettingAgent(agent);
+export async function automaticBettingOnList(agent: unknown, predictions: Prediction[]): Promise<BetDecision[]> {
+    const betAgent = new AutomaticBettingAgent(agent as IAgentProfile);
     await betAgent.initialize();
     return betAgent.analyzePredictions(predictions);
 }
