@@ -373,7 +373,7 @@ const PaymentPage = () => {
                                 color="secondary"
                                 size="lg"
                                 className="w-full"
-                                onClick={handleMintNFT}
+                                onPress={handleMintNFT}
                             >
                                 Mint NFT
                             </Button>
