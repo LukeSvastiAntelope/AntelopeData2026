@@ -21,7 +21,8 @@ const BetsSkeleton = () => (
                 {/* Title and Category Skeleton */}
                 <div className="flex-grow min-w-0 max-w-[200px]">
                     <Skeleton className="h-4 w-32 rounded-lg mb-1" />
-                    <Skeleton className="h-3 w-24 rounded-lg" />
+                    <Skeleton className="h-3 w-24 rounded-lg mb-1" />
+                    <Skeleton className="h-3 w-40 rounded-lg" />
                 </div>
 
                 {/* Question Skeleton */}
@@ -81,7 +82,7 @@ const BetsPage = () => {
             } else {
                 toast.error(response.message);
             }
-            
+
             setHasMore(response.bets.length === ITEMS_PER_PAGE);
             setIsLoading(false);
             setIsLoadingMore(false);
@@ -175,6 +176,9 @@ const BetsPage = () => {
                                                 <h3 className="text-sm font-regular">
                                                     {bet.description}
                                                 </h3>
+                                                <p className="text-xs text-default-500 mt-1">
+                                                    Reason: {bet.reason}
+                                                </p>
                                             </div>
 
                                             {/* Choices */}

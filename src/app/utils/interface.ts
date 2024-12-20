@@ -174,6 +174,7 @@ export interface IBet {
     outcome: string;
     resolution_date: string;
     creator_choice: string;
+    reason: string;
 }
 
 export interface SerpApiNewsResult {
