@@ -475,7 +475,7 @@ export class AutomaticBettingAgent {
         Extract 2-3 key search terms from this prediction:
         "${text}"
         
-        Return only the terms as a JSON array of strings.
+        Return ONLY a JSON array of strings without any additional text or explanation.
         Example: ["bitcoin price", "crypto market"]
         
         Rules:
@@ -490,7 +490,7 @@ export class AutomaticBettingAgent {
                 messages: [
                     {
                         role: "system",
-                        content: "Extract key search terms for news gathering. Return only JSON array."
+                        content: "You are a JSON-only response bot. Return only a valid JSON array of strings without any explanation or additional text."
                     },
                     {
                         role: "user",
@@ -500,7 +500,12 @@ export class AutomaticBettingAgent {
                 temperature: 0.3
             });
 
-            const terms = JSON.parse(completion.choices[0].message.content!);
+            const content = completion.choices[0].message.content || '[]';
+            // Extract JSON array if response contains any non-JSON text
+            const jsonMatch = content.match(/\[.*\]/);
+            const jsonStr = jsonMatch ? jsonMatch[0] : content;
+            
+            const terms = JSON.parse(jsonStr);
             return Array.isArray(terms) ? terms : [text];
         } catch (error) {
             console.error('Error extracting key terms:', error);
