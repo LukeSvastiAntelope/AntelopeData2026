@@ -278,7 +278,7 @@ export class AIEnhancedPredictionGenerator {
 
                 return response.score;
             } catch (jsonError) {
-                console.error('Failed to parse AI response:', jsonError);
+                console.error('3Failed to parse AI response:', jsonError);
                 return 0.5; // Default middle score if parsing fails
             }
         } catch (error) {
@@ -605,8 +605,16 @@ export class AIEnhancedPredictionGenerator {
             max_tokens: 1000
         });
 
+        const content = completion.choices[0].message.content || '{"leagues": []}';
+        
+        // Remove markdown code blocks and clean up the response
+        const cleanContent = content
+            .replace(/```json\n?/g, '')  // Remove opening code block
+            .replace(/\n?```/g, '')      // Remove closing code block
+            .trim();                     // Remove extra whitespace
+
         try {
-            const response = JSON.parse(completion.choices[0].message.content!);
+            const response = JSON.parse(cleanContent);
 
             // Validate that returned leagues exist in matchedLeagues
             const validLeagues = response.leagues.filter((league: ILeague) =>
@@ -615,14 +623,13 @@ export class AIEnhancedPredictionGenerator {
 
             if (validLeagues.length === 0) {
                 console.warn('No matching leagues found');
-                return [];
+                return matchedLeagues.slice(0, 3); // Fallback to first 3 leagues
             }
 
             return validLeagues;
         } catch (error) {
             console.error('Failed to parse AI response:', error);
-            // Fallback to first league if parsing fails
-            return [];
+            return matchedLeagues.slice(0, 3); // Fallback to first 3 leagues
         }
     }
 
@@ -681,6 +688,7 @@ export class AIEnhancedPredictionGenerator {
                         All predictions MUST end before ${formattedMaxDate}.
                         NEVER generate dates beyond ${formattedMaxDate}.
                         ONLY respond with a valid JSON object.
+                        Dates MUST be in ISO format (YYYY-MM-DD).
                         DO NOT include any explanations or additional text.`
                     },
                     {
@@ -692,22 +700,28 @@ export class AIEnhancedPredictionGenerator {
             });
 
             const content = completion.choices[0].message.content?.trim() || "{}";
-
-            // Remove any potential markdown formatting or extra text
             const jsonContent = content.replace(/```json\n?|\n?```/g, '').trim();
 
+            const response: AIResponse = JSON.parse(jsonContent);
             try {
-                const response: AIResponse = JSON.parse(jsonContent);
 
-                // Extract date from question
-                const dateMatch = response.endDate;
-                if (!dateMatch) {
-                    throw new Error('No valid date format found in question');
+                // Ensure endDate exists and is in the correct format
+                if (!response.endDate) {
+                    throw new Error('No end date provided in response');
                 }
 
-                const questionDate = new Date(dateMatch);
-                if (!this.isValidPredictionDate(questionDate)) {
-                    throw new Error('Invalid prediction date');
+                // Parse and validate the date
+                const questionDate = new Date(response.endDate);
+                if (isNaN(questionDate.getTime())) {
+                    // If date is invalid, generate a valid date
+                    questionDate.setDate(currentDate.getDate() + Math.floor(Math.random() * this.agent.maxTimelineLimit));
+                }
+
+                // Ensure date is within valid range
+                if (questionDate <= currentDate || questionDate > maxEndDate) {
+                    // Adjust date to be within valid range
+                    const daysToAdd = Math.floor(Math.random() * this.agent.maxTimelineLimit) + 1;
+                    questionDate.setDate(currentDate.getDate() + daysToAdd);
                 }
 
                 return {
@@ -717,7 +731,15 @@ export class AIEnhancedPredictionGenerator {
                 };
             } catch (jsonError) {
                 console.error('Failed to parse AI response:', jsonError);
-                throw new Error('Failed to generate valid prediction format');
+                // Generate a fallback prediction with a valid date
+                const fallbackDate = new Date(currentDate);
+                fallbackDate.setDate(currentDate.getDate() + Math.floor(Math.random() * this.agent.maxTimelineLimit) + 1);
+                
+                return {
+                    ...response,
+                    endDate: fallbackDate,
+                    initialStake: this.calculateStakeBasedOnConfidence(response.confidence || 0.5)
+                };
             }
         } catch (error) {
             console.error('Failed to generate prediction with OpenAI:', error);
