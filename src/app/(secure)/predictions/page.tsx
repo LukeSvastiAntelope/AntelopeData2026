@@ -104,6 +104,9 @@ const Predictions = () => {
                     className="rounded-full"
                 />
             </Link>
+            <Link href="/" className="icon-profile flex justify-center pb-4">
+                
+            </Link>
             <Link href="/bets" className="flex justify-center pb-4">
                 <Image
                     src={"/assets/images/bet.svg"}
@@ -126,12 +129,12 @@ const Predictions = () => {
 
         
         <div className="container mx-auto py-6 min-h-screen">
-            {/* <button
+            <button
                 onClick={() => router.back()}
                 className="mb-4 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
             >
                 ← Back
-            </button> */}
+            </button>
             <h1 className="text-2xl font-bold mb-6">Active Predictions</h1>
 
             <div className="grid gap-6 md:grid-cols-3 mb-6">

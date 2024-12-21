@@ -39,6 +39,57 @@ background-clip: text;
   background-color:hsl(240deg 35.04% 28.98% / 50%)
 }
 
+.icon-profile {
+  background-image: url('/assets/images/profile_off.svg');
+  background-size: 32px 32px;
+  background-repeat: no-repeat;
+  background-position: center;
+  width: auto;
+  height: 32px;
+  transition: background-image 0.2s ease-in-out;
+}
+
+.icon-bet {
+  background-image: url('/assets/images/bet_off.svg');
+  background-size: 32px 32px;
+  background-repeat: no-repeat;
+  background-position: center;
+  width: auto;
+  height: 32px;
+  transition: background-image 0.2s ease-in-out;
+}
+
+.icon-predict {
+  background-image: url('/assets/images/predict_off.svg');
+  background-size: 32px 32px;
+  background-repeat: no-repeat;
+  background-position: center;
+  width: auto;
+  height: 32px;
+  transition: background-image 0.2s ease-in-out;
+}
+
+.icon-bet:hover {
+  background-image: url('/assets/images/bet.svg');
+  /* transition  to hover */
+  transition: background-image 0.2s ease-in-out;
+
+}
+
+.icon-predict:hover {
+  background-image: url('/assets/images/predict.svg');
+
+  transition: background-image 0.2s ease-in-out;
+ 
+}
+
+.icon-profile:hover {
+  background-image: url('/assets/images/profile.svg');
+
+  transition: background-image 0.2s ease-in-out;
+ 
+}
+
 @media (prefers-color-scheme: dark) {
   :root {
     --background: #0a0a0a;

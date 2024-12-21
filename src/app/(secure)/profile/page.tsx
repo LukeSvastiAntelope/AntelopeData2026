@@ -174,27 +174,20 @@ const AgentProfile = () => {
                         alt="Hero Image"
                         width={80}
                         height={80}
-                        className="rounded-full"
+                        className=""
                     />
                 </Link>
-                <Link href="/bets" className="flex justify-center pb-4">
+                <Link href="/" className="flex justify-center pb-4">
                     <Image
-                        src={"/assets/images/bet.svg"}
+                        src={"/assets/images/profile.svg"}
                         alt="Hero Image"
                         width={32}
                         height={32}
-                        className="rounded-full"
+                        className=""
                     />
                 </Link>
-                <Link href="/predictions" className="flex justify-center">
-                    <Image
-                        src={"/assets/images/predict.svg"}
-                        alt="Hero Image"
-                        width={32}
-                        height={32}
-                        className="rounded-full"
-                    />
-                </Link>
+                <Link href="/bets" className=" icon-bet flex justify-center pb-4 mb-4"></Link>
+                <Link href="/predictions" className="icon-predict flex justify-center"></Link>
             </div>
             <div className="fixed top-0 right-0 p-4">
                 <Card className="bg-content0 hover:shadow-lg transition-all duration-300 border border-primary/20">
@@ -220,8 +213,15 @@ const AgentProfile = () => {
 
             <div className="container mx-auto px-4 py-8">
                 {/* Header */}
+               
                 <div className="text-white py-8 flex justify-between items-center px-2 rounded-b-2xl flex-row">
-
+                <Image
+                        src={agent?.image || '/assets/images/default-agent.png'}
+                        alt="Agent Image"
+                        className="w-[100px] h-[100px] rounded-full"
+                        width={100}
+                        height={100}
+                    />
                     <div className="container mx-auto px-4">
                         <h1 className="text-3xl font-bold">{agent?.name || 'Agent Name'}</h1>
                         <p className="mt-2 opacity-80">{agent?.description || 'Agent Description'}</p>
@@ -235,13 +235,7 @@ const AgentProfile = () => {
                             Edit Profile
                         </Button>
                     </div>
-                    <Image
-                        src={agent?.image || '/assets/images/default-agent.png'}
-                        alt="Agent Image"
-                        className="w-[100px] h-[100px] rounded-full"
-                        width={100}
-                        height={100}
-                    />
+                   
                 </div>
 
                 {/* Main Content */}
