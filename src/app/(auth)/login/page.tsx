@@ -54,7 +54,6 @@ const LoginPage = () => {
                 body: JSON.stringify(formData),
             });
             const data = await result.json();
-            console.log(data);
             if (data.status) {
                 toast.success(data.message);
                 if (typeof window !== 'undefined') {

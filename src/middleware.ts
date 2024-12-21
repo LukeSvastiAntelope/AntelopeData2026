@@ -27,8 +27,6 @@ export default async function middleware(req: NextRequest) {
     }
 
     const token = authHeader.split(' ')[1];
-    console.log("token:", token);
-    
     const isAuthenticated = await verifyConfirmationToken(token);
 
     if (!isAuthenticated) {

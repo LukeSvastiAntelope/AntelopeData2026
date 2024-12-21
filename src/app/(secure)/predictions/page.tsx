@@ -54,10 +54,8 @@ const Predictions = () => {
     // Load more items when scrolling
     useEffect(() => {
         const loadMore = () => {
-            console.log('Loading more items, current page:', page);
             setTimeout(() => {
                 const nextItems = predictions.slice(0, (page + 1) * ITEMS_PER_PAGE);
-                console.log('Next items length:', nextItems.length);
                 setDisplayedPredictions(nextItems);
                 setHasMore(nextItems.length < predictions.length);
                 setPage(prev => prev + 1);
@@ -66,7 +64,6 @@ const Predictions = () => {
 
         const observer = new IntersectionObserver(
             (entries) => {
-                console.log('Intersection observed:', entries[0].isIntersecting);
                 if (entries[0].isIntersecting && hasMore) {
                     loadMore();
                 }

@@ -52,7 +52,6 @@ export class AIEnhancedPredictionGenerator {
 
         // Check date validity
         if (predictionDate <= currentDate || predictionDate > maxEndDate) {
-            console.log('Invalid prediction date:', predictionDate);
             return false;
         }
 
@@ -68,7 +67,6 @@ export class AIEnhancedPredictionGenerator {
         );
 
         if (hasUnrealisticTerms) {
-            console.log('Prediction contains unrealistic terms');
             return false;
         }
 
@@ -281,7 +279,6 @@ export class AIEnhancedPredictionGenerator {
                 return response.score;
             } catch (jsonError) {
                 console.error('Failed to parse AI response:', jsonError);
-                console.log('Raw AI response:', content);
                 return 0.5; // Default middle score if parsing fails
             }
         } catch (error) {
@@ -525,7 +522,6 @@ export class AIEnhancedPredictionGenerator {
     private async getUpcomingSportsEvents(): Promise<SportsEvent[]> {
         try {
             const sportTypes = await this.determineSportTypes();
-            console.log("sportTypes", sportTypes);
 
             if (sportTypes.length === 0) {
                 return [];
@@ -721,7 +717,6 @@ export class AIEnhancedPredictionGenerator {
                 };
             } catch (jsonError) {
                 console.error('Failed to parse AI response:', jsonError);
-                console.log('Raw AI response:', content);
                 throw new Error('Failed to generate valid prediction format');
             }
         } catch (error) {

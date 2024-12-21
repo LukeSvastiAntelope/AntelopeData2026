@@ -42,14 +42,12 @@ export const buyTransaction = async (
             false,
             TOKEN_PROGRAM_ID
         );
-        console.log("addSenderToAcct", addSenderToAcct);
         const addRecipientToAcct = await getAssociatedTokenAddressSync(
             USDT_pubkey,
             escrowPublic,
             false,
             TOKEN_PROGRAM_ID
         );
-        console.log("addRecipientToAcct", addRecipientToAcct);
         transaction.add(
             createTransferInstruction(
                 addSenderToAcct,

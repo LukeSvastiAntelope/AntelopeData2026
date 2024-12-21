@@ -50,7 +50,6 @@ const EditAgentProfile = () => {
   };
 
   const saveAgentProfile = async () => {
-    console.log(agent);
     if (!agent) return;
     const formData = new FormData();
     formData.append('name', agent.name || "");

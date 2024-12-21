@@ -20,7 +20,6 @@ export async function POST(request: NextRequest) {
 
         while (!tx && attempts < maxAttempts) {
             tx = await connection.getParsedTransaction(signature);
-            console.log(tx);
 
             if (!tx) {
                 attempts++;

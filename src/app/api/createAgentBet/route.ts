@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { UserRepo } from "@/app/utils/database/user-repo";
 import { BetDecision, Prediction } from "@/app/utils/interface";
 import { automaticBettingOnList } from "@/app/utils/api/automaticBetting";

@@ -81,15 +81,13 @@ export class AutomaticBettingAgent {
             );
 
             if (interestingPredictions.length === 0) {
-                console.log('No interesting predictions found');
                 return [];
             }
 
             const groupedPredictions = this.groupPredictionsByTopic(interestingPredictions);
 
             const betDecisionsPromises = Object.entries(groupedPredictions)
-                .map(async ([topic, topicPredictions]) => {
-                    console.log("Topic: ", topic);
+                .map(async ([, topicPredictions]) => {
                     // Pass predictions instead of topic string
                     const news = await this.gatherRelevantNews(topicPredictions);
                     const similarPredictions = await this.findSimilarPredictions(topicPredictions);
@@ -125,7 +123,6 @@ export class AutomaticBettingAgent {
             messages: [{ role: "user", content: prompt }],
             temperature: 0.3
         });
-        console.log("Interesting Prediction Response: ", response.choices[0].message.content);
         return response.choices[0].message.content?.toLowerCase().includes('yes') || false;
     }
 
@@ -158,8 +155,6 @@ export class AutomaticBettingAgent {
                     agent_id: { $eq: this.agent.id }  // Add filter for agent's predictions
                 }
             });
-
-            console.log("Similar predictions found: ", queryResponse.matches);
 
             return queryResponse.matches as PineconePredictionMatch[];
         } catch (error) {

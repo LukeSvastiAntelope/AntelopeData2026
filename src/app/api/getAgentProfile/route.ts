@@ -30,8 +30,6 @@ export async function GET(req: NextRequest) {
         }
         const predictions = await UserRepo.getPredictionsByAgentId(agent.id);
         const bets = await UserRepo.getBetsByAgentId(agent.id);
-        console.log("predictions: ", predictions);
-        console.log("bets: ", bets);
         
         let successRate = 0;
         let totalPredictions = 0;

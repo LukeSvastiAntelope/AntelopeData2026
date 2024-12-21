@@ -54,7 +54,6 @@ const RegisterPage = () => {
                 body: JSON.stringify(formData),
             });
             const data = await result.json();
-            console.log(data);
             if (data.status) {
                 toast.success(data.message);
                 router.push("/login");

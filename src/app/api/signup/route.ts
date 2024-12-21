@@ -9,7 +9,6 @@ export async function POST(req: NextRequest) {
         const confirmationLink = `${process.env.NEXT_PUBLIC_APP_URL}/verify?token=${token}`;
         const telegramBotToken = process.env.TELEGRAM_BOT_TOKEN;
         const telegramMessage = encodeURIComponent(`Your confirmation link is: \n${confirmationLink}`);
-        console.log(telegramMessage);
         const response = await fetch(`https://api.telegram.org/bot${telegramBotToken}/sendMessage?chat_id=${chatId}&text=${telegramMessage}`);
         if (!response.ok) {
             throw new Error('Failed to send message');
