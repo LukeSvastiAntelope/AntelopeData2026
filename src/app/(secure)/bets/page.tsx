@@ -156,7 +156,7 @@ const BetsPage = () => {
                             {bets.map((bet: IBet, index: number) => (
                                 <Card key={index} className="">
                                     <CardBody className="p-2 bg-content0">
-                                        <div className="flex gap-4 items-center">
+                                    <div className="flex flex-col md:flex-row gap-4 items-start md:items-center">
                                             {/* Event Image */}
                                             <div className="w-12 h-12 relative rounded-lg overflow-hidden flex-shrink-0">
                                                 <Image
@@ -176,30 +176,27 @@ const BetsPage = () => {
                                                 </p>
                                             </div>
 
-                                            {/* Choices */}
-                                            <div className="flex gap-1 min-w-[80px] flex-col">
-                                                <span className="text-xs">
-                                                    <span className="text-default-500">Creator:</span>
-                                                    {bet.predicted_outcome ? bet.predicted_outcome : bet.creator_choice}
-                                                </span>
-                                                <span className="text-xs">
-                                                    <span className="text-default-500">You:</span> {bet.choice}
-                                                </span>
-                                           
+                                           {/* Choices & Stake */}
+<div className="flex flex-row md:flex-col gap-1 min-w-[80px]">
+  <span className="text-xs">
+    <span className="text-default-500">Creator:</span>
+    {bet.predicted_outcome ? bet.predicted_outcome : bet.creator_choice}
+  </span>
+  <span className="text-xs">
+    <span className="text-default-500">You:</span> {bet.choice}
+  </span>
+  
+  <span className="text-xs text-default-500">
+    {bet.amount} credits
+  </span>
+</div>
 
-                                            {/* Stake */}
-                                           
-                                                <span className="text-xs text-default-500">
-                                                    {bet.amount} credits
-                                                </span>
-                                            </div>
-
-                                            {/* Category Chip */}
-                                            <div className="min-w-[80px]">
-                                                <Chip size="sm" variant="flat" color="default" className="text-xs">
-                                                    {bet.source}
-                                                </Chip>
-                                            </div>
+{/* Category Chip */}
+<div className="min-w-[80px]">
+  <Chip size="sm" variant="flat" color="default" className="text-xs">
+    {bet.source}
+  </Chip>
+</div>
 
                                             {/* Status */}
                                             <div className="min-w-[70px]">
