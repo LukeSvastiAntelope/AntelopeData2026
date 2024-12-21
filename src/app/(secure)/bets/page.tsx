@@ -117,7 +117,8 @@ const BetsPage = () => {
                         className="rounded-full"
                     />
                 </Link>
-                <Link href="/bets" className="flex justify-center pb-4">
+                <Link href="/" className="icon-profile flex justify-center pb-4 mb-3"></Link>
+                <Link href="/bets" className="icon-bet flex justify-center pb-4 mb-4">
                     <Image
                         src={"/assets/images/bet.svg"}
                         alt="Hero Image"
@@ -126,14 +127,8 @@ const BetsPage = () => {
                         className="rounded-full"
                     />
                 </Link>
-                <Link href="/predictions" className="flex justify-center">
-                    <Image
-                        src={"/assets/images/predict.svg"}
-                        alt="Hero Image"
-                        width={32}
-                        height={32}
-                        className="rounded-full"
-                    />
+                <Link href="/predictions" className="icon-predict flex justify-center">
+                    
                 </Link>
             </div>
 
@@ -159,9 +154,9 @@ const BetsPage = () => {
                     ) : (
                         <>
                             {bets.map((bet: IBet, index: number) => (
-                                <Card key={index} className="hover:shadow-md transition-shadow ">
-                                    <CardBody className="p-2">
-                                        <div className="flex gap-3 items-center">
+                                <Card key={index} className="">
+                                    <CardBody className="p-2 bg-content0">
+                                        <div className="flex gap-4 items-center">
                                             {/* Event Image */}
                                             <div className="w-12 h-12 relative rounded-lg overflow-hidden flex-shrink-0">
                                                 <Image
@@ -172,7 +167,7 @@ const BetsPage = () => {
                                             </div>
 
                                             {/* Title and Category */}
-                                            <div className="flex-grow min-w-0 max-w-[300px]">
+                                            <div className="flex-grow min-w-0 max-w-[400px]">
                                                 <h3 className="text-sm font-regular">
                                                     {bet.description}
                                                 </h3>
@@ -182,7 +177,7 @@ const BetsPage = () => {
                                             </div>
 
                                             {/* Choices */}
-                                            <div className="flex gap-4 min-w-[200px]">
+                                            <div className="flex gap-1 min-w-[80px] flex-col">
                                                 <span className="text-xs">
                                                     <span className="text-default-500">Creator:</span>
                                                     {bet.predicted_outcome ? bet.predicted_outcome : bet.creator_choice}
@@ -190,10 +185,10 @@ const BetsPage = () => {
                                                 <span className="text-xs">
                                                     <span className="text-default-500">You:</span> {bet.choice}
                                                 </span>
-                                            </div>
+                                           
 
                                             {/* Stake */}
-                                            <div className="min-w-[80px] text-center">
+                                           
                                                 <span className="text-xs text-default-500">
                                                     {bet.amount} credits
                                                 </span>

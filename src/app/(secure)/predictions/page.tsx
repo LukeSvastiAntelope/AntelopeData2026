@@ -93,7 +93,11 @@ const Predictions = () => {
     return (
         predictions && predictions.length > 0 &&
 
+        
+
         <div className="min-h-screen flex text-align:center;">
+
+            
         <div className="fixed top-0 left-0">
             <Link href="/">
                 <Image
@@ -129,12 +133,12 @@ const Predictions = () => {
 
         
         <div className="container mx-auto py-6 min-h-screen">
-            <button
+            {/* <button
                 onClick={() => router.back()}
                 className="mb-4 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
             >
                 ← Back
-            </button>
+            </button> */}
             <h1 className="text-2xl font-bold mb-6">Active Predictions</h1>
 
             <div className="grid gap-6 md:grid-cols-3 mb-6">
