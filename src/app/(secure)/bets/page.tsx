@@ -106,42 +106,58 @@ const BetsPage = () => {
     };
 
     return (
-        <div className="min-h-screen flex text-align:center;">
-            <div className="fixed top-0 left-0">
-                <Link href="/">
-                    <Image
-                        src={"/assets/images/logo-simple.svg"}
-                        alt="Hero Image"
-                        width={80}
-                        height={80}
-                        className="rounded-full"
-                    />
-                </Link>
-                <Link href="/" className="icon-profile flex justify-center pb-4 mb-3"></Link>
-                <Link href="/bets" className="icon-bet flex justify-center pb-4 mb-4">
-                    <Image
-                        src={"/assets/images/bet.svg"}
-                        alt="Hero Image"
-                        width={32}
-                        height={32}
-                        className="rounded-full"
-                    />
-                </Link>
-                <Link href="/predictions" className="icon-predict flex justify-center">
-                    
-                </Link>
-            </div>
-
-            <div className="min-h-screen  p-6">
+        <div className="min-h-screen">
+        {/* Responsive Navigation */}
+        <nav className="
+          fixed
+          top-0
+          left-0
+          z-50
+          flex
+          flex-row
+          md:flex-col
+          items-center
+          gap-4
+         
+          w-full
+          md:w-20
+          p-3
+          shadow-md
+          
+        ">
+          {/* Logo/Home Link */}
+          <Link href="/" className="flex items-center gap-2">
+            <Image
+              src={"/assets/images/logo-simple.svg"}
+              alt="Hero Image"
+              width={48}
+              height={48}
+              className="rounded-full"
+            />
+          </Link>
+  
+          {/* Navigation Links */}
+          <div className="flex flex-row md:flex-col gap-4 md:mt-6">
+            <Link href="/" className="icon-profile flex justify-center">
+              
+            </Link>
+            <Link href="/bets" className="flex justify-center">
+              <Image
+                src={"/assets/images/bet.svg"}
+                alt="Bets"
+                width={24}
+                height={24}
+                className="rounded-full"
+              />
+            </Link>
+            <Link href="/predictions" className="icon-predict flex justify-center">
+            
+            </Link>
+          </div>
+        </nav>
+            <div className="pt-16 md:pl-20 p-4">
                 <header className="mb-4">
-                    {/* <Button
-                    className="mb-4"
-                    variant="light"
-                    startContent={<FaArrowLeft />}
-                    onPress={() => router.back()}
-                >
-                    Back
-                </Button> */}
+                   
                     <h1 className="text-3xl font-bold">Your Bets</h1>
                     <p className="text-default-500 text-sm">Track and manage your betting predictions</p>
                 </header>

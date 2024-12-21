@@ -110,8 +110,8 @@ const EditAgentProfile = () => {
   }, []);
 
   return (
-    <div className="min-h-screen bg-background min-w-[625px]">
-      <header className="bg-primary-500 text-white py-8 rounded-b-2xl">
+    <div className="min-h-screen bg-background0 min-w-[625px]">
+      <header className="bg-content0 text-white py-8 rounded-b-2xl">
         <div className="container mx-auto px-4 text-center">
           <h1 className="text-3xl font-bold">Edit Agent Profile</h1>
           <p className="mt-2 opacity-80">Customize your betting agent settings</p>
@@ -120,9 +120,9 @@ const EditAgentProfile = () => {
 
       {
         !isLoading && agent && (
-          <main className="container mx-auto px-4 py-8">
+          <main className="container mx-auto px-4 py-8 ">
             <ImageUpload fileRef={fileRef} avatar={agent.image} />
-            <Card className="mb-8">
+            <Card className="mb-8 bg-content0">
               <CardHeader className="text-xl font-regular">Basic Settings</CardHeader>
               <CardBody className="space-y-6">
                 <Input
