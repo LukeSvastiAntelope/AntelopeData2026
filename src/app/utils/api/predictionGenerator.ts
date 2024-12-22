@@ -188,41 +188,6 @@ export class AIEnhancedPredictionGenerator {
         }
     }
 
-    // private createPromptWithPrinciples(news: NewsItem[]): string {
-    //     const newsContext = news.map(item =>
-    //         `${item.title}\nContext: ${item.snippet}\n`
-    //     ).join('\n');
-
-    //     // Include agent's principles in the prompt
-    //     const principlesContext = this.agent.principles
-    //         .map(p => `${p.title}: ${p.description}`)
-    //         .join('\n');
-
-    //     return `Following these betting principles:
-    // ${principlesContext}
-
-    // And based on the following recent news:
-    // ${newsContext}
-
-    // Generate a prediction about ${this.agent.interests.join(' or ')} that:
-    // - Aligns with the stated betting principles
-    // - Is verifiable within 3 months
-    // - Is specific and measurable
-    // - Includes a clear yes/no outcome
-    // - Considers market trends and developments
-
-    // Format:
-    // {
-    //   "question": "Will X happen by Y date?",
-    //   "description": "Detailed context...",
-    //   "category": "Category",
-    //   "reasoning": "Why this prediction matters and how it aligns with our principles...",
-    //   "sources": ["relevant news links..."],
-    //   "confidence": 0.7,
-    //   "principlesApplied": ["List which principles were applied in making this prediction"]
-    // }`;
-    // }
-
     private async evaluatePredictionAgainstPrinciples(prediction: AutomatedPrediction): Promise<number> {
         try {
             const prompt = `Analyze this prediction against these betting principles:
@@ -315,8 +280,8 @@ export class AIEnhancedPredictionGenerator {
     }
 
     // Update the main generation method
-    async generatePrediction(): Promise<AutomatedPrediction> {
-        let prediction: AutomatedPrediction;
+    async generatePrediction(): Promise<AutomatedPrediction | undefined> {
+        let prediction: AutomatedPrediction | undefined;
         let isValid = false;
         let attempts = 0;
         const MAX_ATTEMPTS = 5;
@@ -324,8 +289,14 @@ export class AIEnhancedPredictionGenerator {
         do {
             if (this.hasSportsInterest()) {
                 prediction = await this.generateSportsPrediction();
+                if (!prediction) {
+                    return undefined;
+                }
             } else {
                 prediction = await this.generateGeneralPrediction();
+                if (!prediction) {
+                    return undefined;
+                }
             }
 
             isValid = await this.validatePrediction(prediction);
@@ -396,8 +367,8 @@ export class AIEnhancedPredictionGenerator {
                     engine: "google_news",
                     q: interest,
                     api_key: this.SERPAPI_API_KEY,
-                    time: "7d", // Last 7 days
-                    num: 10 // Increase number of results
+                    time: "7d",
+                    num: 10
                 });
 
                 const news_results = result.news_results || [];
@@ -482,37 +453,55 @@ export class AIEnhancedPredictionGenerator {
         );
     }
 
-    private async generateSportsPrediction(): Promise<AutomatedPrediction> {
+    private async generateSportsPrediction(): Promise<AutomatedPrediction | undefined> {
         try {
+            const maxAttempts = 10;
+            const usedEventIds: Set<string> = new Set();
+            let attempts = 0;
             const events = await this.getUpcomingSportsEvents();
             if (events.length === 0) {
-                console.log("no events found, retrying...");
-                throw new Error("no events found");
-            }
-            const randomEvents = this.shuffleArray(events).slice(0, 10);
-            const prompt = this.createSportsPrompt(randomEvents);
-            const prediction = await this.generateWithAI(prompt);
-
-            // Ensure the response matches our interface
-            const formattedPrediction: AutomatedPrediction = {
-                question: prediction.question,
-                description: prediction.description,
-                category: 'sportDB',
-                endDate: new Date(prediction.endDate),
-                initialStake: this.calculateStakeBasedOnConfidence(prediction.confidence),
-                choice: prediction.choice || 'Yes',
-                confidence: prediction.confidence,
-                reasoning: prediction.reasoning,
-                event: prediction.event,
-                sources: prediction.sources || []
-            };
-
-            const isSimilar = await this.checkSimilarity(formattedPrediction);
-            if (isSimilar) {
-                return this.generateSportsPrediction();
+                throw new Error("No events found");
             }
 
-            return formattedPrediction;
+            while (attempts < maxAttempts) {
+                console.log("usedEventIds", usedEventIds);
+                // Filter out already used events
+                const unusedEvents = events.filter(event => !usedEventIds.has(event.idEvent));
+
+                if (unusedEvents.length === 0) {
+                    return undefined;
+                }
+
+                const randomEvents = this.shuffleArray(unusedEvents).slice(0, 10);
+                for (const event of randomEvents) {
+                    usedEventIds.add(event.idEvent);
+                }
+
+                const prompt = this.createSportsPrompt(randomEvents);
+                const prediction = await this.generateWithAI(prompt);
+
+                // Ensure the response matches our interface
+                const formattedPrediction: AutomatedPrediction = {
+                    question: prediction.question,
+                    description: prediction.description,
+                    category: 'sportDB',
+                    endDate: new Date(prediction.endDate),
+                    initialStake: this.calculateStakeBasedOnConfidence(prediction.confidence),
+                    choice: prediction.choice || 'Yes',
+                    confidence: prediction.confidence,
+                    reasoning: prediction.reasoning,
+                    event: prediction.event,
+                    sources: prediction.sources || []
+                };
+
+                const isSimilar = await this.checkSimilarity(formattedPrediction);
+                if (!isSimilar) {
+                    return formattedPrediction;
+                } else {
+                    attempts++;
+                    console.log("similar prediction found, retrying...");
+                }
+            }
         } catch (error) {
             console.error('Failed to generate sports prediction:', error);
             throw error;
@@ -606,7 +595,7 @@ export class AIEnhancedPredictionGenerator {
         });
 
         const content = completion.choices[0].message.content || '{"leagues": []}';
-        
+
         // Remove markdown code blocks and clean up the response
         const cleanContent = content
             .replace(/```json\n?/g, '')  // Remove opening code block
@@ -696,7 +685,7 @@ export class AIEnhancedPredictionGenerator {
                         content: prompt
                     }
                 ],
-                temperature: 0.3
+                temperature: 0.7 // Increased temperature for more variety
             });
 
             const content = completion.choices[0].message.content?.trim() || "{}";
@@ -734,7 +723,7 @@ export class AIEnhancedPredictionGenerator {
                 // Generate a fallback prediction with a valid date
                 const fallbackDate = new Date(currentDate);
                 fallbackDate.setDate(currentDate.getDate() + Math.floor(Math.random() * this.agent.maxTimelineLimit) + 1);
-                
+
                 return {
                     ...response,
                     endDate: fallbackDate,
@@ -957,31 +946,6 @@ export class AIEnhancedPredictionGenerator {
         return matrix[str1.length][str2.length];
     }
 
-    private extractNumbers(text: string): number[] {
-        const matches = text.match(/\d+(?:\.\d+)?/g);
-        return matches ? matches.map(Number) : [];
-    }
-
-    private calculateNumericSimilarity(nums1: number[], nums2: number[]): number {
-        if (!nums1.length || !nums2.length) return 0;
-
-        let similarities = 0;
-        let comparisons = 0;
-
-        for (const num1 of nums1) {
-            for (const num2 of nums2) {
-                comparisons++;
-                // Calculate percentage difference
-                const diff = Math.abs(num1 - num2) / Math.max(num1, num2);
-                if (diff < 0.15) { // Numbers within 15% of each other
-                    similarities++;
-                }
-            }
-        }
-
-        return similarities / comparisons;
-    }
-
     private async getEmbedding(text: string): Promise<number[]> {
         const response = await this.openai.embeddings.create({
             model: "text-embedding-ada-002",
@@ -1013,12 +977,6 @@ export class AIEnhancedPredictionGenerator {
             console.error('Failed to store prediction in Pinecone:', error);
         }
     }
-
-    // private calculateEndDate(): Date {
-    //     const endDate = new Date();
-    //     endDate.setMonth(endDate.getMonth() + 3);
-    //     return endDate;
-    // }
 }
 
 // Usage example:

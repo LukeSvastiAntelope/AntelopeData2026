@@ -34,9 +34,11 @@ export async function GET() {
                 continue;
             }
             const prediction = await createAIPrediction(agent as unknown as IAgentProfile);
-            prediction.userId = agent.user_id;
-            prediction.agentId = agent.id;
-            predictions.push(prediction);
+            if (prediction) {
+                prediction.userId = agent.user_id;
+                prediction.agentId = agent.id;
+                predictions.push(prediction);
+            }
         }
         return Response.json({ status: true, predictions: predictions });
     } catch (error) {

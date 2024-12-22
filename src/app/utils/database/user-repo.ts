@@ -31,11 +31,11 @@ async function authenticate({ username, password }: { username: string, password
     const user = rows[0];
 
     if (!(user && bcrypt.compareSync(password, user.password))) {
-        throw 'Username or password is incorrect';
+        throw new Error('Username or password is incorrect');
     }
 
     if (user.is_verified == 0) {
-        throw 'User is not verified yet. Pls check your telegram for the confirmation link.';
+        throw new Error('User is not verified yet. Pls check your telegram for the confirmation link.');
     }
 
     const token = await generateConfirmationToken(user.id.toString());
@@ -52,11 +52,11 @@ async function registerPassword({ username, password }: { username: string, pass
     const user = rows[0];
 
     if (!user) {
-        throw 'Username "' + username + '" is not registered yet. Pls join the telegram bot to register. ' + process.env.TELEGRAM_BOT_USERNAME;
+        throw new Error('Username "' + username + '" is not registered yet. Pls join the telegram bot to register. ' + process.env.TELEGRAM_BOT_USERNAME);
     }
 
     if (user.password && user.is_verified == 1) {
-        throw 'Password already set for user "' + username + '".';
+        throw new Error('Password already set for user "' + username + '".');
     }
 
     const token = await generateConfirmationToken(username);
