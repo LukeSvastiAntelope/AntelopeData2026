@@ -345,12 +345,19 @@ export class AutomaticBettingAgent {
 
                     if (!isValid) {
                         console.error('Invalid prediction format:', p);
+                        return false;
                     }
 
                     const prediction = predictions.find(pred => pred.id === p.id);
                     const existingBet = prediction?.agent_bets ?
                         this.parseAgentBets(prediction.agent_bets)[this.agent.id] :
                         null;
+
+                    // Check if agent has already bet twice
+                    if (existingBet && existingBet.betCount && existingBet.betCount >= 2) {
+                        console.log(`Agent ${this.agent.id} has already bet twice on prediction ${p.id}`);
+                        return false;
+                    }
 
                     // Validate bet amount doesn't exceed remaining limit
                     if (existingBet) {
@@ -637,13 +644,21 @@ export class AutomaticBettingAgent {
         return decisions;
     }
 
-    private parseAgentBets(agentBetsStr: string | null): Record<string, { amount: number, choice: string }> {
+    private parseAgentBets(agentBetsStr: string | null): Record<string, { id: number, amount: number, choice: string, betCount?: number }> {
         if (!agentBetsStr) return {};
 
-        const result: Record<string, { amount: number, choice: string }> = {};
+        const result: Record<string, { id: number, amount: number, choice: string, betCount: number }> = {};
+        const betsPerAgent: Record<string, number> = {};
+
         agentBetsStr.split(',').forEach(bet => {
-            const [agentId, amount, choice] = bet.split(':');
-            result[agentId] = { amount: Number(amount), choice };
+            const [id, agentId, amount, choice] = bet.split(':');
+            betsPerAgent[agentId] = (betsPerAgent[agentId] || 0) + 1;
+            result[agentId] = { 
+                id: Number(id), 
+                amount: Number(amount), 
+                choice,
+                betCount: betsPerAgent[agentId]
+            };
         });
         return result;
     }
