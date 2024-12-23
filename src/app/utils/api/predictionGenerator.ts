@@ -795,12 +795,15 @@ export class AIEnhancedPredictionGenerator {
 
             // Get recent predictions from Pinecone
             const index = this.pinecone.Index('predictions');
+            const thirtyDaysAgo = new Date();
+            thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
             const queryResponse = await index.query({
                 vector: await this.getEmbedding(prediction.question),
                 topK: 5,
                 includeMetadata: true,
                 filter: {
-                    category: "Sports"
+                    category: "Sports",
+                    timestamp: { $gte: Math.floor(thirtyDaysAgo.getTime() / 1000) }
                 }
             });
 

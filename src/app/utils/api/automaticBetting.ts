@@ -359,15 +359,6 @@ export class AutomaticBettingAgent {
                         return false;
                     }
 
-                    // Validate bet amount doesn't exceed remaining limit
-                    if (existingBet) {
-                        const totalBetAmount = existingBet.amount + this.calculateBetAmount(p.confidence);
-                        if (totalBetAmount > this.agent.maxBetSize) {
-                            console.error(`Total bet amount ${totalBetAmount} exceeds max limit ${this.agent.maxBetSize}`);
-                            return false;
-                        }
-                    }
-
                     return isValid && p.shouldBet && p.confidence > 0;
                 })
                 .map((p: PredictionAnalysis) => ({
