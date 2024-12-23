@@ -27,12 +27,13 @@ import {
 import { CircularProgress } from '@nextui-org/progress';
 import { buyTransaction } from '@/app/utils/buyTransaction';
 import { loadStripe } from '@stripe/stripe-js';
+import { mintNft } from '@/app/utils/mintNft';
 
 const PaymentPage = () => {
     const wallet = useWallet();
     const { connection } = useConnection();
     const [amount, setAmount] = useState('');
-    const [, setAgent] = useState<IAgentProfile | null>(null);
+    const [agent, setAgent] = useState<IAgentProfile | null>(null);
     const [agentBalance, setAgentBalance] = useState(0);
     const [solPrice, setSolPrice] = useState(0);
     const [paymentMethod, setPaymentMethod] = useState('sol');
@@ -45,6 +46,7 @@ const PaymentPage = () => {
     const fetchData = useFetch();
     const { isOpen, onOpen, onClose } = useDisclosure();
     const [isProcessing, setIsProcessing] = useState(false);
+    const [isMinting, setIsMinting] = useState(false);
 
     const isWithdrawDisabled = () => {
         return true;
@@ -141,7 +143,29 @@ const PaymentPage = () => {
     };
 
     const handleMintNFT = async () => {
-        // Implement NFT minting logic
+        if (!agent) {
+            toast.error("Please update your agent profile first");
+            return;
+        }
+        setIsMinting(true);
+        try {
+            const nftAddress = await mintNft(wallet, agent);
+            const result = await fetchData.post('/api/saveNftAddress', {
+                id: agent.id,
+                nft_address: nftAddress
+            });
+            if (result.status) {
+                toast.success("NFT minted successfully");
+                console.log(nftAddress);
+                setAgent({ ...agent, nft_address: nftAddress });
+            } else {
+                toast.error("Failed to mint NFT: " + result.message);
+            }
+        } catch (error) {
+            console.log(error);
+            toast.error("Failed to mint NFT: " + error);
+        }
+        setIsMinting(false);
     };
 
     const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -365,22 +389,29 @@ const PaymentPage = () => {
                 <CardBody className="space-y-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="space-y-4">
-                            <h3 className="text-xl font-semibold">Mint New NFT</h3>
+                            <h3 className="text-xl font-semibold">Mint NFT with your agent</h3>
                             <p className="text-default-500">
                                 Create your unique NFT on the Solana blockchain. Each NFT represents exclusive benefits in our platform.
                             </p>
                             <Button
-                                color="secondary"
+                                color="primary"
                                 size="lg"
                                 className="w-full"
                                 onPress={handleMintNFT}
+                                isDisabled={isMinting ? true : false}
                             >
-                                Mint NFT
+                                {isMinting ? <CircularProgress size="sm" color="primary" /> : agent?.nft_address ? "Update NFT" : "Mint NFT"}
                             </Button>
                         </div>
                         <div className="bg-default-100 rounded-lg p-4 text-center">
                             <h3 className="text-xl font-semibold mb-2">Your NFT Collection</h3>
-                            <p className="text-default-500">0 NFTs owned</p>
+                            <p className="text-default-500">
+                                {
+                                    agent?.nft_address ?
+                                        <p className="text-default-500">Your NFT address: {agent?.nft_address}</p> :
+                                        <p className="text-default-500">You have not minted an NFT yet.</p>
+                                }
+                            </p>
                         </div>
                     </div>
                 </CardBody>
