@@ -1,47 +1,37 @@
 export const dynamic = 'force-dynamic';
 import { UserRepo } from "@/app/utils/database/user-repo";
-import { BetDecision, Prediction } from "@/app/utils/interface";
+import { Prediction } from "@/app/utils/interface";
 import { automaticBettingOnList } from "@/app/utils/api/automaticBetting";
+import { NextRequest } from "next/server";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+    const agent_id = req.nextUrl.searchParams.get('agentId');
     try {
-        const agentList = await UserRepo.getAgents();
+        const agent = await UserRepo.getAgentById(Number(agent_id));
+        if (!agent) {
+            return Response.json({ status: false, message: 'Agent not found' });
+        }
         const predictions = await UserRepo.getOpenPredictions();
-        
-        const bets: BetDecision[] = [];
 
-        for (const agent of agentList) {
-            if (typeof agent.interests === 'string') {
-                agent.interests = agent.interests.split(',');
+        if (typeof agent.interests === 'string') {
+            agent.interests = agent.interests.split(',');
+        }
+        try {
+            if (typeof agent.principles === 'string') {
+                agent.principles = JSON.parse(agent.principles);
             }
-            try {
-                if (typeof agent.principles === 'string') {
-                    agent.principles = JSON.parse(agent.principles);
-                }
-                if (!Array.isArray(agent.principles)) {
-                    agent.principles = [];
-                }
-            } catch (e) {
-                console.log("Error in principles: ", e);
+            if (!Array.isArray(agent.principles)) {
                 agent.principles = [];
             }
-            if (
-                agent.maxTimelineLimit == 0 ||
-                agent.principles.length == 0 ||
-                agent.interests.length == 0 ||
-                agent.name == "" ||
-                agent.description == "" ||
-                agent.maxBetSize == 0
-            ) {
-                continue;
-            }
-            const agentBets = await automaticBettingOnList(agent, predictions as Prediction[]);
-            bets.push(...agentBets);
+        } catch (e) {
+            console.log("Error in principles: ", e);
+            agent.principles = [];
         }
-
-        return Response.json({ status: true, bets: bets });
+        
+        const agentBets = await automaticBettingOnList(agent, predictions as Prediction[]);
+        return Response.json({ status: true, bets: agentBets });
     } catch (error) {
-        console.error("Error in getAgentProfile: ", error);
+        console.error("Error in createAgentBet: ", error);
         return Response.json({
             status: false,
             message: error instanceof Error ? error.message : 'Internal server error'

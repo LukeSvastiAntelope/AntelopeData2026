@@ -542,11 +542,11 @@ export class AIEnhancedPredictionGenerator {
     private async determineSportTypes(): Promise<string[]> {
         // Map interests to league IDs from TheSportsDB
         const response = await fetch(
-            `https://www.thesportsdb.com/api/v1/json/3/all_leagues.php`
+            `https://www.thesportsdb.com/api/v1/json/${this.SPORTS_API_KEY}/all_leagues.php`
         );
         const data = await response.json();
         const leagues = data.leagues;
-        const matchedLeagues = leagues.filter((league: ILeague) => league.strSport.toLowerCase() == this.agent.category);
+        const matchedLeagues = leagues.filter((league: ILeague) => (league.strSport.toLowerCase() == this.agent.category || league.strLeague.toLowerCase() == this.agent.category));
         const availableLeagues = await this.generateInterestLeaguesWithAI(matchedLeagues);
         return availableLeagues.map((league: ILeague) => league.idLeague);
     }

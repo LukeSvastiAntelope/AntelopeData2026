@@ -2,47 +2,34 @@ export const dynamic = 'force-dynamic'
 
 import { UserRepo } from "@/app/utils/database/user-repo";
 import { createAIPrediction } from "@/app/utils/api/predictionGenerator";
-import { AutomatedPrediction, IAgentProfile } from "@/app/utils/interface";
+import { IAgentProfile } from "@/app/utils/interface";
+import { NextRequest } from "next/server";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+    const agent_id = req.nextUrl.searchParams.get('agentId');
     try {
-        const agentList = await UserRepo.getAgents();
-        const predictions: AutomatedPrediction[] = [];
-        for (const agent of agentList) {
-            if (typeof agent.interests === 'string') {
-                agent.interests = agent.interests.split(',');
+        const agent = await UserRepo.getAgentById(Number(agent_id));
+        if (!agent) {
+            return Response.json({ status: false, message: 'Agent not found' });
+        }
+        if (typeof agent.interests === 'string') {
+            agent.interests = agent.interests.split(',');
+        }
+        try {
+            if (typeof agent.principles === 'string') {
+                agent.principles = JSON.parse(agent.principles);
             }
-            try {
-                if (typeof agent.principles === 'string') {
-                    agent.principles = JSON.parse(agent.principles);
-                }
-                if (!Array.isArray(agent.principles)) {
-                    agent.principles = [];
-                }
-            } catch (e) {
-                console.log("Error in principles: ", e);
+            if (!Array.isArray(agent.principles)) {
                 agent.principles = [];
             }
-            if (
-                agent.maxTimelineLimit == 0 ||
-                agent.principles.length == 0 ||
-                agent.interests.length == 0 ||
-                agent.name == "" ||
-                agent.description == "" ||
-                agent.maxBetSize == 0
-            ) {
-                continue;
-            }
-            const prediction = await createAIPrediction(agent as unknown as IAgentProfile);
-            if (prediction) {
-                prediction.userId = agent.user_id;
-                prediction.agentId = agent.id;
-                predictions.push(prediction);
-            }
+        } catch (e) {
+            console.log("Error in principles: ", e);
+            agent.principles = [];
         }
-        return Response.json({ status: true, predictions: predictions });
+        const prediction = await createAIPrediction(agent as unknown as IAgentProfile);
+        return Response.json({ status: true, prediction: prediction });
     } catch (error) {
-        console.error("Error in getAgentProfile: ", error);
+        console.error("Error in createAgentPrediction: ", error);
         return Response.json({
             status: false,
             message: error instanceof Error ? error.message : 'Internal server error'

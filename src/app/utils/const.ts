@@ -7,7 +7,7 @@ export const AGENT_RISK_LEVEL = [
 export const CATEGORIES = [
     'General',
     'Soccer',
-    'PremierLeague',
+    'English Premier League',
     'NBA',
     'NFL',
 ]

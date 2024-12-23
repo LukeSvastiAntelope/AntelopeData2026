@@ -12,6 +12,7 @@ export const UserRepo = {
     verifyAccount,
     getUserById,
     getAgentByUserId,
+    getAgentById,
     createAgent,
     updateAgent,
     getAgents,
@@ -104,6 +105,12 @@ async function getAgents() {
     const db = await getMySQLConnection();
     const [rows] = await db.execute<(AgentDB & RowDataPacket)[]>('SELECT * FROM agents');
     return rows;
+}
+
+async function getAgentById(id: number) {
+    const db = await getMySQLConnection();
+    const [rows] = await db.execute<(AgentDB & RowDataPacket)[]>('SELECT * FROM agents WHERE id = ?', [id]);
+    return rows[0];
 }
 
 async function getOpenPredictions() {
