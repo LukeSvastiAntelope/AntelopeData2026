@@ -23,7 +23,8 @@ export const UserRepo = {
     createPaymentIntent,
     getPaymentIntent,
     updatePaymentIntent,
-    updateAgentBalance
+    updateAgentBalance,
+    updateAgentNftAddress
 }
 
 async function authenticate({ username, password }: { username: string, password: string }) {
@@ -187,4 +188,9 @@ async function updatePaymentIntent(paymentId: string, status: string) {
 async function updateAgentBalance(agentId: number, creditAmount: number) {
     const db = await getMySQLConnection();
     await db.execute('UPDATE agents SET wallet_balance = wallet_balance + ? WHERE id = ?', [creditAmount, agentId]);
+}
+
+async function updateAgentNftAddress(agentId: number, nftAddress: string) {
+    const db = await getMySQLConnection();
+    await db.execute('UPDATE agents SET nft_address = ? WHERE id = ?', [nftAddress, agentId]);
 }

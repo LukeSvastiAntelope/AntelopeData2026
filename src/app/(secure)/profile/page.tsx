@@ -167,59 +167,57 @@ const AgentProfile = () => {
 
     return (
         <div className="min-h-screen">
-        {/* Responsive Navigation */}
-        <nav className="
-          fixed
-          top-0
-          left-0
-          z-50
-          flex
-          flex-row
-          md:flex-col
-          items-center
-          gap-4
-         
-          w-full
-          md:w-20
-          p-3
-          shadow-md
-          
-        ">
-          {/* Logo/Home Link */}
-          <Link href="/" className="flex items-center gap-2">
-            <Image
-              src={"/assets/images/logo-simple.svg"}
-              alt="Hero Image"
-              width={48}
-              height={48}
-              className="rounded-full"
-            />
-          </Link>
-  
-          {/* Navigation Links */}
-          <div className="flex flex-row md:flex-col gap-4 md:mt-6">
-            <Link href="/" className=" flex justify-center">
-            <Image
-                src={"/assets/images/profile.svg"}
-                alt="Bets"
-                width={24}
-                height={24}
-                
-              />
-            </Link>
-            <Link href="/bets" className="icon-bet flex justify-center">
-             
-            </Link>
-            <Link href="/predictions" className="icon-predict flex justify-center">
-            
-            </Link>
-          </div>
-        </nav>
+            {/* Responsive Navigation */}
+            <nav className="
+                fixed
+                top-0
+                left-0
+                z-50
+                flex
+                flex-row
+                md:flex-col
+                items-center
+                gap-4
+                w-full
+                md:w-20
+                p-3
+                shadow-md
+            ">
+                {/* Logo/Home Link */}
+                <Link href="/" className="flex items-center gap-2">
+                    <Image
+                        src={"/assets/images/logo-simple.svg"}
+                        alt="Hero Image"
+                        width={48}
+                        height={48}
+                        className="rounded-full"
+                    />
+                </Link>
+
+                {/* Navigation Links */}
+                <div className="flex flex-row md:flex-col gap-4 md:mt-6">
+                    <Link href="/" className=" flex justify-center">
+                        <Image
+                            src={"/assets/images/profile.svg"}
+                            alt="Bets"
+                            width={24}
+                            height={24}
+
+                        />
+                    </Link>
+                    <Link href="/bets" className="icon-bet flex justify-center">
+
+                    </Link>
+                    <Link href="/predictions" className="icon-predict flex justify-center">
+
+                    </Link>
+                </div>
+            </nav>
             <div className="fixed top-0 right-0 p-4">
                 <Card className="bg-content0 hover:shadow-lg transition-all duration-300 border border-primary/20">
                     <CardBody className="p-2">
                         <Button
-                            variant="light" 
+                            variant="light"
                             className="flex flex-col items-start gap-2 p-2 hover:bg-primary/10 rounded-xl"
                             href="/payment"
                             as={Link}
@@ -239,9 +237,9 @@ const AgentProfile = () => {
 
             <div className="container mx-auto px-4 py-8">
                 {/* Header */}
-               
+
                 <div className="text-white py-8 flex justify-between items-center px-2 rounded-b-2xl flex-row">
-                <Image
+                    <Image
                         src={agent?.image || '/assets/images/default-agent.png'}
                         alt="Agent Image"
                         className="w-[100px] h-[100px] rounded-full"
@@ -261,7 +259,7 @@ const AgentProfile = () => {
                             Edit Profile
                         </Button>
                     </div>
-                   
+
                 </div>
 
                 {/* Main Content */}

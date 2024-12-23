@@ -14,6 +14,7 @@ export interface IAgentProfile {
     category: string;
     maxTimelineLimit: number;
     wallet_balance: number;
+    nft_address: string;
 }
 
 export interface IFormDataAgentProfile {
