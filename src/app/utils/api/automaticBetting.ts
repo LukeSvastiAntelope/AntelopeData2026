@@ -103,7 +103,7 @@ export class AutomaticBettingAgent {
     }
 
     private isSportsCategory(): boolean {
-        const sportsCategories = ['premierleague', 'soccer', 'nba', 'nfl'];
+        const sportsCategories = ['english premier league', 'soccer', 'nba', 'nfl'];
 
         return sportsCategories.some(category =>
             category == this.agent.category
