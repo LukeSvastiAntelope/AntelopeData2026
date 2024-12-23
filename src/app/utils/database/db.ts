@@ -15,7 +15,20 @@ const connectionParams = {
     keepAliveInitialDelay: 0
 }
 
+// Create a single pool instance
+let pool: mysql.Pool | null = null;
+
 export const openSql = async () => {
-    const connection = await mysql.createPool(connectionParams);
-    return connection;
+    if (!pool) {
+        pool = mysql.createPool(connectionParams);
+    }
+    return pool;
+}
+
+// Add a method to explicitly close the pool if needed
+export const closePool = async () => {
+    if (pool) {
+        await pool.end();
+        pool = null;
+    }
 }

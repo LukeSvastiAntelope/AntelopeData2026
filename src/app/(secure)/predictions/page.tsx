@@ -16,6 +16,7 @@ import { useEffect, useState } from "react";
 import { useFetch } from "@/app/utils/lib";
 import { formatDate } from "date-fns";
 import Link from "next/link";
+import { toast } from "react-hot-toast";
 
 interface IPrediction {
     id: string;
@@ -44,28 +45,34 @@ const Predictions = () => {
     useEffect(() => {
         const fetchPredictions = async () => {
             const response = await fetch.get('/api/getPredictionHistory');
-            setPredictions(response.predictions);
-            setDisplayedPredictions(response.predictions.slice(0, ITEMS_PER_PAGE));
-            setHasMore(response.predictions.length > ITEMS_PER_PAGE);
-            setIsLoading(false);
+            if (response.status) {
+                setPredictions(response.predictions);
+                setDisplayedPredictions(response.predictions.slice(0, ITEMS_PER_PAGE));
+                setHasMore(response.predictions.length > ITEMS_PER_PAGE);
+                setIsLoading(false);
+            } else {
+                toast.error(response.message);
+                setIsLoading(false);
+            }
+
         };
         fetchPredictions();
     }, []);
 
     useEffect(() => {
         const loadMore = () => {
-            setTimeout(() => {
-                const nextItems = predictions.slice(0, (page + 1) * ITEMS_PER_PAGE);
-                setDisplayedPredictions(nextItems);
-                setHasMore(nextItems.length < predictions.length);
-                setPage(prev => prev + 1);
-            }, 3000);
+            const nextItems = predictions.slice(0, (page + 1) * ITEMS_PER_PAGE);
+            setDisplayedPredictions(nextItems);
+            setHasMore(nextItems.length < predictions.length);
+            setPage(prev => prev + 1);
         };
 
         const observer = new IntersectionObserver(
             (entries) => {
                 if (entries[0].isIntersecting && hasMore) {
-                    loadMore();
+                    requestAnimationFrame(() => {
+                        loadMore();
+                    });
                 }
             },
             { threshold: 0.5 }
@@ -160,28 +167,27 @@ const Predictions = () => {
                         </Card>
                     </div>
 
+                    {/* Table Description */}
+                    <p className="text-gray-500 mb-4">
+                        Below table shows your predictions, their sources, placed bets, and current status
+                    </p>
+
                     {/* Responsive Table (horizontal scroll on small screens) */}
                     <Card>
                         <CardBody className="p-0 overflow-x-auto">
                             <Table
-                                className="min-w-[600px]" /* ensure table doesn't shrink below columns */
+                                aria-label="Predictions table"
+                                className="min-w-[600px]"
                             >
                                 <TableHeader>
-                                    <TableRow>
-                                        <TableCell colSpan={8} className="bg-content0 text-sm text-center p-2">
-                                            Below table shows your predictions, source, bets, and status
-                                        </TableCell>
-                                    </TableRow>
-                                    <TableRow>
-                                        <TableColumn>Image</TableColumn>
-                                        <TableColumn maxWidth={300}>Description</TableColumn>
-                                        <TableColumn>Source</TableColumn>
-                                        <TableColumn>Bet</TableColumn>
-                                        <TableColumn>Amount</TableColumn>
-                                        <TableColumn>Resolution Date</TableColumn>
-                                        <TableColumn>Bets Count</TableColumn>
-                                        <TableColumn>Status</TableColumn>
-                                    </TableRow>
+                                    <TableColumn>Image</TableColumn>
+                                    <TableColumn maxWidth={300}>Description</TableColumn>
+                                    <TableColumn>Source</TableColumn>
+                                    <TableColumn>Bet</TableColumn>
+                                    <TableColumn>Amount</TableColumn>
+                                    <TableColumn>Resolution Date</TableColumn>
+                                    <TableColumn>Bets Count</TableColumn>
+                                    <TableColumn>Status</TableColumn>
                                 </TableHeader>
                                 <TableBody>
                                     {displayedPredictions.map((prediction, index) => (

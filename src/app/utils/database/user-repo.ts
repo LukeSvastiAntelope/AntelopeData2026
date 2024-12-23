@@ -28,23 +28,31 @@ export const UserRepo = {
 }
 
 async function authenticate({ username, password }: { username: string, password: string }) {
-    const db = await getMySQLConnection();
-    const [rows] = await db.execute<(UserDB & RowDataPacket)[]>('SELECT * FROM users WHERE username = ?', [username]);
-    const user = rows[0];
+    const pool = await getMySQLConnection();
+    try {
+        const [rows] = await pool.execute<(UserDB & RowDataPacket)[]>(
+            'SELECT * FROM users WHERE username = ?', 
+            [username]
+        );
+        const user = rows[0];
 
-    if (!(user && bcrypt.compareSync(password, user.password))) {
-        throw new Error('Username or password is incorrect');
-    }
+        if (!(user && bcrypt.compareSync(password, user.password))) {
+            throw new Error('Username or password is incorrect');
+        }
 
-    if (user.is_verified == 0) {
-        throw new Error('User is not verified yet. Pls check your telegram for the confirmation link.');
-    }
+        if (user.is_verified == 0) {
+            throw new Error('User is not verified yet. Pls check your telegram for the confirmation link.');
+        }
 
-    const token = await generateConfirmationToken(user.id.toString());
+        const token = await generateConfirmationToken(user.id.toString());
 
-    return {
-        user: user,
-        token
+        return {
+            user: user,
+            token
+        }
+    } catch (error) {
+        // Handle or rethrow the error as needed
+        throw error;
     }
 }
 
