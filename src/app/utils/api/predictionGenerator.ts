@@ -319,7 +319,8 @@ export class AIEnhancedPredictionGenerator {
         prediction.principleScore = principleScore;
 
         const enrichedPrediction = await this.enrichPredictionWithImages(prediction);
-        await this.storePrediction(enrichedPrediction);
+        const pineconeId = await this.storePrediction(enrichedPrediction);
+        enrichedPrediction.pineconeId = pineconeId;
 
         return enrichedPrediction;
     }
@@ -958,14 +959,15 @@ export class AIEnhancedPredictionGenerator {
         return response.data[0].embedding;
     }
 
-    private async storePrediction(prediction: AutomatedPrediction) {
+    private async storePrediction(prediction: AutomatedPrediction): Promise<string> {
         try {
             const normalizedText = `${prediction.question} ${prediction.description}`.toLowerCase();
             const embedding = await this.getEmbedding(normalizedText);
+            const id = `prediction-${Date.now()}`;
 
             const index = this.pinecone.Index('predictions');
             await index.upsert([{
-                id: Date.now().toString(),
+                id: id,
                 values: embedding,
                 metadata: {
                     question: prediction.question,
@@ -973,11 +975,22 @@ export class AIEnhancedPredictionGenerator {
                     category: prediction.category,
                     timestamp: Math.floor(new Date().getTime() / 1000),
                     creator_choice: prediction.choice,
-                    event: prediction.event ? JSON.stringify(prediction.event) : ""
+                    event: prediction.event ? JSON.stringify(prediction.event) : "",
+                    initial_stake: prediction.initialStake,
+                    confidence: prediction.confidence,
+                    reasoning: prediction.reasoning,
+                    sources: prediction.sources ? JSON.stringify(prediction.sources) : "",
+                    principles_applied: prediction.principlesApplied ? JSON.stringify(prediction.principlesApplied) : "",
+                    principle_score: prediction.principleScore ? prediction.principleScore : 0,
+                    user_id: prediction.userId ? prediction.userId : 0,
+                    agent_id: prediction.agentId ? prediction.agentId : 0
                 }
             }]);
+
+            return id;
         } catch (error) {
             console.error('Failed to store prediction in Pinecone:', error);
+            return '';
         }
     }
 }

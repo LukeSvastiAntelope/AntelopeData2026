@@ -61,6 +61,7 @@ export interface AutomatedPrediction {
     principleScore?: number;
     userId?: number;
     agentId?: number;
+    pineconeId?: string;
 }
 
 export interface SportsEvent {
