@@ -987,6 +987,24 @@ export class AIEnhancedPredictionGenerator {
                 }
             }]);
 
+            const newIndex = this.pinecone.Index('predictions-results');
+            await newIndex.upsert([{
+                id: id,
+                values: embedding,
+                metadata: {
+                    description: prediction.description,
+                    choice: prediction.choice,
+                    amount: prediction.initialStake,
+                    status: 'pending',  // Will need to be updated when prediction resolves
+                    created_at: new Date().toISOString(),
+                    agent_id: prediction.agentId || 0,
+                    prediction_id: 0,
+                    confidence: prediction.confidence,
+                    reasoning: prediction.reasoning,
+                    result: 'pending'
+                }
+            }]);
+
             return id;
         } catch (error) {
             console.error('Failed to store prediction in Pinecone:', error);
