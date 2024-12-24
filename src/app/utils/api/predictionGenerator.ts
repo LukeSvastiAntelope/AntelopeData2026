@@ -987,7 +987,7 @@ export class AIEnhancedPredictionGenerator {
                 }
             }]);
 
-            const newIndex = this.pinecone.Index('predictions-results');
+            const newIndex = this.pinecone.Index('prediction-results');
             await newIndex.upsert([{
                 id: id,
                 values: embedding,
