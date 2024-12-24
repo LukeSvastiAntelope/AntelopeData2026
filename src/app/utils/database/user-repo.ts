@@ -3,7 +3,7 @@ import { openSql as getMySQLConnection } from "./db";
 import { generateConfirmationToken } from "../api/token";
 import { AGENT_RISK_LEVEL } from "../const";
 import { IFormDataAgentProfile } from "../interface";
-import { UserDB, AgentDB, PaymentIntentDB } from "../interface";
+import { UserDB, AgentDB, PaymentIntentDB, PredictionDB } from "../interface";
 import { RowDataPacket } from 'mysql2/promise';
 
 export const UserRepo = {
@@ -24,14 +24,15 @@ export const UserRepo = {
     getPaymentIntent,
     updatePaymentIntent,
     updateAgentBalance,
-    updateAgentNftAddress
+    updateAgentNftAddress,
+    getPredictionById,
 }
 
 async function authenticate({ username, password }: { username: string, password: string }) {
     const pool = await getMySQLConnection();
     try {
         const [rows] = await pool.execute<(UserDB & RowDataPacket)[]>(
-            'SELECT * FROM users WHERE username = ?', 
+            'SELECT * FROM users WHERE username = ?',
             [username]
         );
         const user = rows[0];
@@ -171,7 +172,7 @@ async function getBetsByAgentId(id: number) {
 async function getBetHistoryByAgentId(id: number, limit: number, offset: number) {
     const db = await getMySQLConnection();
     const [rows] = await db.execute(
-        `SELECT * FROM bets JOIN predictions ON bets.prediction_id = predictions.id WHERE bets.agent_id = ? ORDER BY bets.created_at DESC LIMIT ${limit} OFFSET ${offset}`, 
+        `SELECT * FROM bets JOIN predictions ON bets.prediction_id = predictions.id WHERE bets.agent_id = ? ORDER BY bets.created_at DESC LIMIT ${limit} OFFSET ${offset}`,
         [id]
     );
     return rows;
@@ -201,4 +202,43 @@ async function updateAgentBalance(agentId: number, creditAmount: number) {
 async function updateAgentNftAddress(agentId: number, nftAddress: string) {
     const db = await getMySQLConnection();
     await db.execute('UPDATE agents SET nft_address = ? WHERE id = ?', [nftAddress, agentId]);
+}
+
+async function getPredictionById(id: string) {
+    try {
+        const db = await getMySQLConnection();
+        const [rows] = await db.execute<(PredictionDB & RowDataPacket)[]>(`
+            SELECT 
+                p.*,
+                (SELECT COUNT(*) FROM bets WHERE prediction_id = p.id AND agent_id != 0 AND choice = 'yes') as yes_count,
+                (SELECT COUNT(*) FROM bets WHERE prediction_id = p.id AND agent_id != 0 AND choice = 'no') as no_count,
+                GROUP_CONCAT(
+                    JSON_OBJECT(
+                        'id', b.id,
+                        'agent_id', b.agent_id,
+                        'amount', b.amount,
+                        'choice', b.choice,
+                        'reason', b.reason,
+                        'pinecone_id', b.pinecone_id
+                    )
+                ) as bets
+            FROM predictions p
+            LEFT JOIN bets b ON p.id = b.prediction_id 
+            WHERE p.id = ?
+            GROUP BY p.id`,
+            [id]
+        );
+
+        console.log(id, rows);
+        
+        // Parse the GROUP_CONCAT result into a proper array
+        if (rows[0]) {
+            rows[0].bets = rows[0].bets ? JSON.parse(`[${rows[0].bets}]`) : [];
+        }
+        
+        return rows[0];
+    } catch (error) {
+        console.error("Error in getPredictionById: ", error);
+        throw error;
+    }
 }

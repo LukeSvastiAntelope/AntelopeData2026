@@ -178,6 +178,8 @@ export interface IBet {
     resolution_date: string;
     creator_choice: string;
     reason: string;
+    pinecone_id: string;
+    agent_id: number;
 }
 
 export interface SerpApiNewsResult {
@@ -230,4 +232,35 @@ export interface PaymentIntentDB {
     from_address: string;
     status: string;
     expires_at: string;
+}
+
+export interface PredictionDB {
+    id: number;
+    creator_id: number;
+    description: string;
+    source: string;
+    status: string;
+    created_at: string;
+    resolution_date: string;
+    bet_amount: number;
+    creator_choice: string;
+    source_url: string;
+    bet_type: string;
+    fixed_odds: string;
+    event_id: number;
+    league_id: number;
+    team_a: string;
+    team_b: string;
+    str_thumb: string;
+    outcome: string;
+    predicted_outcome: string;
+    source_type: string;
+    updated_at: string;
+    group_info: string;
+    group_id: string;
+    agent_id: number;
+    pinecone_id: string;
+    bets?: IBet[];
+    yes_count: number;
+    no_count: number;
 }

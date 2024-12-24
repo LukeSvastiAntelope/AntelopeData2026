@@ -447,7 +447,7 @@ export class AIEnhancedPredictionGenerator {
     }
 
     private hasSportsInterest(): boolean {
-        const sportsCategories = ['premierleague', 'soccer', 'nba', 'nfl'];
+        const sportsCategories = ['english premier league', 'soccer', 'nba', 'nfl'];
 
         return sportsCategories.some(category =>
             category == this.agent.category

@@ -17,6 +17,7 @@ import { useFetch } from "@/app/utils/lib";
 import { formatDate } from "date-fns";
 import Link from "next/link";
 import { toast } from "react-hot-toast";
+import { useRouter } from "next/navigation";
 
 interface IPrediction {
     id: string;
@@ -41,6 +42,7 @@ const Predictions = () => {
     const [page, setPage] = useState(1);
     const [hasMore, setHasMore] = useState(true);
     const fetch = useFetch();
+    const router = useRouter();
 
     useEffect(() => {
         const fetchPredictions = async () => {
@@ -212,7 +214,11 @@ const Predictions = () => {
                                     </TableHeader>
                                     <TableBody>
                                         {displayedPredictions.map((prediction, index) => (
-                                            <TableRow key={index}>
+                                            <TableRow 
+                                                key={index} 
+                                                className="cursor-pointer hover:bg-content2"
+                                                onClick={() => router.push(`/predictions/${prediction.id}`)}
+                                            >
                                                 <TableCell>
                                                     <Image
                                                         src={prediction.str_thumb}
