@@ -106,6 +106,7 @@ export interface BetDecision {
     riskAssessment: string;
     opposingCreator?: boolean;
     userId?: number;
+    pineconeId?: string;
 }
 
 export interface Prediction {

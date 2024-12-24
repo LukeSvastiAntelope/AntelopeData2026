@@ -88,14 +88,24 @@ export class AutomaticBettingAgent {
 
             const betDecisionsPromises = Object.entries(groupedPredictions)
                 .map(async ([, topicPredictions]) => {
-                    // Pass predictions instead of topic string
                     const news = await this.gatherRelevantNews(topicPredictions);
                     const similarPredictions = await this.findSimilarPredictions(topicPredictions);
-                    return this.analyzeGroupWithGPT(topicPredictions, news, similarPredictions);
+                    const decisions = await this.analyzeGroupWithGPT(topicPredictions, news, similarPredictions);
+                    
+                    // Store each bet decision in Pinecone
+                    await Promise.all(decisions.map(async (decision) => {
+                        const prediction = topicPredictions.find(p => p.id === decision.predictionId);
+                        if (prediction) {
+                            const pineconeId = await this.storeBetInPinecone(decision, prediction);
+                            decision.pineconeId = pineconeId;
+                        }
+                    }));
+
+                    return decisions;
                 });
 
             const groupResults = await Promise.all(betDecisionsPromises);
-            return this.validateAndAdjustBets(groupResults.flat());
+            return groupResults.flat();
         } catch (error) {
             console.error('Error in batch prediction analysis:', error);
             return [];
@@ -138,29 +148,6 @@ export class AutomaticBettingAgent {
         }
 
         return groups;
-    }
-
-    private async findSimilarPredictions(predictions: Prediction[]): Promise<PineconePredictionMatch[]> {
-        try {
-            const descriptions = predictions.map(p => p.description).join(' ');
-            const embedding = await this.getEmbedding(descriptions);
-            const index = this.pinecone.Index('prediction-results');
-
-            const queryResponse = await index.query({
-                vector: embedding,
-                topK: 5,
-                includeMetadata: true,
-                filter: {
-                    status: { $eq: 'resolved' },
-                    agent_id: { $eq: this.agent.id }  // Add filter for agent's predictions
-                }
-            });
-
-            return queryResponse.matches as PineconePredictionMatch[];
-        } catch (error) {
-            console.error('Error finding similar predictions:', error);
-            return [];
-        }
     }
 
     private async analyzeGroupWithGPT(
@@ -620,21 +607,6 @@ export class AutomaticBettingAgent {
         return 'general';
     }
 
-    private validateAndAdjustBets(decisions: BetDecision[]): BetDecision[] {
-        const totalBetAmount = decisions.reduce((sum, d) => sum + d.betAmount, 0);
-        const maxTotalBet = this.agent.maxBetSize * 2; // Adjust this multiplier as needed
-
-        if (totalBetAmount > maxTotalBet) {
-            const ratio = maxTotalBet / totalBetAmount;
-            return decisions.map(decision => ({
-                ...decision,
-                betAmount: Math.floor(decision.betAmount * ratio)
-            }));
-        }
-
-        return decisions;
-    }
-
     private parseAgentBets(agentBetsStr: string | null): Record<string, { id: number, amount: number, choice: string, betCount?: number }> {
         if (!agentBetsStr) return {};
 
@@ -652,6 +624,63 @@ export class AutomaticBettingAgent {
             };
         });
         return result;
+    }
+
+    
+
+    private async findSimilarPredictions(predictions: Prediction[]): Promise<PineconePredictionMatch[]> {
+        try {
+            const descriptions = predictions.map(p => p.description).join(' ');
+            const embedding = await this.getEmbedding(descriptions);
+            const index = this.pinecone.Index('prediction-results');
+
+            const queryResponse = await index.query({
+                vector: embedding,
+                topK: 5,
+                includeMetadata: true,
+                filter: {
+                    status: { $eq: 'resolved' },
+                    agent_id: { $eq: this.agent.id }  // Add filter for agent's predictions
+                }
+            });
+
+            return queryResponse.matches as PineconePredictionMatch[];
+        } catch (error) {
+            console.error('Error finding similar predictions:', error);
+            return [];
+        }
+    }
+
+    private async storeBetInPinecone(bet: BetDecision, prediction: Prediction): Promise<string> {
+        try {
+            const description = prediction.description;
+            const embedding = await this.getEmbedding(description);
+            const index = this.pinecone.Index('prediction-results');
+            const id = `bet-${bet.predictionId}-${bet.agentId}-${Date.now()}`;
+
+            await index.upsert([{
+                id: id,
+                values: embedding,
+                metadata: {
+                    description: description,
+                    choice: bet.choice,
+                    amount: bet.betAmount,
+                    status: 'pending',  // Will need to be updated when prediction resolves
+                    created_at: new Date().toISOString(),
+                    agent_id: bet.agentId,
+                    prediction_id: bet.predictionId,
+                    confidence: bet.confidence,
+                    reasoning: bet.reasoning,
+                    risk_assessment: bet.riskAssessment,
+                    result: 'pending'
+                }
+            }]);
+
+            return id;
+        } catch (error) {
+            console.error('Error storing bet in Pinecone:', error);
+            return '';
+        }
     }
 }
 
