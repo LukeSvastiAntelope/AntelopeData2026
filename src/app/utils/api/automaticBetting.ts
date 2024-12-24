@@ -189,7 +189,7 @@ export class AutomaticBettingAgent {
                 "shouldBet": boolean,
                 "recommendedChoice": "Yes" or "No" without "Draw",
                 "confidence": number (0-1),
-                "reasoning": "brief explanation",
+                "reasoning": "detailed explanation",
                 "riskAssessment": "Low/Medium/High"
             }
         ]
