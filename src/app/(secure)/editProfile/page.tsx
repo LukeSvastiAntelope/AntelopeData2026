@@ -110,7 +110,7 @@ const EditAgentProfile = () => {
   }, []);
 
   return (
-    <div className="min-h-screen bg-background0 min-w-[625px]">
+    <div className="min-h-screen  min-w-[625px]">
       <header className="bg-content0 text-white py-8 rounded-b-2xl">
         <div className="container mx-auto px-4 text-center">
           <h1 className="text-3xl font-bold">Edit Agent Profile</h1>
@@ -120,7 +120,7 @@ const EditAgentProfile = () => {
 
       {
         !isLoading && agent && (
-          <main className="container mx-auto px-4 py-8 ">
+          <main className="container mx-auto px-4 py-8">
             <ImageUpload fileRef={fileRef} avatar={agent.image} />
             <Card className="mb-8 bg-content0">
               <CardHeader className="text-xl font-regular">Basic Settings</CardHeader>
@@ -203,7 +203,7 @@ const EditAgentProfile = () => {
               </CardBody>
             </Card>
 
-            <Card className="mb-8">
+            <Card className="mb-8 bg-content0">
               <CardHeader className="text-xl font-regular">Interests</CardHeader>
               <CardBody>
                 <div className="flex flex-wrap gap-2 mb-4">
@@ -230,7 +230,7 @@ const EditAgentProfile = () => {
               </CardBody>
             </Card>
 
-            <Card className="mb-8">
+            <Card className="mb-8 bg-content0">
               <CardHeader className="text-xl font-regular">Risk Settings</CardHeader>
               <CardBody className="space-y-6">
                 <Select
@@ -274,7 +274,7 @@ const EditAgentProfile = () => {
               </CardBody>
             </Card>
 
-            <Card className="mb-8">
+            <Card className="mb-8 bg-background0">
               <CardHeader className="flex justify-between items-center">
                 <h2 className="text-xl font-regular">Betting Principles</h2>
                 <Button
@@ -286,7 +286,7 @@ const EditAgentProfile = () => {
                 </Button>
               </CardHeader>
               <CardBody>
-                <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-1 gap-4 ">
                   {agent.principles.length > 0 && agent.principles.map((principle, index) => (
                     <EditablePrincipleCard
                       key={index}
@@ -343,7 +343,7 @@ const ImageUpload = ({ fileRef, avatar }: { fileRef: React.RefObject<HTMLInputEl
   }, []);
 
   return (
-    <Card className="mb-8">
+    <Card className="mb-8 bg-content0">
       <CardHeader className="text-xl font-regular">Profile Image</CardHeader>
       <CardBody>
         <div className="flex flex-col items-center gap-4">
@@ -408,7 +408,7 @@ const EditablePrincipleCard = ({
   onDescriptionChange,
   onDelete
 }: EditablePrincipleCardProps) => (
-  <Card shadow="sm">
+  <Card shadow="sm" className="">
     <CardBody className="space-y-4">
       <div className="flex justify-between items-start">
         <Input

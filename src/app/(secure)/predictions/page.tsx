@@ -96,38 +96,55 @@ const Predictions = () => {
 
     return (
         predictions && predictions.length > 0 && (
-            <div className="min-h-screen flex">
-                <div className="fixed top-0 left-0">
-                    {/* Logo & Navigation */}
-                    <Link href="/">
-                        <Image
-                            src={"/assets/images/logo-simple.svg"}
-                            alt="Hero Image"
-                            width={80}
-                            height={80}
-                            className="rounded-full"
-                        />
-                    </Link>
-                    <Link href="/" className="icon-profile flex justify-center pb-4" />
-                    <Link href="/bets" className="flex justify-center pb-4">
-                        <Image
-                            src={"/assets/images/bet.svg"}
-                            alt="Hero Image"
-                            width={32}
-                            height={32}
-                            className="rounded-full"
-                        />
-                    </Link>
-                    <Link href="/predictions" className="flex justify-center">
-                        <Image
-                            src={"/assets/images/predict.svg"}
-                            alt="Hero Image"
-                            width={32}
-                            height={32}
-                            className="rounded-full"
-                        />
-                    </Link>
-                </div>
+            <div className="min-h-screen">
+            {/* Responsive Navigation */}
+            <nav className="
+              fixed
+              top-0
+              left-0
+              z-50
+              flex
+              flex-row
+              md:flex-col
+              items-center
+              gap-4
+             
+              w-full
+              md:w-20
+              p-3
+              shadow-md
+              
+            ">
+              {/* Logo/Home Link */}
+              <Link href="/" className="flex items-center gap-2">
+                <Image
+                  src={"/assets/images/logo-simple.svg"}
+                  alt="Hero Image"
+                  width={48}
+                  height={48}
+                  className="rounded-full"
+                />
+              </Link>
+      
+              {/* Navigation Links */}
+              <div className="flex flex-row md:flex-col gap-4 md:mt-6">
+                <Link href="/" className="icon-profile flex justify-center">
+                  
+                </Link>
+                <Link href="/bets" className="icon-bet flex justify-center">
+                
+                </Link>
+                <Link href="/predictions" className="icon-predict flex justify-center">
+                <Image
+                    src={"/assets/images/predict.svg"}
+                    alt="Predictions"
+                    width={24}
+                    height={24}
+                    className="rounded-full"
+                  />
+                </Link>
+              </div>
+            </nav>
 
                 <div className="container mx-auto py-6 min-h-screen px-4 sm:px-2">
                     <h1 className="text-2xl font-bold mb-6">Active Predictions</h1>
