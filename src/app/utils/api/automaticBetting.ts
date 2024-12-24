@@ -187,7 +187,7 @@ export class AutomaticBettingAgent {
             {
                 "id": number,
                 "shouldBet": boolean,
-                "recommendedChoice": "Yes" or "No",
+                "recommendedChoice": "Yes" or "No" without "Draw",
                 "confidence": number (0-1),
                 "reasoning": "brief explanation",
                 "riskAssessment": "Low/Medium/High"
@@ -198,8 +198,8 @@ export class AutomaticBettingAgent {
     Predictions to analyze:
     ${batchPredictions.map(p =>
                 `ID: ${p.id}
-         Description: ${p.description}
-         Creator Choice: ${p.source == "sportDB" ? p.predicted_outcome : p.creator_choice}
+         Description: ${p.description} ${p.source == "sportDB" && `winner: ${p.predicted_outcome}`}
+         Creator Choice: ${p.creator_choice}
          Creator Betting Amount: ${p.bet_amount}
          Match Total Bet Amount: ${p.match_total_amount}
          Not Match Total Bet Amount: ${p.not_match_total_amount}
@@ -219,7 +219,7 @@ export class AutomaticBettingAgent {
     
     Agent Principles:
     - Betting Strategy:
-  1. If no previous bet exists, make initial bet with small amount
+  1. If no previous bet exists, make initial bet with a bit confidence
   2. If previous bet exists:
      - Only bet additional amount if odds are favorable
      - Ensure total bet doesn't exceed maximum limit
@@ -339,7 +339,7 @@ export class AutomaticBettingAgent {
                     const isValid =
                         typeof p.id === 'number' &&
                         typeof p.shouldBet === 'boolean' &&
-                        (p.recommendedChoice === 'Yes' || p.recommendedChoice === 'No') &&
+                        (p.recommendedChoice === 'Yes' || p.recommendedChoice === 'No' || p.recommendedChoice === 'Draw') &&
                         typeof p.confidence === 'number' &&
                         p.confidence >= 0 && p.confidence <= 1;
 
