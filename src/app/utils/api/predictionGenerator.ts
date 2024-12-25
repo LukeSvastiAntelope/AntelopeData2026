@@ -474,9 +474,6 @@ export class AIEnhancedPredictionGenerator {
                 }
 
                 const randomEvents = this.shuffleArray(unusedEvents).slice(0, 10);
-                for (const event of randomEvents) {
-                    usedEventIds.add(event.idEvent);
-                }
 
                 const prompt = this.createSportsPrompt(randomEvents);
                 const prediction = await this.generateWithAI(prompt);
@@ -494,6 +491,10 @@ export class AIEnhancedPredictionGenerator {
                     event: prediction.event,
                     sources: prediction.sources || []
                 };
+
+                if (prediction.event?.idEvent) {
+                    usedEventIds.add(prediction.event.idEvent);
+                }
 
                 const isSimilar = await this.checkSimilarity(formattedPrediction);
                 if (!isSimilar) {

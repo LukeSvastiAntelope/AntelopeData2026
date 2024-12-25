@@ -55,8 +55,8 @@ export default function PredictionDetail() {
     return (
         <div className="container mx-auto py-6 px-4 min-h-screen">
             {/* Back Button */}
-            <Link 
-                href="/predictions" 
+            <Link
+                href="/predictions"
                 className="inline-flex items-center gap-2 mb-6 text-primary hover:underline"
             >
                 ← Back to Predictions
@@ -79,7 +79,7 @@ export default function PredictionDetail() {
                                 <p className="text-gray-500">Source: {prediction.source}</p>
                             </div>
 
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                                 <div>
                                     <p className="text-sm text-gray-500">Status</p>
                                     <Chip
@@ -92,6 +92,10 @@ export default function PredictionDetail() {
                                                 ? 'Win'
                                                 : 'Loss'}
                                     </Chip>
+                                </div>
+                                <div>
+                                    <p className="text-sm text-gray-500">Creator Choice</p>
+                                    <p className="font-semibold">{prediction.creator_choice}</p>
                                 </div>
                                 <div>
                                     <p className="text-sm text-gray-500">Predicted Outcome</p>
