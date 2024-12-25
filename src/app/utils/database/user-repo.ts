@@ -219,7 +219,8 @@ async function getPredictionById(id: string) {
                         'amount', b.amount,
                         'choice', b.choice,
                         'reason', b.reason,
-                        'pinecone_id', b.pinecone_id
+                        'pinecone_id', b.pinecone_id,
+                        'created_at', b.created_at
                     )
                 ) as bets
             FROM predictions p

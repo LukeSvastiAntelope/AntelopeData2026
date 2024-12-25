@@ -79,6 +79,7 @@ export class AutomaticBettingAgent {
             const interestingPredictions = categoryPredictions.filter(p =>
                 this.isInterestingPredictionWithAI(p)
             );
+            
 
             if (interestingPredictions.length === 0) {
                 return [];

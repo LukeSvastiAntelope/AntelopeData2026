@@ -10,9 +10,11 @@ import Link from "next/link";
 import { toast } from "react-hot-toast";
 import { useParams } from "next/navigation";
 import { PredictionDB } from "@/app/utils/interface";
+import { formatDate } from "date-fns";
 
 export default function PredictionDetail() {
     const [prediction, setPrediction] = useState<PredictionDB | null>(null);
+    const [reason, setReason] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const params = useParams();
     const fetch = useFetch();
@@ -23,6 +25,7 @@ export default function PredictionDetail() {
                 const response = await fetch.get(`/api/getPrediction/${params.id}`);
                 if (response.status) {
                     setPrediction(response.prediction);
+                    setReason(response.reason);
                 } else {
                     toast.error(response.message);
                 }
@@ -113,48 +116,45 @@ export default function PredictionDetail() {
                                 </div>
                             </div>
 
-                            {/* {prediction.reason && (
-                                <div>
-                                    <p className="text-sm text-gray-500">Reason</p>
-                                    <p className="font-semibold">{prediction.reason}</p>
-                                </div>
-                            )} */}
+                            {
+                                reason && (
+                                    <div>
+                                        <p className="text-sm text-gray-500">Reason</p>
+                                        <p className="font-semibold">{reason}</p>
+                                    </div>
+                                )
+                            }
                         </div>
                     </div>
                 </CardBody>
             </Card>
 
             {/* Prediction Timeline */}
-            {/* <div className="space-y-4">
+            <div className="space-y-4">
                 <h2 className="text-xl font-bold">Prediction Timeline</h2>
-                {prediction.logs?.map((log, index) => (
+                { prediction.bets && prediction.bets.length > 0 && prediction.bets.map((bet, index) => (
                     <Card key={index}>
                         <CardBody>
                             <div className="flex justify-between items-start gap-4">
                                 <div className="flex-1">
-                                    <p className="font-medium">{log.action}</p>
-                                    <p className="text-sm text-gray-500 mt-1">{log.details}</p>
-                                    {log.agent && (
+                                    <p className="font-medium">{bet.choice}</p>
+                                    <p className="text-sm text-gray-500 mt-1">{bet.reason}</p>
+                                    {bet.agent_id && (
                                         <div className="flex flex-wrap items-center gap-2 mt-2">
                                             <Chip size="sm" variant="flat">
-                                                Agent: {log.agent}
+                                                Agent: {bet.agent_id}
                                             </Chip>
-                                            {log.confidence && (
-                                                <Chip size="sm" variant="flat">
-                                                    Confidence: {log.confidence}%
-                                                </Chip>
-                                            )}
                                         </div>
                                     )}
                                 </div>
                                 <span className="text-sm text-gray-500 whitespace-nowrap">
-                                    {formatDate(log.timestamp, 'MM/dd/yyyy HH:mm')}
+                                    {bet.created_at ? formatDate(bet.created_at, 'MM/dd/yyyy HH:mm') : ''}
                                 </span>
                             </div>
                         </CardBody>
                     </Card>
                 ))}
-            </div> */}
+            </div>
         </div>
     );
 } 
