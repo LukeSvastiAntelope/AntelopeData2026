@@ -228,9 +228,9 @@ export class AIEnhancedPredictionGenerator {
     // Update the main generation method
     async generatePrediction(): Promise<AutomatedPrediction | undefined> {
         let prediction: AutomatedPrediction | undefined;
-        let isValid = false;
-        let attempts = 0;
-        const MAX_ATTEMPTS = 5;
+        // const isValid = false;
+        // const attempts = 0;
+        // const MAX_ATTEMPTS = 5;
 
         // do {
         if (this.hasSportsInterest()) {
@@ -246,16 +246,16 @@ export class AIEnhancedPredictionGenerator {
         }
 
         // isValid = await this.validatePrediction(prediction);
-        attempts++;
+        // attempts++;
 
         // if (!isValid && attempts < MAX_ATTEMPTS) {
         //     console.log('Generated prediction was invalid, retrying...');
         // }
         // } while (!isValid && attempts < MAX_ATTEMPTS);
 
-        if (!isValid) {
-            throw new Error('Failed to generate valid prediction after maximum attempts');
-        }
+        // if (!isValid) {
+        //     throw new Error('Failed to generate valid prediction after maximum attempts');
+        // }
 
         // Continue with principle evaluation and image enrichment
         const principleScore = await this.evaluatePredictionAgainstPrinciples(prediction);
