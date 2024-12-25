@@ -933,7 +933,7 @@ export class AIEnhancedPredictionGenerator {
                     principles_applied: prediction.principlesApplied ? JSON.stringify(prediction.principlesApplied) : "",
                     principle_score: prediction.principleScore ? prediction.principleScore : 0,
                     user_id: prediction.userId ? prediction.userId : 0,
-                    agent_id: prediction.agentId ? prediction.agentId : 0
+                    agent_id: this.agent.id
                 }
             }]);
 
@@ -947,7 +947,7 @@ export class AIEnhancedPredictionGenerator {
                     amount: prediction.initialStake,
                     status: 'pending',  // Will need to be updated when prediction resolves
                     created_at: new Date().toISOString(),
-                    agent_id: prediction.agentId || 0,
+                    agent_id: this.agent.id,
                     prediction_id: 0,
                     confidence: prediction.confidence,
                     reasoning: prediction.reasoning,

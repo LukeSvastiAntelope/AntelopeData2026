@@ -11,9 +11,9 @@ export async function GET(
     const pinecone = new Pinecone({
         apiKey: process.env.PINECONE_API_KEY!
     });
-    const index = pinecone.index('predictions-result');
-    const vector = await index.fetch([params.id]);
-    console.log(vector);
+    const index = pinecone.index('prediction-results');
+    const vector = await index.fetch(['prediction-1735084940997']);
+    console.log(vector.records['prediction-1735084940997'].metadata);
     
     try {
         // Verify JWT token
