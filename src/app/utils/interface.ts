@@ -54,7 +54,7 @@ export interface AutomatedPrediction {
     choice: string;
     confidence: number;
     reasoning: string;
-    event?: SportsEvent;  // Optional for sports predictions
+    event?: PredictionEvent;  // Optional for sports predictions
     images?: PredictionImage[];
     sources?: string[];
     principlesApplied?: string[];
@@ -74,6 +74,15 @@ export interface SportsEvent {
     strLeague: string;
     strSeason: string;
     idLeague: string;
+    strThumb: string;
+}
+
+export interface PredictionEvent {
+    winner: string;
+    event_id: string;
+    league_id: string;
+    home_team: string;
+    away_team: string;
 }
 
 export interface PredictionImage {

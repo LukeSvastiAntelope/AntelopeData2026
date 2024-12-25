@@ -1,4 +1,4 @@
-import { SportsEvent } from "../interface";
+import { PredictionEvent } from "../interface";
 
 export interface SportsDBTeam {
     strTeam: string;
@@ -25,7 +25,7 @@ export interface AIResponse {
     category: string;
     endDate: string;
     confidence: number;
-    event?: SportsEvent;
+    event?: PredictionEvent;
     choice: string;
     reasoning: string;
     sources: string[];

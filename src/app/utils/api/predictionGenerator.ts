@@ -75,66 +75,10 @@ export class AIEnhancedPredictionGenerator {
 
     private async getImagesForPrediction(topic: string): Promise<PredictionImage[]> {
         try {
-            // Try SportsDB first if it's a sports prediction
-            const sportsImages = await this.getSportsDBImages(topic);
-            if (sportsImages.length > 0) {
-                return sportsImages;
-            }
-
             // Fallback to Google Images via SerpAPI
             return await this.getGoogleImages(topic);
         } catch (error) {
             console.error('Failed to fetch images:', error);
-            return [];
-        }
-    }
-
-    private async getSportsDBImages(topic: string): Promise<PredictionImage[]> {
-        try {
-            interface SportsDBTeam {
-                strTeam: string;
-                strTeamBadge: string;
-                strTeamLogo: string;
-                strTeamFanart1: string;
-            }
-
-            interface SportsDBEvent {
-                strEvent: string;
-                strThumb: string;
-                strBanner: string;
-            }
-
-            // Extract team names or event names
-            const teamSearch = await fetch(
-                `https://www.thesportsdb.com/api/v1/json/${this.SPORTS_API_KEY}/searchteams.php?t=${encodeURIComponent(topic)}`
-            );
-            const teamData = await teamSearch.json();
-
-            if (teamData.teams) {
-                return teamData.teams.map((team: SportsDBTeam) => ({
-                    url: team.strTeamBadge || team.strTeamLogo || team.strTeamFanart1,
-                    source: 'TheSportsDB',
-                    title: team.strTeam
-                })).filter((img: PredictionImage) => img.url);
-            }
-
-            // Try event images if team search fails
-            const eventSearch = await fetch(
-                `https://www.thesportsdb.com/api/v1/json/${this.SPORTS_API_KEY}/searchevents.php?e=${encodeURIComponent(topic)}`
-            );
-            const eventData = await eventSearch.json();
-
-            if (eventData.events) {
-                return eventData.events.map((event: SportsDBEvent) => ({
-                    url: event.strThumb || event.strBanner,
-                    source: 'TheSportsDB',
-                    title: event.strEvent
-                })).filter((img: PredictionImage) => img.url);
-            }
-
-            return [];
-        } catch (error) {
-            console.error('Failed to fetch SportsDB images:', error);
             return [];
         }
     }
@@ -171,10 +115,10 @@ export class AIEnhancedPredictionGenerator {
     private async enrichPredictionWithImages(prediction: AutomatedPrediction): Promise<AutomatedPrediction> {
         try {
             // Determine search topic based on prediction type
-            let searchTopic = prediction.question;
-            if (prediction.category === 'sportDB' && prediction.event) {
-                searchTopic = `${prediction.event.strEvent} ${prediction.event.strVenue}`;
+            if (prediction.images && prediction.images.length > 0 && prediction.images[0].url) {
+                return prediction;
             }
+            const searchTopic = prediction.question;
 
             const images = await this.getImagesForPrediction(searchTopic);
 
@@ -463,6 +407,7 @@ export class AIEnhancedPredictionGenerator {
             if (events.length === 0) {
                 throw new Error("No events found");
             }
+            console.log("events", events.length);
 
             while (attempts < maxAttempts) {
                 console.log("usedEventIds", usedEventIds);
@@ -478,6 +423,12 @@ export class AIEnhancedPredictionGenerator {
                 const prompt = this.createSportsPrompt(randomEvents);
                 const prediction = await this.generateWithAI(prompt);
 
+                if (prediction.event?.event_id) {
+                    usedEventIds.add(prediction.event.event_id);
+                }
+
+                const strThumb = randomEvents.find(event => event.idEvent === prediction.event?.event_id)?.strThumb || '';
+
                 // Ensure the response matches our interface
                 const formattedPrediction: AutomatedPrediction = {
                     question: prediction.question,
@@ -489,12 +440,9 @@ export class AIEnhancedPredictionGenerator {
                     confidence: prediction.confidence,
                     reasoning: prediction.reasoning,
                     event: prediction.event,
-                    sources: prediction.sources || []
+                    sources: prediction.sources || [],
+                    images: [{ url: strThumb, source: 'sportsdb', title: prediction.question }]
                 };
-
-                if (prediction.event?.idEvent) {
-                    usedEventIds.add(prediction.event.idEvent);
-                }
 
                 const isSimilar = await this.checkSimilarity(formattedPrediction);
                 if (!isSimilar) {
@@ -795,10 +743,10 @@ export class AIEnhancedPredictionGenerator {
             const predictionEvent = prediction.event;
             if (!predictionEvent) return false;
 
-            // Get recent predictions from Pinecone
             const index = this.pinecone.Index('predictions');
             const thirtyDaysAgo = new Date();
             thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+            
             const queryResponse = await index.query({
                 vector: await this.getEmbedding(prediction.question),
                 topK: 5,
@@ -819,21 +767,22 @@ export class AIEnhancedPredictionGenerator {
                 try {
                     const existingEvent = JSON.parse(match.metadata.event as string);
 
-                    // Check if it's the same event
-                    if (existingEvent.idEvent === predictionEvent.idEvent) {
-                        console.log('Same event found:', {
-                            new: predictionEvent.strEvent,
-                            existing: existingEvent.strEvent
-                        });
-                        return true;
-                    }
-
-                    // Check if it's the same teams playing on the same date
-                    if (existingEvent.dateEvent === predictionEvent.dateEvent &&
-                        existingEvent.strEvent === predictionEvent.strEvent) {
+                    // Check if it's exactly the same event (same teams on same date)
+                    if (existingEvent.event_id === predictionEvent.event_id ||
+                        (existingEvent.home_team === predictionEvent.home_team &&
+                         existingEvent.away_team === predictionEvent.away_team &&
+                         existingEvent.endDate === prediction.endDate)) {
                         console.log('Same match found:', {
-                            new: predictionEvent.strEvent,
-                            existing: existingEvent.strEvent
+                            new: {
+                                home: predictionEvent.home_team,
+                                away: predictionEvent.away_team,
+                                date: prediction.endDate
+                            },
+                            existing: {
+                                home: existingEvent.home_team,
+                                away: existingEvent.away_team,
+                                date: existingEvent.endDate
+                            }
                         });
                         return true;
                     }
