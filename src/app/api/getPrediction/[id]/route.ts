@@ -25,7 +25,7 @@ export async function GET(
         // Get prediction details
         const prediction = await UserRepo.getPredictionById(params.id);
         if (!prediction) {
-            return Response.json({ 
+            return Response.json({
                 status: false, 
                 message: 'Prediction not found' 
             });

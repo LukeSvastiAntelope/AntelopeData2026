@@ -65,6 +65,8 @@ export class AIEnhancedPredictionGenerator {
         const hasUnrealisticTerms = unrealisticKeywords.some(keyword =>
             predictionText.includes(keyword.toLowerCase())
         );
+        console.log("predictionText", predictionText);
+        console.log("unrealisticTerms", unrealisticKeywords);
 
         if (hasUnrealisticTerms) {
             return false;
@@ -230,26 +232,26 @@ export class AIEnhancedPredictionGenerator {
         let attempts = 0;
         const MAX_ATTEMPTS = 5;
 
-        do {
-            if (this.hasSportsInterest()) {
-                prediction = await this.generateSportsPrediction();
-                if (!prediction) {
-                    return undefined;
-                }
-            } else {
-                prediction = await this.generateGeneralPrediction();
-                if (!prediction) {
-                    return undefined;
-                }
+        // do {
+        if (this.hasSportsInterest()) {
+            prediction = await this.generateSportsPrediction();
+            if (!prediction) {
+                return undefined;
             }
-
-            isValid = await this.validatePrediction(prediction);
-            attempts++;
-
-            if (!isValid && attempts < MAX_ATTEMPTS) {
-                console.log('Generated prediction was invalid, retrying...');
+        } else {
+            prediction = await this.generateGeneralPrediction();
+            if (!prediction) {
+                return undefined;
             }
-        } while (!isValid && attempts < MAX_ATTEMPTS);
+        }
+
+        // isValid = await this.validatePrediction(prediction);
+        attempts++;
+
+        // if (!isValid && attempts < MAX_ATTEMPTS) {
+        //     console.log('Generated prediction was invalid, retrying...');
+        // }
+        // } while (!isValid && attempts < MAX_ATTEMPTS);
 
         if (!isValid) {
             throw new Error('Failed to generate valid prediction after maximum attempts');
@@ -408,6 +410,7 @@ export class AIEnhancedPredictionGenerator {
                 throw new Error("No events found");
             }
             console.log("events", events.length);
+            let predictionResult: AutomatedPrediction | undefined;
 
             while (attempts < maxAttempts) {
                 console.log("usedEventIds", usedEventIds);
@@ -415,7 +418,7 @@ export class AIEnhancedPredictionGenerator {
                 const unusedEvents = events.filter(event => !usedEventIds.has(event.idEvent));
 
                 if (unusedEvents.length === 0) {
-                    return undefined;
+                    break;
                 }
 
                 const randomEvents = this.shuffleArray(unusedEvents).slice(0, 10);
@@ -446,12 +449,14 @@ export class AIEnhancedPredictionGenerator {
 
                 const isSimilar = await this.checkSimilarity(formattedPrediction);
                 if (!isSimilar) {
-                    return formattedPrediction;
+                    predictionResult = formattedPrediction;
+                    break;
                 } else {
                     attempts++;
                     console.log("similar prediction found, retrying...");
                 }
             }
+            return predictionResult;
         } catch (error) {
             console.error('Failed to generate sports prediction:', error);
             throw error;
@@ -726,7 +731,7 @@ export class AIEnhancedPredictionGenerator {
     private async checkSimilarity(prediction: AutomatedPrediction): Promise<boolean> {
         try {
             // Special handling for sports predictions
-            if (prediction.category === 'Sports' && prediction.event) {
+            if (prediction.category === 'sportDB' && prediction.event) {
                 return await this.checkSportsPredictionSimilarity(prediction);
             }
 
@@ -746,13 +751,13 @@ export class AIEnhancedPredictionGenerator {
             const index = this.pinecone.Index('predictions');
             const thirtyDaysAgo = new Date();
             thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-            
+
             const queryResponse = await index.query({
                 vector: await this.getEmbedding(prediction.question),
                 topK: 5,
                 includeMetadata: true,
                 filter: {
-                    category: "Sports",
+                    category: "sportDB",
                     timestamp: { $gte: Math.floor(thirtyDaysAgo.getTime() / 1000) }
                 }
             });
@@ -766,12 +771,13 @@ export class AIEnhancedPredictionGenerator {
 
                 try {
                     const existingEvent = JSON.parse(match.metadata.event as string);
+                    console.log("existingEvent", existingEvent);
 
                     // Check if it's exactly the same event (same teams on same date)
                     if (existingEvent.event_id === predictionEvent.event_id ||
                         (existingEvent.home_team === predictionEvent.home_team &&
-                         existingEvent.away_team === predictionEvent.away_team &&
-                         existingEvent.endDate === prediction.endDate)) {
+                            existingEvent.away_team === predictionEvent.away_team &&
+                            existingEvent.endDate === prediction.endDate)) {
                         console.log('Same match found:', {
                             new: {
                                 home: predictionEvent.home_team,
@@ -834,13 +840,6 @@ export class AIEnhancedPredictionGenerator {
                     prediction.question.toLowerCase(),
                     existingQuestion
                 );
-
-                console.log('General prediction similarity check:', {
-                    vectorSimilarity: similarityScore,
-                    textSimilarity: questionSimilarity,
-                    newPrediction: prediction.question,
-                    existingPrediction: existingQuestion
-                });
 
                 // Stricter thresholds for general predictions
                 if (similarityScore > 0.92 || questionSimilarity > 0.9) {
