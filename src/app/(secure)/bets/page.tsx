@@ -10,7 +10,6 @@ import { useFetch } from "@/app/utils/lib";
 import { IBet } from "@/app/utils/interface";
 import Link from "next/link";
 import toast from "react-hot-toast";
-import { Accordion, AccordionItem } from "@nextui-org/accordion";
 import { useRouter } from "next/navigation";
 
 const BetsSkeleton = () => (
@@ -175,7 +174,7 @@ const BetsPage = () => {
                             {bets.map((bet: IBet, index: number) => (
                                 <div
                                     key={index}
-                                    onClick={() => router.push(`/bets/${bet.id}`)}
+                                    onClick={() => router.push(`/bets/${bet.bet_id}`)}
                                     className="w-full p-4 rounded-lg bg-default-50 hover:bg-default-100 transition-colors border border-default-200 cursor-pointer"
                                 >
                                     <div className="flex flex-col md:flex-row gap-6 items-start md:items-center">

@@ -189,6 +189,7 @@ export interface IBet {
     reason: string;
     pinecone_id: string;
     agent_id: number;
+    bet_id?: number;
 }
 
 export interface SerpApiNewsResult {

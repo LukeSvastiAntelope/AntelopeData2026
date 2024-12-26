@@ -10,12 +10,20 @@ import { IBet } from "@/app/utils/interface";
 import toast from "react-hot-toast";
 import { useParams, useRouter } from "next/navigation";
 
+interface PineconeMetadata {
+    [key: string]: string | number | boolean | object;
+}
+
+interface PineconeData {
+    metadata?: PineconeMetadata;
+}
+
 export default function BetDetailPage() {
     const params = useParams();
     const router = useRouter();
     const [bet, setBet] = useState<IBet | null>(null);
     const [isLoading, setIsLoading] = useState(true);
-    const [pineconeData, setPineconeData] = useState<any>(null);
+    const [pineconeData, setPineconeData] = useState<PineconeData | null>(null);
     const fetch = useFetch();
 
     useEffect(() => {
@@ -28,7 +36,7 @@ export default function BetDetailPage() {
             if (response.status) {
                 setBet(response.bet);
                 if (response.bet.pinecone_id) {
-                    fetchPineconeData(response.bet.pinecone_id);
+                    setPineconeData(response.vector);
                 }
             } else {
                 toast.error(response.message);
@@ -37,19 +45,6 @@ export default function BetDetailPage() {
         } catch (error) {
             console.error('Failed to fetch bet details:', error);
             setIsLoading(false);
-        }
-    };
-
-    const fetchPineconeData = async (pineconeId: string) => {
-        try {
-            const response = await fetch.get(`/api/getPineconeData?id=${pineconeId}`);
-            if (response.status) {
-                setPineconeData(response.data);
-            } else {
-                toast.error(response.message);
-            }
-        } catch (error) {
-            console.error('Failed to fetch Pinecone data:', error);
         }
     };
 
@@ -115,7 +110,7 @@ export default function BetDetailPage() {
                                     <Chip color="secondary">{bet.choice}</Chip>
                                 </div>
                                 <div>
-                                    <h3 className="text-sm font-medium text-default-400 mb-1">Creator's Choice</h3>
+                                    <h3 className="text-sm font-medium text-default-400 mb-1">Creator&apos;s Choice</h3>
                                     <Chip color="warning">{bet.predicted_outcome || bet.creator_choice}</Chip>
                                 </div>
                             </div>

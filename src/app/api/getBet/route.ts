@@ -12,27 +12,39 @@ export async function GET(req: NextRequest) {
         });
     }
 
-    const bet = await UserRepo.getBetById(betId);
-
     try {
-        const pinecone = new Pinecone({
-            apiKey: process.env.PINECONE_API_KEY as string
-        });
-    
-        const index = pinecone.index('prediction-results');
-        const result = await index.fetch([id]);
-        const vector = result.records[id];
-    
-        return Response.json({
-            status: true,
-            data: vector
-        });
+        const bet = await UserRepo.getBetById(betId);
+        if (!bet) {
+            return Response.json({
+                status: false,
+                message: 'Bet not found'
+            });
+        }
+
+        if (bet.pinecone_id) {
+            const pinecone = new Pinecone({
+                apiKey: process.env.PINECONE_API_KEY as string
+            });
+
+            const index = pinecone.index('prediction-results');
+            const result = await index.fetch([bet.pinecone_id]);
+            const vector = result.records[bet.pinecone_id];
+            return Response.json({
+                status: true,
+                bet: bet,
+                vector: vector
+            });
+        } else {
+            return Response.json({
+                status: true,
+                bet: bet
+            });
+        }
     } catch (error) {
-        console.error('Failed to fetch Pinecone data:', error);
+        console.log(error);
         return Response.json({
             status: false,
-            message: 'Failed to fetch Pinecone data:' + error
+            message: 'Failed to fetch bet details:' + error
         });
-
     }
 }   

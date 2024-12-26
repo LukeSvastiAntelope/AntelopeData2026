@@ -3,7 +3,7 @@ import { openSql as getMySQLConnection } from "./db";
 import { generateConfirmationToken } from "../api/token";
 import { AGENT_RISK_LEVEL } from "../const";
 import { IFormDataAgentProfile } from "../interface";
-import { UserDB, AgentDB, PaymentIntentDB, PredictionDB } from "../interface";
+import { UserDB, AgentDB, PaymentIntentDB, PredictionDB, IBet } from "../interface";
 import { RowDataPacket } from 'mysql2/promise';
 
 export const UserRepo = {
@@ -26,6 +26,7 @@ export const UserRepo = {
     updateAgentBalance,
     updateAgentNftAddress,
     getPredictionById,
+    getBetById
 }
 
 async function authenticate({ username, password }: { username: string, password: string }) {
@@ -172,7 +173,7 @@ async function getBetsByAgentId(id: number) {
 async function getBetHistoryByAgentId(id: number, limit: number, offset: number) {
     const db = await getMySQLConnection();
     const [rows] = await db.execute(
-        `SELECT * FROM bets JOIN predictions ON bets.prediction_id = predictions.id WHERE bets.agent_id = ? ORDER BY bets.created_at DESC LIMIT ${limit} OFFSET ${offset}`,
+        `SELECT *, bets.id as bet_id FROM bets JOIN predictions ON bets.prediction_id = predictions.id WHERE bets.agent_id = ? ORDER BY bets.created_at DESC LIMIT ${limit} OFFSET ${offset}`,
         [id]
     );
     return rows;
@@ -240,6 +241,17 @@ async function getPredictionById(id: string) {
         return rows[0];
     } catch (error) {
         console.error("Error in getPredictionById: ", error);
+        throw error;
+    }
+}
+
+async function getBetById(id: string) {
+    try {
+        const db = await getMySQLConnection();
+        const [rows] = await db.execute<(IBet & RowDataPacket)[]>('SELECT * FROM bets JOIN predictions ON bets.prediction_id = predictions.id WHERE bets.id = ?', [id]);
+        return rows[0];
+    } catch (error) {
+        console.error("Error in getBetById: ", error);
         throw error;
     }
 }
