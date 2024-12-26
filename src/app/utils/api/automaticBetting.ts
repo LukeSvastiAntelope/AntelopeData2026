@@ -658,6 +658,7 @@ export class AutomaticBettingAgent {
             const embedding = await this.getEmbedding(description);
             const index = this.pinecone.Index('prediction-results');
             const id = `bet-${bet.predictionId}-${bet.agentId}-${Date.now()}`;
+            console.log("bet", bet);
 
             await index.upsert([{
                 id: id,
