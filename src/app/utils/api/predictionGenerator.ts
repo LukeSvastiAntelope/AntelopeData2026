@@ -65,8 +65,6 @@ export class AIEnhancedPredictionGenerator {
         const hasUnrealisticTerms = unrealisticKeywords.some(keyword =>
             predictionText.includes(keyword.toLowerCase())
         );
-        console.log("predictionText", predictionText);
-        console.log("unrealisticTerms", unrealisticKeywords);
 
         if (hasUnrealisticTerms) {
             return false;
@@ -409,7 +407,6 @@ export class AIEnhancedPredictionGenerator {
             if (events.length === 0) {
                 throw new Error("No events found");
             }
-            console.log("events", events.length);
             let predictionResult: AutomatedPrediction | undefined;
 
             while (attempts < maxAttempts) {
@@ -611,7 +608,8 @@ export class AIEnhancedPredictionGenerator {
         "away_team": "Away_Team"
       },
       "endDate": "Date",
-      "confidence": 0.7
+      "confidence": 0.7,
+      "reasoning": "Why this prediction is realistic and verifiable...",
     }`;
     }
 
@@ -771,13 +769,11 @@ export class AIEnhancedPredictionGenerator {
 
                 try {
                     const existingEvent = JSON.parse(match.metadata.event as string);
-                    console.log("existingEvent", existingEvent);
-
                     // Check if it's exactly the same event (same teams on same date)
                     if (existingEvent.event_id === predictionEvent.event_id ||
                         (existingEvent.home_team === predictionEvent.home_team &&
                             existingEvent.away_team === predictionEvent.away_team &&
-                            existingEvent.endDate === prediction.endDate)) {
+                            existingEvent.endDate === match.metadata.end_date)) {
                         console.log('Same match found:', {
                             new: {
                                 home: predictionEvent.home_team,
@@ -787,7 +783,7 @@ export class AIEnhancedPredictionGenerator {
                             existing: {
                                 home: existingEvent.home_team,
                                 away: existingEvent.away_team,
-                                date: existingEvent.endDate
+                                date: match.metadata.end_date
                             }
                         });
                         return true;
@@ -932,7 +928,8 @@ export class AIEnhancedPredictionGenerator {
                     principles_applied: prediction.principlesApplied ? JSON.stringify(prediction.principlesApplied) : "",
                     principle_score: prediction.principleScore ? prediction.principleScore : 0,
                     user_id: prediction.userId ? prediction.userId : 0,
-                    agent_id: this.agent.id
+                    agent_id: this.agent.id,
+                    end_date: prediction.endDate ? prediction.endDate.toISOString() : ""
                 }
             }]);
 
