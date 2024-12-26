@@ -11,6 +11,7 @@ import { IBet } from "@/app/utils/interface";
 import Link from "next/link";
 import toast from "react-hot-toast";
 import { Accordion, AccordionItem } from "@nextui-org/accordion";
+import { useRouter } from "next/navigation";
 
 const BetsSkeleton = () => (
     <Card className="hover:shadow-md transition-shadow">
@@ -62,6 +63,7 @@ const BetsSkeleton = () => (
 );
 
 const BetsPage = () => {
+    const router = useRouter();
     const [bets, setBets] = useState<IBet[]>([]);
     const [isLoading, setIsLoading] = useState<boolean>(true);
     const [page, setPage] = useState<number>(1);
@@ -69,7 +71,6 @@ const BetsPage = () => {
     const [isLoadingMore, setIsLoadingMore] = useState<boolean>(false);
     const ITEMS_PER_PAGE = 10;
     const fetch = useFetch();
-    const [pineconeData, setPineconeData] = useState<{ [key: string]: any }>({});
 
     const fetchBets = async (pageNumber: number) => {
         try {
@@ -92,22 +93,6 @@ const BetsPage = () => {
             console.error('Failed to fetch bets:', error);
             setIsLoading(false);
             setIsLoadingMore(false);
-        }
-    };
-
-    const fetchPineconeData = async (betId: string, pineconeId: string) => {
-        try {
-            const response = await fetch.get(`/api/getPineconeData?id=${pineconeId}`);
-            if (response.status) {
-                setPineconeData(prev => ({
-                    ...prev,
-                    [betId]: response.data
-                }));
-            } else {
-                toast.error(response.message);
-            }
-        } catch (error) {
-            console.error('Failed to fetch Pinecone data:', error);
         }
     };
 
@@ -187,135 +172,81 @@ const BetsPage = () => {
                         ))
                     ) : (
                         <>
-                            <Accordion className="px-0 w-full" variant="splitted">
-                                {bets.map((bet: IBet, index: number) => (
-                                    <AccordionItem
-                                        key={index}
-                                        aria-label={`Bet ${bet.id}`}
-                                        classNames={{
-                                            base: "group-[.is-splitted]:shadow-none w-full",
-                                            title: "font-normal w-full",
-                                            trigger: "px-0 py-0 w-full",
-                                            content: "px-2 w-full",
-                                            heading: "w-full",
-                                            titleWrapper: "w-full"
-                                        }}
-                                        title={
-                                            <div className="w-full p-4 rounded-lg bg-default-50 hover:bg-default-100 transition-colors border border-default-200">
-                                                <div className="flex flex-col md:flex-row gap-6 items-start md:items-center">
-                                                    {/* Left Section: Image and Title */}
-                                                    <div className="flex gap-4 flex-grow items-start">
-                                                        <div className="w-16 h-16 relative rounded-xl overflow-hidden flex-shrink-0 shadow-sm">
-                                                            <Image
-                                                                src={bet.str_thumb}
-                                                                alt="Event"
-                                                                className="w-16 h-16 object-cover"
-                                                            />
-                                                        </div>
-
-                                                        <div className="flex-grow min-w-0 max-w-[400px]">
-                                                            <h3 className="text-base font-medium mb-2">
-                                                                {bet.description}
-                                                            </h3>
-
-                                                            {/* Source and Date Info */}
-                                                            <div className="flex gap-3 items-center">
-                                                                <Chip size="sm" variant="flat" color="default" className="text-xs">
-                                                                    {bet.source}
-                                                                </Chip>
-                                                                <span className="text-xs text-default-400">
-                                                                    {bet.status == "open"
-                                                                        ? `Created ${new Date(bet.created_at).toLocaleDateString()}`
-                                                                        : `Resolved ${new Date(bet.resolution_date).toLocaleDateString()}`
-                                                                    }
-                                                                </span>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-
-                                                    {/* Right Section: Betting Details */}
-                                                    <div className="flex gap-6 items-center ml-auto">
-                                                        {/* Predictions */}
-                                                        <div className="flex flex-col gap-1.5">
-                                                            <div className="flex items-center gap-2">
-                                                                <span className="text-xs font-medium text-default-400">Creator:</span>
-                                                                <Chip size="sm" variant="flat" color="warning" className="text-xs">
-                                                                    {bet.predicted_outcome ? bet.predicted_outcome : bet.creator_choice}
-                                                                </Chip>
-                                                            </div>
-                                                            <div className="flex items-center gap-2">
-                                                                <span className="text-xs font-medium text-default-400">You:</span>
-                                                                <Chip size="sm" variant="flat" color="secondary" className="text-xs">
-                                                                    {bet.choice}
-                                                                </Chip>
-                                                            </div>
-                                                        </div>
-
-                                                        {/* Amount and Status */}
-                                                        <div className="flex flex-col items-end gap-1.5">
-                                                            <Chip size="sm" color={bet.status != "open"
-                                                                ? (bet.outcome === bet.choice ? "success" : "danger")
-                                                                : "primary"}
-                                                                variant="shadow"
-                                                                className="font-medium"
-                                                            >
-                                                                {bet.status != "open"
-                                                                    ? (bet.outcome === bet.choice ? "Won" : "Lost")
-                                                                    : bet.status}
-                                                            </Chip>
-                                                            <div className="text-sm font-medium">
-                                                                {bet.amount} credits
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        }
-                                        onPress={() => {
-                                            if (bet.pinecone_id && !pineconeData[bet.id]) {
-                                                fetchPineconeData(bet.id, bet.pinecone_id);
-                                            }
-                                        }}
-                                    >
-                                        <div className="p-6 bg-default-100 rounded-lg mt-2 w-full max-w-full">
-                                            <h4 className="text-lg font-semibold mb-4">Detailed Information</h4>
-
-                                            {/* Reasoning Section */}
-                                            <div className="mb-6">
-                                                <h5 className="font-medium mb-2 text-default-600">Reasoning</h5>
-                                                <p className="text-sm text-default-600 leading-relaxed">{bet.reason}</p>
+                            {bets.map((bet: IBet, index: number) => (
+                                <div
+                                    key={index}
+                                    onClick={() => router.push(`/bets/${bet.id}`)}
+                                    className="w-full p-4 rounded-lg bg-default-50 hover:bg-default-100 transition-colors border border-default-200 cursor-pointer"
+                                >
+                                    <div className="flex flex-col md:flex-row gap-6 items-start md:items-center">
+                                        {/* Left Section: Image and Title */}
+                                        <div className="flex gap-4 flex-grow items-start">
+                                            <div className="w-16 h-16 relative rounded-xl overflow-hidden flex-shrink-0 shadow-sm">
+                                                <Image
+                                                    src={bet.str_thumb}
+                                                    alt="Event"
+                                                    className="w-16 h-16 object-cover"
+                                                />
                                             </div>
 
-                                            {/* Pinecone Data Section */}
-                                            {bet.pinecone_id && (
-                                                <div className="mt-4">
-                                                    <h5 className="font-medium mb-3 text-default-600">Source Information</h5>
-                                                    {pineconeData[bet.id] ? (
-                                                        <div className="bg-default-50 rounded-lg p-4 border border-default-200">
-                                                            <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
-                                                                {Object.entries(pineconeData[bet.id].metadata || {}).map(([key, value]) => (
-                                                                    <div key={key} className="space-y-1.5">
-                                                                        <div className="text-xs font-medium text-default-400 capitalize">
-                                                                            {key.replace(/_/g, ' ')}
-                                                                        </div>
-                                                                        <div className="text-sm text-default-600 break-words">
-                                                                            {typeof value === 'string' ? value : JSON.stringify(value)}
-                                                                        </div>
-                                                                    </div>
-                                                                ))}
-                                                            </div>
-                                                        </div>
-                                                    ) : (
-                                                        <div className="bg-default-50 rounded-lg p-4 border border-default-200">
-                                                            <p className="text-sm text-default-500">Loading source information...</p>
-                                                        </div>
-                                                    )}
+                                            <div className="flex-grow min-w-0 max-w-[400px]">
+                                                <h3 className="text-base font-medium mb-2">
+                                                    {bet.description}
+                                                </h3>
+
+                                                {/* Source and Date Info */}
+                                                <div className="flex gap-3 items-center">
+                                                    <Chip size="sm" variant="flat" color="default" className="text-xs">
+                                                        {bet.source}
+                                                    </Chip>
+                                                    <span className="text-xs text-default-400">
+                                                        {bet.status == "open"
+                                                            ? `Created ${new Date(bet.created_at).toLocaleDateString()}`
+                                                            : `Resolved ${new Date(bet.resolution_date).toLocaleDateString()}`
+                                                        }
+                                                    </span>
                                                 </div>
-                                            )}
+                                            </div>
                                         </div>
-                                    </AccordionItem>
-                                ))}
-                            </Accordion>
+
+                                        {/* Right Section: Betting Details */}
+                                        <div className="flex gap-6 items-center ml-auto">
+                                            {/* Predictions */}
+                                            <div className="flex flex-col gap-1.5">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-xs font-medium text-default-400">Creator:</span>
+                                                    <Chip size="sm" variant="flat" color="warning" className="text-xs">
+                                                        {bet.predicted_outcome ? bet.predicted_outcome : bet.creator_choice}
+                                                    </Chip>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-xs font-medium text-default-400">You:</span>
+                                                    <Chip size="sm" variant="flat" color="secondary" className="text-xs">
+                                                        {bet.choice}
+                                                    </Chip>
+                                                </div>
+                                            </div>
+
+                                            {/* Amount and Status */}
+                                            <div className="flex flex-col items-end gap-1.5">
+                                                <Chip size="sm" color={bet.status != "open"
+                                                    ? (bet.outcome === bet.choice ? "success" : "danger")
+                                                    : "primary"}
+                                                    variant="shadow"
+                                                    className="font-medium"
+                                                >
+                                                    {bet.status != "open"
+                                                        ? (bet.outcome === bet.choice ? "Won" : "Lost")
+                                                        : bet.status}
+                                                </Chip>
+                                                <div className="text-sm font-medium">
+                                                    {bet.amount} credits
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
 
                             {/* Show More Button */}
                             {hasMore && (
