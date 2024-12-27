@@ -23,6 +23,9 @@ const config: Config = {
       backgroundImage: {
         mainImage: "url('/assets/images/background.jpg')",
       },
+      fontFamily: {
+        kodemono: ['Kode Mono', 'serif'],
+      },
     },
   },
   darkMode: "class",

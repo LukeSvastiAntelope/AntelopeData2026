@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { Rubik } from 'next/font/google';
+import { Kode_Mono } from 'next/font/google';
 import { Toaster } from "react-hot-toast";
 import { Providers } from "./components/provider/mainProvider";
 import { SolProvider } from "./components/provider/solProvider";
@@ -13,6 +14,11 @@ export const metadata: Metadata = {
 const rubik = Rubik({
   subsets: ['latin'],
   variable: '--font-rubik',
+});
+
+const kodemono = Kode_Mono({
+  subsets: ['latin'],
+  variable: '--font-kodemono',
 });
 
 export default function RootLayout({
