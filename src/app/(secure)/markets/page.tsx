@@ -189,7 +189,7 @@ export default function MarketsPage() {
     <div className="flex text-white">
       {/* Sidebar */}
       <aside className="w-64 fixed top-0 text-sm">
-        <nav className="flex min-h-screen flex-col gap-4 text-normal justify-between p-4">
+        <nav className="flex min-h-screen flex-col gap-4 text-normal justify-between py-8 px-4">
           <div>
             <div className="flex items-center mb-4">
               <Image
@@ -295,7 +295,7 @@ export default function MarketsPage() {
             value={searchTerm}
             onChange={handleSearchChange}
             placeholder="Search..."
-            className="w-full p-2 rounded-md focus:outline-none active:outline-none"
+            className="w-full p-2 rounded-md focus:outline-none text-small active:outline-none input-search"
           />
         </div>
 

@@ -235,6 +235,10 @@ background-clip: text;
 -webkit-text-fill-color: transparent;
 }
 
+.input-search {
+  background-color: #1e212a;
+}
+
 @media (prefers-color-scheme: dark) {
   :root {
     --background: #0a0a0a;
