@@ -60,7 +60,7 @@ export default function BetDetailPage() {
     return (
         <div className="flex text-white">
             {/* Sidebar (copied from dashboard) */}
-            <aside className="w-64">
+            <aside className="w-64 fixed top-0">
                 <nav className="flex min-h-screen flex-col gap-4 justify-between p-4">
                     <div>
                         <div className="flex items-center mb-4">
@@ -72,7 +72,7 @@ export default function BetDetailPage() {
                                 className="mr-2 rounded-full w-100"
                             />
                         </div>
-                        <Link href="/payment" className="flex items-center gap-2 mb-4">
+                        <Link href="/payment" className="flex items-center gap-2 mb-4 ">
                             <Image
                                 src={"/assets/images/logo-simple.svg"}
                                 alt="Profile"
@@ -81,10 +81,10 @@ export default function BetDetailPage() {
                                 className="rounded-full bg-gray-700 mr-2"
                             />
                             <span className="text-sm font-regular icon-credits px-5">
-                                <span className="text-gradient">83940</span>
+                                <span className="text-gradient font-kodemono">83940</span>
                             </span>
                         </Link>
-                        <Link href="/" className="flex items-center gap-2 mb-4 text-white">
+                        <Link href="/" className="flex items-center gap-2 mb-4 text-white font-kodemono">
                             <span className="icon-dashboard mr-2" /> Dashboard
                         </Link>
                         <Link 
@@ -93,36 +93,36 @@ export default function BetDetailPage() {
                         >
                             <span className="icon-markets mr-2 block group-hover:hidden" />
                             <span className="icon-markets-active mr-2 hidden group-hover:block" />
-                            <span className="text-default-400 group-hover:text-white">Markets</span>
+                            <span className="text-default-400 group-hover:text-white font-kodemono">Markets</span>
                         </Link>
                         <Link href="/strategy" className="flex items-center gap-2 mb-4 group text-default-400">
                             <span className="icon-strategy mr-2 block group-hover:hidden" />
                             <span className="icon-strategy-active mr-2 hidden group-hover:block" />
-                            <span className="text-default-400 group-hover:text-white">Strategy</span>
+                            <span className="text-default-400 group-hover:text-white font-kodemono">Strategy</span>
                         </Link>
                     </div>
                     <div>
                         <Link href="/about" className="flex items-center gap-2 mb-4 text-default-400 group">
                             <span className="icon-about mr-2 block group-hover:hidden" />
                             <span className="icon-about-active mr-2 hidden group-hover:block" />
-                            <span className="text-default-400 group-hover:text-white">About</span>
+                            <span className="text-default-400 group-hover:text-white font-kodemono">About</span>
                         </Link>
                         <Link href="/community" className="flex items-center gap-2 mb-4 text-default-400 group">
                             <span className="icon-support mr-2 block group-hover:hidden" />
                             <span className="icon-support-active mr-2 hidden group-hover:block" />
-                            <span className="text-default-400 group-hover:text-white">Community</span>
+                            <span className="text-default-400 group-hover:text-white font-kodemono">Community</span>
                         </Link>
                         <Link href="/signout" className="flex items-center gap-2 mb-4 text-default-400 group">
                             <span className="icon-logout mr-2 block group-hover:hidden" />
                             <span className="icon-logout-active mr-2 hidden group-hover:block" />
-                            <span className="text-default-400 group-hover:text-white">Sign out</span>
+                            <span className="text-default-400 group-hover:text-white font-kodemono">Sign out</span>
                         </Link>
                     </div>
                 </nav>
             </aside>
 
             {/* Main Bet Detail Content */}
-            <main className="flex-1 container mx-auto px-4 py-6 md:px-8 md:py-8">
+            <main className="flex-1 ml-64 container mx-auto px-4 py-6 md:px-8 md:py-8">
                 <Button
                     color="default"
                     variant="light"
@@ -135,14 +135,14 @@ export default function BetDetailPage() {
                 <Card>
                     <CardBody className="p-6 max-w-[800px]">
                         {/* Header Section */}
-                        <div className="flex gap-6 mb-8">
+                        <div className="flex gap-6 mb-8 flex-col">
                             <Image
                                 src={bet.str_thumb}
                                 alt="Event"
-                                className="w-24 h-24 rounded-xl object-cover"
+                                className="w-full rounded-xl object-cover"
                             />
                             <div>
-                                <h1 className="text-2xl font-bold mb-2">{bet.description}</h1>
+                                <h1 className="text-xl font-semibold mb-2">{bet.description}</h1>
                                 <div className="flex gap-3 items-center">
                                     <Chip size="sm" color="default">{bet.source}</Chip>
                                     <span className="text-default-400">
@@ -157,8 +157,10 @@ export default function BetDetailPage() {
 
                         {/* Bet Details */}
                         <div className="">
+                        <h2 className="text-lg font-semibold mb-4">Reasoning</h2>
+                        <p className="text-default-600 leading-relaxed">{bet.reason}</p>
                             <div className="w-full">
-                                <h2 className="text-xl font-semibold mb-4">Bet Details</h2>
+                                <h2 className="text-lg font-semibold mb-4">Bet Details</h2>
                                 <div className=" grid grid-cols-2 grid-rows-2 gap-8">
                                     <div>
                                         <h3 className="text-sm font-medium text-default-400 mb-1">Status</h3>
@@ -171,7 +173,7 @@ export default function BetDetailPage() {
                                     </div>
                                     <div>
                                         <h3 className="text-sm font-medium text-default-400 mb-1">Amount</h3>
-                                        <p className="text-lg font-semibold">{bet.amount} credits</p>
+                                        <p className="text-sm font-semibold"><span className="icon-credits mr-2 inline-block"></span>{bet.amount} credits</p>
                                     </div>
                                     <div>
                                         <h3 className="text-sm font-medium text-default-400 mb-1">Your Choice</h3>
@@ -185,8 +187,7 @@ export default function BetDetailPage() {
                             </div>
 
                             <div className="mt-8">
-                                <h2 className="text-xl font-semibold mb-4">Reasoning</h2>
-                                <p className="text-default-600 leading-relaxed">{bet.reason}</p>
+                               
 
                                 {pineconeData && (
                                     <div className="mt-8">

@@ -250,14 +250,14 @@ tbody {
 
 @font-face {
   font-family: "Kode Mono";
-  src: url("/fonts/KodeMono.woff2") format("woff2");
+  src: url("/fonts/KodeMono-Regular.woff2") format("woff2");
   font-weight: normal;
   font-style: normal;
 }
 
 @font-face {
   font-family: "Kode Mono";
-  src: url("/fonts/KodeMono-Bold.woff2") format("woff2");
+  src: url("/fonts/KodeMono-SemiBold.woff2") format("woff2");
   font-weight: bold;
   font-style: normal;
 }

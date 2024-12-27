@@ -201,7 +201,7 @@ export default function Dashboard() {
   return (
     <div className="flex text-white">
       {/* Sidebar */}
-      <aside className="w-64">
+      <aside className="w-64 fixed top-0">
       <nav className="flex min-h-screen flex-col gap-4 justify-between p-4">
            <div>
            <div className="flex items-center mb-4">
@@ -281,7 +281,7 @@ export default function Dashboard() {
       {/* Main Content */}
 
       
-      <main className="flex-1 p-8">
+      <main className="flex-1 ml-64 container mx-auto px-4 py-6 md:px-8 md:py-8">
         {/* Top bar with toggles */}
         <div className="flex justify-between items-center mb-4">
          
