@@ -291,7 +291,7 @@ export default function Dashboard() {
         <div className="flex gap-2">
             <button
               onClick={() => setActiveTab("bets")}
-              className={`px-1 py-2 hover:bg-gray-700 ${
+              className={`px-0 py-2 hover:text-white ${
                 activeTab === "bets" ? "text-white" : "text-gray-700"
               }`}
             >
@@ -311,66 +311,61 @@ export default function Dashboard() {
 
         {/* BETS SECTION */}
         {activeTab === "bets" && (
-          <section className="px-0 py-3 rounded-lg min-w-[780px]">
-            
+          <section className="rounded-lg min-w-[780px]">
+           
 
             {isLoadingBets && bets.length === 0 && (
-              <div className="flex justify-center items-center py-8 min-w-[780px">
+              <div className="flex justify-center items-center py-8">
                 <Spinner size="lg" />
               </div>
             )}
+
             {!isLoadingBets && bets.length === 0 && (
-              <div className="text-center text-gray-500 py-8 min-w-[780px]">No bets found</div>
+              <div className="text-center text-gray-500 py-8">No bets found</div>
             )}
 
-            {bets.map((bet, index) => {
-              // short reason snippet
-              const words = bet.reason?.split(" ") || [];
-              const truncatedReason =
-                words.length > 5 ? words.slice(0, 5).join(" ") + "..." : bet.reason;
-
-              return (
-                <Card key={index} className="mb-2 hover:bg-gray-600">
-                  <CardBody className="p-2">
-                    <div className="flex flex-col md:flex-row gap-4 items-start md:items-center">
-                      {/* Event Image */}
-                      <div className="w-12 h-12 relative rounded-lg overflow-hidden flex-shrink-0">
+            {/* Table Header */}
+            {bets.length > 0 && (
+              <table className="w-full text-sm text-left">
+                {/* <thead>
+                  <tr className="text-gray-500">
+                    <th className="py-2 px-0 text-xs">Image</th>
+                    <th className="py-2 px-4 text-xs">Description</th>
+                    <th className="py-2 px-4 text-xs">Source</th>
+                    <th className="py-2 px-4 text-xs">Stake</th>
+                    <th className="py-2 px-4 text-xs">Status</th>
+                    <th className="py-2 px-4 text-xs">Date</th>
+                  </tr>
+                </thead> */}
+                <tbody>
+                  {bets.map((bet, index) => (
+                    <tr
+                      key={index}
+                      className=""
+                    >
+                      {/* Image */}
+                      <td className="py-2 px-0">
                         {bet.str_thumb && (
                           <Image
                             src={bet.str_thumb}
-                            alt="Event"
-                            className="w-12 h-12"
+                            alt={bet.description}
+                            width={40}
+                            height={40}
+                            className="rounded-md"
                           />
                         )}
-                      </div>
-                      {/* Title / Reason */}
-                      <div className="flex-grow min-w-0 max-w-[400px]">
-                        <h3 className="text-sm font-regular">{bet.description}</h3>
-                        <p className="text-xs text-gray-400 mt-1">
-                          Reason: {truncatedReason}
-                        </p>
-                      </div>
-                      {/* Choices & Stake */}
-                      {/* <div className="flex flex-row md:flex-col gap-1 min-w-[80px]">
-                        <span className="text-xs">
-                          <span className="text-gray-500">Creator:</span>{" "}
-                          {bet.predicted_outcome || bet.creator_choice}
-                        </span>
-                        <span className="text-xs">
-                          <span className="text-gray-500">You:</span> {bet.choice}
-                        </span>
-                        <span className="text-xs text-gray-500">{bet.amount} credits</span>
-                      </div> */}
+                      </td>
+                      {/* Description */}
+                      <td className="py-2 px-4 break-words max-w-xs">
+                        {bet.description}
+                      </td>
                       {/* Source */}
-                      <div className="min-w-[80px]">
-                        <Chip size="sm" variant="flat" color="default" className="text-xs">
-                          {bet.source}
-                        </Chip>
-                      </div>
+                      <td className="py-2 px-4">{bet.source}</td>
+                      {/* Stake */}
+                      {/* <td className="py-2 px-4">{bet.amount}</td> */}
                       {/* Status */}
-                      <div className="min-w-[70px]">
+                      <td className="py-2 px-4">
                         <Chip
-                          size="sm"
                           color={
                             bet.status !== "open"
                               ? bet.outcome === bet.choice
@@ -379,6 +374,7 @@ export default function Dashboard() {
                               : "primary"
                           }
                           variant="flat"
+                          size="sm"
                         >
                           {bet.status !== "open"
                             ? bet.outcome === bet.choice
@@ -386,23 +382,21 @@ export default function Dashboard() {
                               : "Lost"
                             : bet.status}
                         </Chip>
-                      </div>
-                      {/* Date */}
-                      <div className="min-w-[90px] text-right">
-                        <span className="text-xs text-gray-400">
-                          {bet.status === "open"
-                            ? formatDate(bet.created_at)
-                            : formatDate(bet.resolution_date)}
-                        </span>
-                      </div>
-                    </div>
-                  </CardBody>
-                </Card>
-              );
-            })}
+                      </td>
+                      {/* Date (created_at or resolution_date depending on status) */}
+                      <td className="py-2 px-4">
+                        {bet.status === "open"
+                          ? formatDate(bet.created_at)
+                          : formatDate(bet.resolution_date)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
 
             {/* Show More Button */}
-            {hasMoreBets && !isLoadingBets && (
+            {hasMoreBets && !isLoadingBets && bets.length > 0 && (
               <div className="flex justify-center mt-4">
                 <Button
                   color="primary"
@@ -478,14 +472,13 @@ export default function Dashboard() {
             {/* Predictions Table */}
             {displayedPredictions.length > 0 && (
               <section className="rounded-lg p-4 overflow-x-auto">
-                <table className="w-full text-sm">
+                <table className="w-full text-sm text-left">
                   <thead>
-                    <tr className="border-b border-gray-600">
-                      <th className="py-2 px-4">Image</th>
+                    <tr className="text-left text-white">
+                      <th className="py-2 px-0">Image</th>
                       <th className="py-2 px-4">Description</th>
                       <th className="py-2 px-4">Source</th>
-                      {/* <th className="py-2 px-4">Creator Choice</th> */}
-                      {/* <th className="py-2 px-4">Bet Amount</th> */}
+               
                       <th className="py-2 px-4">Resolves</th>
                       <th className="py-2 px-4">Bets</th>
                       <th className="py-2 px-4">Status</th>
@@ -495,10 +488,10 @@ export default function Dashboard() {
                     {displayedPredictions.map((prediction, index) => (
                       <tr
                         key={index}
-                        className="cursor-pointer hover:bg-gray-600 border-b border-gray-600"
+                        className="cursor-pointer hover:bg-gray-600 "
                         onClick={() => router.push(`/predictions/${prediction.id}`)}
                       >
-                        <td className="py-2 px-4">
+                        <td className="py-2 px-0">
                           {prediction.str_thumb && (
                             <Image
                               src={prediction.str_thumb}
