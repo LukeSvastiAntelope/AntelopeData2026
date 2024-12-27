@@ -7,8 +7,8 @@ import { Providers } from "./components/provider/mainProvider";
 import { SolProvider } from "./components/provider/solProvider";
 
 export const metadata: Metadata = {
-  title: "Market Maker Agent",
-  description: "Market Maker Agent",
+  title: "Antelope",
+  description: "Synthetic Prediction Market",
 };
 
 const rubik = Rubik({

@@ -167,53 +167,67 @@ const AgentProfile = () => {
 
     return (
         <div className="min-h-screen">
-            {/* Responsive Navigation */}
-            <nav className="
-                fixed
-                top-0
-                left-0
-                z-50
-                flex
-                flex-row
-                md:flex-col
-                items-center
-                gap-4
-                w-full
-                md:w-20
-                p-3
-                shadow-md
-            ">
-                {/* Logo/Home Link */}
-                <Link href="/" className="flex items-center gap-2">
-                    <Image
-                        src={"/assets/images/logo-simple.svg"}
-                        alt="Hero Image"
-                        width={48}
-                        height={48}
-                        className="rounded-full"
-                    />
-                </Link>
-
-                {/* Navigation Links */}
-                <div className="flex flex-row md:flex-col gap-4 md:mt-6">
-                    <Link href="/" className=" flex justify-center">
+            <aside className="w-64 fixed top-0 text-sm">
+                <nav className="flex min-h-screen flex-col gap-4 text-normal justify-between p-4">
+                    <div>
+                        <div className="flex items-center mb-4">
+                            <Image
+                                src={"/assets/images/logo-text.svg"}
+                                alt="Dashboard Logo"
+                                width={160}
+                                height={40}
+                                className="mr-2 rounded-full w-100"
+                            />
+                        </div>
+                        <Link href="/payment" className="flex items-center gap-2 mb-4">
                         <Image
-                            src={"/assets/images/profile.svg"}
-                            alt="Bets"
-                            width={24}
-                            height={24}
+                        src={agent?.image || '/assets/images/default-agent.png'}
+                        alt="Agent Image"
+                        className="w-[24px] h-[24px] rounded-full"
+                        width={24}
+                        height={24}
+                    />
+                            <span className="text-sm font-semibold icon-credits px-5 font-kodemono">
+                                <span className="text-gradient">83940</span>
+                            </span>
+                        </Link>
+                        <Link href="/" className="flex items-center gap-2 mb-4 text-white font-kodemono">
+                            <span className="icon-dashboard mr-2" /> Dashboard
+                        </Link>
+                        <Link 
+                            href="/betting" 
+                            className="flex items-center gap-2 mb-4 group"
+                        >
+                            <span className="icon-markets mr-2 block group-hover:hidden" />
+                            <span className="icon-markets-active mr-2 hidden group-hover:block" />
+                            <span className="text-default-400 group-hover:text-white font-kodemono">Markets</span>
+                        </Link>
+                        <Link href="/predictions" className="flex items-center gap-2 mb-4 group text-default-400">
+                            <span className="icon-strategy mr-2 block group-hover:hidden" />
+                            <span className="icon-strategy-active mr-2 hidden group-hover:block" />
+                            <span className="text-default-400 group-hover:text-white font-kodemono">Strategy</span>
+                        </Link>
+                    </div>
 
-                        />
-                        Profile
-                    </Link>
-                    <Link href="/bets" className="icon-bet flex justify-center">
-                        Bets
-                    </Link>
-                    <Link href="/predictions" className="icon-predict flex justify-center">
-                        Predictions
-                    </Link>
-                </div>
-            </nav>
+                    <div>
+                        <Link href="/about" className="flex items-center gap-2 mb-4 text-default-400 group">
+                            <span className="icon-about mr-2 block group-hover:hidden" />
+                            <span className="icon-about-active mr-2 hidden group-hover:block" />
+                            <span className="text-default-400 group-hover:text-white font-kodemono">About</span>
+                        </Link>
+                        <Link href="/community" className="flex items-center gap-2 mb-4 text-default-400 group">
+                            <span className="icon-support mr-2 block group-hover:hidden" />
+                            <span className="icon-support-active mr-2 hidden group-hover:block" />
+                            <span className="text-default-400 group-hover:text-white font-kodemono">Community</span>
+                        </Link>
+                        <Link href="/signout" className="flex items-center gap-2 mb-4 text-default-400 group">
+                            <span className="icon-logout mr-2 block group-hover:hidden" />
+                            <span className="icon-logout-active mr-2 hidden group-hover:block" />
+                            <span className="text-default-400 group-hover:text-white font-kodemono">Sign out</span>
+                        </Link>
+                    </div>
+                </nav>
+            </aside>
             <div className="fixed top-0 right-0 p-4">
                 <Card className="bg-content0 hover:shadow-lg transition-all duration-300 border border-primary/20">
                     <CardBody className="p-2">
@@ -236,7 +250,7 @@ const AgentProfile = () => {
                 </Card>
             </div>
 
-            <div className="container mx-auto px-4 py-8">
+            <div className="flex-1 ml-64 container mx-auto px-4 py-6 md:px-8 md:py-8 max-w-[800px]">
                 {/* Header */}
 
                 <div className="text-white py-8 flex justify-between items-center px-2 rounded-b-2xl flex-row">
@@ -269,25 +283,25 @@ const AgentProfile = () => {
                     <Link href="/bets">
                         <StatCard
                             icon={<FaRocket />}
-                            title="Total Bets"
+                            title="Bets"
                             value={totalBets.toString()}
                         />
                     </Link>
                     <Link href="/predictions">
                         <StatCard
                             icon={<FaDatabase />}
-                            title="Total Predictions"
+                            title="Predictions"
                             value={totalPredictions.toString()}
                         />
                     </Link>
                     <StatCard
                         icon={<FaChartLine />}
-                        title="Success Rate"
+                        title="Success"
                         value={`${Number(successRate || 0).toFixed(2)}%`}
                     />
                     <StatCard
                         icon={<FaShieldAlt />}
-                        title="Max Bet Size"
+                        title="Bet Size"
                         value={`${agent?.maxBetSize || 0} credits`}
                     />
                 </div>

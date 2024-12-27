@@ -201,8 +201,8 @@ export default function Dashboard() {
   return (
     <div className="flex text-white">
       {/* Sidebar */}
-      <aside className="w-64 fixed top-0">
-      <nav className="flex min-h-screen flex-col gap-4 justify-between p-4">
+      <aside className="w-64 fixed top-0 text-sm">
+      <nav className="flex min-h-screen flex-col gap-4 text-normal justify-between p-4">
            <div>
            <div className="flex items-center mb-4">
           {/* Logo (image) */}
@@ -225,13 +225,13 @@ export default function Dashboard() {
                 className="rounded-full bg-gray-700 mr-2 "
               />
             {/* Credits */}
-            <span className="text-sm font-regular icon-credits px-5">
+            <span className="text-sm font-semibold icon-credits px-5 font-kodemono">
                 <span className="text-gradient">83940</span>
             </span>    
 
             </Link>
-          <Link href="/" className="flex items-center gap-2 mb-4 text-white">
-            <span className="icon-dashboard mr-2 " /> Dashboard
+          <Link href="/" className="flex items-center gap-2 mb-4 text-white font-kodemono">
+            <span className="icon-dashboard mr-2" /> Dashboard
           </Link>
           <Link 
                 href="/markets" 
@@ -241,7 +241,7 @@ export default function Dashboard() {
                 <span className="icon-markets mr-2 block group-hover:hidden " />
                 {/* hover icon */}
                 <span className="icon-markets-active mr-2 hidden group-hover:block" />
-                <span className="text-default-400 group-hover:text-white">Markets</span>
+                <span className="text-default-400 group-hover:text-white font-kodemono">Markets</span>
             </Link>
 
           <Link href="/strategy" className="flex items-center gap-2 mb-4 group text-default-400">
@@ -249,7 +249,7 @@ export default function Dashboard() {
             <span className="icon-strategy mr-2 block group-hover:hidden" /> 
              {/* hover icon */}
              <span className="icon-strategy-active mr-2 hidden group-hover:block" />
-            <span className="text-default-400 group-hover:text-white">Strategy</span>
+            <span className="text-default-400 group-hover:text-white font-kodemono">Strategy</span>
           </Link>
           </div>
           <div>
@@ -258,21 +258,21 @@ export default function Dashboard() {
             <span className="icon-about mr-2 block group-hover:hidden" /> 
              {/* hover icon */}
              <span className="icon-about-active mr-2 hidden group-hover:block" />
-            <span className="text-default-400 group-hover:text-white">About</span>
+            <span className="text-default-400 group-hover:text-white font-kodemono">About</span>
           </Link>
           <Link href="/community" className="flex items-center gap-2 mb-4 text-default-400 group">
             {/* default icon */}
             <span className="icon-support mr-2 block group-hover:hidden" /> 
              {/* hover icon */}
              <span className="icon-support-active mr-2 hidden group-hover:block" />
-            <span className="text-default-400 group-hover:text-white">Community</span>
+            <span className="text-default-400 group-hover:text-white font-kodemono">Community</span>
           </Link>
           <Link href="/signout" className="flex items-center gap-2 mb-4 text-default-400 group">
             {/* default icon */}
             <span className="icon-logout mr-2 block group-hover:hidden" /> 
              {/* hover icon */}
              <span className="icon-logout-active mr-2 hidden group-hover:block" />
-            <span className="text-default-400 group-hover:text-white">Sign out</span>
+            <span className="text-default-400 group-hover:text-white font-kodemono">Sign out</span>
           </Link>
           </div>
         </nav>
@@ -283,10 +283,7 @@ export default function Dashboard() {
       
       <main className="flex-1 ml-64 container mx-auto px-4 py-6 md:px-8 md:py-8">
         {/* Top bar with toggles */}
-        <div className="flex justify-between items-center mb-4">
-         
-         
-        </div>
+    
 
         <div className="flex gap-2">
             <button

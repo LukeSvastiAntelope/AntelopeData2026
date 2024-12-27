@@ -26,6 +26,11 @@ const config: Config = {
       fontFamily: {
         kodemono: ['Kode Mono', 'serif'],
       },
+      fontSize: {
+        'base-sm': '0.9375rem',    // 15px
+        'base-md': '1rem',         // 16px
+        'base-lg': '1.0625rem',    // 17px
+      },
     },
   },
   darkMode: "class",

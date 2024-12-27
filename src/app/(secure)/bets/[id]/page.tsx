@@ -60,7 +60,7 @@ export default function BetDetailPage() {
     return (
         <div className="flex text-white">
             {/* Sidebar (copied from dashboard) */}
-            <aside className="w-64 fixed top-0">
+            <aside className="w-64 fixed top-0 text-sm" >
                 <nav className="flex min-h-screen flex-col gap-4 justify-between p-4">
                     <div>
                         <div className="flex items-center mb-4">
