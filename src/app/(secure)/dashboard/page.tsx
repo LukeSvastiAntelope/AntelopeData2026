@@ -203,58 +203,84 @@ export default function Dashboard() {
       {/* Sidebar */}
       <aside className="w-64">
       <nav className="flex min-h-screen flex-col gap-4 justify-between p-4">
-        
-        
            <div>
            <div className="flex items-center mb-4">
           {/* Logo (image) */}
           <Image
-            src={"/assets/images/logo-simple.svg"}
+            src={"/assets/images/logo-text.svg"}
             alt="Dashboard Logo"
-            width={40}
+            width={160}
             height={40}
-            className="mr-2 rounded-full"
+            className="mr-2 rounded-full w-100"
           />
-          <span className="text-xl font-bold">ANTELOPE</span>
+          {/* <span className="text-xl font-bold">ANTELOPE</span> */}
         </div>
             {/* Profile Photo */}
-            <Link href="/" className="flex items-center gap-2 mb-4 "> 
+            <Link href="/payment" className="flex items-center gap-2 mb-4"> 
             <Image
                 src={agent?.image || "/assets/images/logo-simple.svg"}
                 alt="Profile"
-                width={32}
-                height={32}
-                className="rounded-full bg-gray-700"
+                width={24}
+                height={24}
+                className="rounded-full bg-gray-700 mr-2 "
               />
             {/* Credits */}
-            <span className="text-sm font-regular text-gradient icon-credits">83940</span>    
+            <span className="text-sm font-regular icon-credits px-5">
+                <span className="text-gradient">83940</span>
+            </span>    
 
             </Link>
-          <Link href="/" className="flex items-center gap-2 mb-4">
-            <span className="icon-dashboard mr-2" /> Dashboard
+          <Link href="/" className="flex items-center gap-2 mb-4 text-white">
+            <span className="icon-dashboard mr-2 " /> Dashboard
           </Link>
-          <Link href="/markets" className="flex items-center gap-2 mb-4">
-            <span className="icon-markets mr-2" /> Markets
-          </Link>
-          <Link href="/strategy" className="flex items-center gap-2 mb-4">
-            <span className="icon-strategy mr-2" /> Strategy
+          <Link 
+                href="/markets" 
+                className="flex items-center gap-2 mb-4 group"
+                >
+                {/* default icon */}
+                <span className="icon-markets mr-2 block group-hover:hidden " />
+                {/* hover icon */}
+                <span className="icon-markets-active mr-2 hidden group-hover:block" />
+                <span className="text-default-400 group-hover:text-white">Markets</span>
+            </Link>
+
+          <Link href="/strategy" className="flex items-center gap-2 mb-4 group text-default-400">
+          {/* default icon */}
+            <span className="icon-strategy mr-2 block group-hover:hidden" /> 
+             {/* hover icon */}
+             <span className="icon-strategy-active mr-2 hidden group-hover:block" />
+            <span className="text-default-400 group-hover:text-white">Strategy</span>
           </Link>
           </div>
           <div>
-          <Link href="/about" className="flex items-center gap-2 mb-4">
-            <span className="icon-about mr-2" /> About
+          <Link href="/about" className="flex items-center gap-2 mb-4 text-default-400 group">
+            {/* default icon */}
+            <span className="icon-about mr-2 block group-hover:hidden" /> 
+             {/* hover icon */}
+             <span className="icon-about-active mr-2 hidden group-hover:block" />
+            <span className="text-default-400 group-hover:text-white">About</span>
           </Link>
-          <Link href="/community" className="flex items-center gap-2 mb-4">
-            <span className="icon-support mr-2" /> Community
+          <Link href="/community" className="flex items-center gap-2 mb-4 text-default-400 group">
+            {/* default icon */}
+            <span className="icon-support mr-2 block group-hover:hidden" /> 
+             {/* hover icon */}
+             <span className="icon-support-active mr-2 hidden group-hover:block" />
+            <span className="text-default-400 group-hover:text-white">Community</span>
           </Link>
-          <Link href="/signout" className="flex items-center gap-2 mb-4">
-            <span className="icon-logout mr-2" /> Sign out
+          <Link href="/signout" className="flex items-center gap-2 mb-4 text-default-400 group">
+            {/* default icon */}
+            <span className="icon-logout mr-2 block group-hover:hidden" /> 
+             {/* hover icon */}
+             <span className="icon-logout-active mr-2 hidden group-hover:block" />
+            <span className="text-default-400 group-hover:text-white">Sign out</span>
           </Link>
           </div>
         </nav>
       </aside>
 
       {/* Main Content */}
+
+      
       <main className="flex-1 p-8">
         {/* Top bar with toggles */}
         <div className="flex justify-between items-center mb-4">
@@ -265,7 +291,7 @@ export default function Dashboard() {
         <div className="flex gap-2">
             <button
               onClick={() => setActiveTab("bets")}
-              className={`px-1 py-2 ${
+              className={`px-1 py-2 hover:bg-gray-700 ${
                 activeTab === "bets" ? "text-white" : "text-gray-700"
               }`}
             >
@@ -273,7 +299,7 @@ export default function Dashboard() {
             </button>
             <button
               onClick={() => setActiveTab("predictions")}
-              className={`px-1 py-2 ${
+              className={`px-1 py-2 hover:text-white ${
                 activeTab === "predictions" ? "text-white" : "text-gray-700"
               }`}
             >
@@ -281,18 +307,20 @@ export default function Dashboard() {
             </button>
           </div>
 
+          
+
         {/* BETS SECTION */}
         {activeTab === "bets" && (
-          <section className="px-0 py-3 rounded-lg">
+          <section className="px-0 py-3 rounded-lg min-w-[780px]">
             
 
             {isLoadingBets && bets.length === 0 && (
-              <div className="flex justify-center items-center py-8">
+              <div className="flex justify-center items-center py-8 min-w-[780px">
                 <Spinner size="lg" />
               </div>
             )}
             {!isLoadingBets && bets.length === 0 && (
-              <div className="text-center text-gray-500 py-8">No bets found</div>
+              <div className="text-center text-gray-500 py-8 min-w-[780px]">No bets found</div>
             )}
 
             {bets.map((bet, index) => {
@@ -400,8 +428,8 @@ export default function Dashboard() {
 
         {/* PREDICTIONS SECTION */}
         {activeTab === "predictions" && (
-          <section className="bg-gray-800 p-4 rounded-lg">
-            <h1 className="text-xl font-bold mb-6">Active Predictions</h1>
+          <section className="rounded-lg min-w-[780px]">
+            {/* <h1 className="text-xl font-bold mb-6">Active Predictions</h1> */}
 
             {isLoadingPredictions && predictions.length === 0 && (
               <div className="flex justify-center items-center py-8">
@@ -409,13 +437,13 @@ export default function Dashboard() {
               </div>
             )}
             {!isLoadingPredictions && predictions.length === 0 && (
-              <div className="text-center text-gray-500 py-8">No predictions found</div>
+              <div className="text-center text-gray-500 py-8 container">No predictions found</div>
             )}
 
             {/* Stats Row */}
             {predictions.length > 0 && (
               <div className="grid gap-6 md:grid-cols-3 mb-6">
-                <Card className="bg-gray-700 text-white">
+                <Card className=" text-white bg-content0">
                   <CardHeader className="text-sm font-medium">Total Active Predictions</CardHeader>
                   <CardBody>
                     <p className="text-2xl font-bold">
@@ -423,7 +451,7 @@ export default function Dashboard() {
                     </p>
                   </CardBody>
                 </Card>
-                <Card className="bg-gray-700 text-white">
+                <Card className=" text-white bg-content0">
                   <CardHeader className="text-sm font-medium">Total Bets Placed</CardHeader>
                   <CardBody>
                     <p className="text-2xl font-bold">
@@ -431,7 +459,7 @@ export default function Dashboard() {
                     </p>
                   </CardBody>
                 </Card>
-                <Card className="bg-gray-700 text-white">
+                <Card className=" text-white bg-content0">
                   <CardHeader className="text-sm font-medium">Win Rate</CardHeader>
                   <CardBody>
                     <p className="text-2xl font-bold">
@@ -449,17 +477,17 @@ export default function Dashboard() {
 
             {/* Predictions Table */}
             {displayedPredictions.length > 0 && (
-              <section className="rounded-lg bg-gray-700 p-4 overflow-x-auto">
+              <section className="rounded-lg p-4 overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-gray-600">
                       <th className="py-2 px-4">Image</th>
                       <th className="py-2 px-4">Description</th>
                       <th className="py-2 px-4">Source</th>
-                      <th className="py-2 px-4">Creator Choice</th>
-                      <th className="py-2 px-4">Bet Amount</th>
-                      <th className="py-2 px-4">Resolution Date</th>
-                      <th className="py-2 px-4">Bets Count</th>
+                      {/* <th className="py-2 px-4">Creator Choice</th> */}
+                      {/* <th className="py-2 px-4">Bet Amount</th> */}
+                      <th className="py-2 px-4">Resolves</th>
+                      <th className="py-2 px-4">Bets</th>
                       <th className="py-2 px-4">Status</th>
                     </tr>
                   </thead>
@@ -483,10 +511,10 @@ export default function Dashboard() {
                         </td>
                         <td className="py-2 px-4 break-words max-w-xs">{prediction.description}</td>
                         <td className="py-2 px-4">{prediction.source}</td>
-                        <td className="py-2 px-4">
+                        {/* <td className="py-2 px-4">
                           {prediction.predicted_outcome || prediction.creator_choice}
                         </td>
-                        <td className="py-2 px-4">{prediction.bet_amount}</td>
+                        <td className="py-2 px-4">{prediction.bet_amount}</td> */}
                         <td className="py-2 px-4">{formatDate(prediction.resolution_date)}</td>
                         <td className="py-2 px-4">{prediction.bets_count}</td>
                         <td className="py-2 px-4">

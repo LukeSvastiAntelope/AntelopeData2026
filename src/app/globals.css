@@ -71,72 +71,123 @@ background-clip: text;
 
 .icon-dashboard {
   background-image: url('/assets/images/dashboard_off.svg');
-  background-size: 24px 24px;
+  background-size: 20px 20px;
   background-repeat: no-repeat;
   background-position: center;
-  width: 24px;
-  height: 24px;
+  width: 20px;
+  height: 20px;
   transition: background-image 0.2s ease-in-out;
 }
 
 .icon-markets {
   background-image: url('/assets/images/markets_off.svg');
-  background-size: 24px 24px;
+  background-size: 20px 20px;
   background-repeat: no-repeat;
   background-position: center;
-  width: 24px;
-  height: 24px;
+  width: 20px;
+  height: 20px;
   transition: background-image 0.2s ease-in-out;
 }
 
-.icon-strategy {
-  background-image: url('/assets/images/strategy_off.svg');
-  background-size: 24px 24px;
+.icon-markets-active {
+  background-image: url('/assets/images/markets_on.svg');
+  background-size: 20px 20px;
   background-repeat: no-repeat;
   background-position: center;
-  width: 24px;
-  height: 24px;
+  width: 20px;
+  height: 20px;
+  transition: background-image 0.2s ease-in-out;
+} 
+
+.icon-strategy {
+  background-image: url('/assets/images/strategy_off.svg');
+  background-size: 20px 20px;
+  background-repeat: no-repeat;
+  background-position: center;
+  width: 20px;
+  height: 20px;
+  transition: background-image 0.2s ease-in-out;
+}
+
+.icon-strategy-active {
+  background-image: url('/assets/images/strategy_on.svg');
+  background-size: 20px 20px;
+  background-repeat: no-repeat;
+  background-position: center;
+  width: 20px;
+  height: 20px;
   transition: background-image 0.2s ease-in-out;
 }
 
 .icon-about {
   background-image: url('/assets/images/about_off.svg');
-  background-size: 24px 24px;
+  background-size: 20px 20px;
   background-repeat: no-repeat;
   background-position: center;
-  width: 24px;
-  height: 24px;
+  width: 20px;
+  height: 20px;
+  transition: background-image 0.2s ease-in-out;
+}
+
+.icon-about-active {
+  background-image: url('/assets/images/about_on.svg');
+  background-size: 20px 20px;
+  background-repeat: no-repeat;
+  background-position: center;
+  width: 20px;
+  height: 20px;
   transition: background-image 0.2s ease-in-out;
 }
 
 .icon-credits {
   background-image: url('/assets/images/credit.svg');
-  background-size: 24px 24px;
+  background-size: 16px 16px;
   background-repeat: no-repeat;
-  background-position: center;
-  width: 24px;
-  height: 24px;
-  padding-right: 40px;
+  background-position: left center;
+  width: 16px;
+  height: 16px;
   transition: background-image 0.2s ease-in-out;
 }
 
+
+
 .icon-logout {
   background-image: url('/assets/images/logout_off.svg');
-  background-size: 24px 24px;
+  background-size: 20px 20px;
   background-repeat: no-repeat;
   background-position: center;
-  width: 24px;
-  height: 24px;
+  width: 20px;
+  height: 20px;
+  transition: background-image 0.2s ease-in-out;
+}
+
+.icon-logout-active {
+  background-image: url('/assets/images/logout_on.svg');
+  background-size: 20px 20px;
+  background-repeat: no-repeat;
+  background-position: center;
+  width: 20px;
+  height: 20px;
   transition: background-image 0.2s ease-in-out;
 }
 
 .icon-support {
   background-image: url('/assets/images/support_off.svg');
-  background-size: 24px 24px;
+  background-size: 20px 20px;
   background-repeat: no-repeat;
   background-position: center;
-  width: 24px;
-  height: 24px;
+  width: 20px;
+  height: 20px;
+  transition: background-image 0.2s ease-in-out;
+    }
+
+.icon-support-active {
+  background-image: url('/assets/images/support_on.svg');
+  background-size: 20px 20px;
+  background-repeat: no-repeat;
+  background-position: center;
+  width: 20px;
+  height: 20px;
   transition: background-image 0.2s ease-in-out;
 }
 
@@ -144,7 +195,6 @@ background-clip: text;
   background-image: url('/assets/images/bet.svg');
   /* transition  to hover */
   transition: background-image 0.2s ease-in-out;
-
 }
 
 .icon-predict:hover {
@@ -159,6 +209,20 @@ background-clip: text;
 
   transition: background-image 0.2s ease-in-out;
  
+}
+
+.text-gradient {
+  background: linear-gradient(86deg, #7A34E2 -3.84%, #1DA1F2 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.text-gradient-red {
+  background: linear-gradient(223deg, #F88418 15.01%, #F81818 84.75%);
+background-clip: text;
+-webkit-background-clip: text;
+-webkit-text-fill-color: transparent;
 }
 
 @media (prefers-color-scheme: dark) {
