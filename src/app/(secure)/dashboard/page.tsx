@@ -60,6 +60,7 @@ const formatDate = (dateStr: string): string => {
 
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState<"bets" | "predictions">("bets");
+  const [searchTerm, setSearchTerm] = useState('');
 
   // Agent
   const [agent, setAgent] = useState<IAgentProfile | null>(null);
@@ -198,6 +199,11 @@ export default function Dashboard() {
     }
   }, [activeTab]);
 
+  const handleSearchChange = (event) => {
+    setSearchTerm(event.target.value);
+    // Optionally, add logic to filter bets based on searchTerm
+  };
+
   return (
     <div className="flex text-white">
       {/* Sidebar */}
@@ -302,6 +308,17 @@ export default function Dashboard() {
             >
               Predictions
             </button>
+          </div>
+
+          {/* Search Field */}
+          <div className="my-4">
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={handleSearchChange}
+              placeholder="Search bets..."
+              className="w-full p-2 rounded-md focus:outline-none active:outline-none"
+            />
           </div>
 
           

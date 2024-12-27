@@ -79,6 +79,16 @@ background-clip: text;
   transition: background-image 0.2s ease-in-out;
 }
 
+.icon-dashboard-active {
+  background-image: url('/assets/images/dashboard_on.svg');
+  background-size: 20px 20px;
+  background-repeat: no-repeat;
+  background-position: center;
+  width: 20px;
+  height: 20px;
+  transition: background-image 0.2s ease-in-out;
+}
+
 .icon-markets {
   background-image: url('/assets/images/markets_off.svg');
   background-size: 20px 20px;

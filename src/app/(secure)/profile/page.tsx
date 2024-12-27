@@ -179,7 +179,7 @@ const AgentProfile = () => {
                                 className="mr-2 rounded-full w-100"
                             />
                         </div>
-                        <Link href="/payment" className="flex items-center gap-2 mb-4">
+                        <Link href="/profile" className="flex items-center gap-2 mb-4">
                         <Image
                         src={agent?.image || '/assets/images/default-agent.png'}
                         alt="Agent Image"
@@ -191,7 +191,7 @@ const AgentProfile = () => {
                                 <span className="text-gradient">83940</span>
                             </span>
                         </Link>
-                        <Link href="/" className="flex items-center gap-2 mb-4 text-white font-kodemono">
+                        <Link href="/dashboard" className="flex items-center gap-2 mb-4 text-white font-kodemono">
                             <span className="icon-dashboard mr-2" /> Dashboard
                         </Link>
                         <Link 
