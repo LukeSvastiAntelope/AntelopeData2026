@@ -195,14 +195,14 @@ const AgentProfile = () => {
                             <span className="icon-dashboard mr-2" /> Dashboard
                         </Link>
                         <Link 
-                            href="/betting" 
+                            href="/markets" 
                             className="flex items-center gap-2 mb-4 group"
                         >
                             <span className="icon-markets mr-2 block group-hover:hidden" />
                             <span className="icon-markets-active mr-2 hidden group-hover:block" />
                             <span className="text-default-400 group-hover:text-white font-kodemono">Markets</span>
                         </Link>
-                        <Link href="/predictions" className="flex items-center gap-2 mb-4 group text-default-400">
+                        <Link href="/strategy" className="flex items-center gap-2 mb-4 group text-default-400">
                             <span className="icon-strategy mr-2 block group-hover:hidden" />
                             <span className="icon-strategy-active mr-2 hidden group-hover:block" />
                             <span className="text-default-400 group-hover:text-white font-kodemono">Strategy</span>

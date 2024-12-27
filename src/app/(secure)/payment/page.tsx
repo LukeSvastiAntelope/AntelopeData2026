@@ -240,60 +240,81 @@ const PaymentPage = () => {
     return (
         <div className="min-h-screen">
             {/* Responsive Navigation */}
-            <nav className="
-                    fixed
-                    top-0
-                    left-0
-                    z-50
-                    flex
-                    flex-row
-                    md:flex-col
-                    items-center
-                    gap-4
-                    w-full
-                    md:w-20
-                    p-3
-                    shadow-md
-                    ">
-                {/* Logo/Home Link */}
-                <Link href="/" className="flex items-center gap-2">
-                    <Image
-                        src={"/assets/images/logo-simple.svg"}
-                        alt="Hero Image"
-                        width={48}
-                        height={48}
-                        className="rounded-full"
-                    />
-                </Link>
-
-                {/* Navigation Links */}
-                <div className="flex flex-row md:flex-col gap-4 md:mt-6">
-                    <Link href="/" className="icon-profile flex justify-center">
-
-                    </Link>
-                    <Link href="/bets" className="icon-bet flex justify-center">
-
-                    </Link>
-                    <Link href="/predictions" className="icon-predict flex justify-center">
-                        <Image
-                            src={"/assets/images/predict.svg"}
-                            alt="Predictions"
-                            width={24}
-                            height={24}
-                            className="rounded-full"
-                        />
-                    </Link>
-                </div>
-            </nav>
-            <div className="max-w-6xl mx-auto p-6 space-y-6">
+             {/* Sidebar */}
+             <aside className="w-64 fixed top-0 text-sm">
+                <nav className="flex min-h-screen flex-col gap-4 justify-between py-8 px-4">
+                    <div>
+                        <div className="flex items-center mb-4">
+                            <Image
+                                src={"/assets/images/logo-text.svg"}
+                                alt="Dashboard Logo"
+                                width={160}
+                                height={40}
+                                className="mr-2 rounded-full w-100"
+                            />
+                        </div>
+                        <Link href="/payment" className="flex items-center mb-4 group text-white">
+                            <Image
+                                src={"/assets/images/logo-simple.svg"}
+                                alt="Profile"
+                                width={24}
+                                height={24}
+                                className="rounded-full bg-gray-700 mr-2"
+                            />
+                            <span className="text-sm font-regular icon-credits px-5">
+                                <span className="text-gradient font-kodemono">
+                                    {agentBalance || 0}
+                                </span>
+                            </span>
+                        </Link>
+                        <Link href="/" className="flex items-center gap-2 mb-4 text-default-400 group hover:text-white">
+                            <span className="icon-dashboard mr-2 block group-hover:hidden" />
+                            <span className="icon-dashboard-active mr-2 hidden group-hover:block" />
+                            <span className="group-hover:text-white font-kodemono">Dashboard</span>
+                        </Link>
+                        <Link 
+                            href="/markets" 
+                            className="flex items-center gap-2 mb-4 text-default-400 group hover:text-white"
+                        >
+                            <span className="icon-markets mr-2 block group-hover:hidden" />
+                            <span className="icon-markets-active mr-2 hidden group-hover:block" />
+                            <span className="group-hover:text-white font-kodemono">Markets</span>
+                        </Link>
+                        <Link href="/strategy" className="flex items-center gap-2 mb-4 text-default-400 group hover:text-white">
+                            <span className="icon-strategy mr-2 block group-hover:hidden" />
+                            <span className="icon-strategy-active mr-2 hidden group-hover:block" />
+                            <span className="text-default-400 group-hover:text-white font-kodemono">Strategy</span>
+                        </Link>
+                    </div>
+                    <div>
+                        <Link href="/about" className="flex items-center gap-2 mb-4 text-default-400 group hover:text-white">
+                            <span className="icon-about mr-2 block group-hover:hidden" />
+                            <span className="icon-about-active mr-2 hidden group-hover:block" />
+                            <span className="group-hover:text-white font-kodemono">About</span>
+                        </Link>
+                        <Link href="/community" className="flex items-center gap-2 mb-4 text-default-400 group hover:text-white">
+                            <span className="icon-support mr-2 block group-hover:hidden" />
+                            <span className="icon-support-active mr-2 hidden group-hover:block" />
+                            <span className="group-hover:text-white font-kodemono">Community</span>
+                        </Link>
+                        <Link href="/signout" className="flex items-center gap-2 mb-4 text-default-400 group hover:text-white">
+                            <span className="icon-logout mr-2 block group-hover:hidden" />
+                            <span className="icon-logout-active mr-2 hidden group-hover:block" />
+                            <span className="group-hover:text-white font-kodemono">Sign out</span>
+                        </Link>
+                    </div>
+                </nav>
+            </aside>
+            
+            <div className="flex-1 ml-64 container mx-auto px-4 py-6 md:px-8 md:py-8 max-w-[800px]">
                 <div className="flex justify-between items-center mb-8">
-                    <h1 className="text-4xl font-bold">Payment & Credits</h1>
+                    <h1 className="text-lg font-bold">Payment & Credits</h1>
                     <WalletMultiButton />
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {/* Buy Credits Card */}
-                    <Card className="p-4">
+                    <Card className="p-4 bg-content0">
                         <CardHeader className="pb-2">
                             <div className="flex items-center space-x-2">
                                 <IconCreditCard />
@@ -357,7 +378,7 @@ const PaymentPage = () => {
                     </Card>
 
                     {/* Withdraw Card */}
-                    <Card className="p-4">
+                    <Card className="p-4 bg-content0">
                         <CardHeader className="pb-2">
                             <div className="flex items-center space-x-2">
                                 <IconWallet />
@@ -428,7 +449,7 @@ const PaymentPage = () => {
                 </div>
 
                 {/* NFT Card */}
-                <Card className="p-4 mt-6">
+                <Card className="p-4 mt-6 bg-content0">
                     <CardHeader className="pb-2">
                         <div className="flex items-center space-x-2">
                             <IconNft />

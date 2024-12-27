@@ -7,10 +7,12 @@ import { Button } from "@nextui-org/button";
 import { Card, CardBody, CardHeader } from "@nextui-org/card";
 import { Spinner } from "@nextui-org/spinner";
 import { Chip } from "@nextui-org/chip";
-import { IAgentProfile, IBet, IPrediction } from "@/app/utils/interface";
+import { IAgentProfile, IBet, Prediction } from "@/app/utils/interface";
 import { useFetch, formatDate } from "@/app/utils/lib";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
+
+
 
 export default function MarketsPage() {
   const [activeTab, setActiveTab] = useState<"bets" | "predictions" | "sports" | "general">("bets");

@@ -199,10 +199,10 @@ export default function Dashboard() {
     }
   }, [activeTab]);
 
-  const handleSearchChange = (event) => {
-    setSearchTerm(event.target.value);
-    // Optionally, add logic to filter bets based on searchTerm
-  };
+  // const handleSearchChange = (event) => {
+  //   setSearchTerm(event.target.value);
+  //   // Optionally, add logic to filter bets based on searchTerm
+  // };
 
   return (
     <div className="flex text-white">
@@ -315,7 +315,7 @@ export default function Dashboard() {
             <input
               type="text"
               value={searchTerm}
-              onChange={handleSearchChange}
+              // onChange={handleSearchChange}
               placeholder="Search bets..."
               className="w-full p-2 rounded-md focus:outline-none text-small active:outline-none input-search"
             />

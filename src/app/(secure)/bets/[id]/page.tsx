@@ -84,7 +84,7 @@ export default function BetDetailPage() {
                                 <span className="text-gradient font-kodemono">83940</span>
                             </span>
                         </Link>
-                        <Link href="/" className="flex items-center gap-2 mb-4 text-white font-kodemono">
+                        <Link href="/dashboard" className="flex items-center gap-2 mb-4 text-white font-kodemono">
                             <span className="icon-dashboard mr-2" /> Dashboard
                         </Link>
                         <Link 
