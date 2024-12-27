@@ -56,8 +56,9 @@ export default function PredictionDetail() {
     }
 
     return (
-        <div className="container mx-auto py-6 px-4 min-h-screen">
+        <div className="container mx-auto py-6 px-4 min-h-screen max-w-[800px]">
             {/* Back Button */}
+            
             <Link
                 href="/predictions"
                 className="inline-flex items-center gap-2 mb-6 text-primary hover:underline"
@@ -66,15 +67,15 @@ export default function PredictionDetail() {
             </Link>
 
             {/* Prediction Overview */}
-            <Card className="mb-6">
+            
+            <Card className="mb-6 ">
                 <CardBody className="gap-4">
-                    <div className="flex items-start gap-4 flex-col md:flex-row">
+                    <div className="flex items-start gap-4 flex-col md:flex-col object-cover ">
                         <Image
                             src={prediction.str_thumb}
                             alt={prediction.description}
-                            width={200}
-                            height={200}
-                            className="rounded-lg"
+  
+                            className="rounded-lg w-full max-h-[200px] object-cover"
                         />
                         <div className="space-y-4 flex-1">
                             <div>

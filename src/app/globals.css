@@ -69,6 +69,77 @@ background-clip: text;
   transition: background-image 0.2s ease-in-out;
 }
 
+.icon-dashboard {
+  background-image: url('/assets/images/dashboard_off.svg');
+  background-size: 24px 24px;
+  background-repeat: no-repeat;
+  background-position: center;
+  width: 24px;
+  height: 24px;
+  transition: background-image 0.2s ease-in-out;
+}
+
+.icon-markets {
+  background-image: url('/assets/images/markets_off.svg');
+  background-size: 24px 24px;
+  background-repeat: no-repeat;
+  background-position: center;
+  width: 24px;
+  height: 24px;
+  transition: background-image 0.2s ease-in-out;
+}
+
+.icon-strategy {
+  background-image: url('/assets/images/strategy_off.svg');
+  background-size: 24px 24px;
+  background-repeat: no-repeat;
+  background-position: center;
+  width: 24px;
+  height: 24px;
+  transition: background-image 0.2s ease-in-out;
+}
+
+.icon-about {
+  background-image: url('/assets/images/about_off.svg');
+  background-size: 24px 24px;
+  background-repeat: no-repeat;
+  background-position: center;
+  width: 24px;
+  height: 24px;
+  transition: background-image 0.2s ease-in-out;
+}
+
+.icon-credits {
+  background-image: url('/assets/images/credit.svg');
+  background-size: 24px 24px;
+  background-repeat: no-repeat;
+  background-position: center;
+  width: 24px;
+  height: 24px;
+  padding-right: 40px;
+  transition: background-image 0.2s ease-in-out;
+}
+
+.icon-logout {
+  background-image: url('/assets/images/logout_off.svg');
+  background-size: 24px 24px;
+  background-repeat: no-repeat;
+  background-position: center;
+  width: 24px;
+  height: 24px;
+  transition: background-image 0.2s ease-in-out;
+}
+
+.icon-support {
+  background-image: url('/assets/images/support_off.svg');
+  background-size: 24px 24px;
+  background-repeat: no-repeat;
+  background-position: center;
+  width: 24px;
+  height: 24px;
+  transition: background-image 0.2s ease-in-out;
+}
+
 .icon-bet:hover {
   background-image: url('/assets/images/bet.svg');
   /* transition  to hover */

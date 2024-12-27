@@ -204,12 +204,13 @@ const AgentProfile = () => {
                             height={24}
 
                         />
+                        Profile
                     </Link>
                     <Link href="/bets" className="icon-bet flex justify-center">
-
+                        Bets
                     </Link>
                     <Link href="/predictions" className="icon-predict flex justify-center">
-
+                        Predictions
                     </Link>
                 </div>
             </nav>
