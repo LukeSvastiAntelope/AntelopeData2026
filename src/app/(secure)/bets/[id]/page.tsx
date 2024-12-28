@@ -61,7 +61,7 @@ export default function BetDetailPage() {
         <div className="flex text-white">
             {/* Sidebar (copied from dashboard) */}
             <aside className="w-64 fixed top-0 text-sm" >
-                <nav className="flex min-h-screen flex-col gap-4 justify-between p-4">
+                <nav className="flex min-h-screen flex-col gap-4 justify-between py-8 px-4">
                     <div>
                         <div className="flex items-center mb-4">
                             <Image
@@ -84,7 +84,7 @@ export default function BetDetailPage() {
                                 <span className="text-gradient font-kodemono">83940</span>
                             </span>
                         </Link>
-                        <Link href="/" className="flex items-center gap-2 mb-4 text-white font-kodemono">
+                        <Link href="/dashboard" className="flex items-center gap-2 mb-4 text-white font-kodemono">
                             <span className="icon-dashboard mr-2" /> Dashboard
                         </Link>
                         <Link 
@@ -107,7 +107,7 @@ export default function BetDetailPage() {
                             <span className="icon-about-active mr-2 hidden group-hover:block" />
                             <span className="text-default-400 group-hover:text-white font-kodemono">About</span>
                         </Link>
-                        <Link href="/community" className="flex items-center gap-2 mb-4 text-default-400 group">
+                        <Link href="https://discord.gg/dSEV8YCDQ2" className="flex items-center gap-2 mb-4 text-default-400 group">
                             <span className="icon-support mr-2 block group-hover:hidden" />
                             <span className="icon-support-active mr-2 hidden group-hover:block" />
                             <span className="text-default-400 group-hover:text-white font-kodemono">Community</span>
@@ -127,13 +127,13 @@ export default function BetDetailPage() {
                     color="default"
                     variant="light"
                     onPress={() => router.back()}
-                    className="mb-4"
+                    className="mb-4 text-small p-0 border-white"
                 >
-                    ← Back to Bets
+                    ← Back
                 </Button>
 
-                <Card>
-                    <CardBody className="p-6 max-w-[800px]">
+                <div>
+                    <div className="py-6 px-0 max-w-[800px]">
                         {/* Header Section */}
                         <div className="flex gap-6 mb-8 flex-col">
                             <Image
@@ -142,7 +142,7 @@ export default function BetDetailPage() {
                                 className="w-full rounded-xl object-cover"
                             />
                             <div>
-                                <h1 className="text-xl font-semibold mb-2">{bet.description}</h1>
+                                <h3 className="text-lg font-semibold mb-2">{bet.description}</h3>
                                 <div className="flex gap-3 items-center">
                                     <Chip size="sm" color="default">{bet.source}</Chip>
                                     <span className="text-default-400">
@@ -159,12 +159,12 @@ export default function BetDetailPage() {
                         <div className="">
                         <h2 className="text-lg font-semibold mb-4">Reasoning</h2>
                         <p className="text-default-600 leading-relaxed">{bet.reason}</p>
-                            <div className="w-full">
+                            <div className="w-full mt-8">
                                 <h2 className="text-lg font-semibold mb-4">Bet Details</h2>
                                 <div className=" grid grid-cols-2 grid-rows-2 gap-8">
                                     <div>
-                                        <h3 className="text-sm font-medium text-default-400 mb-1">Status</h3>
-                                        <Chip color={bet.status !== "open" ? (bet.outcome === bet.choice ? "success" : "danger") : "primary"}>
+                                        <h3 className="text-sm font-medium text-default-400 mb-1 ">Status</h3>
+                                        <Chip color={bet.status !== "open" ? (bet.outcome === bet.choice ? "success" : "danger") : "primary"} className="bg-primary/20">
                                             {bet.status !== "open" 
                                                 ? (bet.outcome === bet.choice ? "Won" : "Lost") 
                                                 : bet.status
@@ -172,16 +172,16 @@ export default function BetDetailPage() {
                                         </Chip>
                                     </div>
                                     <div>
-                                        <h3 className="text-sm font-medium text-default-400 mb-1">Amount</h3>
-                                        <p className="text-sm font-semibold"><span className="icon-credits mr-2 inline-block"></span>{bet.amount} credits</p>
+                                        <h3 className="text-sm font-medium text-default-400 mb-1">Credits</h3>
+                                        <p className="text-sm font-semibold"><span className="icon-credits inline-block px-6">{bet.amount}</span></p>
                                     </div>
                                     <div>
                                         <h3 className="text-sm font-medium text-default-400 mb-1">Your Choice</h3>
-                                        <Chip color="secondary">{bet.choice}</Chip>
+                                        <Chip color="secondary" className="bg-primary/20">{bet.choice}</Chip>
                                     </div>
                                     <div>
                                         <h3 className="text-sm font-medium text-default-400 mb-1">Creator&apos;s Choice</h3>
-                                        <Chip color="warning">{bet.predicted_outcome || bet.creator_choice}</Chip>
+                                        <Chip color="secondary" className="bg-primary/20">{bet.predicted_outcome || bet.creator_choice}</Chip>
                                     </div>
                                 </div>
                             </div>
@@ -210,8 +210,8 @@ export default function BetDetailPage() {
                                 )}
                             </div>
                         </div>
-                    </CardBody>
-                </Card>
+                    </div>
+                </div>
             </main>
         </div>
     );

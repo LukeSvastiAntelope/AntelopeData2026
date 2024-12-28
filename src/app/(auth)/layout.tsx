@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 const AuthLayout = ({ children }: { children: React.ReactNode }) => {
     const route = useRouter();
     if (typeof window !== 'undefined' && localStorage.getItem("token")) {
-        route.push("/profile");
+        route.push("/dashboard");
     }
 
     return (

@@ -35,6 +35,10 @@ background-clip: text;
   height: 24px;
 }
 
+.text-white {
+  color: #E3E2F0
+}
+
 .bg-divider {
   background-color:hsl(240deg 35.04% 28.98% / 50%)
 }
@@ -233,6 +237,10 @@ background-clip: text;
 background-clip: text;
 -webkit-background-clip: text;
 -webkit-text-fill-color: transparent;
+}
+
+.input-search {
+  background-color: #1e212a;
 }
 
 @media (prefers-color-scheme: dark) {
