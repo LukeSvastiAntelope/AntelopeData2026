@@ -237,7 +237,7 @@ export default function Dashboard() {
 
             </Link>
           <Link href="/" className="flex items-center gap-2 mb-4 text-white font-kodemono">
-            <span className="icon-dashboard mr-2" /> Dashboard
+            <span className="icon-dashboard-active mr-2" /> Dashboard
           </Link>
           <Link 
                 href="/markets" 
@@ -287,7 +287,7 @@ export default function Dashboard() {
       {/* Main Content */}
 
       
-      <main className="flex-1 ml-64 container mx-auto px-4 py-6 md:px-8 md:py-8">
+      <main className="flex-1 ml-64 container mx-auto px-4 py-6 md:px-8 md:py-8 max-w-[1200px]">
         {/* Top bar with toggles */}
     
 
@@ -325,7 +325,7 @@ export default function Dashboard() {
 
         {/* BETS SECTION */}
         {activeTab === "bets" && (
-          <section className="rounded-lg min-w-[780px]">
+          <section className="rounded-lg overflow-x-auto mb-8">
            
 
             {isLoadingBets && bets.length === 0 && (
@@ -341,16 +341,7 @@ export default function Dashboard() {
             {/* Table Header */}
             {bets.length > 0 && (
               <table className="w-full text-sm text-left">
-                {/* <thead>
-                  <tr className="text-gray-500">
-                    <th className="py-2 px-0 text-xs">Image</th>
-                    <th className="py-2 px-4 text-xs">Description</th>
-                    <th className="py-2 px-4 text-xs">Source</th>
-                    <th className="py-2 px-4 text-xs">Stake</th>
-                    <th className="py-2 px-4 text-xs">Status</th>
-                    <th className="py-2 px-4 text-xs">Date</th>
-                  </tr>
-                </thead> */}
+               
                 <tbody>
                   {bets.map((bet, index) => (
                     <tr
@@ -365,19 +356,26 @@ export default function Dashboard() {
                             alt={bet.description}
                             width={40}
                             height={40}
-                            className="rounded-md"
+                            className="rounded-full"
                           />
                         )}
                       </td>
                       {/* Description */}
-                      <td className="py-2 px-4 break-words max-w-xs">
+                      <td className="py-2 px-4 break-words">
                         {bet.description}
                       </td>
                       {/* Source */}
-                      <td className="py-2 px-4">{bet.source}</td>
+                      {/* <td className="py-2 px-4">{bet.source}</td> */}
                       {/* Stake */}
                       {/* <td className="py-2 px-4">{bet.amount}</td> */}
                       {/* Status */}
+                     
+                      {/* Date (created_at or resolution_date depending on status) */}
+                      <td className="py-2 px-4">
+                        {bet.status === "open"
+                          ? formatDate(bet.created_at)
+                          : formatDate(bet.resolution_date)}
+                      </td>
                       <td className="py-2 px-4">
                         <Chip
                           color={
@@ -396,12 +394,6 @@ export default function Dashboard() {
                               : "Lost"
                             : bet.status}
                         </Chip>
-                      </td>
-                      {/* Date (created_at or resolution_date depending on status) */}
-                      <td className="py-2 px-4">
-                        {bet.status === "open"
-                          ? formatDate(bet.created_at)
-                          : formatDate(bet.resolution_date)}
                       </td>
                     </tr>
                   ))}
@@ -436,7 +428,7 @@ export default function Dashboard() {
 
         {/* PREDICTIONS SECTION */}
         {activeTab === "predictions" && (
-          <section className="rounded-lg min-w-[780px]">
+          <section className="rounded-lg overflow-x-auto mb-8">
             {/* <h1 className="text-xl font-bold mb-6">Active Predictions</h1> */}
 
             {isLoadingPredictions && predictions.length === 0 && (
@@ -485,9 +477,9 @@ export default function Dashboard() {
 
             {/* Predictions Table */}
             {displayedPredictions.length > 0 && (
-              <section className="rounded-lg p-4 overflow-x-auto">
+              <section className="rounded-lg overflow-x-auto">
                 <table className="w-full text-sm text-left">
-                  <thead>
+                  {/* <thead>
                     <tr className="text-left text-white">
                       <th className="py-2 px-0">Image</th>
                       <th className="py-2 px-4">Description</th>
@@ -497,7 +489,7 @@ export default function Dashboard() {
                       <th className="py-2 px-4">Bets</th>
                       <th className="py-2 px-4">Status</th>
                     </tr>
-                  </thead>
+                  </thead> */}
                   <tbody>
                     {displayedPredictions.map((prediction, index) => (
                       <tr
@@ -516,8 +508,8 @@ export default function Dashboard() {
                             />
                           )}
                         </td>
-                        <td className="py-2 px-4 break-words max-w-xs">{prediction.description}</td>
-                        <td className="py-2 px-4">{prediction.source}</td>
+                        <td className="py-2 px-4 break-words ">{prediction.description}</td>
+                        {/* <td className="py-2 px-4">{prediction.source}</td> */}
                         {/* <td className="py-2 px-4">
                           {prediction.predicted_outcome || prediction.creator_choice}
                         </td>

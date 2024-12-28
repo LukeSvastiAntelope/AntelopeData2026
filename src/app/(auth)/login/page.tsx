@@ -60,7 +60,7 @@ const LoginPage = () => {
                     localStorage.setItem("token", data.token);
                     localStorage.setItem("userId", data.user.id);
                 }
-                router.push("/profile");
+                router.push("/dashboard");
             } else {
                 toast.error(data.message.toString());
             }

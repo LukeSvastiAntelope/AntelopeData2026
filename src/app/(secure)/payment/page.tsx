@@ -318,16 +318,16 @@ const PaymentPage = () => {
                         <CardHeader className="pb-2">
                             <div className="flex items-center space-x-2">
                                 <IconCreditCard />
-                                <h2 className="text-2xl font-bold">Buy Credits</h2>
+                                <h2 className="text-lg font-bold">Buy Credits</h2>
                             </div>
                         </CardHeader>
                         <CardBody className="space-y-6">
-                            <div className="text-center bg-default-100 p-4 rounded-lg">
-                                <p className="text-xl mb-2">Current Balance</p>
+                            <div className="text-center bg-content0 p-4 rounded-lg">
+                                <p className="text-lg mb-2">Current Balance</p>
                                 {
                                     isLoading ?
                                         <Skeleton className="w-full h-10" /> :
-                                        <p className="text-3xl font-bold text-primary">{agentBalance?.toLocaleString() || 0} Credits</p>
+                                        <p className="text-xl font-bold text-primary">{agentBalance?.toLocaleString() || 0} Credits</p>
                                 }
                             </div>
                             <Input
@@ -337,12 +337,14 @@ const PaymentPage = () => {
                                 value={amount}
                                 onChange={handleAmountChange}
                                 isDisabled={isLoading}
+                                
                                 startContent={
                                     <div className="pointer-events-none flex items-center">
                                         <span className="text-default-400 text-small">$</span>
                                     </div>
                                 }
                                 description={amount ? `You will receive ${creditAmount.toLocaleString()} Credits` : ""}
+                                
                             />
                             <Select
                                 label="Payment Method"
@@ -354,6 +356,9 @@ const PaymentPage = () => {
                                     `You will pay ${paymentAmount} ${paymentMethod.toUpperCase()}` :
                                     ""}
                                 defaultSelectedKeys={['sol']}
+                                classNames={{
+                                    trigger: "bg-content0"
+                                }}
                             >
                                 <SelectItem key="sol" value="sol" startContent={<IconWallet />}>
                                     Pay with SOL
@@ -382,13 +387,13 @@ const PaymentPage = () => {
                         <CardHeader className="pb-2">
                             <div className="flex items-center space-x-2">
                                 <IconWallet />
-                                <h2 className="text-2xl font-bold">Withdraw Funds</h2>
+                                <h2 className="text-lg font-bold">Withdraw Funds</h2>
                             </div>
                         </CardHeader>
                         <CardBody className="space-y-6">
-                            <div className="text-center bg-default-100 p-4 rounded-lg">
-                                <p className="text-xl mb-2">Available to Withdraw</p>
-                                <p className="text-3xl font-bold text-success">{availableBalance} Credits</p>
+                            <div className="text-center bg-content0 p-4 rounded-lg">
+                                <p className="text-lg mb-2">Available to Withdraw</p>
+                                <p className="text-xl font-bold text-success">{availableBalance} Credits</p>
                             </div>
                             <Input
                                 type="number"
