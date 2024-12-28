@@ -15,7 +15,7 @@ export default async function middleware(req: NextRequest) {
             const isAuthenticated = await verifyConfirmationToken(token);
             if (isAuthenticated) {
                 // Redirect authenticated users to /dashboard (or any other desired route)
-                return NextResponse.redirect('/profile'); // Change to your actual dashboard route
+                return NextResponse.redirect('/dashboard'); // Change to your actual dashboard route
             }
         }
         // Allow access to public routes if no auth header is provided

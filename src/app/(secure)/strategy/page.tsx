@@ -181,7 +181,7 @@ export default function StrategyPage() {
   if (isLoading) return <StrategySkeleton />;
 
   return (
-    <div className="min-h-screen">
+    <div className="flex text-white">
       {/* Sidebar */}
       <aside className="w-64 fixed top-0 text-sm">
         <nav className="flex min-h-screen flex-col gap-4 text-normal justify-between p-4">
@@ -205,14 +205,18 @@ export default function StrategyPage() {
                 height={24}
               />
               <span className="text-sm font-semibold icon-credits px-5 font-kodemono">
-                <span className="text-gradient">83940</span>
+                <span className="text-gradient">{agent?.wallet_balance?.toLocaleString() || 0}</span>
               </span>
             </Link>
             <Link
               href="/dashboard"
-              className="flex items-center gap-2 mb-4 text-white font-kodemono"
+              className="flex items-center gap-2 mb-4  group"
             >
-              <span className="icon-dashboard mr-2" /> Dashboard
+              <span className="icon-dashboard mr-2 block group-hover:hidden" />
+              <span className="icon-dashboard-active mr-2 hidden group-hover:block" />
+              <span className="text-default-400 group-hover:text-white font-kodemono">
+               Dashboard
+              </span>
             </Link>
             <Link href="/markets" className="flex items-center gap-2 mb-4 group">
               <span className="icon-markets mr-2 block group-hover:hidden" />
@@ -223,13 +227,10 @@ export default function StrategyPage() {
             </Link>
             <Link
               href="/strategy"
-              className="flex items-center gap-2 mb-4 group text-default-400"
+              className="flex items-center gap-2 mb-4 text-white group "
             >
-              <span className="icon-strategy mr-2 block group-hover:hidden" />
-              <span className="icon-strategy-active mr-2 hidden group-hover:block" />
-              <span className="text-default-400 group-hover:text-white font-kodemono">
-                Strategy
-              </span>
+                <span className="icon-strategy-active mr-2" /> Strategy
+              
             </Link>
           </div>
 
@@ -311,7 +312,7 @@ export default function StrategyPage() {
               color="default"
               variant="flat"
               className="mt-4"
-              href="/editStrategy"
+              href="/editProfile"
               as="a"
             >
               Edit Strategy
