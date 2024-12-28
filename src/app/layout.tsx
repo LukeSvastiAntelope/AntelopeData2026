@@ -21,7 +21,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" style={{ backgroundColor: '#16181c' }}>
       <body
         className={`${rubik.className} antialiased dark text-foreground bg-background min-h-screen`}
       >
