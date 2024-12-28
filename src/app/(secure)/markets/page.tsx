@@ -7,21 +7,16 @@ import { Button } from "@nextui-org/button";
 import { Card, CardBody, CardHeader } from "@nextui-org/card";
 import { Spinner } from "@nextui-org/spinner";
 import { Chip } from "@nextui-org/chip";
-import { IAgentProfile, IBet, IPrediction } from "@/app/utils/interface";
-import { useFetch, formatDate } from "@/app/utils/lib";
+import { IAgentProfile, IPrediction } from "@/app/utils/interface";
+import { useFetch } from "@/app/utils/lib";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
+import { formatDate } from "date-fns";
 
 export default function MarketsPage() {
-  const [activeTab, setActiveTab] = useState<"bets" | "predictions" | "sports" | "general">("bets");
+  const [activeTab, setActiveTab] = useState<"predictions" | "sports" | "general">("predictions");
   const [searchTerm, setSearchTerm] = useState("");
   const [agent, setAgent] = useState<IAgentProfile | null>(null);
-
-  // Bets
-  const [bets, setBets] = useState<IBet[]>([]);
-  const [isLoadingBets, setIsLoadingBets] = useState<boolean>(false);
-  const [pageBets, setPageBets] = useState<number>(1);
-  const [hasMoreBets, setHasMoreBets] = useState<boolean>(true);
 
   // Predictions
   const [predictions, setPredictions] = useState<IPrediction[]>([]);
@@ -36,17 +31,17 @@ export default function MarketsPage() {
   const [generalData, setGeneralData] = useState<any[]>([]);
   const [isLoadingGeneral, setIsLoadingGeneral] = useState<boolean>(false);
 
-  const ITEMS_PER_PAGE_BETS = 5;
   const ITEMS_PER_PAGE_PREDICTIONS = 5;
 
-  const fetch = useFetch();
   const router = useRouter();
+  const fetch = useFetch();
 
   // Fetch Agent
   useEffect(() => {
-    const fetchAgentProfile = async () => {
+    const fetchData = useFetch();
+    const fetchAgentProfile = async (): Promise<void> => {
       try {
-        const response = await fetch.get("/api/getAgentProfile");
+        const response = await fetchData.get("/api/getAgentProfile");
         if (response.status) {
           setAgent(response.agent);
         } else {
@@ -58,37 +53,7 @@ export default function MarketsPage() {
       }
     };
     fetchAgentProfile();
-  }, [fetch]);
-
-  // Fetch Bets
-  const fetchBets = async (page: number) => {
-    if (isLoadingBets) return;
-    setIsLoadingBets(true);
-
-    try {
-      const response = await fetch.get("/api/getBets", { page });
-      if (response.status) {
-        setBets((prev) => [...prev, ...response.bets]);
-        setHasMoreBets(response.bets.length === ITEMS_PER_PAGE_BETS);
-      } else {
-        toast.error(response.message);
-      }
-    } catch (error) {
-      console.error("Failed to fetch bets:", error);
-      toast.error("Failed to fetch bets");
-      setHasMoreBets(false);
-    } finally {
-      setIsLoadingBets(false);
-    }
-  };
-
-  const loadMoreBets = () => {
-    if (!isLoadingBets && hasMoreBets) {
-      const nextPage = pageBets + 1;
-      setPageBets(nextPage);
-      fetchBets(nextPage);
-    }
-  };
+  }, []);
 
   // Fetch Predictions
   const fetchPredictions = async () => {
@@ -177,7 +142,7 @@ export default function MarketsPage() {
 
   // On first mount
   useEffect(() => {
-    fetchBets(1);
+    fetchPredictions();
   }, []);
 
   // Handle search
@@ -255,14 +220,6 @@ export default function MarketsPage() {
         {/* Tabs */}
         <div className="flex gap-2">
           <button
-            onClick={() => setActiveTab("bets")}
-            className={`px-1 py-2 hover:text-white ${
-              activeTab === "bets" ? "text-white" : "text-gray-700"
-            }`}
-          >
-            Bets
-          </button>
-          <button
             onClick={() => setActiveTab("predictions")}
             className={`px-1 py-2 hover:text-white ${
               activeTab === "predictions" ? "text-white" : "text-gray-700"
@@ -299,82 +256,6 @@ export default function MarketsPage() {
           />
         </div>
 
-        {/* BETS SECTION */}
-        {activeTab === "bets" && (
-          <section className="rounded-lg min-w-[780px]">
-            {isLoadingBets && bets.length === 0 && (
-              <div className="flex justify-center items-center py-8">
-                <Spinner size="lg" />
-              </div>
-            )}
-            {!isLoadingBets && bets.length === 0 && (
-              <div className="text-center text-gray-500 py-8">No bets found</div>
-            )}
-            {bets.length > 0 && (
-              <table className="w-full text-sm text-left">
-                <tbody>
-                  {bets.map((bet, index) => (
-                    <tr key={index}>
-                      <td className="py-2 px-2">
-                        {bet.str_thumb && (
-                          <Image
-                            src={bet.str_thumb}
-                            alt={bet.description}
-                            width={40}
-                            height={40}
-                            className="rounded-md"
-                          />
-                        )}
-                      </td>
-                      <td className="py-2 px-4 break-words max-w-xs">{bet.description}</td>
-                      <td className="py-2 px-4">{bet.source}</td>
-                      <td className="py-2 px-4">
-                        <Chip
-                          color={
-                            bet.status !== "open"
-                              ? bet.outcome === bet.choice
-                                ? "success"
-                                : "danger"
-                              : "primary"
-                          }
-                          variant="flat"
-                          size="sm"
-                        >
-                          {bet.status !== "open"
-                            ? bet.outcome === bet.choice
-                              ? "Won"
-                              : "Lost"
-                            : bet.status}
-                        </Chip>
-                      </td>
-                      <td className="py-2 px-4">
-                        {bet.status === "open"
-                          ? formatDate(bet.created_at)
-                          : formatDate(bet.resolution_date)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-
-            {/* Show More */}
-            {hasMoreBets && !isLoadingBets && bets.length > 0 && (
-              <div className="flex justify-center mt-4">
-                <Button
-                  color="primary"
-                  variant="flat"
-                  onPress={loadMoreBets}
-                  isLoading={isLoadingBets}
-                  className="min-w-[200px]"
-                >
-                  {isLoadingBets ? "Loading..." : "Show More"}
-                </Button>
-              </div>
-            )}
-          </section>
-        )}
-
         {/* PREDICTIONS SECTION */}
         {activeTab === "predictions" && (
           <section className="rounded-lg min-w-[780px]">
@@ -410,9 +291,9 @@ export default function MarketsPage() {
                         <td className="py-2 px-4 break-words max-w-xs">{prediction.description}</td>
                         <td className="py-2 px-4">{prediction.source}</td>
                         <td className="py-2 px-4">
-                          {formatDate(prediction.resolution_date || prediction.created_at)}
+                          {formatDate(prediction.resolution_date || prediction.created_at, "MM/dd/yyyy")}
                         </td>
-                        <td className="py-2 px-4">{prediction.bets_count}</td>
+                        <td className="py-2 px-4">{prediction.bet_amount}</td>
                         <td className="py-2 px-4">
                           <Chip
                             color={

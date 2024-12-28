@@ -18,20 +18,7 @@ import { formatDate } from "date-fns";
 import Link from "next/link";
 import { toast } from "react-hot-toast";
 import { useRouter } from "next/navigation";
-
-interface IPrediction {
-    id: string;
-    description: string;
-    source: string;
-    predicted_outcome: string;
-    creator_choice: string;
-    bets_count: number;
-    status: string;
-    bet_amount: number;
-    resolution_date: string;
-    str_thumb: string;
-    outcome: string;
-}
+import { IPrediction } from "@/app/utils/interface";
 
 const ITEMS_PER_PAGE = 15;
 

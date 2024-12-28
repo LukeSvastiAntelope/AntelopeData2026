@@ -274,3 +274,18 @@ export interface PredictionDB {
     yes_count: number;
     no_count: number;
 }
+
+export interface IPrediction {
+    id: string;
+    description: string;
+    source: string;
+    predicted_outcome: string;
+    creator_choice: string;
+    bets_count: number;
+    status: string;
+    bet_amount: number;
+    resolution_date: string;
+    str_thumb: string;
+    outcome: string;
+    created_at: string;
+}
