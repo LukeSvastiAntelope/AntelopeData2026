@@ -1,6 +1,5 @@
 'use client'
 
-import { Card, CardBody } from "@nextui-org/card";
 import { Chip } from "@nextui-org/chip";
 import { Image } from "@nextui-org/image";
 import { Button } from "@nextui-org/button";

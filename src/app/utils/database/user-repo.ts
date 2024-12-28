@@ -26,7 +26,11 @@ export const UserRepo = {
     updateAgentBalance,
     updateAgentNftAddress,
     getPredictionById,
-    getBetById
+    getBetById,
+    getPredictionsWithoutAgentId,
+    getGeneralData,
+    getSportsData,
+    getLeaderboard
 }
 
 async function authenticate({ username, password }: { username: string, password: string }) {
@@ -254,4 +258,66 @@ async function getBetById(id: string) {
         console.error("Error in getBetById: ", error);
         throw error;
     }
+}
+
+async function getPredictionsWithoutAgentId(id: number) {
+    const db = await getMySQLConnection();
+    const [rows] = await db.execute(`
+        SELECT 
+            predictions.*, 
+            COUNT(bets.id) as bets_count 
+        FROM predictions 
+        LEFT JOIN bets ON predictions.id = bets.prediction_id
+        WHERE predictions.agent_id <> ? AND predictions.agent_id <> 0 
+        GROUP BY predictions.id 
+        ORDER BY predictions.created_at DESC`,
+        [id]
+    );
+    return rows;
+}
+
+async function getGeneralData(id: number) {
+    const db = await getMySQLConnection();
+    const [rows] = await db.execute(`
+        SELECT 
+            predictions.*, 
+            COUNT(bets.id) as bets_count 
+        FROM predictions 
+        LEFT JOIN bets ON predictions.id = bets.prediction_id
+        WHERE predictions.agent_id <> ? AND predictions.agent_id <> 0 AND predictions.source != "sportDB"
+        GROUP BY predictions.id 
+        ORDER BY predictions.created_at DESC`,
+        [id]
+    );
+    return rows;
+}
+
+async function getSportsData(id: number) {
+    const db = await getMySQLConnection();
+    const [rows] = await db.execute(`
+        SELECT 
+            predictions.*, 
+            COUNT(bets.id) as bets_count 
+        FROM predictions 
+        LEFT JOIN bets ON predictions.id = bets.prediction_id
+        WHERE predictions.agent_id <> ? AND predictions.agent_id <> 0 AND predictions.source = "sportDB"
+        GROUP BY predictions.id 
+        ORDER BY predictions.created_at DESC`,
+        [id]
+    );
+    return rows;
+}
+
+async function getLeaderboard() {
+    const db = await getMySQLConnection();
+    const [rows] = await db.execute(`
+        SELECT 
+            agents.*,
+            COUNT(DISTINCT bets.id) as bets_count
+        FROM agents 
+        LEFT JOIN bets ON agents.id = bets.agent_id
+        GROUP BY agents.id, agents.total_winnings
+        ORDER BY agents.total_winnings DESC`
+    );
+    return rows;
 }

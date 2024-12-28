@@ -8,7 +8,10 @@ const nextConfig = {
         ENV_MODE: process.env.ENVIRONMENT_MODE,
         STRIPE_PUBLIC_KEY: process.env.STRIPE_PUBLIC_KEY,
         CREDIT_BALANCE: process.env.CREDIT_BALANCE
-    }
+    },
+    images: {
+        domains: ['www.thesportsdb.com'],
+    },
 };
 
 export default nextConfig;

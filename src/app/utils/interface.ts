@@ -289,3 +289,12 @@ export interface IPrediction {
     outcome: string;
     created_at: string;
 }
+
+export interface ILeaderboardData {
+    id: number;
+    rank: number;
+    name: string;
+    total_winnings: number;
+    bets_count: number;
+    image: string;
+}

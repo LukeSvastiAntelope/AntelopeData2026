@@ -13,9 +13,9 @@ import { Image } from "@nextui-org/image";
 import { useFetch } from "@/app/utils/lib";
 
 interface IAgentProfile {
-    image?: string;
-    // add any other fields you need from /api/getAgentProfile
-  }
+  image?: string;
+  // add any other fields you need from /api/getAgentProfile
+}
 
 interface IPrediction {
   id: string;
@@ -54,13 +54,33 @@ const formatDate = (dateStr: string): string => {
   try {
     return new Date(dateStr).toLocaleDateString();
   } catch (err) {
+    console.log(err);
     return dateStr;
   }
+};
+
+const filterBets = (bets: IBet[], searchTerm: string): IBet[] => {
+  const term = searchTerm.toLowerCase();
+  return bets.filter(bet => 
+    bet.description.toLowerCase().includes(term) ||
+    bet.source.toLowerCase().includes(term) ||
+    bet.status.toLowerCase().includes(term)
+  );
+};
+
+const filterPredictions = (predictions: IPrediction[], searchTerm: string): IPrediction[] => {
+  const term = searchTerm.toLowerCase();
+  return predictions.filter(prediction => 
+    prediction.description.toLowerCase().includes(term) ||
+    prediction.source.toLowerCase().includes(term) ||
+    prediction.status.toLowerCase().includes(term)
+  );
 };
 
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState<"bets" | "predictions">("bets");
   const [searchTerm, setSearchTerm] = useState('');
+  const [searchPredictions, setSearchPredictions] = useState('');
 
   // Agent
   const [agent, setAgent] = useState<IAgentProfile | null>(null);
@@ -81,23 +101,23 @@ export default function Dashboard() {
   const fetch = useFetch();
   const router = useRouter();
 
-    // Fetch Agent to show their image
-    useEffect(() => {
-        const fetchAgentProfile = async () => {
-          try {
-            const response = await fetch.get("/api/getAgentProfile");
-            if (response.status) {
-              setAgent(response.agent);
-            } else {
-              toast.error(response.message);
-            }
-          } catch (error) {
-            console.error("Failed to fetch agent profile:", error);
-            toast.error("Failed to fetch agent profile");
-          }
-        };
-        fetchAgentProfile();
-      }, [fetch]);
+  // Fetch Agent to show their image
+  useEffect(() => {
+    const fetchAgentProfile = async () => {
+      try {
+        const response = await fetch.get("/api/getAgentProfile");
+        if (response.status) {
+          setAgent(response.agent);
+        } else {
+          toast.error(response.message);
+        }
+      } catch (error) {
+        console.error("Failed to fetch agent profile:", error);
+        toast.error("Failed to fetch agent profile");
+      }
+    };
+    fetchAgentProfile();
+  }, []);
 
   // Fetch Bets
   const fetchBets = async (pageNumber: number) => {
@@ -162,12 +182,19 @@ export default function Dashboard() {
     if (activeTab !== "predictions") return;
 
     const loadMorePredictions = () => {
+      const filteredPredictions = filterPredictions(predictions, searchPredictions);
       const newPage = pagePredictions + 1;
-      const nextItems = predictions.slice(0, newPage * ITEMS_PER_PAGE_PREDICTIONS);
+      const nextItems = filteredPredictions.slice(0, newPage * ITEMS_PER_PAGE_PREDICTIONS);
       setDisplayedPredictions(nextItems);
-      setHasMorePredictions(nextItems.length < predictions.length);
+      setHasMorePredictions(nextItems.length < filteredPredictions.length);
       setPagePredictions(newPage);
     };
+
+    // Reset pagination when search term changes
+    setPagePredictions(1);
+    const filteredPredictions = filterPredictions(predictions, searchPredictions);
+    setDisplayedPredictions(filteredPredictions.slice(0, ITEMS_PER_PAGE_PREDICTIONS));
+    setHasMorePredictions(filteredPredictions.length > ITEMS_PER_PAGE_PREDICTIONS);
 
     const observer = new IntersectionObserver(
       (entries) => {
@@ -185,7 +212,7 @@ export default function Dashboard() {
     if (sentinel) observer.observe(sentinel);
 
     return () => observer.disconnect();
-  }, [activeTab, hasMorePredictions, predictions, pagePredictions]);
+  }, [activeTab, hasMorePredictions, predictions, pagePredictions, searchPredictions]);
 
   // On first mount
   useEffect(() => {
@@ -199,134 +226,148 @@ export default function Dashboard() {
     }
   }, [activeTab]);
 
-  // const handleSearchChange = (event) => {
-  //   setSearchTerm(event.target.value);
-  //   // Optionally, add logic to filter bets based on searchTerm
-  // };
+  const handleBetSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchTerm(e.target.value);
+  };
+
+  const handlePredictionSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchPredictions(e.target.value);
+  };
 
   return (
     <div className="flex text-white">
       {/* Sidebar */}
       <aside className="w-64 fixed top-0 text-sm">
-      <nav className="flex min-h-screen flex-col gap-4 text-normal justify-between py-8 px-4 ">
-           <div>
-           <div className="flex items-center mb-4">
-          {/* Logo (image) */}
-          <Image
-            src={"/assets/images/logo-text.svg"}
-            alt="Dashboard Logo"
-            width={160}
-            height={40}
-            className="mr-2 rounded-full w-100"
-          />
-          {/* <span className="text-xl font-bold">ANTELOPE</span> */}
-        </div>
+        <nav className="flex min-h-screen flex-col gap-4 text-normal justify-between py-8 px-4 ">
+          <div>
+            <div className="flex items-center mb-4">
+              {/* Logo (image) */}
+              <Image
+                src={"/assets/images/logo-text.svg"}
+                alt="Dashboard Logo"
+                width={160}
+                height={40}
+                className="mr-2 rounded-full w-100"
+              />
+              {/* <span className="text-xl font-bold">ANTELOPE</span> */}
+            </div>
             {/* Profile Photo */}
-            <Link href="/payment" className="flex items-center gap-2 mb-4"> 
-            <Image
+            <Link href="/payment" className="flex items-center gap-2 mb-4">
+              <Image
                 src={agent?.image || "/assets/images/logo-simple.svg"}
                 alt="Profile"
                 width={24}
                 height={24}
                 className="rounded-full bg-gray-700 mr-2 "
               />
-            {/* Credits */}
-            <span className="text-sm font-semibold icon-credits px-5 font-kodemono">
+              {/* Credits */}
+              <span className="text-sm font-semibold icon-credits px-5 font-kodemono">
                 <span className="text-gradient">83940</span>
-            </span>    
+              </span>
 
             </Link>
-          <Link href="/" className="flex items-center gap-2 mb-4 text-white font-kodemono">
-            <span className="icon-dashboard mr-2" /> Dashboard
-          </Link>
-          <Link 
-                href="/markets" 
-                className="flex items-center gap-2 mb-4 group"
-                >
-                {/* default icon */}
-                <span className="icon-markets mr-2 block group-hover:hidden " />
-                {/* hover icon */}
-                <span className="icon-markets-active mr-2 hidden group-hover:block" />
-                <span className="text-default-400 group-hover:text-white font-kodemono">Markets</span>
+            <Link href="/" className="flex items-center gap-2 mb-4 text-white font-kodemono">
+              <span className="icon-dashboard mr-2" /> Dashboard
+            </Link>
+            <Link
+              href="/markets"
+              className="flex items-center gap-2 mb-4 group"
+            >
+              {/* default icon */}
+              <span className="icon-markets mr-2 block group-hover:hidden " />
+              {/* hover icon */}
+              <span className="icon-markets-active mr-2 hidden group-hover:block" />
+              <span className="text-default-400 group-hover:text-white font-kodemono">Markets</span>
             </Link>
 
-          <Link href="/strategy" className="flex items-center gap-2 mb-4 group text-default-400">
-          {/* default icon */}
-            <span className="icon-strategy mr-2 block group-hover:hidden" /> 
-             {/* hover icon */}
-             <span className="icon-strategy-active mr-2 hidden group-hover:block" />
-            <span className="text-default-400 group-hover:text-white font-kodemono">Strategy</span>
-          </Link>
+            <Link href="/strategy" className="flex items-center gap-2 mb-4 group text-default-400">
+              {/* default icon */}
+              <span className="icon-strategy mr-2 block group-hover:hidden" />
+              {/* hover icon */}
+              <span className="icon-strategy-active mr-2 hidden group-hover:block" />
+              <span className="text-default-400 group-hover:text-white font-kodemono">Strategy</span>
+            </Link>
           </div>
           <div>
-          <Link href="/about" className="flex items-center gap-2 mb-4 text-default-400 group">
-            {/* default icon */}
-            <span className="icon-about mr-2 block group-hover:hidden" /> 
-             {/* hover icon */}
-             <span className="icon-about-active mr-2 hidden group-hover:block" />
-            <span className="text-default-400 group-hover:text-white font-kodemono">About</span>
-          </Link>
-          <Link href="https://discord.gg/dSEV8YCDQ2" className="flex items-center gap-2 mb-4 text-default-400 group">
-            {/* default icon */}
-            <span className="icon-support mr-2 block group-hover:hidden" /> 
-             {/* hover icon */}
-             <span className="icon-support-active mr-2 hidden group-hover:block" />
-            <span className="text-default-400 group-hover:text-white font-kodemono">Community</span>
-          </Link>
-          <Link href="/signout" className="flex items-center gap-2 mb-4 text-default-400 group">
-            {/* default icon */}
-            <span className="icon-logout mr-2 block group-hover:hidden" /> 
-             {/* hover icon */}
-             <span className="icon-logout-active mr-2 hidden group-hover:block" />
-            <span className="text-default-400 group-hover:text-white font-kodemono">Sign out</span>
-          </Link>
+            <Link href="/about" className="flex items-center gap-2 mb-4 text-default-400 group">
+              {/* default icon */}
+              <span className="icon-about mr-2 block group-hover:hidden" />
+              {/* hover icon */}
+              <span className="icon-about-active mr-2 hidden group-hover:block" />
+              <span className="text-default-400 group-hover:text-white font-kodemono">About</span>
+            </Link>
+            <Link href="https://discord.gg/dSEV8YCDQ2" className="flex items-center gap-2 mb-4 text-default-400 group">
+              {/* default icon */}
+              <span className="icon-support mr-2 block group-hover:hidden" />
+              {/* hover icon */}
+              <span className="icon-support-active mr-2 hidden group-hover:block" />
+              <span className="text-default-400 group-hover:text-white font-kodemono">Community</span>
+            </Link>
+            <Link href="/signout" className="flex items-center gap-2 mb-4 text-default-400 group">
+              {/* default icon */}
+              <span className="icon-logout mr-2 block group-hover:hidden" />
+              {/* hover icon */}
+              <span className="icon-logout-active mr-2 hidden group-hover:block" />
+              <span className="text-default-400 group-hover:text-white font-kodemono">Sign out</span>
+            </Link>
           </div>
         </nav>
       </aside>
 
       {/* Main Content */}
 
-      
+
       <main className="flex-1 ml-64 container mx-auto px-4 py-6 md:px-8 md:py-8">
         {/* Top bar with toggles */}
-    
+
 
         <div className="flex gap-2">
-            <button
-              onClick={() => setActiveTab("bets")}
-              className={`px-0 py-2 hover:text-white ${
-                activeTab === "bets" ? "text-white" : "text-gray-700"
+          <button
+            onClick={() => setActiveTab("bets")}
+            className={`px-0 py-2 hover:text-white ${activeTab === "bets" ? "text-white" : "text-gray-700"
               }`}
-            >
-              Bets
-            </button>
-            <button
-              onClick={() => setActiveTab("predictions")}
-              className={`px-1 py-2 hover:text-white ${
-                activeTab === "predictions" ? "text-white" : "text-gray-700"
+          >
+            Bets
+          </button>
+          <button
+            onClick={() => setActiveTab("predictions")}
+            className={`px-1 py-2 hover:text-white ${activeTab === "predictions" ? "text-white" : "text-gray-700"
               }`}
-            >
-              Predictions
-            </button>
-          </div>
+          >
+            Predictions
+          </button>
+        </div>
 
-          {/* Search Field */}
+        {/* Search Field for Bets */}
+        {activeTab == "bets" && (
           <div className="my-4">
             <input
               type="text"
               value={searchTerm}
-              // onChange={handleSearchChange}
+              onChange={handleBetSearch}
               placeholder="Search bets..."
               className="w-full p-2 rounded-md focus:outline-none text-small active:outline-none input-search"
             />
           </div>
+        )}
 
-          
+        {/* Search Field for Predictions */}
+        {activeTab == "predictions" && (
+          <div className="my-4">
+            <input
+              type="text"
+              value={searchPredictions}
+              onChange={handlePredictionSearch}
+              placeholder="Search predictions..."
+              className="w-full p-2 rounded-md focus:outline-none text-small active:outline-none input-search"
+            />
+          </div>
+        )}
 
         {/* BETS SECTION */}
         {activeTab === "bets" && (
           <section className="rounded-lg min-w-[780px]">
-           
+
 
             {isLoadingBets && bets.length === 0 && (
               <div className="flex justify-center items-center py-8">
@@ -341,18 +382,8 @@ export default function Dashboard() {
             {/* Table Header */}
             {bets.length > 0 && (
               <table className="w-full text-sm text-left">
-                {/* <thead>
-                  <tr className="text-gray-500">
-                    <th className="py-2 px-0 text-xs">Image</th>
-                    <th className="py-2 px-4 text-xs">Description</th>
-                    <th className="py-2 px-4 text-xs">Source</th>
-                    <th className="py-2 px-4 text-xs">Stake</th>
-                    <th className="py-2 px-4 text-xs">Status</th>
-                    <th className="py-2 px-4 text-xs">Date</th>
-                  </tr>
-                </thead> */}
                 <tbody>
-                  {bets.map((bet, index) => (
+                  {filterBets(bets, searchTerm).map((bet, index) => (
                     <tr
                       key={index}
                       className=""
@@ -492,7 +523,7 @@ export default function Dashboard() {
                       <th className="py-2 px-0">Image</th>
                       <th className="py-2 px-4">Description</th>
                       <th className="py-2 px-4">Source</th>
-               
+
                       <th className="py-2 px-4">Resolves</th>
                       <th className="py-2 px-4">Bets</th>
                       <th className="py-2 px-4">Status</th>
@@ -533,8 +564,8 @@ export default function Dashboard() {
                             {prediction.status === "open"
                               ? "Open"
                               : prediction.outcome === prediction.creator_choice
-                              ? "Win"
-                              : "Loss"}
+                                ? "Win"
+                                : "Loss"}
                           </Chip>
                         </td>
                       </tr>
