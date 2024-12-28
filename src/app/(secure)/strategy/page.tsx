@@ -210,7 +210,7 @@ export default function StrategyPage() {
             </Link>
             <Link
               href="/dashboard"
-              className="flex items-center gap-2 mb-4  group"
+              className="flex items-center gap-2 mb-4 group"
             >
               <span className="icon-dashboard mr-2 block group-hover:hidden" />
               <span className="icon-dashboard-active mr-2 hidden group-hover:block" />
@@ -246,7 +246,7 @@ export default function StrategyPage() {
               </span>
             </Link>
             <Link
-              href="/community"
+              href="https://discord.gg/dSEV8YCDQ2"
               className="flex items-center gap-2 mb-4 text-default-400 group"
             >
               <span className="icon-support mr-2 block group-hover:hidden" />

@@ -107,7 +107,7 @@ export default function BetDetailPage() {
                             <span className="icon-about-active mr-2 hidden group-hover:block" />
                             <span className="text-default-400 group-hover:text-white font-kodemono">About</span>
                         </Link>
-                        <Link href="/community" className="flex items-center gap-2 mb-4 text-default-400 group">
+                        <Link href="https://discord.gg/dSEV8YCDQ2" className="flex items-center gap-2 mb-4 text-default-400 group">
                             <span className="icon-support mr-2 block group-hover:hidden" />
                             <span className="icon-support-active mr-2 hidden group-hover:block" />
                             <span className="text-default-400 group-hover:text-white font-kodemono">Community</span>

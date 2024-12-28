@@ -35,6 +35,10 @@ background-clip: text;
   height: 24px;
 }
 
+.text-white {
+  color: #E3E2F0
+}
+
 .bg-divider {
   background-color:hsl(240deg 35.04% 28.98% / 50%)
 }
