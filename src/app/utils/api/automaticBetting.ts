@@ -83,14 +83,11 @@ export class AutomaticBettingAgent {
                     categoryPredictions.map(async p => {
                         const { shouldBet, reasoning } = await this.isInterestingPredictionWithAI(p);
                         p.betReason = reasoning ? [{ step: "interesting", reasoning: reasoning }] : [];
-                        console.log("p.betReason", shouldBet, ":", p.betReason);
                         return { prediction: p, shouldBet };
                     })
                 )
             ).filter(result => result.shouldBet)
              .map(result => result.prediction);
-            console.log("interestingPredictions", interestingPredictions);
-    
             if (interestingPredictions.length === 0) {
                 return [];
             }
@@ -101,23 +98,23 @@ export class AutomaticBettingAgent {
                 .map(async ([, topicPredictions]) => {
                     const news = await this.gatherRelevantNews(topicPredictions);
                     const similarPredictions = await this.findSimilarPredictions(topicPredictions);
-                    const decisions = await this.analyzeGroupWithGPT(topicPredictions, news, similarPredictions);
+                    const { decision, relevantNews, relevantSimilar } = await this.analyzeGroupWithGPT(topicPredictions, news, similarPredictions);
                     
                     // Store each bet decision in Pinecone
-                    await Promise.all(decisions.map(async (decision) => {
+                    await Promise.all(decision.map(async (decision) => {
                         const prediction = topicPredictions.find(p => p.id === decision.predictionId);
                         if (prediction) {
                             if (!prediction.betReason) {
                                 prediction.betReason = [];
                             }
-                            prediction.betReason.push({ step: "relevantNews", reasoning: news.map(n => n.title).join(', ') });
-                            prediction.betReason.push({ step: "similarPredictions", reasoning: similarPredictions.map(p => p.metadata?.description).join(', ') });
+                            prediction.betReason.push({ step: "relevantNews", reasoning: relevantNews.slice(0, 3).map(n => n.title).join(', ') });
+                            prediction.betReason.push({ step: "similarPredictions", reasoning: relevantSimilar.map(p => p.metadata?.description).join(', ') });
                             const pineconeId = await this.storeBetInPinecone(decision, prediction);
                             decision.pineconeId = pineconeId;
                         }
                     }));
 
-                    return decisions;
+                    return decision;
                 });
 
             const groupResults = await Promise.all(betDecisionsPromises);
@@ -182,10 +179,12 @@ export class AutomaticBettingAgent {
         predictions: Prediction[],
         news: NewsItem[],
         similarPredictions: PineconePredictionMatch[]
-    ): Promise<BetDecision[]> {
+    ): Promise<{ decision: BetDecision[], relevantNews: NewsItem[], relevantSimilar: PineconePredictionMatch[] }> {
         // Process predictions in smaller batches
         const BATCH_SIZE = 3;
         const allDecisions: BetDecision[] = [];
+        const allNews: NewsItem[] = [];
+        const allSimilar: PineconePredictionMatch[] = [];
 
         for (let i = 0; i < predictions.length; i += BATCH_SIZE) {
             const batchPredictions = predictions.slice(i, i + BATCH_SIZE);
@@ -195,6 +194,8 @@ export class AutomaticBettingAgent {
 
             // Limit similar predictions
             const relevantSimilar = this.filterSimilarPredictions(similarPredictions, batchPredictions, 2);
+            allSimilar.push(...relevantSimilar);
+            allNews.push(...relevantNews);
 
             const prompt = `Return ONLY valid JSON in this format:
     {
@@ -277,7 +278,7 @@ export class AutomaticBettingAgent {
             }
         }
 
-        return allDecisions;
+        return { decision: allDecisions, relevantNews: allNews, relevantSimilar: allSimilar };
     }
 
     private filterSimilarPredictions(
