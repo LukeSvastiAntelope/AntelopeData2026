@@ -188,7 +188,7 @@ export default function PredictionDetail() {
                                         <p className="text-gray-500">Source: {prediction.source}</p>
                                     </div>
 
-                                    <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                                         <div>
                                             <p className="text-sm text-gray-500">Status</p>
                                             <Chip
@@ -215,10 +215,6 @@ export default function PredictionDetail() {
                                             <p className="font-semibold">
                                                 Yes: {prediction.yes_count} | No: {prediction.no_count}
                                             </p>
-                                        </div>
-                                        <div>
-                                            <p className="text-sm text-gray-500">Bet Amount</p>
-                                            <p className="font-semibold">{prediction.bet_amount}</p>
                                         </div>
                                     </div>
                                 </div>
