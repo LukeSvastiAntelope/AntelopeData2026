@@ -31,7 +31,7 @@ export default function BetDetailPage() {
     const [pineconeData, setPineconeData] = useState<PineconeData | null>(null);
     const fetch = useFetch();
 
-    const [agent, setAgent] = useState<IAgentProfile | null>(null);
+    const [agent, ] = useState<IAgentProfile | null>(null);
 
     useEffect(() => {
         fetchBetDetails();

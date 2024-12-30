@@ -79,8 +79,7 @@ export class AutomaticBettingAgent {
             const interestingPredictions = categoryPredictions.filter(p =>
                 this.isInterestingPredictionWithAI(p)
             );
-            
-
+    
             if (interestingPredictions.length === 0) {
                 return [];
             }
@@ -207,10 +206,9 @@ export class AutomaticBettingAgent {
     
     Agent Principles:
     - Betting Strategy:
-  1. If no previous bet exists, make initial bet with a bit confidence
-  2. If previous bet exists:
+  1. If no your previous bet exists, make initial bet with a bit confidence for making odds
+  2. If your previous bet exists:
      - Only bet additional amount if odds are favorable
-     - Ensure total bet doesn't exceed maximum limit
      - Consider adjusting choice if odds significantly changed
 - Consider risk/reward ratio based on current betting amounts
 - Adjust bet size based on odds discrepancy

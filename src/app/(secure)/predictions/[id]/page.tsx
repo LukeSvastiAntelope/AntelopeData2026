@@ -26,26 +26,9 @@ export default function PredictionDetail() {
     const params = useParams();
     const fetchData = useFetch();
     const router = useRouter();
-
-    const [agent, setAgent] = useState<IAgentProfile | null>(null);
-
-   
-
+    const [agent, ] = useState<IAgentProfile | null>(null);
 
     useEffect(() => {
-        const fetchAgentProfile = async () => {
-          try {
-            const response = await fetchData.get("/api/getAgentProfile");
-            if (response.status) {
-              setAgent(response.agent);
-            } else {
-              toast.error(response.message);
-            }
-          } catch (error) {
-            console.log(error);
-            toast.error("Failed to fetch agent profile");
-          }
-        };
         
         const fetchPredictionDetail = async () => {
             try {

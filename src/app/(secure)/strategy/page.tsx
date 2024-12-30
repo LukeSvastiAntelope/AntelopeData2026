@@ -6,7 +6,7 @@ import { Progress } from "@nextui-org/progress";
 import { Divider } from "@nextui-org/divider";
 import { Skeleton } from "@nextui-org/skeleton";
 import { Button } from "@nextui-org/button";
-import { FaRocket, FaDatabase, FaChartLine, FaShieldAlt, FaCoins } from "react-icons/fa";
+import { FaRocket, FaDatabase, FaChartLine, FaShieldAlt } from "react-icons/fa";
 import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
 import { useFetch } from "@/app/utils/lib";

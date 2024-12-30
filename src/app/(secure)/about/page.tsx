@@ -2,9 +2,6 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { Card, CardBody } from "@nextui-org/card";
-import { Button } from "@nextui-org/button";
-import { FaCoins } from "react-icons/fa";
 import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
 import { useFetch } from "@/app/utils/lib";
