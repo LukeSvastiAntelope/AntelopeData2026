@@ -62,3 +62,16 @@ This document details how the Market Maker Agent application is organized and ho
 - Keep this document in sync with backend changes (both database schema and new endpoints).  
 
 This architecture overview should serve as a reference for how the pieces of the application fit together and how best to navigate the code to extend or modify features. 
+
+## New Components and Routes
+
+- **Frontend**: Added new pages in the `(secure)` folder such as `dashboard`, `predictions`, `payment`, `bets`, `markets`, `about`, `strategy`, and `logout`.
+- **Backend**: Introduced new API routes like `createAgentBet`, `createAgentPrediction`, `stripeWebhookCheckout`, and `stripeCheckout`.
+
+## Updated Technology Stack
+
+- Added new dependencies in `package.json` for enhanced functionality and integration.
+
+## Utilities
+
+- Updated utility functions in `api/predictionGenerator.ts` and `api/automaticBetting.ts` for improved prediction and betting capabilities. 

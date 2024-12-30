@@ -64,9 +64,15 @@ export default function AboutPage() {
               </span>
 
             </Link>
-          <Link href="/" className="flex items-center gap-2 mb-4 text-white font-kodemono">
-            <span className="icon-dashboard-active mr-2" /> <span className="hidden md:inline-block">Dashboard</span>
-          </Link>
+          
+            <Link href="/dashboard" className="flex items-center gap-2 mb-4 text-default-400 group">
+              {/* default icon */}
+              <span className="icon-dashboard mr-2 block group-hover:hidden" />
+              {/* hover icon */}
+              <span className="icon-dashboard-active mr-2 hidden group-hover:block" />
+              <span className="text-default-400 group-hover:text-white font-kodemono"><span className="hidden md:inline-block">Dashboard</span></span>
+            </Link>
+
           <Link 
                 href="/markets" 
                 className="flex items-center gap-2 mb-4 group"
@@ -91,13 +97,10 @@ export default function AboutPage() {
                   </div>
 
           <div className="flex flex-row md:flex-col justify-evenly w-full">
-            <Link href="/about" className="flex items-center gap-2 mb-4 text-default-400 group">
-              {/* default icon */}
-              <span className="icon-about mr-2 block group-hover:hidden" />
-              {/* hover icon */}
-              <span className="icon-about-active mr-2 hidden group-hover:block" />
-              <span className="text-default-400 group-hover:text-white font-kodemono"><span className="hidden md:inline-block">About</span></span>
-            </Link>
+          <Link href="/" className="flex items-center gap-2 mb-4 text-white font-kodemono">
+            <span className="icon-about-active mr-2" /> <span className="hidden md:inline-block">About</span>
+          </Link>
+           
             <Link href="https://discord.gg/dSEV8YCDQ2" className="flex items-center gap-2 mb-4 text-default-400 group">
               {/* default icon */}
               <span className="icon-support mr-2 block group-hover:hidden" />

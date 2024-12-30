@@ -104,7 +104,7 @@ export default function PredictionDetail() {
 
             </Link>
             <Link 
-                href="/markets" 
+                href="/dashboard" 
                 className="flex items-center gap-2 mb-4 group"
                 >
                 {/* default icon */}
