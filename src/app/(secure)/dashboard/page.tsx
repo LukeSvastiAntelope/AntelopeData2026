@@ -411,12 +411,7 @@ export default function Dashboard() {
 
         {/* BETS SECTION */}
         {activeTab === "bets" && (
-
-
-
           <section className="rounded-lg overflow-x-auto mb-8">
-
-
             {isLoadingBets && bets.length === 0 && (
               <div className="flex justify-center items-center py-8">
                 <Spinner size="lg" />
