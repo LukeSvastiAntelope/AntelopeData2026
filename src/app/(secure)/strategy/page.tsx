@@ -222,7 +222,7 @@ export default function StrategyPage() {
              
             </div>
             {/* Profile Photo */}
-            <Link href="/payment" className="md:flex items-center gap-2 mb-4 hidden">
+            <Link href="/profile" className="md:flex items-center gap-2 mb-4 hidden">
               <Image
                 src={agent?.image || "/assets/images/logo-simple.svg"}
                 alt="Profile"
@@ -297,7 +297,7 @@ export default function StrategyPage() {
             <Button
               variant="light"
               className="flex flex-col items-start gap-2 p-2 hover:bg-primary/10 rounded-xl"
-              href="/payment"
+              href="/profile"
               as={Link}
             >
               <div className="flex items-center gap-3">

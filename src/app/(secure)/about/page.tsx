@@ -50,7 +50,7 @@ export default function AboutPage() {
              
             </div>
             {/* Profile Photo */}
-            <Link href="/payment" className="md:flex items-center gap-2 mb-4 hidden">
+            <Link href="/profile" className="md:flex items-center gap-2 mb-4 hidden">
               <Image
                 src={agent?.image || "/assets/images/logo-simple.svg"}
                 alt="Profile"
@@ -118,29 +118,6 @@ export default function AboutPage() {
           </div>
         </nav>
       </aside>
-
-      {/* Top-right balance card */}
-      {/* <div className="fixed top-0 right-0 p-4">
-        <Card className="bg-content0 hover:shadow-lg transition-all duration-300 border border-primary/20">
-          <CardBody className="p-2">
-            <Button
-              variant="light"
-              className="flex flex-col items-start gap-2 p-2 hover:bg-primary/10 rounded-xl"
-              href="/payment"
-              as={Link}
-            >
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-primary/10 rounded-lg">
-                  <FaCoins className="text-basic text-primary" />
-                </div>
-                <span className="text-xl font-bold text-primary">
-                  {agent?.wallet_balance?.toLocaleString() || 0}
-                </span>
-              </div>
-            </Button>
-          </CardBody>
-        </Card>
-      </div> */}
 
       {/* Main Content */}
       <div className="flex-1 ml-0 md:ml-64 container mt-14 md:mt-0  mx-auto px-4 py-6 md:px-8 md:py-8 min-w-full md:min-w-[800px] max-w-full md:max-w-[800px]">

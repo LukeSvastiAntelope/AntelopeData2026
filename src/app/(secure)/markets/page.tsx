@@ -241,7 +241,7 @@ export default function MarketsPage() {
              
             </div>
             {/* Profile Photo */}
-            <Link href="/payment" className="md:flex items-center gap-2 mb-4 hidden">
+            <Link href="/profile" className="md:flex items-center gap-2 mb-4 hidden">
               <Image
                 src={agent?.image || "/assets/images/logo-simple.svg"}
                 alt="Profile"
