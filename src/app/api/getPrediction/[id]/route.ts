@@ -1,17 +1,12 @@
 import { NextRequest } from "next/server";
 import { UserRepo } from "@/app/utils/database/user-repo";
 import { verifyConfirmationToken } from "@/app/utils/api/token";
-import { Pinecone } from '@pinecone-database/pinecone';
 
 export async function GET(
     req: NextRequest,
     { params }: { params: { id: string } }
 ) {
     const token = req.headers.get('Authorization')?.split(' ')[1];
-    const pinecone = new Pinecone({
-        apiKey: process.env.PINECONE_API_KEY!
-    });
-    const index = pinecone.index('prediction-results');
     
     try {
         // Verify JWT token
