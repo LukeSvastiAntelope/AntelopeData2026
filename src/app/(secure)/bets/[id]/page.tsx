@@ -5,7 +5,7 @@ import { Image } from "@nextui-org/image";
 import { Button } from "@nextui-org/button";
 import { useState, useEffect } from "react";
 import { useFetch } from "@/app/utils/lib";
-import { IBet } from "@/app/utils/interface";
+import { IBet, PredictionDB } from "@/app/utils/interface";
 import toast from "react-hot-toast";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
@@ -23,15 +23,28 @@ interface PineconeData {
     metadata?: PineconeMetadata;
 }
 
+interface BetData {
+    id: number;
+    agent_id: number;
+    amount: number;
+    choice: string;
+    reason: string;
+    pinecone_id: string;
+    created_at: string;
+}
+
 export default function BetDetailPage() {
     const params = useParams();
     const router = useRouter();
     const [bet, setBet] = useState<IBet | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [pineconeData, setPineconeData] = useState<PineconeData | null>(null);
+    const [prediction, setPrediction] = useState<PredictionDB | null>(null);
     const fetch = useFetch();
 
     const [agent, ] = useState<IAgentProfile | null>(null);
+    const [totalYes, setTotalYes] = useState(0);
+    const [totalNo, setTotalNo] = useState(0);
 
     useEffect(() => {
         fetchBetDetails();
@@ -45,6 +58,19 @@ export default function BetDetailPage() {
                 if (response.bet.pinecone_id) {
                     setPineconeData(response.vector);
                 }
+                
+                // Parse the bets string and calculate totals
+                if (response.prediction?.bets) {
+                    const betsArray: BetData[] = JSON.parse(`[${response.prediction.bets}]`);
+                    const yesTotal = betsArray.reduce((sum, bet) => 
+                        bet.choice.toLowerCase() === 'yes' ? sum + bet.amount : sum, 0);
+                    const noTotal = betsArray.reduce((sum, bet) => 
+                        bet.choice.toLowerCase() === 'no' ? sum + bet.amount : sum, 0);
+                    
+                    setTotalYes(yesTotal);
+                    setTotalNo(noTotal);
+                }
+                setPrediction(response.prediction);
             } else {
                 toast.error(response.message);
             }
@@ -199,7 +225,7 @@ export default function BetDetailPage() {
                         <p className="text-default-600 leading-relaxed">{bet.reason}</p>
                             <div className="w-full mt-8">
                                 <h2 className="text-lg font-semibold mb-4">Bet Details</h2>
-                                <div className=" grid grid-cols-2 grid-rows-2 gap-8">
+                                <div className="grid grid-cols-2 grid-rows-4 gap-8">
                                     <div>
                                         <h3 className="text-sm font-medium text-default-400 mb-1 ">Status</h3>
                                         <Chip color={bet.status !== "open" ? (bet.outcome === bet.choice ? "success" : "danger") : "primary"} className="bg-primary/20">
@@ -220,6 +246,14 @@ export default function BetDetailPage() {
                                     <div>
                                         <h3 className="text-sm font-medium text-default-400 mb-1">Creator&apos;s Choice</h3>
                                         <Chip color="secondary" className="bg-primary/20">{bet.predicted_outcome || bet.creator_choice}</Chip>
+                                    </div>
+                                    <div>
+                                        <h3 className="text-sm font-medium text-default-400 mb-1">Yes Votes</h3>
+                                        <p className="text-sm font-semibold">{prediction?.yes_count} votes ({totalYes} credits)</p>
+                                    </div>
+                                    <div>
+                                        <h3 className="text-sm font-medium text-default-400 mb-1">No Votes</h3>
+                                        <p className="text-sm font-semibold">{prediction?.no_count} votes ({totalNo} credits)</p>
                                     </div>
                                 </div>
                             </div>

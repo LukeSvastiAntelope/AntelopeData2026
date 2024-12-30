@@ -177,8 +177,8 @@ async function getBetsByAgentId(id: number) {
 async function getBetHistoryByAgentId(id: number, limit: number, offset: number) {
     const db = await getMySQLConnection();
     const [rows] = await db.execute(
-        `SELECT *, bets.id as bet_id FROM bets JOIN predictions ON bets.prediction_id = predictions.id WHERE bets.agent_id = ? ORDER BY bets.created_at DESC LIMIT ${limit} OFFSET ${offset}`,
-        [id]
+        `SELECT *, bets.id as bet_id FROM bets JOIN predictions ON bets.prediction_id = predictions.id WHERE bets.agent_id = ? AND is_secret = ? ORDER BY bets.created_at DESC LIMIT ${limit} OFFSET ${offset}`,
+        [id, 0]
     );
     return rows;
 }
@@ -215,8 +215,8 @@ async function getPredictionById(id: string) {
         const [rows] = await db.execute<(PredictionDB & RowDataPacket)[]>(`
             SELECT 
                 p.*,
-                (SELECT COUNT(*) FROM bets WHERE prediction_id = p.id AND agent_id != 0 AND choice = 'yes') as yes_count,
-                (SELECT COUNT(*) FROM bets WHERE prediction_id = p.id AND agent_id != 0 AND choice = 'no') as no_count,
+                (SELECT COUNT(*) FROM bets WHERE prediction_id = p.id AND agent_id != 0 AND choice = 'yes' AND is_secret = 1) as yes_count,
+                (SELECT COUNT(*) FROM bets WHERE prediction_id = p.id AND agent_id != 0 AND choice = 'no' AND is_secret = 1) as no_count,
                 GROUP_CONCAT(
                     JSON_OBJECT(
                         'id', b.id,
@@ -229,10 +229,10 @@ async function getPredictionById(id: string) {
                     )
                 ) as bets
             FROM predictions p
-            LEFT JOIN bets b ON p.id = b.prediction_id 
+            LEFT JOIN bets b ON p.id = b.prediction_id AND b.is_secret = ?
             WHERE p.id = ?
             GROUP BY p.id`,
-            [id]
+            [1, id]
         );
 
         console.log(id, rows);
@@ -268,7 +268,7 @@ async function getPredictionsWithoutAgentId(id: number) {
             COUNT(bets.id) as bets_count 
         FROM predictions 
         LEFT JOIN bets ON predictions.id = bets.prediction_id
-        WHERE predictions.agent_id <> ? AND predictions.agent_id <> 0 
+        WHERE predictions.agent_id <> ? 
         GROUP BY predictions.id 
         ORDER BY predictions.created_at DESC`,
         [id]
@@ -284,7 +284,7 @@ async function getGeneralData(id: number) {
             COUNT(bets.id) as bets_count 
         FROM predictions 
         LEFT JOIN bets ON predictions.id = bets.prediction_id
-        WHERE predictions.agent_id <> ? AND predictions.agent_id <> 0 AND predictions.source != "sportDB"
+        WHERE predictions.agent_id <> ? AND predictions.source != "sportDB"
         GROUP BY predictions.id 
         ORDER BY predictions.created_at DESC`,
         [id]
@@ -300,7 +300,7 @@ async function getSportsData(id: number) {
             COUNT(bets.id) as bets_count 
         FROM predictions 
         LEFT JOIN bets ON predictions.id = bets.prediction_id
-        WHERE predictions.agent_id <> ? AND predictions.agent_id <> 0 AND predictions.source = "sportDB"
+        WHERE predictions.agent_id <> ? AND predictions.source = "sportDB"
         GROUP BY predictions.id 
         ORDER BY predictions.created_at DESC`,
         [id]

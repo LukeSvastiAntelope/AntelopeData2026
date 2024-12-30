@@ -21,6 +21,15 @@ export async function GET(req: NextRequest) {
             });
         }
 
+        if (!bet.prediction_id) {
+            return Response.json({
+                status: false,
+                message: 'Bet not found'
+            });
+        }
+
+        const prediction = await UserRepo.getPredictionById(bet.prediction_id);
+
         if (bet.pinecone_id) {
             const pinecone = new Pinecone({
                 apiKey: process.env.PINECONE_API_KEY as string
@@ -32,12 +41,14 @@ export async function GET(req: NextRequest) {
             return Response.json({
                 status: true,
                 bet: bet,
-                vector: vector
+                vector: vector,
+                prediction: prediction
             });
         } else {
             return Response.json({
                 status: true,
-                bet: bet
+                bet: bet,
+                prediction: prediction
             });
         }
     } catch (error) {

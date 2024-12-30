@@ -32,6 +32,7 @@ interface IPrediction {
 }
 
 interface IBet {
+  id: number;
   description: string;
   reason: string;
   choice: string;
@@ -44,6 +45,7 @@ interface IBet {
   created_at: string;
   resolution_date: string;
   str_thumb?: string;
+  bet_id: number;
 }
 
 const ITEMS_PER_PAGE_BETS = 10;
@@ -395,7 +397,8 @@ export default function Dashboard() {
                   {filterBets(bets, searchTerm).map((bet, index) => (
                     <tr
                       key={index}
-                      className=""
+                      className="cursor-pointer hover:bg-content0"
+                      onClick={() => router.push(`/bets/${bet.bet_id}`)}
                     >
                       {/* Image */}
                       <td className="py-2 px-4">
