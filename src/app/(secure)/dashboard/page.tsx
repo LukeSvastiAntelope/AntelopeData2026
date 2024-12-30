@@ -426,7 +426,7 @@ export default function Dashboard() {
               <div className="text-center text-gray-500 py-8">No bets found</div>
             )}
 
-{predictions.length > 0 && (
+{bets.length > 0 && (
               <div className="grid gap-6 md:grid-cols-3 mb-6">
                 <Card className="text-white bg-content0">
                   <CardHeader className="text-sm font-medium">
