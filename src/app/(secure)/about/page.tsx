@@ -9,9 +9,9 @@ import { IAgentProfile } from "@/app/utils/interface";
 
 export default function AboutPage() {
   const [agent, setAgent] = useState<IAgentProfile | null>(null);
+  const fetchData = useFetch();
   
   useEffect(() => {
-    const fetchData = useFetch();
     const fetchAgentProfile = async () => {
       try {
         const response = await fetchData.get("/api/getAgentProfile");
