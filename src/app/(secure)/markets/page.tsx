@@ -220,7 +220,7 @@ export default function MarketsPage() {
   };
 
   return (
-    <div className="flex text-white">
+    <div className="flex text-white max-w-[1200px]">
       {/* Sidebar */}
       <aside className="w-64 fixed top-0 text-sm">
         <nav className="flex min-h-screen flex-col gap-4 text-normal justify-between py-8 px-4">
@@ -285,7 +285,7 @@ export default function MarketsPage() {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 ml-64 container mx-auto px-4 py-6 md:px-8 md:py-8">
+      <main className="flex-1 ml-64 container mx-auto px-4 py-6 md:px-8 md:py-8 min-w-[800px] max-w-[800px]">
         {/* Tabs */}
         <div className="flex gap-2">
           <button
@@ -335,7 +335,7 @@ export default function MarketsPage() {
 
         {/* PREDICTIONS SECTION */}
         {activeTab === "predictions" && (
-          <section className="rounded-lg min-w-[780px]">
+          <section className="rounded-lg ">
             {isLoadingPredictions && predictions.length === 0 && (
               <div className="flex justify-center items-center py-8">
                 <Spinner size="lg" />
@@ -345,7 +345,7 @@ export default function MarketsPage() {
               <div className="text-center text-gray-500 py-8 container">No predictions found</div>
             )}
             {displayedPredictions.length > 0 && (
-              <div className="rounded-lg p-4 overflow-x-auto">
+              <div className="rounded-lg p-0 overflow-x-auto">
                 <table className="w-full text-sm text-left">
                   <tbody>
                     {displayedPredictions.map((prediction, index) => (
@@ -361,11 +361,11 @@ export default function MarketsPage() {
                               alt={prediction.description}
                               width={40}
                               height={40}
-                              className="rounded-md"
+                              className="rounded-full min-w-[40px] min-h-[40px] max-w-[40px] max-h-[40px]"
                             />
                           )}
                         </td>
-                        <td className="py-2 px-4 break-words max-w-xs">{prediction.description}</td>
+                        <td className="py-2 px-4 break-words">{prediction.description}</td>
                         <td className="py-2 px-4">{prediction.source}</td>
                         <td className="py-2 px-4">
                           {formatDate(prediction.resolution_date || prediction.created_at, "MM/dd/yyyy")}
@@ -436,11 +436,11 @@ export default function MarketsPage() {
                                 alt={item.description}
                                 width={40}
                                 height={40}
-                                className="rounded-md"
+                                className="rounded-full min-w-[40px] min-h-[40px] w-[40px] h-[40px]"
                               />
                             )}
                           </td>
-                          <td className="py-2 px-4 break-words max-w-xs">{item.description}</td>
+                          <td className="py-2 px-4 break-words">{item.description}</td>
                           <td className="py-2 px-4">{item.source}</td>
                           <td className="py-2 px-4">
                             {formatDate(item.resolution_date || item.created_at, "MM/dd/yyyy")}
@@ -502,11 +502,11 @@ export default function MarketsPage() {
                                 alt={item.description}
                                 width={40}
                                 height={40}
-                                className="rounded-md"
+                                className="rounded-md min-w-[40px] min-h-[40px] w-[40px] h-[40px]"
                               />
                             )}
                           </td>
-                          <td className="py-2 px-4 break-words max-w-xs">{item.description}</td>
+                          <td className="py-2 px-4 break-words">{item.description}</td>
                           <td className="py-2 px-4">{item.source}</td>
                           <td className="py-2 px-4">
                             {formatDate(item.resolution_date || item.created_at, "MM/dd/yyyy")}
@@ -545,7 +545,7 @@ export default function MarketsPage() {
 
         {/* LEADERBOARD SECTION */}
         {activeTab === "leaderboard" && (
-          <section className="rounded-lg min-w-[780px]">
+          <section className="rounded-lg max-w-[780px]">
             {isLoadingLeaderboard && (
               <div className="flex justify-center items-center py-8">
                 <Spinner size="lg" />
@@ -555,13 +555,13 @@ export default function MarketsPage() {
               <div className="text-center text-gray-500 py-8 container">No leaderboard data found</div>
             )}
             {leaderboardData.length > 0 && (
-              <div className="bg-content1 rounded-xl shadow-medium overflow-hidden border border-content3">
+              <div className=" rounded-xl shadow-medium overflow-hidden border border-content3">
                 {/* Header */}
                 <div className="bg-content2 px-6 py-4 border-b border-content3 grid grid-cols-12 gap-4">
                   <div className="col-span-1 font-semibold text-foreground">Rank</div>
-                  <div className="col-span-3 font-semibold text-foreground">Agent</div>
-                  <div className="col-span-3 font-semibold text-foreground">Total Winnings</div>
-                  <div className="col-span-3 font-semibold text-foreground">Bets Closed</div>
+                  <div className="col-span-6 font-semibold text-foreground">Agent</div>
+                  <div className="col-span-1 font-semibold text-foreground">Wins</div>
+                  <div className="col-span-2 font-semibold text-foreground">Bets </div>
                   <div className="col-span-2 font-semibold text-foreground">Win Rate</div>
                 </div>
 
@@ -570,14 +570,14 @@ export default function MarketsPage() {
                   <div 
                     key={item.id}
                     className={`px-6 py-4 grid grid-cols-12 gap-4 border-b border-content3 hover:bg-content2 transition-colors
-                      ${item.rank === 1 ? 'bg-warning-50' : ''} 
+                      ${item.rank === 1 ? 'bg-content0' : ''} 
                       ${item.rank === 2 ? 'bg-content2' : ''} 
                       ${item.rank === 3 ? 'bg-danger-50' : ''}`}
                   >
-                    <div className="col-span-1 font-medium">
+                    <div className="col-span-1 p-2 font-medium">
                       {item.rank <= 3 ? (
                         <span className={`
-                          inline-flex items-center justify-center w-8 h-8 rounded-full font-bold
+                          inline-flex items-center justify-center w-6 h-6 rounded-full font-bold
                           ${item.rank === 1 ? 'bg-warning text-warning-foreground' : ''}
                           ${item.rank === 2 ? 'bg-content3 text-foreground' : ''}
                           ${item.rank === 3 ? 'bg-danger text-danger-foreground' : ''}
@@ -588,20 +588,20 @@ export default function MarketsPage() {
                         <span className="text-foreground-500">{item.rank}</span>
                       )}
                     </div>
-                    <div className="col-span-3 flex items-center gap-3">
+                    <div className="col-span-6 flex items-center gap-3">
                       <Image
                         src={item.image || '/assets/images/default-agent.png'}
                         alt={item.name}
                         width={40}
                         height={40}
-                        className="rounded-full"
+                        className="rounded-full min-w-[40px] min-h-[40px] w-[40px] h-[40px]"
                       />
                       <span className="text-foreground font-medium">{item.name}</span>
                     </div>
-                    <div className="col-span-3 text-success font-medium">
+                    <div className="col-span-1 text-success font-medium">
                       {item.total_winnings}
                     </div>
-                    <div className="col-span-3 text-foreground-600">{item.bets_count}</div>
+                    <div className="col-span-2 text-foreground-600">{item.bets_count}</div>
                     <div className="col-span-2 text-primary font-medium">{(item.total_winnings * 100 /item.bets_count).toFixed(2)}%</div>
                   </div>
                 ))}

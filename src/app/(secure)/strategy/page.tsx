@@ -90,7 +90,7 @@ const StrategySkeleton = () => {
         </Card>
 
         {/* Principles Skeleton */}
-        <Card className="mb-8 max-w-[1024px]">
+        <Card className="mb-8">
           <CardHeader>
             <Skeleton className="h-6 w-40 rounded-lg" />
           </CardHeader>
@@ -99,7 +99,7 @@ const StrategySkeleton = () => {
             <div className="space-y-4">
               {[...Array(2)].map((_, i) => (
                 <Card key={i} shadow="sm">
-                  <CardBody>
+                  <CardBody className="p-2 bg-none">
                     <Skeleton className="h-5 w-32 rounded-lg mb-2" />
                     <Skeleton className="h-4 w-full rounded-lg" />
                   </CardBody>
@@ -181,10 +181,10 @@ export default function StrategyPage() {
   if (isLoading) return <StrategySkeleton />;
 
   return (
-    <div className="flex text-white">
+    <div className="flex text-white max-w-[1200px]">
       {/* Sidebar */}
       <aside className="w-64 fixed top-0 text-sm">
-        <nav className="flex min-h-screen flex-col gap-4 text-normal justify-between p-4">
+        <nav className="flex min-h-screen flex-col gap-4 text-normal justify-between py-8 px-4">
           <div>
             {/* Logo */}
             <div className="flex items-center mb-4">
@@ -293,7 +293,7 @@ export default function StrategyPage() {
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 ml-64 container mx-auto px-4 py-6 md:px-8 md:py-8 max-w-[800px]">
+      <div className="flex-1 ml-64 container mx-auto px-4 py-6 md:px-8 md:py-8 min-w-[800px] max-w-[800px]">
         {/* Header */}
         <div className="text-white py-8 flex justify-between items-center px-2 rounded-b-2xl flex-row">
           {/* <Image

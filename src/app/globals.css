@@ -43,6 +43,20 @@ background-clip: text;
   background-color:hsl(240deg 35.04% 28.98% / 50%)
 }
 
+.enlarge-icon {
+  width: 40px;
+  height: 40px;
+}
+
+.center-logo {
+max-width: 80px;
+    background: url(/assets/images/logo-simple.svg);
+    width: 40px;
+    height: 40px;
+    background-size: 40px;
+    background-position: top;
+  }
+
 .icon-profile {
   background-image: url('/assets/images/profile_off.svg');
   background-size: 24px 24px;
@@ -51,6 +65,10 @@ background-clip: text;
   width: 24px;
   height: 24px;
   transition: background-image 0.2s ease-in-out;
+}
+
+.justify-evenly {
+  justify-content: space-evenly;
 }
 
 .icon-bet {

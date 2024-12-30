@@ -306,7 +306,7 @@ const PaymentPage = () => {
                 </nav>
             </aside>
             
-            <div className="flex-1 ml-64 container mx-auto px-4 py-6 md:px-8 md:py-8 max-w-[800px]">
+            <div className="flex-1 ml-64 container mx-auto px-4 py-6 md:px-8 md:py-8 min-w-[800px] max-w-[800px]">
                 <div className="flex justify-between items-center mb-8">
                     <h1 className="text-lg font-bold">Payment & Credits</h1>
                     <WalletMultiButton />
