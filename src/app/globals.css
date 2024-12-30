@@ -297,3 +297,10 @@ tbody {
   font-weight: bold;
   font-style: normal;
 }
+
+@media (min-width: 768px) {
+  nav {
+   height: 100vh;
+    justify-content: space-between!important;
+  }
+}

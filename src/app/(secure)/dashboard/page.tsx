@@ -238,12 +238,7 @@ export default function Dashboard() {
     <div className="flex text-white max-w-[1200px]">
       {/* Sidebar */}
       <aside className="md:w-64 md:flex-col md:left-auto left-0 fixed top-0 text-sm w-full">
-        
-        
-        
-        <nav className="flex md-min-h-screen flex-row md:flex-col gap-4 text-normal md:justify-evenly py-8 px-4 ">
-          
-          
+        <nav className="flex flex-row md:flex-col gap-4 text-normal justify-evenly py-8 px-4 ">
           <div className="flex flex-row md:flex-col justify-evenly w-full">
           <div className="flex items-center mb-4">
               {/* Large logo for md+ screens */}
@@ -261,7 +256,7 @@ export default function Dashboard() {
              
             </div>
             {/* Profile Photo */}
-            <Link href="/payment" className="md:flex items-center gap-2 mb-4 ">
+            <Link href="/payment" className="md:flex items-center gap-2 mb-4 hidden">
               <Image
                 src={agent?.image || "/assets/images/logo-simple.svg"}
                 alt="Profile"

@@ -183,30 +183,38 @@ export default function StrategyPage() {
   return (
     <div className="flex text-white max-w-[1200px]">
       {/* Sidebar */}
-      <aside className="w-64 fixed top-0 text-sm">
-        <nav className="flex min-h-screen flex-col gap-4 text-normal justify-between py-8 px-4">
-          <div>
-            {/* Logo */}
-            <div className="flex items-center mb-4">
-              <Image
-                src={"/assets/images/logo-text.svg"}
-                alt="Dashboard Logo"
-                width={160}
-                height={40}
-                className="mr-2 rounded-full w-100"
-              />
+      <aside className="md:w-64 md:flex-col md:left-auto left-0 fixed top-0 text-sm w-full">
+        <nav className="flex flex-row md:flex-col gap-4 text-normal justify-evenly py-8 px-4 ">
+          <div className="flex flex-row md:flex-col justify-evenly w-full">
+          <div className="flex items-center mb-4">
+              {/* Large logo for md+ screens */}
+              <span className="hidden md:inline-block">
+                <Image
+                  src={"/assets/images/logo-text.svg"}
+                  alt="Dashboard Logo"
+                  width={160}
+                  height={40}
+                  className="mr-2 w-100"
+                />
+              </span>
+
+              {/* Smaller logo for mobile screens */}
+             
             </div>
-            <Link href="/profile" className="flex items-center gap-2 mb-4">
+            {/* Profile Photo */}
+            <Link href="/payment" className="md:flex items-center gap-2 mb-4 hidden">
               <Image
-                src={agent?.image || "/assets/images/default-agent.png"}
-                alt="Agent Image"
-                className="w-[24px] h-[24px] rounded-full"
+                src={agent?.image || "/assets/images/logo-simple.svg"}
+                alt="Profile"
                 width={24}
                 height={24}
+                className="rounded-full bg-gray-700 mr-2 sm-hidden"
               />
-              <span className="text-sm font-semibold icon-credits px-5 font-kodemono">
-                <span className="text-gradient">{agent?.wallet_balance?.toLocaleString() || 0}</span>
+              {/* Credits */}
+              <span className="text-sm font-semibold font-kodemono">
+                <span className="text-gradient">83940</span>
               </span>
+
             </Link>
             <Link
               href="/dashboard"
@@ -218,59 +226,52 @@ export default function StrategyPage() {
                Dashboard
               </span>
             </Link>
-            <Link href="/markets" className="flex items-center gap-2 mb-4 group">
+
+            <Link href="/markets" className="flex items-center gap-2 mb-4 group text-default-400">
+              {/* default icon */}
               <span className="icon-markets mr-2 block group-hover:hidden" />
-              <span className="icon-markets-active mr-2 hidden group-hover:block" />
-              <span className="text-default-400 group-hover:text-white font-kodemono">
-                Markets
-              </span>
+              {/* hover icon */}
+              <span className="icon-markets-active mr-2 hidden sm:enlarge-icon group-hover:block" />
+              <span className="text-default-400 group-hover:text-white font-kodemono"><span className="hidden md:inline-block">Markets</span></span>
             </Link>
-            <Link
-              href="/strategy"
-              className="flex items-center gap-2 mb-4 text-white group "
-            >
-                <span className="icon-strategy-active mr-2" /> Strategy
-              
-            </Link>
+
+            <Link href="/strategy" className="flex items-center gap-2 mb-4 text-white font-kodemono">
+            <span className="icon-strategy-active mr-2" /> <span className="hidden md:inline-block">Strategy</span>
+          </Link>
+
           </div>
 
-          <div>
-            <Link
-              href="/about"
-              className="flex items-center gap-2 mb-4 text-default-400 group"
-            >
+                  <div className="md:hidden min-w-40px min-h-40px max-w-40px max-h-40px center-logo">
+                  </div>
+
+          <div className="flex flex-row md:flex-col justify-evenly w-full">
+            <Link href="/about" className="flex items-center gap-2 mb-4 text-default-400 group">
+              {/* default icon */}
               <span className="icon-about mr-2 block group-hover:hidden" />
+              {/* hover icon */}
               <span className="icon-about-active mr-2 hidden group-hover:block" />
-              <span className="text-default-400 group-hover:text-white font-kodemono">
-                About
-              </span>
+              <span className="text-default-400 group-hover:text-white font-kodemono"><span className="hidden md:inline-block">About</span></span>
             </Link>
-            <Link
-              href="https://discord.gg/dSEV8YCDQ2"
-              className="flex items-center gap-2 mb-4 text-default-400 group"
-            >
+            <Link href="https://discord.gg/dSEV8YCDQ2" className="flex items-center gap-2 mb-4 text-default-400 group">
+              {/* default icon */}
               <span className="icon-support mr-2 block group-hover:hidden" />
+              {/* hover icon */}
               <span className="icon-support-active mr-2 hidden group-hover:block" />
-              <span className="text-default-400 group-hover:text-white font-kodemono">
-                Community
-              </span>
+              <span className="text-default-400 group-hover:text-white font-kodemono"><span className="hidden md:inline-block">Community</span></span>
             </Link>
-            <Link
-              href="/signout"
-              className="flex items-center gap-2 mb-4 text-default-400 group"
-            >
+            <Link href="/logout" className="flex items-center gap-2 mb-4 text-default-400 group">
+              {/* default icon */}
               <span className="icon-logout mr-2 block group-hover:hidden" />
+              {/* hover icon */}
               <span className="icon-logout-active mr-2 hidden group-hover:block" />
-              <span className="text-default-400 group-hover:text-white font-kodemono">
-                Sign out
-              </span>
+              <span className="text-default-400 group-hover:text-white font-kodemono"><span className="hidden md:inline-block">Log out</span></span>
             </Link>
           </div>
         </nav>
       </aside>
 
       {/* Top-right balance card */}
-      <div className="fixed top-0 right-0 p-4">
+      {/* <div className="fixed top-0 right-0 p-4">
         <Card className="bg-content0 hover:shadow-lg transition-all duration-300 border border-primary/20">
           <CardBody className="p-2">
             <Button
@@ -290,10 +291,10 @@ export default function StrategyPage() {
             </Button>
           </CardBody>
         </Card>
-      </div>
+      </div> */}
 
       {/* Main Content Area */}
-      <div className="flex-1 ml-64 container mx-auto px-4 py-6 md:px-8 md:py-8 min-w-[800px] max-w-[800px]">
+      <div className="flex-1 ml-0 md:ml-64 container mt-14 md:mt-0  mx-auto px-4 py-6 md:px-8 md:py-8 min-w-full md:min-w-[800px] max-w-full md:max-w-[800px]">
         {/* Header */}
         <div className="text-white py-8 flex justify-between items-center px-2 rounded-b-2xl flex-row">
           {/* <Image
