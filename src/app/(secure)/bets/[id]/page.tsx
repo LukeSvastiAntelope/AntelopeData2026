@@ -33,6 +33,11 @@ interface BetData {
     created_at: string;
 }
 
+interface AnalysisLog {
+    step: string;
+    reasoning?: string;
+}
+
 export default function BetDetailPage() {
     const params = useParams();
     const router = useRouter();
@@ -264,16 +269,52 @@ export default function BetDetailPage() {
                                         <h2 className="text-xl font-semibold mb-4">Source Information</h2>
                                         <div className="bg-default-50 rounded-lg p-4 border border-default-200">
                                             <div className="grid gap-4">
-                                                {Object.entries(pineconeData.metadata || {}).map(([key, value]) => (
-                                                    <div key={key}>
-                                                        <h3 className="text-sm font-medium text-default-400 capitalize mb-1">
-                                                            {key.replace(/_/g, ' ')}
-                                                        </h3>
-                                                        <p className="text-sm text-default-600">
-                                                            {typeof value === 'string' ? value : JSON.stringify(value)}
-                                                        </p>
-                                                    </div>
-                                                ))}
+                                                {Object.entries(pineconeData.metadata || {}).map(([key, value]) => {
+                                                    return (
+                                                        (key != "agent_id" && key != "choice" && key != "amount" && key != "created_at" && key != "prediction_id" && key != "log") ? (
+                                                            <div key={key}>
+                                                                <h3 className="text-sm font-medium text-default-400 capitalize mb-1">
+                                                                    {key.replace(/_/g, ' ')}
+                                                                </h3>
+                                                                <p className="text-sm text-default-600">
+                                                                    {typeof value === 'string' ? value : JSON.stringify(value)}
+                                                                </p>
+                                                            </div>
+                                                        ) : (
+                                                            key === "log" ? (
+                                                                <div key={key} className="space-y-4">
+                                                                    <h3 className="text-lg font-semibold text-white mb-2">
+                                                                        Analysis Log
+                                                                    </h3>
+                                                                    <div className="space-y-4">
+                                                                        {JSON.parse(value as string).map((log: AnalysisLog, index: number) => (
+                                                                            <div 
+                                                                                key={`${log.step}-${index}`} 
+                                                                                className="bg-default-100 rounded-lg p-4 border border-default-200"
+                                                                            >
+                                                                                <div className="flex items-center gap-2 mb-2">
+                                                                                    <span className="text-primary font-medium">
+                                                                                        Step {index + 1}:
+                                                                                    </span>
+                                                                                    <span className="text-default-400 capitalize">
+                                                                                        {log.step.replace(/_/g, ' ')}
+                                                                                    </span>
+                                                                                </div>
+                                                                                {log.reasoning && (
+                                                                                    <p className="text-default-600 text-sm leading-relaxed">
+                                                                                        {log.reasoning}
+                                                                                    </p>
+                                                                                )}
+                                                                            </div>
+                                                                        ))}
+                                                                    </div>
+                                                                </div>
+                                                            ) : (
+                                                                ""
+                                                            )
+                                                        )
+                                                    )
+                                                })}
                                             </div>
                                         </div>
                                     </div>

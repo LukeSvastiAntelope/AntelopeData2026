@@ -136,11 +136,16 @@ export class AutomaticBettingAgent {
     private async isInterestingPredictionWithAI(prediction: Prediction): Promise<{ shouldBet: boolean; reasoning: string | null }> {
         const description = prediction.description.toLowerCase();
         const prompt = `
-        This is the agents interests:
+        Given these specific interests:
         ${this.agent.interests.map(interest => interest.toLowerCase()).join(', ')}
         
-        Determine if this prediction is interesting for a betting agent based on the agents interests:
+        Analyze if this prediction would be interesting:
         ${description}
+        
+        Rules for determining interest:
+        1. For sports matches, ONLY consider them interesting if they involve specific teams, players, or competitions mentioned in the interests
+        2. Generic sports matches without connection to the interests should be marked as NOT interesting
+        3. For non-sports predictions, evaluate based on topic relevance to interests
         
         Start your response with either "YES:" or "NO:" followed by your reasoning.
         `;
