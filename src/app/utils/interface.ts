@@ -134,6 +134,10 @@ export interface Prediction {
     not_match_total_amount: number;
     agent_bets?: string;
     outcome: string;
+    betReason?: Array<{
+        step: string;
+        reasoning: string;
+    }>;
 }
 
 export interface GroupAnalysis {

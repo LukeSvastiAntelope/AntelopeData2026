@@ -76,9 +76,20 @@ export class AutomaticBettingAgent {
             const openPredictions = predictions.filter(p => p.creator_id !== this.agent.user_id);
             const isSportsCategory = this.isSportsCategory();
             const categoryPredictions = openPredictions.filter(p => isSportsCategory ? p.source == "sportDB" : p.source == "google_news");
-            const interestingPredictions = categoryPredictions.filter(p =>
-                this.isInterestingPredictionWithAI(p)
-            );
+            
+            // Fix: Use Promise.all with map first, then filter
+            const interestingPredictions = (
+                await Promise.all(
+                    categoryPredictions.map(async p => {
+                        const { shouldBet, reasoning } = await this.isInterestingPredictionWithAI(p);
+                        p.betReason = reasoning ? [{ step: "interesting", reasoning: reasoning }] : [];
+                        console.log("p.betReason", shouldBet, ":", p.betReason);
+                        return { prediction: p, shouldBet };
+                    })
+                )
+            ).filter(result => result.shouldBet)
+             .map(result => result.prediction);
+            console.log("interestingPredictions", interestingPredictions);
     
             if (interestingPredictions.length === 0) {
                 return [];
@@ -96,6 +107,11 @@ export class AutomaticBettingAgent {
                     await Promise.all(decisions.map(async (decision) => {
                         const prediction = topicPredictions.find(p => p.id === decision.predictionId);
                         if (prediction) {
+                            if (!prediction.betReason) {
+                                prediction.betReason = [];
+                            }
+                            prediction.betReason.push({ step: "relevantNews", reasoning: news.map(n => n.title).join(', ') });
+                            prediction.betReason.push({ step: "similarPredictions", reasoning: similarPredictions.map(p => p.metadata?.description).join(', ') });
                             const pineconeId = await this.storeBetInPinecone(decision, prediction);
                             decision.pineconeId = pineconeId;
                         }
@@ -120,20 +136,32 @@ export class AutomaticBettingAgent {
         );
     }
 
-    private async isInterestingPredictionWithAI(prediction: Prediction): Promise<boolean> {
+    private async isInterestingPredictionWithAI(prediction: Prediction): Promise<{ shouldBet: boolean; reasoning: string | null }> {
         const description = prediction.description.toLowerCase();
         const prompt = `
         This is the agents interests:
         ${this.agent.interests.map(interest => interest.toLowerCase()).join(', ')}
+        
         Determine if this prediction is interesting for a betting agent based on the agents interests:
         ${description}
+        
+        Start your response with either "YES:" or "NO:" followed by your reasoning.
         `;
+        
         const response = await this.openai.chat.completions.create({
             model: "gpt-4o",
             messages: [{ role: "user", content: prompt }],
             temperature: 0.3
         });
-        return response.choices[0].message.content?.toLowerCase().includes('yes') || false;
+
+        const content = response.choices[0].message.content || '';
+        const shouldBet = content.trim().toUpperCase().startsWith('YES:');
+        const reasoning = content.substring(content.indexOf(':') + 1).trim();
+
+        return {
+            shouldBet,
+            reasoning
+        };
     }
 
     private groupPredictionsByTopic(predictions: Prediction[]): GroupedPredictions {
@@ -656,7 +684,7 @@ export class AutomaticBettingAgent {
             const embedding = await this.getEmbedding(description);
             const index = this.pinecone.Index('prediction-results');
             const id = `bet-${bet.predictionId}-${bet.agentId}-${Date.now()}`;
-            console.log("bet", bet);
+            console.log("bet", prediction.betReason);
 
             await index.upsert([{
                 id: id,
@@ -672,7 +700,8 @@ export class AutomaticBettingAgent {
                     confidence: bet.confidence,
                     reasoning: bet.reasoning,
                     risk_assessment: bet.riskAssessment,
-                    result: 'pending'
+                    result: 'pending',
+                    log: prediction.betReason ? JSON.stringify(prediction.betReason) : ""
                 }
             }]);
 
