@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
             return Response.json({ error: 'Agent not found' }, { status: 404 });
         }
         
-        const predictions = await UserRepo.getPredictionsByAgentId(agent.id);
+        const predictions = await UserRepo.getPredictionsByUserId(jwtPayload.email as string);
         return Response.json({status: true, agent: agent, predictions: predictions});
     } catch (error) {
         console.error("Error in getAgentProfile: ", error);

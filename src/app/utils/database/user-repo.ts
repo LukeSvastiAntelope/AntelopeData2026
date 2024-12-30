@@ -30,7 +30,8 @@ export const UserRepo = {
     getPredictionsWithoutAgentId,
     getGeneralData,
     getSportsData,
-    getLeaderboard
+    getLeaderboard,
+    getPredictionsByUserId
 }
 
 async function authenticate({ username, password }: { username: string, password: string }) {
@@ -321,3 +322,20 @@ async function getLeaderboard() {
     );
     return rows;
 }
+
+async function getPredictionsByUserId(id: string) {
+    const db = await getMySQLConnection();
+    const [rows] = await db.execute(`
+        SELECT 
+            predictions.*, 
+            COUNT(bets.id) as bets_count 
+        FROM predictions 
+        LEFT JOIN bets ON predictions.id = bets.prediction_id
+        WHERE predictions.creator_id = ? 
+        GROUP BY predictions.id 
+        ORDER BY predictions.created_at DESC`,
+        [id]
+    );
+    return rows;
+}
+

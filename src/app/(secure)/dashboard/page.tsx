@@ -63,7 +63,7 @@ const formatDate = (dateStr: string): string => {
 
 const filterBets = (bets: IBet[], searchTerm: string): IBet[] => {
   const term = searchTerm.toLowerCase();
-  return bets.filter(bet => 
+  return bets.filter(bet =>
     bet.description.toLowerCase().includes(term) ||
     bet.source.toLowerCase().includes(term) ||
     bet.status.toLowerCase().includes(term)
@@ -72,7 +72,7 @@ const filterBets = (bets: IBet[], searchTerm: string): IBet[] => {
 
 const filterPredictions = (predictions: IPrediction[], searchTerm: string): IPrediction[] => {
   const term = searchTerm.toLowerCase();
-  return predictions.filter(prediction => 
+  return predictions.filter(prediction =>
     prediction.description.toLowerCase().includes(term) ||
     prediction.source.toLowerCase().includes(term) ||
     prediction.status.toLowerCase().includes(term)
@@ -185,36 +185,41 @@ export default function Dashboard() {
 
     const loadMorePredictions = () => {
       const filteredPredictions = filterPredictions(predictions, searchPredictions);
-      const newPage = pagePredictions + 1;
-      const nextItems = filteredPredictions.slice(0, newPage * ITEMS_PER_PAGE_PREDICTIONS);
+      const startIndex = (pagePredictions - 1) * ITEMS_PER_PAGE_PREDICTIONS;
+      const endIndex = startIndex + ITEMS_PER_PAGE_PREDICTIONS;
+      const nextItems = filteredPredictions.slice(0, endIndex);
+
       setDisplayedPredictions(nextItems);
       setHasMorePredictions(nextItems.length < filteredPredictions.length);
-      setPagePredictions(newPage);
     };
-
-    // Reset pagination when search term changes
-    setPagePredictions(1);
-    const filteredPredictions = filterPredictions(predictions, searchPredictions);
-    setDisplayedPredictions(filteredPredictions.slice(0, ITEMS_PER_PAGE_PREDICTIONS));
-    setHasMorePredictions(filteredPredictions.length > ITEMS_PER_PAGE_PREDICTIONS);
 
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries[0].isIntersecting && hasMorePredictions) {
-          // Use requestAnimationFrame to avoid running outside the main thread
-          requestAnimationFrame(() => {
-            loadMorePredictions();
-          });
+          setPagePredictions(prev => prev + 1);
         }
       },
-      { threshold: 0.5 }
+      { threshold: 0.1 }
     );
 
     const sentinel = document.getElementById("sentinel");
     if (sentinel) observer.observe(sentinel);
 
+    // Load more predictions when page changes
+    loadMorePredictions();
+
     return () => observer.disconnect();
-  }, [activeTab, hasMorePredictions, predictions, pagePredictions, searchPredictions]);
+  }, [activeTab, predictions, pagePredictions, searchPredictions]);
+
+  // Reset pagination when search term changes
+  useEffect(() => {
+    if (activeTab === "predictions") {
+      setPagePredictions(1);
+      const filteredPredictions = filterPredictions(predictions, searchPredictions);
+      setDisplayedPredictions(filteredPredictions.slice(0, ITEMS_PER_PAGE_PREDICTIONS));
+      setHasMorePredictions(filteredPredictions.length > ITEMS_PER_PAGE_PREDICTIONS);
+    }
+  }, [searchPredictions, activeTab]);
 
   // On first mount
   useEffect(() => {
@@ -242,7 +247,7 @@ export default function Dashboard() {
       <aside className="md:w-64 md:flex-col md:left-auto left-0 fixed top-0 text-sm w-full">
         <nav className="flex flex-row md:flex-col gap-4 text-normal justify-evenly py-8 px-4 ">
           <div className="flex flex-row md:flex-col justify-evenly w-full">
-          <div className="flex items-center mb-4">
+            <div className="flex items-center mb-4">
               {/* Large logo for md+ screens */}
               <span className="hidden md:inline-block">
                 <Image
@@ -255,7 +260,7 @@ export default function Dashboard() {
               </span>
 
               {/* Smaller logo for mobile screens */}
-             
+
             </div>
             {/* Profile Photo */}
             <Link href="/payment" className="md:flex items-center gap-2 mb-4 hidden">
@@ -272,18 +277,18 @@ export default function Dashboard() {
               </span>
 
             </Link>
-          <Link href="/" className="flex items-center gap-2 mb-4 text-white font-kodemono">
-            <span className="icon-dashboard-active mr-2" /> <span className="hidden md:inline-block">Dashboard</span>
-          </Link>
-          <Link 
-                href="/markets" 
-                className="flex items-center gap-2 mb-4 group"
-                >
-                {/* default icon */}
-                <span className="icon-markets mr-2 block group-hover:hidden " />
-                {/* hover icon */}
-                <span className="icon-markets-active mr-2 hidden group-hover:block" />
-                <span className="text-default-400 group-hover:text-white font-kodemono"><span className="hidden md:inline-block">Markets</span></span>
+            <Link href="/" className="flex items-center gap-2 mb-4 text-white font-kodemono">
+              <span className="icon-dashboard-active mr-2" /> <span className="hidden md:inline-block">Dashboard</span>
+            </Link>
+            <Link
+              href="/markets"
+              className="flex items-center gap-2 mb-4 group"
+            >
+              {/* default icon */}
+              <span className="icon-markets mr-2 block group-hover:hidden " />
+              {/* hover icon */}
+              <span className="icon-markets-active mr-2 hidden group-hover:block" />
+              <span className="text-default-400 group-hover:text-white font-kodemono"><span className="hidden md:inline-block">Markets</span></span>
             </Link>
 
             <Link href="/strategy" className="flex items-center gap-2 mb-4 group text-default-400">
@@ -295,8 +300,8 @@ export default function Dashboard() {
             </Link>
           </div>
 
-                  <div className="md:hidden min-w-40px min-h-40px max-w-40px max-h-40px center-logo">
-                  </div>
+          <div className="md:hidden min-w-40px min-h-40px max-w-40px max-h-40px center-logo">
+          </div>
 
           <div className="flex flex-row md:flex-col justify-evenly w-full">
             <Link href="/about" className="flex items-center gap-2 mb-4 text-default-400 group">
@@ -326,7 +331,7 @@ export default function Dashboard() {
 
       {/* Main Content */}
 
-      
+
       <main className="flex-1 ml-0 md:ml-64 container mt-14 md:mt-0  mx-auto px-4 py-6 md:px-8 md:py-8 min-w-full md:min-w-[800px] max-w-full md:max-w-[800px]">
         {/* Top bar with toggles */}
 
@@ -377,7 +382,7 @@ export default function Dashboard() {
         {/* BETS SECTION */}
         {activeTab === "bets" && (
           <section className="rounded-lg overflow-x-auto mb-8">
-           
+
 
             {isLoadingBets && bets.length === 0 && (
               <div className="flex justify-center items-center py-8">
@@ -392,7 +397,7 @@ export default function Dashboard() {
             {/* Table Header */}
             {bets.length > 0 && (
               <table className="w-full text-sm text-left">
-               
+
                 <tbody>
                   {filterBets(bets, searchTerm).map((bet, index) => (
                     <tr
@@ -402,16 +407,16 @@ export default function Dashboard() {
                     >
                       {/* Image */}
                       <td className="py-2 px-4">
-                    {bet.str_thumb && (
-                      <Image
-                        src={bet.str_thumb}
-                        alt={bet.description}
-                        width={40}
-                        height={40}
-                        className="w-[40px] h-[40px] min-w-[40px] min-h-[40px] rounded-full" // Remove/replace m-w-[40px]
-                      />
-                    )}
-                   </td>
+                        {bet.str_thumb && (
+                          <Image
+                            src={bet.str_thumb}
+                            alt={bet.description}
+                            width={40}
+                            height={40}
+                            className="w-[40px] h-[40px] min-w-[40px] min-h-[40px] rounded-full" // Remove/replace m-w-[40px]
+                          />
+                        )}
+                      </td>
                       {/* Description */}
                       <td className="py-2 px-4 break-words">
                         {bet.description}
@@ -421,7 +426,7 @@ export default function Dashboard() {
                       {/* Stake */}
                       {/* <td className="py-2 px-4">{bet.amount}</td> */}
                       {/* Status */}
-                     
+
                       {/* Date (created_at or resolution_date depending on status) */}
                       <td className="py-2 px-4">
                         {bet.status === "open"
