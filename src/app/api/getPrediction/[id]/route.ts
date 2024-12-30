@@ -22,13 +22,7 @@ export async function GET(
 
         // Get prediction details
         const prediction = await UserRepo.getPredictionById(params.id);
-        let reason = "";
-        
-        if (prediction.pinecone_id) {
-            const vector = await index.fetch([prediction.pinecone_id.toString()]);
-            console.log(vector.records[prediction.pinecone_id.toString()].metadata);
-            reason = vector.records[prediction.pinecone_id.toString()].metadata?.reasoning as string || "";
-        }
+
         if (!prediction) {
             return Response.json({
                 status: false, 
@@ -38,8 +32,7 @@ export async function GET(
 
         return Response.json({
             status: true,
-            prediction: prediction,
-            reason: reason
+            prediction: prediction
         });
 
     } catch (error) {

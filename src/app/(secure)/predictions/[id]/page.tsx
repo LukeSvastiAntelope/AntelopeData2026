@@ -221,13 +221,6 @@ export default function PredictionDetail() {
                                             <p className="font-semibold">{prediction.bet_amount}</p>
                                         </div>
                                     </div>
-
-                                    {reason && (
-                                        <div>
-                                            <p className="text-sm text-gray-500">Reason</p>
-                                            <p className="font-semibold">{reason}</p>
-                                        </div>
-                                    )}
                                 </div>
                             </div>
                         </CardBody>
