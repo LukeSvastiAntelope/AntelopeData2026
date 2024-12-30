@@ -26,6 +26,15 @@ background-clip: text;
 -webkit-text-fill-color: transparent;
 }
 
+.input-search::placeholder {
+  color: rgb(55 65 81 / var(--tw-text-opacity, 1)); /* for example, Tailwind's gray-400 tone */
+  transition: color 0.2s ease-in-out;
+}
+
+.input-search:focus::placeholder {
+  color: #f9fafb; /* for example, Tailwind's gray-50 tone */
+}
+
 .predict-active:hover {
   background: url('/assets/images/predict.svg');
     background-size: 24px 24px;

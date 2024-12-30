@@ -349,50 +349,122 @@ export default function Dashboard() {
         </div>
 
         {/* Search Field for Bets */}
-        {activeTab == "bets" && (
-          <div className="my-4">
+        {activeTab === "bets" && (
+          <div className="my-4 relative">
+            <span className="absolute inset-y-0 left-0 flex items-center pl-2 pointer-events-none">
+              <svg
+                aria-hidden="true"
+                className="w-5 h-5 text-gray-700"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                viewBox="0 0 24 24"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <circle cx="10" cy="10" r="7"></circle>
+                <path d="M21 21l-4.35-4.35"></path>
+              </svg>
+            </span>
             <input
               type="text"
               value={searchTerm}
               onChange={handleBetSearch}
               placeholder="Search bets..."
-              className="w-full p-2 rounded-md focus:outline-none text-small active:outline-none input-search"
+              className="w-full p-2 pl-9 rounded-md text-gray-700 focus:outline-none text-small input-search bg-gray-800 placeholder-gray-700"
             />
           </div>
         )}
 
         {/* Search Field for Predictions */}
-        {activeTab == "predictions" && (
-          <div className="my-4">
+        {activeTab === "predictions" && (
+          <div className="my-4 relative">
+            <span className="absolute inset-y-0 left-0 flex items-center pl-2 pointer-events-none">
+              <svg
+                aria-hidden="true"
+                className="w-5 h-5 text-gray-700"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                viewBox="0 0 24 24"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <circle cx="10" cy="10" r="7"></circle>
+                <path d="M21 21l-4.35-4.35"></path>
+              </svg>
+            </span>
             <input
               type="text"
               value={searchPredictions}
               onChange={handlePredictionSearch}
               placeholder="Search predictions..."
-              className="w-full p-2 rounded-md focus:outline-none text-small active:outline-none input-search"
+              className="w-full p-2 pl-9 rounded-md text-gray-700 focus:outline-none text-small input-search bg-gray-800 placeholder-gray-700"
             />
           </div>
         )}
 
         {/* BETS SECTION */}
         {activeTab === "bets" && (
+
+
+
           <section className="rounded-lg overflow-x-auto mb-8">
-           
+            {/* Replicate the Stats Row here */}
+         
 
             {isLoadingBets && bets.length === 0 && (
               <div className="flex justify-center items-center py-8">
                 <Spinner size="lg" />
               </div>
             )}
-
             {!isLoadingBets && bets.length === 0 && (
               <div className="text-center text-gray-500 py-8">No bets found</div>
+            )}
+
+{predictions.length > 0 && (
+              <div className="grid gap-6 md:grid-cols-3 mb-6">
+                <Card className="text-white bg-content0">
+                  <CardHeader className="text-sm font-medium">
+                    Total Active Predictions
+                  </CardHeader>
+                  <CardBody>
+                    <p className="text-2xl font-bold">
+                      {predictions.filter((p) => p.status === "open").length}
+                    </p>
+                  </CardBody>
+                </Card>
+                <Card className="text-white bg-content0">
+                  <CardHeader className="text-sm font-medium">
+                    Total Bets Placed
+                  </CardHeader>
+                  <CardBody>
+                    <p className="text-2xl font-bold">
+                      {predictions.reduce((acc, curr) => acc + curr.bets_count, 0)}
+                    </p>
+                  </CardBody>
+                </Card>
+                <Card className="text-white bg-content0">
+                  <CardHeader className="text-sm font-medium">
+                    Win Rate
+                  </CardHeader>
+                  <CardBody>
+                    <p className="text-2xl font-bold">
+                      {(
+                        (predictions.filter((p) => p.outcome === p.creator_choice).length /
+                        predictions.length) *
+                        100
+                      ).toFixed(2)}
+                      %
+                    </p>
+                  </CardBody>
+                </Card>
+              </div>
             )}
 
             {/* Table Header */}
             {bets.length > 0 && (
               <table className="w-full text-sm text-left">
-               
                 <tbody>
                   {filterBets(bets, searchTerm).map((bet, index) => (
                     <tr
@@ -416,13 +488,6 @@ export default function Dashboard() {
                       <td className="py-2 px-4 break-words">
                         {bet.description}
                       </td>
-                      {/* Source */}
-                      {/* <td className="py-2 px-4">{bet.source}</td> */}
-                      {/* Stake */}
-                      {/* <td className="py-2 px-4">{bet.amount}</td> */}
-                      {/* Status */}
-                     
-                      {/* Date (created_at or resolution_date depending on status) */}
                       <td className="py-2 px-4">
                         {bet.status === "open"
                           ? formatDate(bet.created_at)
@@ -473,7 +538,9 @@ export default function Dashboard() {
               </div>
             )}
             {!hasMoreBets && bets.length > 0 && (
-              <div className="text-center text-gray-500 py-4">No more bets to load</div>
+              <div className="text-center text-gray-500 py-4">
+                No more bets to load
+              </div>
             )}
           </section>
         )}
@@ -481,22 +548,24 @@ export default function Dashboard() {
         {/* PREDICTIONS SECTION */}
         {activeTab === "predictions" && (
           <section className="rounded-lg overflow-x-auto mb-8">
-            {/* <h1 className="text-xl font-bold mb-6">Active Predictions</h1> */}
-
             {isLoadingPredictions && predictions.length === 0 && (
               <div className="flex justify-center items-center py-8">
                 <Spinner size="lg" />
               </div>
             )}
             {!isLoadingPredictions && predictions.length === 0 && (
-              <div className="text-center text-gray-500 py-8 container">No predictions found</div>
+              <div className="text-center text-gray-500 py-8 container">
+                No predictions found
+              </div>
             )}
 
-            {/* Stats Row */}
+            {/* Stats Row (original) */}
             {predictions.length > 0 && (
               <div className="grid gap-6 md:grid-cols-3 mb-6">
                 <Card className=" text-white bg-content0">
-                  <CardHeader className="text-sm font-medium">Total Active Predictions</CardHeader>
+                  <CardHeader className="text-sm font-medium">
+                    Total Active Predictions
+                  </CardHeader>
                   <CardBody>
                     <p className="text-2xl font-bold">
                       {predictions.filter((p) => p.status === "open").length}
@@ -504,7 +573,9 @@ export default function Dashboard() {
                   </CardBody>
                 </Card>
                 <Card className=" text-white bg-content0">
-                  <CardHeader className="text-sm font-medium">Total Bets Placed</CardHeader>
+                  <CardHeader className="text-sm font-medium">
+                    Total Bets Placed
+                  </CardHeader>
                   <CardBody>
                     <p className="text-2xl font-bold">
                       {predictions.reduce((acc, curr) => acc + curr.bets_count, 0)}
@@ -516,7 +587,9 @@ export default function Dashboard() {
                   <CardBody>
                     <p className="text-2xl font-bold">
                       {(
-                        (predictions.filter((p) => p.outcome === p.creator_choice).length /
+                        (predictions.filter(
+                          (p) => p.outcome === p.creator_choice
+                        ).length /
                           predictions.length) *
                         100
                       ).toFixed(2)}
@@ -531,17 +604,6 @@ export default function Dashboard() {
             {displayedPredictions.length > 0 && (
               <section className="rounded-lg overflow-x-auto">
                 <table className="w-full text-sm text-left">
-                  {/* <thead>
-                    <tr className="text-left text-white">
-                      <th className="py-2 px-0">Image</th>
-                      <th className="py-2 px-4">Description</th>
-                      <th className="py-2 px-4">Source</th>
-
-                      <th className="py-2 px-4">Resolves</th>
-                      <th className="py-2 px-4">Bets</th>
-                      <th className="py-2 px-4">Status</th>
-                    </tr>
-                  </thead> */}
                   <tbody>
                     {displayedPredictions.map((prediction, index) => (
                       <tr
@@ -549,36 +611,40 @@ export default function Dashboard() {
                         className="cursor-pointer hover:bg-content0"
                         onClick={() => router.push(`/predictions/${prediction.id}`)}
                       >
-                        <td className="py-2 px-4">
+                        <td className="py-2 px-0">
                           {prediction.str_thumb && (
                             <Image
                               src={prediction.str_thumb}
                               alt={prediction.description}
-                              width={40}
-                              height={40}
-                              className="w-[40px] h-[40px] min-w-[40px] min-h-[40px] rounded-full"
+                              width={32}
+                              height={32}
+                              className="w-[32px] h-[32px] min-w-[32px] min-h-[32px] rounded-full"
                             />
                           )}
                         </td>
-                        <td className="py-2 px-4 break-words ">{prediction.description}</td>
-                        {/* <td className="py-2 px-4">{prediction.source}</td> */}
-                        {/* <td className="py-2 px-4">
-                          {prediction.predicted_outcome || prediction.creator_choice}
+                        <td className="py-2 px-4 break-words ">
+                          {prediction.description}
                         </td>
-                        <td className="py-2 px-4">{prediction.bet_amount}</td> */}
-                        <td className="py-2 px-4">{formatDate(prediction.resolution_date)}</td>
+                        <td className="py-2 px-4">
+                          {formatDate(prediction.resolution_date)}
+                        </td>
                         <td className="py-2 px-4">{prediction.bets_count}</td>
                         <td className="py-2 px-4">
                           <Chip
-                            color={prediction.status === "open" ? "primary" : "secondary"}
+                            color={
+                              prediction.status === "open"
+                                ? "primary"
+                                : "secondary"
+                            }
                             variant="flat"
                             size="sm"
                           >
                             {prediction.status === "open"
                               ? "Open"
-                              : prediction.outcome === prediction.creator_choice
-                                ? "Win"
-                                : "Loss"}
+                              : prediction.outcome ===
+                                prediction.creator_choice
+                              ? "Win"
+                              : "Loss"}
                           </Chip>
                         </td>
                       </tr>
@@ -590,7 +656,9 @@ export default function Dashboard() {
 
             {/* Sentinel */}
             <div id="sentinel" className="flex justify-center p-4">
-              {hasMorePredictions && displayedPredictions.length > 0 && <Spinner size="sm" />}
+              {hasMorePredictions && displayedPredictions.length > 0 && (
+                <Spinner size="sm" />
+              )}
               {!hasMorePredictions && predictions.length > 0 && (
                 <p className="text-gray-500">No more predictions to load</p>
               )}
