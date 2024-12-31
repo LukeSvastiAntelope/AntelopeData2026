@@ -48,8 +48,8 @@ interface IBet {
   bet_id: number;
 }
 
-const ITEMS_PER_PAGE_BETS = 10;
-const ITEMS_PER_PAGE_PREDICTIONS = 15;
+const ITEMS_PER_PAGE_BETS = 50;
+const ITEMS_PER_PAGE_PREDICTIONS = 50;
 
 // Simple fallback date formatter
 const formatDate = (dateStr: string): string => {
@@ -421,7 +421,7 @@ export default function Dashboard() {
               <div className="text-center text-gray-500 py-8">No bets found</div>
             )}
 
-{bets.length > 0 && (
+            {bets.length > 0 && (
               <div className="grid gap-6 md:grid-cols-3 mb-6">
                 <Card className="text-white bg-content0">
                   <CardHeader className="text-sm font-medium">
