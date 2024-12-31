@@ -82,6 +82,7 @@ export class AutomaticBettingAgent {
                 await Promise.all(
                     categoryPredictions.map(async p => {
                         const { shouldBet, reasoning } = await this.isInterestingPredictionWithAI(p);
+                        console.log("reasoning", shouldBet, reasoning);
                         p.betReason = reasoning ? [{ step: "interesting", reasoning: reasoning }] : [];
                         return { prediction: p, shouldBet };
                     })
@@ -134,26 +135,34 @@ export class AutomaticBettingAgent {
     }
 
     private async isInterestingPredictionWithAI(prediction: Prediction): Promise<{ shouldBet: boolean; reasoning: string | null }> {
-        const description = prediction.description.toLowerCase();
         const prompt = `
-        Given these specific interests:
-        ${this.agent.interests.map(interest => interest.toLowerCase()).join(', ')}
+        Evaluate if there's ANY potential connection between this prediction and the agent's interests.
+        Even slight or indirect relationships should be considered interesting.
+
+        Agent's Interests: ${this.agent.interests.map(interest => interest.toLowerCase()).join(', ')}
+        Prediction: ${prediction.description}
+
+        Consider:
+        1. Direct matches with interests
+        2. Indirect relationships or implications
+        3. Related industries or topics
+        4. Potential impact on areas of interest
         
-        Analyze if this prediction would be interesting:
-        ${description}
-        
-        Rules for determining interest:
-        1. For sports matches, ONLY consider them interesting if they involve specific teams, players, or competitions mentioned in the interests
-        2. Generic sports matches without connection to the interests should be marked as NOT interesting
-        3. For non-sports predictions, evaluate based on topic relevance to interests
-        
-        Start your response with either "YES:" or "NO:" followed by your reasoning.
+        Return "YES:" if there's ANY reasonable connection, even if minor.
+        Return "NO:" only if absolutely no relationship exists.
+        Follow with a brief explanation.
         `;
         
         const response = await this.openai.chat.completions.create({
             model: "gpt-4o",
-            messages: [{ role: "user", content: prompt }],
-            temperature: 0.3
+            messages: [
+                {
+                    role: "system",
+                    content: "You are an inclusive analyst who looks for any possible connections between topics. Err on the side of finding relationships rather than dismissing them."
+                },
+                { role: "user", content: prompt }
+            ],
+            temperature: 0.4  // Slightly higher temperature to allow for more creative connections
         });
 
         const content = response.choices[0].message.content || '';
@@ -162,7 +171,7 @@ export class AutomaticBettingAgent {
 
         return {
             shouldBet,
-            reasoning
+            reasoning: reasoning || null
         };
     }
 
