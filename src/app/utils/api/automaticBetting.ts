@@ -136,21 +136,20 @@ export class AutomaticBettingAgent {
 
     private async isInterestingPredictionWithAI(prediction: Prediction): Promise<{ shouldBet: boolean; reasoning: string | null }> {
         const prompt = `
-        Evaluate if there's ANY potential connection between this prediction and the agent's interests.
-        Even slight or indirect relationships should be considered interesting.
+        Analyze the prediction's relevance to the agent's interests:
 
-        Agent's Interests: ${this.agent.interests.map(interest => interest.toLowerCase()).join(', ')}
-        Prediction: ${prediction.description}
+        AGENT INTERESTS: ${this.agent.interests.map(interest => interest.toLowerCase()).join(', ')}
+        AGENT CATEGORY: ${this.agent.category}
+        PREDICTION: ${prediction.description}
 
-        Consider:
-        1. Direct matches with interests
-        2. Indirect relationships or implications
-        3. Related industries or topics
-        4. Potential impact on areas of interest
-        
-        Return "YES:" if there's ANY reasonable connection, even if minor.
-        Return "NO:" only if absolutely no relationship exists.
-        Follow with a brief explanation.
+        Rules:
+        - For sports predictions, only consider if they match agent's category
+        - Consider both direct matches and indirect connections
+        - Include related industries, topics, and potential impacts
+        - ANY reasonable connection warrants a positive response
+
+        Required format:
+        [YES/NO]: [1-2 sentence explanation]
         `;
         
         const response = await this.openai.chat.completions.create({
@@ -542,64 +541,6 @@ export class AutomaticBettingAgent {
         });
 
         return response.data[0].embedding;
-    }
-
-    private async analyzeWithGPT(
-        prediction: Prediction,
-        news: NewsItem[],
-        similarPredictions: PineconePredictionMatch[]
-    ): Promise<{
-        shouldBet: boolean;
-        recommendedChoice: 'Yes' | 'No';
-        confidence: number;
-        reasoning: string;
-        riskAssessment: string;
-    }> {
-        const prompt = `
-        Analyze this prediction based on available data:
-        
-        Prediction: ${prediction.description}
-        Creator's Choice: ${prediction.creator_choice}
-        Bet Amount: ${prediction.bet_amount}
-        
-        Recent News:
-        ${news.map(n => `- ${n.title}: ${n.snippet}`).join('\n')}
-        
-        Similar Past Predictions:
-        ${similarPredictions.map(p =>
-            `- ${p.metadata?.description} (Result: ${p.metadata?.result})`
-        ).join('\n')}
-        
-        Agent's Principles:
-        ${this.agent.principles.map(p =>
-            `- ${p.title}: ${p.description}`
-        ).join('\n')}
-        
-        Provide analysis in this JSON format:
-        {
-            "shouldBet": boolean,
-            "recommendedChoice": "Yes" or "No",
-            "confidence": number (0-1),
-            "reasoning": "string",
-            "riskAssessment": "string"
-        }`;
-
-        const completion = await this.openai.chat.completions.create({
-            model: "gpt-4o",
-            messages: [
-                {
-                    role: "system",
-                    content: "You are an AI specialized in analyzing predictions and making betting decisions."
-                },
-                {
-                    role: "user",
-                    content: prompt
-                }
-            ],
-            temperature: 0.3
-        });
-
-        return JSON.parse(completion.choices[0].message.content!);
     }
 
     private calculateBetAmount(confidence: number): number {
