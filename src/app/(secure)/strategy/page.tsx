@@ -317,32 +317,45 @@ export default function StrategyPage() {
       </div> */}
 
       {/* Main Content Area */}
-      <div className="flex-1 ml-0 md:ml-64 container mt-14 md:mt-0  mx-auto px-4 py-6 md:px-8 md:py-8 min-w-full md:min-w-[800px] max-w-full md:max-w-[800px]">
+      <main className="flex-1 ml-0 md:ml-64 container mt-14 md:mt-0  mx-auto px-4 py-6 md:px-8 md:py-8 min-w-full md:min-w-[800px] max-w-full md:max-w-[800px]">
         {/* Header */}
-        <div className="text-white py-8 flex justify-between items-center px-2 rounded-b-2xl flex-row">
-          {/* <Image
-            src={agent?.image || "/assets/images/default-agent.png"}
-            alt="Strategy Image"
-            className="w-[100px] h-[100px] rounded-full"
-            width={100}
-            height={100}
-          /> */}
-          <div className="container mx-auto px-4">
+        <div className="flex flex-row justify-between h-32">
+          
+          <div className="pr-8 pt-2">
+              <h1 className="font-bold mb-2 ">
+                Strategy
+              </h1>
+              <p className="text-gray-500">
+                Refine the core principles of your betting approach, manage risk levels, and set preferred categories and timelines. 
+              </p>
+              
+          </div>
+          
+          <div className="mx-auto px-4">
             {/* <h1 className="text-3xl font-bold">My Strategy</h1>
             <p className="mt-2 opacity-80">
               {agent?.description || "Refine your personal betting approach"}
             </p> */}
-            <Button
+    
+            <div className="map"></div>
+          </div>
+          
+          
+
+        </div>
+        <div className="flex flex-row justify-between bg-content0 p-2 my-8 rounded-lg items-center">
+
+            <div className="text-sm font-bold pl-4 strategy-holder">Adjust your strategy to fit your needs</div>
+
+          <Button
               color="default"
               variant="flat"
-              className="mt-4"
+              className=""
               href="/editProfile"
               as="a"
             >
               Edit Strategy
-            </Button>
-          </div>
-        </div>
+            </Button></div>
 
         {/* Stats Overview */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8 text-small">
@@ -460,7 +473,7 @@ export default function StrategyPage() {
             </div>
           </CardBody>
         </Card>
-      </div>
+      </main>
     </div>
   );
 }

@@ -177,6 +177,28 @@ max-width: 80px;
   min-height: 120px;
 }
 
+.map {
+  background-image: url('/assets/images/map.svg');
+  background-size: 120px 120px;
+  background-repeat: no-repeat;
+  background-position: center;
+  width: 120px;
+  height: 120px;
+  min-width: 120px;
+  min-height: 120px;
+}
+
+.strategy-holder::before {
+  content: '';
+  background-image: url('/assets/images/strategy_color.svg');
+  background-size: 16px 16px;
+  background-repeat: no-repeat;
+  background-position: center;
+  padding-right: 32px;
+  min-width: 16px;
+  min-height: 160px;
+}
+
 .icon-markets-active {
   background-image: url('/assets/images/markets_on.svg');
   background-size: 20px 20px;

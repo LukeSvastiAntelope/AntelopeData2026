@@ -492,7 +492,7 @@ export default function Dashboard() {
                         )}
                       </td>
                       {/* Description */}
-                      <td className=" px-4 break-words w-full">
+                      <td className=" px-2 break-words w-full">
                         {bet.description}
                       </td>
                       <td className=" px-4">

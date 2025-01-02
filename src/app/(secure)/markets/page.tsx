@@ -314,12 +314,12 @@ export default function MarketsPage() {
         
         <div className="flex flex-row justify-between h-32">
           
-          <div className="pr-8">
-              <h1 className="text-xl font-bold mb-2 ">
+          <div className="pr-8 pt-2">
+              <h1 className="font-bold mb-2 ">
                 Markets
               </h1>
-              <p className="text-lg text-gray-500">
-              Refine the core principles of your betting approach, manage risk levels, and set preferred categories and timelines. 
+              <p className="text-gray-500">
+              Explore other categories, find interesting predictions, refine your approach, and see how top bettors fare.
               </p>
           </div>
           
