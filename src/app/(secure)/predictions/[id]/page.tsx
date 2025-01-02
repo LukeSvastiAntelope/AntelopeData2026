@@ -14,36 +14,62 @@ import { format as formatDateFn } from "date-fns";
 
 interface IAgentProfile {
     image?: string;
+    name?: string;
     // add any other fields you need from /api/getAgentProfile
 }
 
 export default function PredictionDetail() {
-    const [prediction, setPrediction] = useState<PredictionDB | null>(null);
-    const [isLoading, setIsLoading] = useState(true);
     const params = useParams();
     const fetchData = useFetch();
     const router = useRouter();
-    const [agent,] = useState<IAgentProfile | null>(null);
 
-    useEffect(() => {
+    // Local state
+    const [prediction, setPrediction] = useState<PredictionDB | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
+    const [agent, setAgent] = useState<IAgentProfile | null>(null);
+    const [agentBalance, setAgentBalance] = useState(0);
 
-        const fetchPredictionDetail = async () => {
-            try {
-                const response = await fetchData.get(`/api/getPrediction/${params.id}`);
-                if (response.status) {
-                    setPrediction(response.prediction);
-                } else {
-                    toast.error(response.message);
-                }
-            } catch (error) {
-                toast.error("Failed to fetch prediction details: " + error);
-            } finally {
-                setIsLoading(false);
+    // fetchAgentProfile
+    const fetchAgentProfile = async () => {
+        try {
+          const response = await fetchData.get("/api/getAgentProfile");
+          if (response.status) {
+            setAgent(response.agent);
+            setAgentBalance(response.agent.wallet_balance ?? 0);
+          } else {
+            toast.error(response.message);
+          }
+        } catch (error) {
+          console.error("Failed to fetch agent profile:", error);
+          toast.error("Failed to fetch agent profile");
+        }
+      };
+
+   
+  // Call both fetches
+  const fetchPredictionDetails = async (id: string) => {
+        try {
+            const response = await fetchData.get(`/api/getPrediction/${params.id}`);
+            if (response.status) {
+                setPrediction(response.prediction);
+            } else {
+                toast.error(response.message);
             }
-        };
+        } catch (error) {
+            toast.error("Failed to fetch prediction details: " + error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
-        fetchPredictionDetail();
-    }, [params.id]);
+    // Call both fetches
+    useEffect(() => {
+        if (params.id) {
+          fetchAgentProfile();
+          fetchPredictionDetails(params.id);
+        }
+      }, [params.id]);
+
 
     if (isLoading) {
         return (
@@ -83,20 +109,21 @@ export default function PredictionDetail() {
 
                         </div>
                         {/* Profile Photo */}
-                        <Link href="/profile" className="md:flex items-center gap-2 mb-4 hidden">
-                            <Image
-                                src={agent?.image || "/assets/images/logo-simple.svg"}
-                                alt="Profile"
-                                width={24}
-                                height={24}
-                                className="rounded-full bg-gray-700 mr-2 sm-hidden"
-                            />
-                            {/* Credits */}
-                            <span className="text-sm font-semibold font-kodemono">
-                                <span className="text-gradient">83940</span>
-                            </span>
+                        <Link href="/profile" className="md:flex items-center gap-2 mb-4 hidden p-2 border border-white/10 rounded-lg backbutton">
+              <Image
+                src={agent?.image || "/assets/images/logo-simple.svg"}
+                alt="Profile"
+                width={32}
+                height={32}
+                className="rounded-full bg-gray-700 mr-2 sm-hidden"
+              />
+              {/* Credits */}
+              <div className="flex flex-col">
+              <span className="text-sm font-semibold font-kodemono w-full"> {agent?.name || 'Agent Name'} </span>
+              <span className="text-gradient">{agentBalance?.toLocaleString() || 0}</span>
+              </div>
 
-                        </Link>
+            </Link>
                         <Link
                             href="/dashboard"
                             className="flex items-center gap-2 mb-4 group"

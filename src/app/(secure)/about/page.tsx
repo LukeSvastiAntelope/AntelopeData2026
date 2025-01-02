@@ -9,6 +9,7 @@ import { IAgentProfile } from "@/app/utils/interface";
 
 export default function AboutPage() {
   const [agent, setAgent] = useState<IAgentProfile | null>(null);
+  const [agentBalance, setAgentBalance] = useState(0);
   const fetchData = useFetch();
   
   useEffect(() => {
@@ -17,6 +18,7 @@ export default function AboutPage() {
         const response = await fetchData.get("/api/getAgentProfile");
         if (response.status) {
           setAgent(response.agent);
+          setAgentBalance(response.agent.wallet_balance ?? 0); // capture wallet balance
         } else {
           toast.error(response.message);
         }
@@ -50,18 +52,19 @@ export default function AboutPage() {
              
             </div>
             {/* Profile Photo */}
-            <Link href="/profile" className="md:flex items-center gap-2 mb-4 hidden">
+            <Link href="/profile" className="md:flex items-center gap-2 mb-4 hidden p-2 border border-white/10 rounded-lg backbutton">
               <Image
                 src={agent?.image || "/assets/images/logo-simple.svg"}
                 alt="Profile"
-                width={24}
-                height={24}
+                width={32}
+                height={32}
                 className="rounded-full bg-gray-700 mr-2 sm-hidden"
               />
               {/* Credits */}
-              <span className="text-sm font-semibold font-kodemono">
-                <span className="text-gradient">83940</span>
-              </span>
+              <div className="flex flex-col">
+              <span className="text-sm font-semibold font-kodemono w-full"> {agent?.name || 'Agent Name'} </span>
+              <span className="text-gradient">{agentBalance?.toLocaleString() || 0}</span>
+              </div>
 
             </Link>
           

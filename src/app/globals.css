@@ -140,6 +140,43 @@ max-width: 80px;
   transition: background-image 0.2s ease-in-out;
 }
 
+.image-cut {
+  max-width: fit-content;
+  min-width: fit-content;
+  max-width: -webkit-fill-available;
+  min-width: -webkit-fill-available;
+}
+
+.imagecut img {
+  height: 240px;
+  min-height: 240px;
+  max-width: fit-content;
+  min-width: fit-content;
+  max-width: -webkit-fill-available;
+  min-width: -webkit-fill-available;
+}
+
+.backbutton {
+  transition: background-color 0.1s ease-in-out;
+  vertical-align: top;
+ }
+
+ .backbutton:hover { 
+  background-color: rgba(255 255 255 / 0.05);
+  border-radius: 8px;
+}
+
+.pie-chart {
+  background-image: url('/assets/images/piechart.svg');
+  background-size: 120px 120px;
+  background-repeat: no-repeat;
+  background-position: center;
+  width: 120px;
+  height: 120px;
+  min-width: 120px;
+  min-height: 120px;
+}
+
 .icon-markets-active {
   background-image: url('/assets/images/markets_on.svg');
   background-size: 20px 20px;
@@ -271,9 +308,13 @@ max-width: 80px;
 
 .text-gradient-red {
   background: linear-gradient(223deg, #F88418 15.01%, #F81818 84.75%);
-background-clip: text;
--webkit-background-clip: text;
--webkit-text-fill-color: transparent;
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.border-gradient {
+  border: 1px solid linear-gradient(223deg, #F88418 15.01%, #F81818 84.75%);
 }
 
 .input-search {

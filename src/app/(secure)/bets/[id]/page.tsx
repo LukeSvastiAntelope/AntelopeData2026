@@ -12,6 +12,7 @@ import Link from "next/link";
 
 interface IAgentProfile {
     image?: string;
+    name?: string;
     // add any other fields you need from /api/getAgentProfile
 }
 
@@ -47,13 +48,32 @@ export default function BetDetailPage() {
     const [prediction, setPrediction] = useState<PredictionDB | null>(null);
     const fetch = useFetch();
 
-    const [agent,] = useState<IAgentProfile | null>(null);
+    const [agent, setAgent] = useState<IAgentProfile | null>(null);
+    const [agentBalance, setAgentBalance] = useState(0);
     const [totalYes, setTotalYes] = useState(0);
     const [totalNo, setTotalNo] = useState(0);
 
-    useEffect(() => {
-        fetchBetDetails();
-    }, [params.id]);
+    // useEffect(() => {
+    //     fetchBetDetails();
+    // }, [params.id]);
+
+    const fetchAgentProfile = async () => {
+        try {
+          const response = await fetch.get("/api/getAgentProfile");
+          if (response.status) {
+            setAgent(response.agent);
+            setAgentBalance(response.agent.wallet_balance ?? 0);
+            console.log("agent is going to be set to", response.agent); 
+          } else {
+            toast.error(response.message);
+          }
+          setIsLoading(false);
+        } catch (error) {
+          console.error("Failed to fetch agent profile:", error);
+          toast.error("Unable to fetch agent profile");
+          setIsLoading(false);
+        }
+      };
 
     const fetchBetDetails = async () => {
         try {
@@ -86,6 +106,12 @@ export default function BetDetailPage() {
         }
     };
 
+    useEffect(() => {
+        // Call both in the same effect
+        fetchAgentProfile();
+        fetchBetDetails();
+      }, [params.id]);
+
     if (isLoading) {
         return <div>Loading...</div>;
     }
@@ -116,20 +142,21 @@ export default function BetDetailPage() {
 
                         </div>
                         {/* Profile Photo */}
-                        <Link href="/profile" className="md:flex items-center gap-2 mb-4 hidden">
-                            <Image
-                                src={agent?.image || "/assets/images/logo-simple.svg"}
-                                alt="Profile"
-                                width={24}
-                                height={24}
-                                className="rounded-full bg-gray-700 mr-2 sm-hidden"
-                            />
-                            {/* Credits */}
-                            <span className="text-sm font-semibold font-kodemono">
-                                <span className="text-gradient">83940</span>
-                            </span>
+<Link href="/profile" className="md:flex items-center gap-2 mb-4 hidden p-2 border border-white/10 rounded-lg backbutton">
+              <Image
+                src={agent?.image || "/assets/images/logo-simple.svg"}
+                alt="Profile"
+                width={32}
+                height={32}
+                className="rounded-full bg-gray-700 mr-2 sm-hidden"
+              />
+              {/* Credits */}
+              <div className="flex flex-col">
+              <span className="text-sm font-semibold font-kodemono w-full"> {agent?.name || 'Agent Name'} </span>
+              <span className="text-gradient">{agentBalance?.toLocaleString() || 0}</span>
+              </div>
 
-                        </Link>
+            </Link>
                         <Link
                             href="/markets"
                             className="flex items-center gap-2 mb-4 group"
@@ -196,7 +223,7 @@ export default function BetDetailPage() {
                     color="default"
                     variant="light"
                     onPress={() => router.back()}
-                    className="mb-4 text-small p-0 border-white"
+                    className="mb-4 text-small p-0 bg-backbutton"
                 >
                     ← Back
                 </Button>
@@ -204,11 +231,12 @@ export default function BetDetailPage() {
                 <div>
                     <div className="py-6 px-0 max-w-[800px]">
                         {/* Header Section */}
-                        <div className="flex gap-6 mb-8 flex-col">
+                        <div className="flex gap-6 mb-8 flex-col w-full imagecut">
                             <Image
                                 src={bet.str_thumb}
                                 alt="Event"
-                                className="w-full rounded-xl object-cover"
+                                className="w-full object-cover rounded-xl imagecut"
+                                style={{ maxWidth: "100%" }}
                             />
                             <div>
                                 <h3 className="text-lg font-semibold mb-2">{bet.description}</h3>

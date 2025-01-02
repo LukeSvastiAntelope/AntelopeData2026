@@ -16,6 +16,7 @@ export default function MarketsPage() {
   const [activeTab, setActiveTab] = useState<"predictions" | "sports" | "general" | "leaderboard">("predictions");
   const [searchTerm, setSearchTerm] = useState("");
   const [agent, setAgent] = useState<IAgentProfile | null>(null);
+  const [agentBalance, setAgentBalance] = useState(0);
 
   // Predictions
   const [predictions, setPredictions] = useState<IPrediction[]>([]);
@@ -40,7 +41,7 @@ export default function MarketsPage() {
   const [leaderboardData, setLeaderboardData] = useState<ILeaderboardData[]>([]);
   const [isLoadingLeaderboard, setIsLoadingLeaderboard] = useState<boolean>(false);
 
-  const ITEMS_PER_PAGE_PREDICTIONS = 5;
+  const ITEMS_PER_PAGE_PREDICTIONS = 50;
 
   const router = useRouter();
   const fetch = useFetch();
@@ -52,6 +53,7 @@ export default function MarketsPage() {
         const response = await fetch.get("/api/getAgentProfile");
         if (response.status) {
           setAgent(response.agent);
+          setAgentBalance(response.agent.wallet_balance ?? 0);
         } else {
           toast.error(response.message);
         }
@@ -241,18 +243,19 @@ export default function MarketsPage() {
              
             </div>
             {/* Profile Photo */}
-            <Link href="/profile" className="md:flex items-center gap-2 mb-4 hidden">
+            <Link href="/profile" className="md:flex items-center gap-2 mb-4 hidden p-2 border border-white/10 rounded-lg backbutton">
               <Image
                 src={agent?.image || "/assets/images/logo-simple.svg"}
                 alt="Profile"
-                width={24}
-                height={24}
+                width={32}
+                height={32}
                 className="rounded-full bg-gray-700 mr-2 sm-hidden"
               />
               {/* Credits */}
-              <span className="text-sm font-semibold font-kodemono">
-                <span className="text-gradient">83940</span>
-              </span>
+              <div className="flex flex-col">
+              <span className="text-sm font-semibold font-kodemono w-full"> {agent?.name || 'Agent Name'} </span>
+              <span className="text-gradient">{agentBalance?.toLocaleString() || 0}</span>
+              </div>
 
             </Link>
             <Link
@@ -307,7 +310,22 @@ export default function MarketsPage() {
         </nav>
       </aside>
       {/* Main Content */}
-      <main className="flex-1 ml-0 md:ml-64 container mt-14 md:mt-0  mx-auto px-4 py-6 md:px-8 md:py-8 min-w-full md:min-w-[800px] max-w-full md:max-w-[800px]">
+      <main className="flex-1 ml-0 md:ml-64 container mt-14 md:mt-0  mx-auto py-6 px-4 md:px-8 md:py-8 min-w-full md:min-w-[800px] max-w-full md:max-w-[800px]">
+        
+        <div className="flex flex-row justify-between h-32">
+          
+          <div className="pr-8">
+              <h1 className="text-xl font-bold mb-2 ">
+                Markets
+              </h1>
+              <p className="text-lg text-gray-500">
+              Refine the core principles of your betting approach, manage risk levels, and set preferred categories and timelines. 
+              </p>
+          </div>
+          
+          <div className="pie-chart"></div>
+        </div>
+        
         {/* Tabs */}
         <div className="flex gap-2">
           <button
@@ -387,13 +405,14 @@ export default function MarketsPage() {
                             />
                           )}
                         </td>
-                        <td className="py-2 px-4 break-words">{prediction.description}</td>
-                        <td className="py-2 px-4">{prediction.source}</td>
-                        <td className="py-2 px-4">
+                        <td className="py-2 md-px-4 break-words">{prediction.description}</td>
+                        {/* <td className="py-2 md-px-4">{prediction.source}</td> */}
+                        <span className="hidden md:block">
+                        {/* <td className="py-2 md-px-4">
                           {formatDate(prediction.resolution_date || prediction.created_at, "MM/dd/yyyy")}
-                        </td>
-                        <td className="py-2 px-4">{prediction.bet_amount}</td>
-                        <td className="py-2 px-4">
+                        </td> */}
+                        <td className="py-2 md-px-4">{prediction.bet_amount}</td>
+                        <td className="py-2 md-px-4">
                           <Chip
                             color={
                               prediction.status !== "open"
@@ -412,6 +431,7 @@ export default function MarketsPage() {
                               : prediction.status}
                           </Chip>
                         </td>
+                        </span>
                       </tr>
                     ))}
                   </tbody>

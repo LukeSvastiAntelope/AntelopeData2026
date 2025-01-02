@@ -14,6 +14,7 @@ import { useFetch } from "@/app/utils/lib";
 
 interface IAgentProfile {
   image?: string;
+  name?: string;
   // add any other fields you need from /api/getAgentProfile
 }
 
@@ -83,6 +84,7 @@ export default function Dashboard() {
   const [activeTab, setActiveTab] = useState<"bets" | "predictions">("bets");
   const [searchTerm, setSearchTerm] = useState('');
   const [searchPredictions, setSearchPredictions] = useState('');
+  const [agentBalance, setAgentBalance] = useState(0);
 
   // Agent
   const [agent, setAgent] = useState<IAgentProfile | null>(null);
@@ -110,6 +112,7 @@ export default function Dashboard() {
         const response = await fetch.get("/api/getAgentProfile");
         if (response.status) {
           setAgent(response.agent);
+          setAgentBalance(response.agent.wallet_balance ?? 0);
         } else {
           toast.error(response.message);
         }
@@ -224,12 +227,15 @@ export default function Dashboard() {
   // On first mount
   useEffect(() => {
     fetchBets(1);
+    fetchPredictions();
+    console.log("fetching bets");
   }, []);
 
   // Lazy-fetch predictions
   useEffect(() => {
     if (activeTab === "predictions" && predictions.length === 0) {
       fetchPredictions();
+      console.log("fetching predictions");
     }
   }, [activeTab]);
 
@@ -263,18 +269,19 @@ export default function Dashboard() {
 
             </div>
             {/* Profile Photo */}
-            <Link href="/profile" className="md:flex items-center gap-2 mb-4 hidden">
+            <Link href="/profile" className="md:flex items-center gap-2 mb-4 hidden p-2 border border-white/10 rounded-lg backbutton">
               <Image
                 src={agent?.image || "/assets/images/logo-simple.svg"}
                 alt="Profile"
-                width={24}
-                height={24}
+                width={32}
+                height={32}
                 className="rounded-full bg-gray-700 mr-2 sm-hidden"
               />
               {/* Credits */}
-              <span className="text-sm font-semibold font-kodemono">
-                <span className="text-gradient">83940</span>
-              </span>
+              <div className="flex flex-col">
+              <span className="text-sm font-semibold font-kodemono w-full"> {agent?.name || 'Agent Name'} </span>
+              <span className="text-gradient">{agentBalance?.toLocaleString() || 0}</span>
+              </div>
 
             </Link>
             <Link href="/" className="flex items-center gap-2 mb-4 text-white font-kodemono">
@@ -425,7 +432,7 @@ export default function Dashboard() {
               <div className="grid gap-6 md:grid-cols-3 mb-6">
                 <Card className="text-white bg-content0">
                   <CardHeader className="text-sm font-medium">
-                    Total Active Predictions
+                    Active Predictions
                   </CardHeader>
                   <CardBody>
                     <p className="text-2xl font-bold">
@@ -435,7 +442,7 @@ export default function Dashboard() {
                 </Card>
                 <Card className="text-white bg-content0">
                   <CardHeader className="text-sm font-medium">
-                    Total Bets Placed
+                    Bets Placed
                   </CardHeader>
                   <CardBody>
                     <p className="text-2xl font-bold">
@@ -468,11 +475,12 @@ export default function Dashboard() {
                   {filterBets(bets, searchTerm).map((bet, index) => (
                     <tr
                       key={index}
-                      className="cursor-pointer hover:bg-content0"
+                      className=""
                       onClick={() => router.push(`/bets/${bet.bet_id}`)}
                     >
+                      <div className="cursor-pointer backbutton py-2">
                       {/* Image */}
-                      <td className="py-2 px-4">
+                      <td className=" px-4">
                         {bet.str_thumb && (
                           <Image
                             src={bet.str_thumb}
@@ -484,15 +492,15 @@ export default function Dashboard() {
                         )}
                       </td>
                       {/* Description */}
-                      <td className="py-2 px-4 break-words">
+                      <td className=" px-4 break-words w-full">
                         {bet.description}
                       </td>
-                      <td className="py-2 px-4">
+                      <td className=" px-4">
                         {bet.status === "open"
                           ? formatDate(bet.created_at)
                           : formatDate(bet.resolution_date)}
                       </td>
-                      <td className="py-2 px-4">
+                      <td className=" px-4">
                         <Chip
                           color={
                             bet.status !== "open"
@@ -511,6 +519,7 @@ export default function Dashboard() {
                             : bet.status}
                         </Chip>
                       </td>
+                      </div>
                     </tr>
                   ))}
                 </tbody>
@@ -607,9 +616,10 @@ export default function Dashboard() {
                     {displayedPredictions.map((prediction, index) => (
                       <tr
                         key={index}
-                        className="cursor-pointer hover:bg-content0"
+                        className=""
                         onClick={() => router.push(`/predictions/${prediction.id}`)}
                       >
+                        <div className="cursor-pointer backbutton py-2">
                         <td className="py-2 px-0">
                           {prediction.str_thumb && (
                             <Image
@@ -621,14 +631,14 @@ export default function Dashboard() {
                             />
                           )}
                         </td>
-                        <td className="py-2 px-4 break-words ">
+                        <td className="px-4 break-words w-full">
                           {prediction.description}
                         </td>
-                        <td className="py-2 px-4">
+                        <td className="px-4">
                           {formatDate(prediction.resolution_date)}
                         </td>
-                        <td className="py-2 px-4">{prediction.bets_count}</td>
-                        <td className="py-2 px-4">
+                        <td className="px-4">{prediction.bets_count}</td>
+                        <td className="px-4">
                           <Chip
                             color={
                               prediction.status === "open"
@@ -646,6 +656,7 @@ export default function Dashboard() {
                               : "Loss"}
                           </Chip>
                         </td>
+                        </div>
                       </tr>
                     ))}
                   </tbody>

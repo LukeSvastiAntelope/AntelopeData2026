@@ -227,7 +227,7 @@ const AgentProfile = () => {
                                         content: "text-secondary",
                                     }}
                                 >
-                                    {successRate}% Success Rate
+                                    {successRate.toFixed(2)}% Success Rate
                                 </Chip>
                             </div>
                         </div>
