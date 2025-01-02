@@ -345,7 +345,7 @@ export default function StrategyPage() {
         </div>
         <div className="flex flex-row justify-between bg-content0 p-2 my-8 rounded-lg items-center">
 
-            <div className="text-sm font-bold pl-4 strategy-holder">Adjust your strategy to fit your needs</div>
+            <div className="text-sm font-bold pl-1 strategy-holder">Adjust your strategy to fit your needs</div>
 
           <Button
               color="default"
