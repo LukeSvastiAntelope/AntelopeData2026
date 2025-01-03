@@ -49,7 +49,7 @@ export default function PredictionDetail() {
   // Call both fetches
   const fetchPredictionDetails = async (id: string) => {
         try {
-            const response = await fetchData.get(`/api/getPrediction/${params.id}`);
+            const response = await fetchData.get(`/api/getPrediction/${id}`);
             if (response.status) {
                 setPrediction(response.prediction);
             } else {
@@ -66,7 +66,7 @@ export default function PredictionDetail() {
     useEffect(() => {
         if (params.id) {
           fetchAgentProfile();
-          fetchPredictionDetails(params.id);
+          fetchPredictionDetails(params.id as string);
         }
       }, [params.id]);
 
