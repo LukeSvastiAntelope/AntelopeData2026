@@ -93,31 +93,31 @@ export default function PredictionDetail() {
         <div className="flex text-white">
             {/* Sidebar (similar to bets/[id]/page.tsx) */}
             <aside className="md:w-64 md:flex-col md:left-auto left-0 fixed top-0 text-sm w-full">
-                <nav className="flex flex-row md:flex-col gap-4 text-normal justify-evenly py-8 px-4 ">
-                    <div className="flex flex-row md:flex-col justify-evenly w-full">
-                        <div className="flex items-center mb-4">
-                            {/* Large logo for md+ screens */}
-                            <span className="hidden md:inline-block">
-                                <Image
-                                    src={"/assets/images/logo-text.svg"}
-                                    alt="Dashboard Logo"
-                                    width={160}
-                                    height={40}
-                                    className="mr-2 w-100"
-                                />
-                            </span>
+        <nav className="flex flex-row md:flex-col gap-4 text-normal justify-evenly py-8 px-4 ">
+          <div className="flex flex-row md:flex-col justify-evenly w-full md:gap-4">
+            <div className="flex hidden md:inline-block items-center ">
+              {/* Large logo for md+ screens */}
+              <span className="hidden md:inline-block hidden">
+                <Image
+                  src={"/assets/images/logo-text.svg"}
+                  alt="Dashboard Logo"
+                  width={160}
+                  height={40}
+                  className="mr-2 w-100"
+                />
+              </span>
 
-                            {/* Smaller logo for mobile screens */}
-
-                        </div>
-                        {/* Profile Photo */}
-                        <Link href="/profile" className="md:flex items-center gap-2 mb-4 hidden p-2 border border-white/10 profile-border ">
+              {/* Smaller logo for mobile screens */}
+             
+            </div>
+            {/* Profile Photo */}
+            <Link href="/profile" className="md:flex items-center p-2 border border-white/10 profile-border hidden gap-2 mb-2  ">
               <Image
                 src={agent?.image || "/assets/images/logo-simple.svg"}
                 alt="Profile"
                 width={32}
                 height={32}
-                className="rounded-full bg-gray-700 mr-2 sm-hidden"
+                className="rounded-full bg-gray-700  sm-hidden"
               />
               {/* Credits */}
               <div className="flex flex-col">
@@ -126,64 +126,65 @@ export default function PredictionDetail() {
               </div>
 
             </Link>
-                        <Link
-                            href="/dashboard"
-                            className="flex items-center gap-2 mb-4 group"
-                        >
-                            {/* default icon */}
-                            <span className="icon-dashboard mr-2 block group-hover:hidden " />
-                            {/* hover icon */}
-                            <span className="icon-dashboard-active mr-2 hidden group-hover:block" />
-                            <span className="text-default-400 group-hover:text-white font-kodemono"><span className="hidden md:inline-block">Dashboard</span></span>
-                        </Link>
-                        <Link
-                            href="/markets"
-                            className="flex items-center gap-2 mb-4 group"
-                        >
-                            {/* default icon */}
-                            <span className="icon-markets mr-2 block group-hover:hidden " />
-                            {/* hover icon */}
-                            <span className="icon-markets-active mr-2 hidden group-hover:block" />
-                            <span className="text-default-400 group-hover:text-white font-kodemono"><span className="hidden md:inline-block">Markets</span></span>
-                        </Link>
+            <Link
+              href="/dashboard"
+              className="flex items-center group md:gap-2"
+            >
+              <span className="icon-dashboard md:gap-2  block group-hover:hidden" />
+              <span className="icon-dashboard-active  hidden sm:enlarge-icon group-hover:block" />
+              <span className="text-default-400 group-hover:text-white font-kodemono "><span className="hidden md:inline-block">Dashboard</span>
+              </span>
+            </Link>
 
-                        <Link href="/strategy" className="flex items-center gap-2 mb-4 group text-default-400">
-                            {/* default icon */}
-                            <span className="icon-strategy mr-2 block group-hover:hidden" />
-                            {/* hover icon */}
-                            <span className="icon-strategy-active mr-2 hidden sm:enlarge-icon group-hover:block" />
-                            <span className="text-default-400 group-hover:text-white font-kodemono"><span className="hidden md:inline-block">Strategy</span></span>
-                        </Link>
-                    </div>
+            <Link
+              href="/markets"
+              className="flex items-center group md:gap-2"
+            >
+              {/* default icon */}
+              <span className="icon-markets block group-hover:hidden " />
+              {/* hover icon */}
+              <span className="icon-markets-active  hidden group-hover:block" />
+              <span className="text-default-400 group-hover:text-white font-kodemono"><span className="hidden md:inline-block">Markets</span></span>
+            </Link>
 
-                    <div className="md:hidden min-w-40px min-h-40px max-w-40px max-h-40px center-logo">
-                    </div>
+            <Link href="/strategy" className="flex items-center md:gap-2 group text-default-400">
+              {/* default icon */}
+              <span className="icon-strategy block group-hover:hidden" />
+              {/* hover icon */}
+              <span className="icon-strategy-active  hidden sm:enlarge-icon group-hover:block" />
+              <span className="text-default-400 group-hover:text-white font-kodemono"><span className="hidden md:inline-block">Strategy</span></span>
+            </Link>
 
-                    <div className="flex flex-row md:flex-col justify-evenly w-full">
-                        <Link href="/about" className="flex items-center gap-2 mb-4 text-default-400 group">
-                            {/* default icon */}
-                            <span className="icon-about mr-2 block group-hover:hidden" />
-                            {/* hover icon */}
-                            <span className="icon-about-active mr-2 hidden group-hover:block" />
-                            <span className="text-default-400 group-hover:text-white font-kodemono"><span className="hidden md:inline-block">About</span></span>
-                        </Link>
-                        <Link href="https://discord.gg/dSEV8YCDQ2" className="flex items-center gap-2 mb-4 text-default-400 group">
-                            {/* default icon */}
-                            <span className="icon-support mr-2 block group-hover:hidden" />
-                            {/* hover icon */}
-                            <span className="icon-support-active mr-2 hidden group-hover:block" />
-                            <span className="text-default-400 group-hover:text-white font-kodemono"><span className="hidden md:inline-block">Community</span></span>
-                        </Link>
-                        <Link href="/logout" className="flex items-center gap-2 mb-4 text-default-400 group">
-                            {/* default icon */}
-                            <span className="icon-logout mr-2 block group-hover:hidden" />
-                            {/* hover icon */}
-                            <span className="icon-logout-active mr-2 hidden group-hover:block" />
-                            <span className="text-default-400 group-hover:text-white font-kodemono"><span className="hidden md:inline-block">Log out</span></span>
-                        </Link>
-                    </div>
-                </nav>
-            </aside>
+          </div>
+
+                  <div className="md:hidden min-w-40px min-h-40px max-w-40px max-h-40px center-logo">
+                  </div>
+
+                  <div className="flex flex-row md:flex-col justify-evenly w-full md:gap-4">
+            <Link href="/about" className="flex items-center md:gap-2 text-default-400 group">
+              {/* default icon */}
+              <span className="icon-about  block group-hover:hidden" />
+              {/* hover icon */}
+              <span className="icon-about-active hidden group-hover:block" />
+              <span className="text-default-400 group-hover:text-white font-kodemono"><span className="hidden md:inline-block">About</span></span>
+            </Link>
+            <Link href="https://discord.gg/dSEV8YCDQ2" className="flex items-center md:gap-2 text-default-400 group">
+              {/* default icon */}
+              <span className="icon-support  block group-hover:hidden" />
+              {/* hover icon */}
+              <span className="icon-support-active  hidden group-hover:block" />
+              <span className="text-default-400 group-hover:text-white font-kodemono"><span className="hidden md:inline-block">Community</span></span>
+            </Link>
+            <Link href="/logout" className="flex items-center md:gap-2 text-default-400 group">
+              {/* default icon */}
+              <span className="icon-logout  block group-hover:hidden" />
+              {/* hover icon */}
+              <span className="icon-logout-active hidden group-hover:block" />
+              <span className="text-default-400 group-hover:text-white font-kodemono"><span className="hidden md:inline-block">Log out</span></span>
+            </Link>
+          </div>
+        </nav>
+      </aside>
 
             {/* Main Content Area (mirror bets detail style) */}
             <main className="flex-1 ml-0 md:ml-64 container mt-14 md:mt-0  mx-auto px-4 py-6 md:px-8 md:py-8 min-w-full md:min-w-[800px] max-w-full md:max-w-[800px]">

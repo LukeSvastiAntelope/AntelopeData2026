@@ -178,7 +178,7 @@ max-width: 80px;
 }
 
 .h1paragraph {
-  width: 75%;
+  width: 100%;
 }
 
 .subtlebackground {
@@ -198,13 +198,13 @@ max-width: 80px;
 
 .map {
   background-image: url('/assets/images/map.svg');
-  background-size: 120px 120px;
+  background-size: 100px 100px;
   background-repeat: no-repeat;
   background-position: center;
-  width: 120px;
-  height: 120px;
-  min-width: 120px;
-  min-height: 120px;
+  width: 100px;
+  height: 100px;
+  min-width: 100px;
+  min-height: 100px;
 }
 
 .strategy-holder::before {
@@ -425,4 +425,9 @@ tbody {
    height: 100vh;
     justify-content: space-between!important;
   }
+
+  .h1paragraph {
+    width: 75%;
+  }
+
 }
