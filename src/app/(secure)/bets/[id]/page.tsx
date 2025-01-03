@@ -59,21 +59,21 @@ export default function BetDetailPage() {
 
     const fetchAgentProfile = async () => {
         try {
-          const response = await fetch.get("/api/getAgentProfile");
-          if (response.status) {
-            setAgent(response.agent);
-            setAgentBalance(response.agent.wallet_balance ?? 0);
-            console.log("agent is going to be set to", response.agent); 
-          } else {
-            toast.error(response.message);
-          }
-          setIsLoading(false);
+            const response = await fetch.get("/api/getAgentProfile");
+            if (response.status) {
+                setAgent(response.agent);
+                setAgentBalance(response.agent.wallet_balance ?? 0);
+                console.log("agent is going to be set to", response.agent);
+            } else {
+                toast.error(response.message);
+            }
+            setIsLoading(false);
         } catch (error) {
-          console.error("Failed to fetch agent profile:", error);
-          toast.error("Unable to fetch agent profile");
-          setIsLoading(false);
+            console.error("Failed to fetch agent profile:", error);
+            toast.error("Unable to fetch agent profile");
+            setIsLoading(false);
         }
-      };
+    };
 
     const fetchBetDetails = async () => {
         try {
@@ -110,7 +110,7 @@ export default function BetDetailPage() {
         // Call both in the same effect
         fetchAgentProfile();
         fetchBetDetails();
-      }, [params.id]);
+    }, [params.id]);
 
     if (isLoading) {
         return <div>Loading...</div>;
@@ -142,21 +142,21 @@ export default function BetDetailPage() {
 
                         </div>
                         {/* Profile Photo */}
-<Link href="/profile" className="md:flex items-center gap-2 mb-4 hidden p-2 border border-white/10 rounded-lg backbutton">
-              <Image
-                src={agent?.image || "/assets/images/logo-simple.svg"}
-                alt="Profile"
-                width={32}
-                height={32}
-                className="rounded-full bg-gray-700 mr-2 sm-hidden"
-              />
-              {/* Credits */}
-              <div className="flex flex-col">
-              <span className="text-sm font-semibold font-kodemono w-full"> {agent?.name || 'Agent Name'} </span>
-              <span className="text-gradient">{agentBalance?.toLocaleString() || 0}</span>
-              </div>
+                        <Link href="/profile" className="md:flex items-center gap-2 mb-4 hidden p-2 border border-white/10 rounded-lg backbutton">
+                            <Image
+                                src={agent?.image || "/assets/images/logo-simple.svg"}
+                                alt="Profile"
+                                width={32}
+                                height={32}
+                                className="rounded-full bg-gray-700 mr-2 sm-hidden"
+                            />
+                            {/* Credits */}
+                            <div className="flex flex-col">
+                                <span className="text-sm font-semibold font-kodemono w-full"> {agent?.name || 'Agent Name'} </span>
+                                <span className="text-gradient">{agentBalance?.toLocaleString() || 0}</span>
+                            </div>
 
-            </Link>
+                        </Link>
                         <Link
                             href="/markets"
                             className="flex items-center gap-2 mb-4 group"
@@ -316,8 +316,8 @@ export default function BetDetailPage() {
                                                                     </h3>
                                                                     <div className="space-y-4">
                                                                         {JSON.parse(value as string).map((log: AnalysisLog, index: number) => (
-                                                                            <div 
-                                                                                key={`${log.step}-${index}`} 
+                                                                            <div
+                                                                                key={`${log.step}-${index}`}
                                                                                 className="bg-default-100 rounded-lg p-4 border border-default-200"
                                                                             >
                                                                                 <div className="flex items-center gap-2 mb-2">
