@@ -224,7 +224,7 @@ export default function StrategyPage() {
              
             </div>
             {/* Profile Photo */}
-            <Link href="/profile" className="md:flex items-center gap-2 mb-4 hidden p-2 border border-white/10 rounded-lg backbutton">
+            <Link href="/profile" className="md:flex items-center gap-2 mb-4 hidden p-2 border border-white/10 profile-border ">
               <Image
                 src={agent?.image || "/assets/images/logo-simple.svg"}
                 alt="Profile"
@@ -325,7 +325,7 @@ export default function StrategyPage() {
               <h1 className="font-bold mb-2 ">
                 Strategy
               </h1>
-              <p className="text-gray-500">
+              <p className="text-gray-500 h1paragraph">
                 Refine the core principles of your betting approach, manage risk levels, and set preferred categories and timelines. 
               </p>
               

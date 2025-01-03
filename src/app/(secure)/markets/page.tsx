@@ -14,7 +14,9 @@ import { formatDate } from "date-fns";
 
 export default function MarketsPage() {
   const [activeTab, setActiveTab] = useState<"predictions" | "sports" | "general" | "leaderboard">("predictions");
-  const [searchTerm, setSearchTerm] = useState("");
+  const [searchPredictions, setSearchPredictions] = useState("");
+  const [searchSports, setSearchSports] = useState("");
+  const [searchGeneral, setSearchGeneral] = useState("");
   const [agent, setAgent] = useState<IAgentProfile | null>(null);
   const [agentBalance, setAgentBalance] = useState(0);
 
@@ -165,8 +167,19 @@ export default function MarketsPage() {
   }, []);
 
   // Handle search
-  const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchTerm(event.target.value);
+  const handlePredictionSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchPredictions(e.target.value);
+    setPagePredictions(1); // reset pagination or infinite scroll
+  };
+
+  const handleSportsSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchSports(e.target.value);
+    setPageSports(1);
+  };
+
+  const handleGeneralSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchGeneral(e.target.value);
+    setPageGeneral(1);
   };
 
   const loadMoreSports = () => {
@@ -243,7 +256,7 @@ export default function MarketsPage() {
              
             </div>
             {/* Profile Photo */}
-            <Link href="/profile" className="md:flex items-center gap-2 mb-4 hidden p-2 border border-white/10 rounded-lg backbutton">
+            <Link href="/profile" className="md:flex items-center gap-2 mb-4 hidden p-2 border border-white/10 profile-border ">
               <Image
                 src={agent?.image || "/assets/images/logo-simple.svg"}
                 alt="Profile"
@@ -315,10 +328,10 @@ export default function MarketsPage() {
         <div className="flex flex-row justify-between h-32">
           
           <div className="pr-8 pt-2">
-              <h1 className="font-bold mb-2 ">
+              <h1 className="font-bold mb-2 font-kodemono ">
                 Markets
               </h1>
-              <p className="text-gray-500">
+              <p className="text-gray-500 h1paragraph">
               Explore other categories, find interesting predictions, refine your approach, and see how top bettors fare.
               </p>
           </div>
@@ -327,7 +340,7 @@ export default function MarketsPage() {
         </div>
         
         {/* Tabs */}
-        <div className="flex gap-2">
+        <div className="flex gap-2 font-kodemono text-small">
           <button
             onClick={() => setActiveTab("predictions")}
             className={`px-1 py-2 hover:text-white ${
@@ -362,28 +375,107 @@ export default function MarketsPage() {
           </button>
         </div>
 
-        {/* Search Field */}
-        <div className="my-4">
-          <input
-            type="text"
-            value={searchTerm}
-            onChange={handleSearchChange}
-            placeholder="Search..."
-            className="w-full p-2 rounded-md focus:outline-none text-small active:outline-none input-search"
-          />
-        </div>
+        {/* Search Field for Predictions */}
+        {activeTab === "predictions" && (
+          <div className="my-4 relative">
+            <span className="absolute inset-y-0 left-0 flex items-center pl-2 pointer-events-none">
+              {/* Search Icon */}
+              <svg
+                aria-hidden="true"
+                className="w-5 h-5 text-gray-700"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                viewBox="0 0 24 24"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <circle cx="10" cy="10" r="7"></circle>
+                <path d="M21 21l-4.35-4.35"></path>
+              </svg>
+            </span>
+            <input
+              type="text"
+              value={searchPredictions}
+              onChange={handlePredictionSearch}
+              placeholder="Search predictions..."
+              className="w-full p-2 pl-9 rounded-md text-gray-700 focus:outline-none text-small input-search bg-gray-800 placeholder-gray-700"
+            />
+          </div>
+        )}
+
+        {/* Search Field for Sports */}
+        {activeTab === "sports" && (
+          <div className="my-4 relative">
+            <span className="absolute inset-y-0 left-0 flex items-center pl-2 pointer-events-none">
+              {/* Search Icon */}
+              <svg
+                aria-hidden="true"
+                className="w-5 h-5 text-gray-700"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                viewBox="0 0 24 24"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <circle cx="10" cy="10" r="7"></circle>
+                <path d="M21 21l-4.35-4.35"></path>
+              </svg>
+            </span>
+            <input
+              type="text"
+              value={searchSports}
+              onChange={handleSportsSearch}
+              placeholder="Search sports..."
+              className="w-full p-2 pl-9 rounded-md text-gray-700 focus:outline-none text-small input-search bg-gray-800 placeholder-gray-700"
+            />
+          </div>
+        )}
+
+        {/* Search Field for General */}
+        {activeTab === "general" && (
+          <div className="my-4 relative">
+            <span className="absolute inset-y-0 left-0 flex items-center pl-2 pointer-events-none">
+              {/* Search Icon */}
+              <svg
+                aria-hidden="true"
+                className="w-5 h-5 text-gray-700"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                viewBox="0 0 24 24"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <circle cx="10" cy="10" r="7"></circle>
+                <path d="M21 21l-4.35-4.35"></path>
+              </svg>
+            </span>
+            <input
+              type="text"
+              value={searchGeneral}
+              onChange={handleGeneralSearch}
+              placeholder="Search general..."
+              className="w-full p-2 pl-9 rounded-md text-gray-700 focus:outline-none text-small input-search bg-gray-800 placeholder-gray-700"
+            />
+          </div>
+        )}
 
         {/* PREDICTIONS SECTION */}
         {activeTab === "predictions" && (
-          <section className="rounded-lg ">
+          <section className="rounded-lg">
             {isLoadingPredictions && predictions.length === 0 && (
               <div className="flex justify-center items-center py-8">
                 <Spinner size="lg" />
               </div>
             )}
             {!isLoadingPredictions && predictions.length === 0 && (
-              <div className="text-center text-gray-500 py-8 container">No predictions found</div>
+              <div className="text-center text-gray-500 py-8 container">
+                No predictions found
+              </div>
             )}
+
             {displayedPredictions.length > 0 && (
               <div className="rounded-lg p-0 overflow-x-auto">
                 <table className="w-full text-sm text-left">
@@ -391,53 +483,70 @@ export default function MarketsPage() {
                     {displayedPredictions.map((prediction, index) => (
                       <tr
                         key={index}
-                        className="cursor-pointer hover:bg-gray-600"
+                        className=""
                         onClick={() => router.push(`/predictions/${prediction.id}`)}
                       >
-                        <td className="py-2 px-2">
-                          {prediction.str_thumb && (
-                            <Image
-                              src={prediction.str_thumb}
-                              alt={prediction.description}
-                              width={40}
-                              height={40}
-                              className="rounded-full min-w-[40px] min-h-[40px] max-w-[40px] max-h-[40px]"
-                            />
-                          )}
+                        {/* Single cell with flex container to handle responsive layout */}
+                        <td colSpan={4} className="p-2 cursor-pointer backbutton">
+                          <div className="flex flex-row gap-4 items-start">
+                            {/* Thumbnail */}
+                            {prediction.str_thumb && (
+                              <Image
+                                src={prediction.str_thumb}
+                                alt={prediction.description}
+                                width={40}
+                                height={40}
+                                className="w-[40px] h-[40px] min-w-[40px] min-h-[40px] max-w-[40px] max-h-[40px] rounded-full"
+                              />
+                            )}
+
+                            {/* Text block */}
+                            <div className="flex flex-col w-full md:flex-row gap-2 items-start">
+                              {/* Description as its own line */}
+                              <p className="mb-1 break-words w-full">
+                                {prediction.description}
+                              </p>
+
+                              {/* Next line for date, bet_amount, and chip */}
+                              <div className="flex flex-row gap-2 items-start sm:items-center">
+                                <span className="text-default-400">
+                                  {formatDate(
+                                    prediction.resolution_date || prediction.created_at,
+                                    "MM/dd/yyyy"
+                                  )}
+                                </span>
+                                <span className="text-default-400">
+                                  {prediction.bet_amount}
+                                </span>
+                                <Chip
+                                  color={
+                                    prediction.status !== "open"
+                                      ? prediction.outcome === prediction.creator_choice
+                                        ? "success"
+                                        : "danger"
+                                      : "primary"
+                                  }
+                                  variant="flat"
+                                  size="sm"
+                                >
+                                  {prediction.status !== "open"
+                                    ? prediction.outcome === prediction.creator_choice
+                                      ? "Won"
+                                      : "Lost"
+                                    : prediction.status}
+                                </Chip>
+                              </div>
+                            </div>
+                          </div>
                         </td>
-                        <td className="py-2 md-px-4 break-words">{prediction.description}</td>
-                        {/* <td className="py-2 md-px-4">{prediction.source}</td> */}
-                        <span className="hidden md:block">
-                        {/* <td className="py-2 md-px-4">
-                          {formatDate(prediction.resolution_date || prediction.created_at, "MM/dd/yyyy")}
-                        </td> */}
-                        <td className="py-2 md-px-4">{prediction.bet_amount}</td>
-                        <td className="py-2 md-px-4">
-                          <Chip
-                            color={
-                              prediction.status !== "open"
-                                ? prediction.outcome === prediction.creator_choice
-                                  ? "success"
-                                  : "danger"
-                                : "primary"
-                            }
-                            variant="flat"
-                            size="sm"
-                          >
-                            {prediction.status !== "open"
-                              ? prediction.outcome === prediction.creator_choice
-                                ? "Won"
-                                : "Lost"
-                              : prediction.status}
-                          </Chip>
-                        </td>
-                        </span>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
             )}
+
+            {/* Show More Button */}
             {hasMorePredictions && !isLoadingPredictions && displayedPredictions.length > 0 && (
               <div className="flex justify-center mt-4">
                 <Button
@@ -455,132 +564,192 @@ export default function MarketsPage() {
 
         {/* SPORTS SECTION */}
         {activeTab === "sports" && (
-          <section className="rounded-lg min-w-[780px]">
+          <section className="rounded-lg">
             {isLoadingSports && sportsData.length === 0 && (
               <div className="flex justify-center items-center py-8">
                 <Spinner size="lg" />
               </div>
             )}
             {!isLoadingSports && sportsData.length === 0 && (
-              <div className="text-center text-gray-500 py-8 container">No sports data found</div>
+              <div className="text-center text-gray-500 py-8 container">
+                No sports data found
+              </div>
             )}
-            {sportsData.length > 0 && (
-              <>
-                <div className="rounded-lg p-4 overflow-x-auto">
-                  <table className="w-full text-sm text-left">
-                    <tbody>
-                      {displayedSports.map((item, index) => (
-                        <tr key={index} className="cursor-pointer hover:bg-gray-600">
-                          <td className="py-2 px-2">
+
+            {displayedSports.length > 0 && (
+             <div className="rounded-lg p-0 overflow-x-auto">
+                <table className="w-full text-sm text-left">
+                  <tbody>
+                    {displayedSports.map((item, index) => (
+                      <tr
+                        key={index}
+                        className=""
+                        onClick={() => router.push(`/sports/${item.id}`)}
+                      >
+                       <td colSpan={4} className="p-2 cursor-pointer backbutton ">
+                       <div className="flex flex-row gap-4 items-start">
+                            {/* Thumbnail */}
                             {item.str_thumb && (
                               <Image
                                 src={item.str_thumb}
                                 alt={item.description}
                                 width={40}
                                 height={40}
-                                className="rounded-full min-w-[40px] min-h-[40px] w-[40px] h-[40px]"
+                                className="w-[40px] h-[40px] min-w-[40px] min-h-[40px] max-w-[40px] max-h-[40px] rounded-full"
                               />
                             )}
-                          </td>
-                          <td className="py-2 px-4 break-words">{item.description}</td>
-                          <td className="py-2 px-4">{item.source}</td>
-                          <td className="py-2 px-4">
-                            {formatDate(item.resolution_date || item.created_at, "MM/dd/yyyy")}
-                          </td>
-                          <td className="py-2 px-4">{item.bet_amount}</td>
-                          <td className="py-2 px-4">
-                            <Chip
-                              color={item.status !== "open" ? (item.outcome === item.creator_choice ? "success" : "danger") : "primary"}
-                              variant="flat"
-                              size="sm"
-                            >
-                              {item.status !== "open" ? (item.outcome === item.creator_choice ? "Won" : "Lost") : item.status}
-                            </Chip>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                {hasMoreSports && !isLoadingSports && displayedSports.length > 0 && (
-                  <div className="flex justify-center mt-4">
-                    <Button
-                      color="primary"
-                      variant="flat"
-                      onPress={loadMoreSports}
-                      className="min-w-[200px]"
-                    >
-                      Show More
-                    </Button>
-                  </div>
-                )}
-              </>
+
+                            {/* Text block */}
+                            <div className="flex flex-col w-full md:flex-row gap-2 items-start">
+                              {/* Description as its own line */}
+                              <p className="break-words w-full">
+                                {item.description}
+                              </p>
+
+                              {/* A second row for date, bet_amount, and Chip */}
+                              <div className="flex flex-row gap-2 items-start sm:items-center">
+                                <span className="text-default-400">
+                                  {formatDate(item.resolution_date || item.created_at, "MM/dd/yyyy")}
+                                </span>
+                                <span className="text-default-400">
+                                  {item.bet_amount}
+                                </span>
+                                <Chip
+                                  color={
+                                    item.status !== "open"
+                                      ? item.outcome === item.creator_choice
+                                        ? "success"
+                                        : "danger"
+                                      : "primary"
+                                  }
+                                  variant="flat"
+                                  size="sm"
+                                >
+                                  {item.status !== "open"
+                                    ? item.outcome === item.creator_choice
+                                      ? "Won"
+                                      : "Lost"
+                                    : item.status}
+                                </Chip>
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {hasMoreSports && !isLoadingSports && displayedSports.length > 0 && (
+              <div className="flex justify-center mt-4">
+                <Button
+                  color="primary"
+                  variant="flat"
+                  onPress={loadMoreSports}
+                  className="min-w-[200px]"
+                >
+                  Show More
+                </Button>
+              </div>
             )}
           </section>
         )}
 
         {/* GENERAL SECTION */}
         {activeTab === "general" && (
-          <section className="rounded-lg min-w-[780px]">
+          <section className="rounded-lg">
             {isLoadingGeneral && generalData.length === 0 && (
               <div className="flex justify-center items-center py-8">
                 <Spinner size="lg" />
               </div>
             )}
             {!isLoadingGeneral && generalData.length === 0 && (
-              <div className="text-center text-gray-500 py-8 container">No general data found</div>
+              <div className="text-center text-gray-500 py-8 container">
+                No general data found
+              </div>
             )}
-            {generalData.length > 0 && (
-              <>
-                <div className="rounded-lg p-4 overflow-x-auto">
-                  <table className="w-full text-sm text-left">
-                    <tbody>
-                      {displayedGeneral.map((item, index) => (
-                        <tr key={index} className="cursor-pointer hover:bg-gray-600">
-                          <td className="py-2 px-2">
+            {displayedGeneral.length > 0 && (
+              <div className="rounded-lg p-0 overflow-x-auto">
+                <table className="w-full text-sm text-left">
+                  <tbody>
+                    {displayedGeneral.map((item, index) => (
+                      <tr
+                        key={index}
+                        className=""
+                        onClick={() => router.push(`/general/${item.id /* or appropriate link */}`)}
+                      >
+                        <td colSpan={4} className="p-2 cursor-pointer backbutton">
+                          <div className="flex flex-row gap-4 items-start">
+                            {/* Thumbnail */}
                             {item.str_thumb && (
                               <Image
                                 src={item.str_thumb}
                                 alt={item.description}
                                 width={40}
                                 height={40}
-                                className="rounded-md min-w-[40px] min-h-[40px] w-[40px] h-[40px]"
+                                className="rounded-full max-w-[40px] max-h-[40px] min-w-[40px] min-h-[40px] w-[40px] h-[40px]"
                               />
                             )}
-                          </td>
-                          <td className="py-2 px-4 break-words">{item.description}</td>
-                          <td className="py-2 px-4">{item.source}</td>
-                          <td className="py-2 px-4">
-                            {formatDate(item.resolution_date || item.created_at, "MM/dd/yyyy")}
-                          </td>
-                          <td className="py-2 px-4">{item.bet_amount}</td>
-                          <td className="py-2 px-4">
-                            <Chip
-                              color={item.status !== "open" ? (item.outcome === item.creator_choice ? "success" : "danger") : "primary"}
-                              variant="flat"
-                              size="sm"
-                            >
-                              {item.status !== "open" ? (item.outcome === item.creator_choice ? "Won" : "Lost") : item.status}
-                            </Chip>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                {hasMoreGeneral && !isLoadingGeneral && displayedGeneral.length > 0 && (
-                  <div className="flex justify-center mt-4">
-                    <Button
-                      color="primary"
-                      variant="flat"
-                      onPress={loadMoreGeneral}
-                      className="min-w-[200px]"
-                    >
-                      Show More
-                    </Button>
-                  </div>
-                )}
-              </>
+
+                            {/* Text block */}
+                            <div className="flex flex-col w-full md:flex-row gap-2 items-start w-full">
+                              {/* Description on its own line */}
+                              <p className="break-words w-full">
+                                {item.description}
+                              </p>
+                              {/* (Optional) Source on a new line, or combined as needed */}
+                              {/* <p className="mb-1 text-default-400">
+                                {item.source}
+                              </p> */}
+
+                              {/* A second row for date, bet_amount, and Chip */}
+                              <div className="flex flex-row gap-2 items-start sm:items-center">
+                                <span className="text-default-400">
+                                  {formatDate(item.resolution_date || item.created_at, "MM/dd/yyyy")}
+                                </span>
+                                <span className="text-default-400">
+                                  {item.bet_amount}
+                                </span>
+                                <Chip
+                                  color={
+                                    item.status !== "open"
+                                      ? item.outcome === item.creator_choice
+                                        ? "success"
+                                        : "danger"
+                                      : "primary"
+                                  }
+                                  variant="flat"
+                                  size="sm"
+                                >
+                                  {item.status !== "open"
+                                    ? item.outcome === item.creator_choice
+                                      ? "Won"
+                                      : "Lost"
+                                    : item.status}
+                                </Chip>
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            {hasMoreGeneral && !isLoadingGeneral && displayedGeneral.length > 0 && (
+              <div className="flex justify-center mt-4">
+                <Button
+                  color="primary"
+                  variant="flat"
+                  onPress={loadMoreGeneral}
+                  className="min-w-[200px]"
+                >
+                  Show More
+                </Button>
+              </div>
             )}
           </section>
         )}
@@ -597,14 +766,14 @@ export default function MarketsPage() {
               <div className="text-center text-gray-500 py-8 container">No leaderboard data found</div>
             )}
             {leaderboardData.length > 0 && (
-              <div className=" rounded-xl shadow-medium overflow-hidden border border-content3">
+              <div className=" rounded-xl overflow-hidden border-none">
                 {/* Header */}
                 <div className="bg-content2 px-6 py-4 border-b border-content3 grid grid-cols-12 gap-4">
-                  <div className="col-span-1 font-semibold text-foreground">Rank</div>
-                  <div className="col-span-6 font-semibold text-foreground">Agent</div>
-                  <div className="col-span-1 font-semibold text-foreground">Wins</div>
-                  <div className="col-span-2 font-semibold text-foreground">Bets </div>
-                  <div className="col-span-2 font-semibold text-foreground">Win Rate</div>
+                  <div className="col-span-1 font-semibold ">Rank</div>
+                  <div className="col-span-6 font-semibold ">Agent</div>
+                  <div className="col-span-1 font-semibold ">Wins</div>
+                  <div className="col-span-2 font-semibold ">Bets </div>
+                  <div className="col-span-2 font-semibold ">Win Rate</div>
                 </div>
 
                 {/* Rows */}

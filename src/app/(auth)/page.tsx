@@ -13,11 +13,14 @@ export default function Home() {
           height={160}
           className="mb-4"
         />
-        <h1 className="textGradient text-2xl md:text-4xl font-bold mb-2">
+        <h1 className="textGradient text-2xl md:text-2xl font-bold mb-2">
           Synthetic Prediction Market
         </h1>
         <p className="text-default-500 text-md md:text-lg mb-6">
-          An AI-driven platform empowering you to predict the future and trade confidently with data-driven insights.
+          Train AI agents to forecast real-world events, turn them into NFTs,
+          and watch their insights grow. You can refine these AI agents with
+          your own expertise, track their performance, and share your
+          strategies with a community of forward-thinkers.
         </p>
         <div className="flex flex-col md:flex-row gap-4 w-full justify-center">
           <Link
@@ -41,9 +44,11 @@ export default function Home() {
           Why Antelope?
         </h2>
         <p className="text-default-500 mb-6">
-          We designed Antelope to cater to both newcomers and experienced bettors, ensuring 
-          an accessible yet sophisticated toolkit. You can efficiently manage markets, 
-          uncover opportunities, and track performance metrics in real time.
+          Antelope offers a user-friendly yet powerful space for both newcomers
+          and seasoned predictors. Whether you’re creating new prediction
+          markets, refining AI strategies, or experimenting with complex bets,
+          you’ll have the tools you need to identify lucrative opportunities
+          and make informed decisions — all in real time.
         </p>
       </section>
 
@@ -54,19 +59,24 @@ export default function Home() {
         </h2>
         <ul className="list-disc list-inside text-default-500 space-y-3">
           <li>
-            <strong>Intuitive Market Management:</strong> Create and oversee markets with minimal hassle.
+            <strong>Intuitive Market Management:</strong> Quickly create,
+            oversee, and personalize markets with minimal fuss.
           </li>
           <li>
-            <strong>Advanced Analysis Tools:</strong> Quickly identify trends and make data-driven wagers.
+            <strong>AI-Powered Analytics:</strong> Leverage cutting-edge
+            machine learning tools to guide your predictions.
           </li>
           <li>
-            <strong>Refined Betting Strategies:</strong> Develop and adjust strategies to maximize success.
+            <strong>Versatile Betting Strategies:</strong> Build, refine, and
+            share strategies that adapt to real-world data.
           </li>
           <li>
-            <strong>Real-Time Tracking:</strong> Stay updated on wins, losses, and market fluctuations as they happen.
+            <strong>Real-Time Performance Tracking:</strong> View market
+            fluctuations, wins, and losses as they happen.
           </li>
           <li>
-            <strong>Community Interaction:</strong> Engage with a vibrant community, share ideas, and learn from peers.
+            <strong>Active Community Collaboration:</strong> Exchange ideas,
+            discuss tactics, and team up with fellow enthusiasts.
           </li>
         </ul>
       </section>
@@ -76,11 +86,40 @@ export default function Home() {
         <h2 className="text-xl md:text-2xl font-semibold text-white mb-2">
           Getting Started
         </h2>
-        <p className="text-default-500">
-          Begin by visiting your dashboard to view available markets or create your own. 
-          If you need inspiration, check out our Community section to see how others 
-          are analyzing trends and deploying their strategies.
+        <p className="text-default-500 mb-6">
+          Kick things off by exploring your dashboard to discover available
+          markets or create your own. Need some inspiration? Head to our
+          Community section to see how other users are leveraging AI insights,
+          analyzing trends, and deploying groundbreaking strategies.
         </p>
+
+        {/* Community Links */}
+        <div className="flex flex-row items-center space-x-4 mt-4">
+          <Link href="https://twitter.com/YourAntelopePage" target="_blank">
+            <Image
+              src="/assets/icons/twitter.svg"
+              alt="Twitter"
+              width={24}
+              height={24}
+            />
+          </Link>
+          <Link href="https://discord.gg/YourAntelopePage" target="_blank">
+            <Image
+              src="/assets/icons/discord.svg"
+              alt="Discord"
+              width={24}
+              height={24}
+            />
+          </Link>
+          <Link href="https://t.me/YourAntelopePage" target="_blank">
+            <Image
+              src="/assets/icons/telegram.svg"
+              alt="Telegram"
+              width={24}
+              height={24}
+            />
+          </Link>
+        </div>
       </section>
     </main>
   );

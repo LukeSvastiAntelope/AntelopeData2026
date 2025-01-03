@@ -142,7 +142,7 @@ export default function BetDetailPage() {
 
                         </div>
                         {/* Profile Photo */}
-                        <Link href="/profile" className="md:flex items-center gap-2 mb-4 hidden p-2 border border-white/10 rounded-lg backbutton">
+                                                <Link href="/profile" className="md:flex items-center gap-2 mb-4 hidden p-2 border border-white/10 profile-border ">
                             <Image
                                 src={agent?.image || "/assets/images/logo-simple.svg"}
                                 alt="Profile"

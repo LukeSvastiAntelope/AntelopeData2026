@@ -9,12 +9,14 @@ import { Spinner } from "@nextui-org/spinner";
 import { Chip } from "@nextui-org/chip";
 import { Button } from "@nextui-org/button";
 import { Image } from "@nextui-org/image";
-
+import { FaRocket, FaDatabase, FaChartLine, FaShieldAlt } from "react-icons/fa";
 import { useFetch } from "@/app/utils/lib";
 
 interface IAgentProfile {
   image?: string;
   name?: string;
+  maxBetSize?: number;
+  wallet_balance?: number;
   // add any other fields you need from /api/getAgentProfile
 }
 
@@ -79,6 +81,30 @@ const filterPredictions = (predictions: IPrediction[], searchTerm: string): IPre
     prediction.status.toLowerCase().includes(term)
   );
 };
+
+function StatCard({
+  icon,
+  title,
+  value,
+  className = "",
+}: {
+  icon: React.ReactNode;
+  title: string;
+  value: string;
+  className?: string;
+}) {
+  return (
+    <div
+      className={`rounded-lg subtlebackground shadow-md p-4 flex items-center gap-2 ${className}`}
+    >
+      <div className="text-primary text-lg">{icon}</div>
+      <div className="flex flex-row gap-1">
+        <p className="text-default-500 text-small">{title}</p>
+        <p className="text-small font-regular">{value}</p>
+      </div>
+    </div>
+  );
+}
 
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState<"bets" | "predictions">("bets");
@@ -269,7 +295,7 @@ export default function Dashboard() {
 
             </div>
             {/* Profile Photo */}
-            <Link href="/profile" className="md:flex items-center gap-2 mb-4 hidden p-2 border border-white/10 rounded-lg backbutton">
+            <Link href="/profile" className="md:flex items-center gap-2 mb-4 hidden p-2 border border-white/10 profile-border ">
               <Image
                 src={agent?.image || "/assets/images/logo-simple.svg"}
                 alt="Profile"
@@ -339,21 +365,63 @@ export default function Dashboard() {
       {/* Main Content */}
 
 
-      <main className="flex-1 ml-0 md:ml-64 container mt-14 md:mt-0  mx-auto px-4 py-6 md:px-8 md:py-8 min-w-full md:min-w-[800px] max-w-full md:max-w-[800px]">
+      <main className="flex-1 ml-0 md:ml-64 container mt-14 md:mt-0 mx-auto px-4 py-6 md:px-8 md:py-8 min-w-full md:min-w-[800px] max-w-full md:max-w-[800px]">
         {/* Top bar with toggles */}
 
+        
 
-        <div className="flex gap-2">
+        {predictions && predictions.length > 0 && (
+          <div className="grid gap-6 md:grid-cols-4 mb-6">
+              
+              <StatCard
+                icon={<FaRocket />}
+                title="Bets"
+                
+                value={predictions
+                  .reduce((acc, curr) => acc + curr.bets_count, 0)
+                  .toString()}
+                  className="backbutton"
+              />
+         
+              <StatCard
+                icon={<FaDatabase />}
+                title="Predictions"
+                value={predictions.length.toString()}
+                className="backbutton"
+              />
+            
+            <StatCard
+              icon={<FaChartLine />}
+              title="Success"
+              value={(
+                (predictions.filter((p) => p.outcome === p.creator_choice).length /
+                  (predictions.length || 1)) *
+                100
+              ).toFixed(2).concat("%")}
+              className="backbutton"
+            />
+
+            <StatCard
+              icon={<FaShieldAlt />}
+              title="Bet Size"
+              value={`${agent?.maxBetSize || 0}`}
+              className="backbutton"
+            />
+
+          </div>
+        )}
+
+        <div className="flex gap-2 font-kodemono text-small">
           <button
             onClick={() => setActiveTab("bets")}
-            className={`px-0 py-2 hover:text-white ${activeTab === "bets" ? "text-white" : "text-gray-700"
+            className={`px-0 py-2 hover:text-white ${activeTab === "bets" ? "text-white" : "text-gray-500"
               }`}
           >
             Bets
           </button>
           <button
             onClick={() => setActiveTab("predictions")}
-            className={`px-1 py-2 hover:text-white ${activeTab === "predictions" ? "text-white" : "text-gray-700"
+            className={`px-1 py-2 hover:text-white ${activeTab === "predictions" ? "text-white" : "text-gray-500"
               }`}
           >
             Predictions
@@ -428,98 +496,70 @@ export default function Dashboard() {
               <div className="text-center text-gray-500 py-8">No bets found</div>
             )}
 
-            {bets.length > 0 && (
-              <div className="grid gap-6 md:grid-cols-3 mb-6">
-                <Card className="text-white bg-content0">
-                  <CardHeader className="text-sm font-medium">
-                    Active Predictions
-                  </CardHeader>
-                  <CardBody>
-                    <p className="text-2xl font-bold">
-                      {predictions.filter((p) => p.status === "open").length}
-                    </p>
-                  </CardBody>
-                </Card>
-                <Card className="text-white bg-content0">
-                  <CardHeader className="text-sm font-medium">
-                    Bets Placed
-                  </CardHeader>
-                  <CardBody>
-                    <p className="text-2xl font-bold">
-                      {predictions.reduce((acc, curr) => acc + curr.bets_count, 0)}
-                    </p>
-                  </CardBody>
-                </Card>
-                <Card className="text-white bg-content0">
-                  <CardHeader className="text-sm font-medium">
-                    Win Rate
-                  </CardHeader>
-                  <CardBody>
-                    <p className="text-2xl font-bold">
-                      {(
-                        (predictions.filter((p) => p.outcome === p.creator_choice).length /
-                        predictions.length) *
-                        100
-                      ).toFixed(2)}
-                      %
-                    </p>
-                  </CardBody>
-                </Card>
-              </div>
-            )}
+            
 
             {/* Table Header */}
             {bets.length > 0 && (
+              
+              
+
               <table className="w-full text-sm text-left">
+                
                 <tbody>
                   {filterBets(bets, searchTerm).map((bet, index) => (
                     <tr
                       key={index}
-                      className=""
+                      className="cursor-pointer backbutton"
                       onClick={() => router.push(`/bets/${bet.bet_id}`)}
                     >
-                      <div className="cursor-pointer backbutton py-2">
-                      {/* Image */}
-                      <td className=" px-4">
-                        {bet.str_thumb && (
-                          <Image
-                            src={bet.str_thumb}
-                            alt={bet.description}
-                            width={40}
-                            height={40}
-                            className="w-[40px] h-[40px] min-w-[40px] min-h-[40px] rounded-full" // Remove/replace m-w-[40px]
-                          />
-                        )}
+                      <td colSpan={4} className="p-2 cursor-pointer backbutton">
+                        <div className="flex flex-row gap-4 items-start">
+                          {/* Thumbnail */}
+                          {bet.str_thumb && (
+                            <Image
+                              src={bet.str_thumb}
+                              alt={bet.description}
+                              width={40}
+                              height={40}
+                              className="w-[40px] h-[40px] rounded-full max-w-[40px] max-h-[40px] min-w-[40px] min-h-[40px]"
+                            />
+                          )}
+
+                          {/* Text block */}
+                          <div className="flex flex-col md:flex-row gap-2 items-start w-full">
+                            {/* Description on its own line */}
+                            <p className="break-words w-full">
+                              {bet.description}
+                            </p>
+
+                            {/* A second line for date and chip, side by side at md */}
+                            <div className="flex flex-row md:flex-row gap-2 items-start sm:items-start">
+                              <span className="text-default-400">
+                                {bet.status === "open"
+                                  ? formatDate(bet.resolution_date)
+                                  : formatDate(bet.resolution_date)}
+                              </span>
+                              <Chip
+                                color={
+                                  bet.status !== "open"
+                                    ? bet.outcome === bet.choice
+                                      ? "success"
+                                      : "danger"
+                                    : "primary"
+                                }
+                                variant="flat"
+                                size="sm"
+                              >
+                                {bet.status !== "open"
+                                  ? bet.outcome === bet.choice
+                                    ? "Won"
+                                    : "Lost"
+                                  : bet.status}
+                              </Chip>
+                            </div>
+                          </div>
+                        </div>
                       </td>
-                      {/* Description */}
-                      <td className=" px-2 break-words w-full">
-                        {bet.description}
-                      </td>
-                      <td className=" px-4">
-                        {bet.status === "open"
-                          ? formatDate(bet.created_at)
-                          : formatDate(bet.resolution_date)}
-                      </td>
-                      <td className=" px-4">
-                        <Chip
-                          color={
-                            bet.status !== "open"
-                              ? bet.outcome === bet.choice
-                                ? "success"
-                                : "danger"
-                              : "primary"
-                          }
-                          variant="flat"
-                          size="sm"
-                        >
-                          {bet.status !== "open"
-                            ? bet.outcome === bet.choice
-                              ? "Won"
-                              : "Lost"
-                            : bet.status}
-                        </Chip>
-                      </td>
-                      </div>
                     </tr>
                   ))}
                 </tbody>
@@ -567,46 +607,7 @@ export default function Dashboard() {
               </div>
             )}
 
-            {/* Stats Row (original) */}
-            {predictions.length > 0 && (
-              <div className="grid gap-6 md:grid-cols-3 mb-6">
-                <Card className=" text-white bg-content0">
-                  <CardHeader className="text-sm font-medium">
-                    Total Active Predictions
-                  </CardHeader>
-                  <CardBody>
-                    <p className="text-2xl font-bold">
-                      {predictions.filter((p) => p.status === "open").length}
-                    </p>
-                  </CardBody>
-                </Card>
-                <Card className=" text-white bg-content0">
-                  <CardHeader className="text-sm font-medium">
-                    Total Bets Placed
-                  </CardHeader>
-                  <CardBody>
-                    <p className="text-2xl font-bold">
-                      {predictions.reduce((acc, curr) => acc + curr.bets_count, 0)}
-                    </p>
-                  </CardBody>
-                </Card>
-                <Card className=" text-white bg-content0">
-                  <CardHeader className="text-sm font-medium">Win Rate</CardHeader>
-                  <CardBody>
-                    <p className="text-2xl font-bold">
-                      {(
-                        (predictions.filter(
-                          (p) => p.outcome === p.creator_choice
-                        ).length /
-                          predictions.length) *
-                        100
-                      ).toFixed(2)}
-                      %
-                    </p>
-                  </CardBody>
-                </Card>
-              </div>
-            )}
+            
 
             {/* Predictions Table */}
             {displayedPredictions.length > 0 && (
@@ -616,47 +617,56 @@ export default function Dashboard() {
                     {displayedPredictions.map((prediction, index) => (
                       <tr
                         key={index}
-                        className=""
+                        className="cursor-pointer backbutton"
                         onClick={() => router.push(`/predictions/${prediction.id}`)}
                       >
-                        <div className="cursor-pointer backbutton py-2">
-                        <td className="py-2 px-0">
-                          {prediction.str_thumb && (
-                            <Image
-                              src={prediction.str_thumb}
-                              alt={prediction.description}
-                              width={32}
-                              height={32}
-                              className="w-[32px] h-[32px] min-w-[32px] min-h-[32px] rounded-full"
-                            />
-                          )}
+                        <td colSpan={5} className="p-2">
+                          <div className="flex flex-row gap-4 items-start w-full">
+                            {/* Thumbnail */}
+                            {prediction.str_thumb && (
+                              <Image
+                                src={prediction.str_thumb}
+                                alt={prediction.description}
+                                width={40}
+                                height={40}
+                                className="w-[40px] h-[40px] min-w-[40px] min-h-[40px] rounded-full"
+                              />
+                            )}
+
+                            {/* Text + details */}
+                            <div className="flex flex-col w-full md:flex-row gap-2 items-start">
+                              {/* Description on its own line */}
+                              <p className="break-words w-full">
+                                {prediction.description}
+                              </p>
+
+                              {/* Date, bet count, and Chip row */}
+                              <div className="flex flex-row gap-2 items-start sm:items-start">
+                                <span className="text-default-400">
+                                  {formatDate(prediction.resolution_date)}
+                                </span>
+                                <span className="text-default-400">
+                                  {prediction.bets_count} 
+                                </span>
+                                <Chip
+                                  color={
+                                    prediction.status === "open"
+                                      ? "primary"
+                                      : "secondary"
+                                  }
+                                  variant="flat"
+                                  size="sm"
+                                >
+                                  {prediction.status === "open"
+                                    ? "Open"
+                                    : prediction.outcome === prediction.creator_choice
+                                    ? "Win"
+                                    : "Loss"}
+                                </Chip>
+                              </div>
+                            </div>
+                          </div>
                         </td>
-                        <td className="px-4 break-words w-full">
-                          {prediction.description}
-                        </td>
-                        <td className="px-4">
-                          {formatDate(prediction.resolution_date)}
-                        </td>
-                        <td className="px-4">{prediction.bets_count}</td>
-                        <td className="px-4">
-                          <Chip
-                            color={
-                              prediction.status === "open"
-                                ? "primary"
-                                : "secondary"
-                            }
-                            variant="flat"
-                            size="sm"
-                          >
-                            {prediction.status === "open"
-                              ? "Open"
-                              : prediction.outcome ===
-                                prediction.creator_choice
-                              ? "Win"
-                              : "Loss"}
-                          </Chip>
-                        </td>
-                        </div>
                       </tr>
                     ))}
                   </tbody>
