@@ -207,7 +207,7 @@ const EditAgentProfile = () => {
               <CardHeader className="text-xl font-regular">Interests</CardHeader>
               <CardBody>
                 <div className="flex flex-wrap gap-2 mb-4">
-                  {agent.interests.length > 0 && agent.interests.map((interest) => (
+                  {agent.interests && agent.interests.length > 0 && agent.interests.map((interest) => (
                     <Chip
                       key={interest}
                       onClose={() => setAgent({ ...agent, interests: agent.interests.filter(i => i !== interest) })}

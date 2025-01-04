@@ -114,13 +114,13 @@ const AgentProfile = () => {
                             />
                         </div>
                         <Link href="/profile" className="flex items-center gap-2 mb-4">
-                        <Image
-                        src={agent?.image || '/assets/images/default-agent.png'}
-                        alt="Agent Image"
-                        className="w-[24px] h-[24px] rounded-full"
-                        width={24}
-                        height={24}
-                    />
+                            <Image
+                                src={agent?.image || '/assets/images/default-agent.png'}
+                                alt="Agent Image"
+                                className="w-[24px] h-[24px] rounded-full"
+                                width={24}
+                                height={24}
+                            />
                             <span className="text-sm font-semibold icon-credits px-5 font-kodemono">
                                 <span className="text-gradient">83940</span>
                             </span>
@@ -128,8 +128,8 @@ const AgentProfile = () => {
                         <Link href="/dashboard" className="flex items-center gap-2 mb-4 text-white font-kodemono">
                             <span className="icon-dashboard mr-2" /> Dashboard
                         </Link>
-                        <Link 
-                            href="/markets" 
+                        <Link
+                            href="/markets"
                             className="flex items-center gap-2 mb-4 group"
                         >
                             <span className="icon-markets mr-2 block group-hover:hidden" />
@@ -154,7 +154,7 @@ const AgentProfile = () => {
                             <span className="icon-support-active mr-2 hidden group-hover:block" />
                             <span className="text-default-400 group-hover:text-white font-kodemono">Community</span>
                         </Link>
-                        <Link href="/signout" className="flex items-center gap-2 mb-4 text-default-400 group">
+                        <Link href="/logout" className="flex items-center gap-2 mb-4 text-default-400 group">
                             <span className="icon-logout mr-2 block group-hover:hidden" />
                             <span className="icon-logout-active mr-2 hidden group-hover:block" />
                             <span className="text-default-400 group-hover:text-white font-kodemono">Sign out</span>
@@ -190,7 +190,7 @@ const AgentProfile = () => {
                                 </Button>
                             </div>
                         </div>
-                        
+
                         <div className="flex-1 text-center md:text-left space-y-3">
                             <div className="relative">
                                 <h1 className="text-4xl font-bold bg-gradient-to-r from-primary via-secondary to-primary bg-clip-text text-transparent bg-[length:200%] animate-gradient">
@@ -227,7 +227,7 @@ const AgentProfile = () => {
                                         content: "text-secondary",
                                     }}
                                 >
-                                    {successRate.toFixed(2)}% Success Rate
+                                    {successRate?.toFixed(2) || '0.00'}% Success Rate
                                 </Chip>
                             </div>
                         </div>

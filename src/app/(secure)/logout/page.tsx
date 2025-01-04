@@ -7,10 +7,7 @@ export default function LogoutPage() {
   const router = useRouter();
 
   useEffect(() => {
-    // Example: Clear localStorage or call an API route to invalidate session on the server
-    // localStorage.removeItem("my_app_token");
-
-    // Then redirect user to /login or your public homepage
+    localStorage.clear();
     router.replace("/login");
   }, [router]);
 

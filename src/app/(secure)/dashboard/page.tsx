@@ -16,7 +16,6 @@ interface IAgentProfile {
   name?: string;
   maxBetSize?: number;
   wallet_balance?: number;
-  // add any other fields you need from /api/getAgentProfile
 }
 
 interface IPrediction {
@@ -141,6 +140,8 @@ export default function Dashboard() {
         } else {
           toast.error(response.message);
         }
+        fetchBets(1);
+        fetchPredictions();
       } catch (error) {
         console.error("Failed to fetch agent profile:", error);
         toast.error("Failed to fetch agent profile");
@@ -248,13 +249,6 @@ export default function Dashboard() {
       setHasMorePredictions(filteredPredictions.length > ITEMS_PER_PAGE_PREDICTIONS);
     }
   }, [searchPredictions, activeTab]);
-
-  // On first mount
-  useEffect(() => {
-    fetchBets(1);
-    fetchPredictions();
-    console.log("fetching bets");
-  }, []);
 
   // Lazy-fetch predictions
   useEffect(() => {
