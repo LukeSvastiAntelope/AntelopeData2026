@@ -6,6 +6,8 @@ export const AGENT_RISK_LEVEL = [
 
 export const CATEGORIES = [
     'General',
+    'Markets',
+    'Crypto',
     'Soccer',
     'English Premier League',
     'NBA',
