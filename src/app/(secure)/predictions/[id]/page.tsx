@@ -66,9 +66,8 @@ export default function PredictionDetail() {
     useEffect(() => {
         const id = Array.isArray(params.id) ? params.id[0] : params.id;
         if (params.id) {
-            
           fetchAgentProfile();
-          fetchPredictionDetails(params.id as string);
+          fetchPredictionDetails(id);
         }
       }, [params.id]);
 
