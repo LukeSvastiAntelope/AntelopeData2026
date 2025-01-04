@@ -294,9 +294,10 @@ export default function BetDetailPage() {
                             <div className="mt-0">
                                 {pineconeData && (
                                     <div className="mt-0">
-                                        <h2 className="text-xl font-semibold mb-4">Reasoning Log</h2>
+                                        
                                         <div className="bg-content0 rounded-lg p-8 ">
                                             <div className="flex flex-col gap-4 font-kodemono">
+                                            <h2 className="text-xl font-semibold mb-4">Reasoning Log</h2>
                                                 {Object.entries(pineconeData.metadata || {}).map(([key, value]) => {
                                                     return (
                                                         (key != "agent_id" && key != "choice" && key != "amount" && key != "created_at" && key != "prediction_id" && key != "log") ? (
