@@ -11,13 +11,7 @@ import { Image } from "@nextui-org/image";
 import { FaRocket, FaDatabase, FaChartLine, FaShieldAlt } from "react-icons/fa";
 import { useFetch } from "@/app/utils/lib";
 import { format } from 'date-fns';
-
-interface IAgentProfile {
-  image?: string;
-  name?: string;
-  maxBetSize?: number;
-  wallet_balance?: number;
-}
+import { IAgentProfile } from "@/app/utils/interface";
 
 interface IPrediction {
   id: string;
@@ -52,16 +46,6 @@ interface IBet {
 
 const ITEMS_PER_PAGE_BETS = 50;
 const ITEMS_PER_PAGE_PREDICTIONS = 50;
-
-// Simple fallback date formatter
-const formatDate = (dateStr: string): string => {
-  try {
-    return new Date(dateStr).toLocaleDateString();
-  } catch (err) {
-    console.log(err);
-    return dateStr;
-  }
-};
 
 const filterBets = (bets: IBet[], searchTerm: string): IBet[] => {
   const term = searchTerm.toLowerCase();
@@ -116,13 +100,13 @@ export default function Dashboard() {
 
   // Bets state
   const [bets, setBets] = useState<IBet[]>([]);
-  const [isLoadingBets, setIsLoadingBets] = useState<boolean>(false);
+  const [isLoadingBets, setIsLoadingBets] = useState<boolean>(true);
   const [pageBets, setPageBets] = useState<number>(1);
   const [hasMoreBets, setHasMoreBets] = useState<boolean>(true);
 
   // Predictions state
   const [predictions, setPredictions] = useState<IPrediction[]>([]);
-  const [isLoadingPredictions, setIsLoadingPredictions] = useState<boolean>(false);
+  const [isLoadingPredictions, setIsLoadingPredictions] = useState<boolean>(true);
   const [displayedPredictions, setDisplayedPredictions] = useState<IPrediction[]>([]);
   const [pagePredictions, setPagePredictions] = useState<number>(1);
   const [hasMorePredictions, setHasMorePredictions] = useState<boolean>(true);
@@ -130,32 +114,9 @@ export default function Dashboard() {
   const fetch = useFetch();
   const router = useRouter();
 
-  // Fetch Agent to show their image
-  useEffect(() => {
-    const fetchAgentProfile = async () => {
-      try {
-        const response = await fetch.get("/api/getAgentProfile");
-        if (response.status) {
-          setAgent(response.agent);
-          setAgentBalance(response.agent.wallet_balance ?? 0);
-        } else {
-          toast.error(response.message);
-        }
-        fetchBets(1);
-        fetchPredictions();
-      } catch (error) {
-        console.error("Failed to fetch agent profile:", error);
-        toast.error("Failed to fetch agent profile");
-      }
-    };
-    fetchAgentProfile();
-  }, []);
-
   // Fetch Bets
   const fetchBets = async (pageNumber: number) => {
-    if (isLoadingBets) return;
     setIsLoadingBets(true);
-
     try {
       const response = await fetch.get(
         `/api/getAgentBetHistory?page=${pageNumber}&limit=${ITEMS_PER_PAGE_BETS}`
@@ -189,7 +150,6 @@ export default function Dashboard() {
 
   // Fetch Predictions
   const fetchPredictions = async () => {
-    if (isLoadingPredictions) return;
     setIsLoadingPredictions(true);
 
     try {
@@ -259,6 +219,27 @@ export default function Dashboard() {
     }
   }, [activeTab]);
 
+  // Fetch Agent to show their image
+  useEffect(() => {
+    const fetchAgentProfile = async () => {
+      try {
+        const response = await fetch.get("/api/getAgentProfile");
+        if (response.status) {
+          setAgent(response.agent);
+          setAgentBalance(response.agent.wallet_balance ?? 0);
+        } else {
+          toast.error(response.message);
+        }
+      } catch (error) {
+        console.error("Failed to fetch agent profile:", error);
+        toast.error("Failed to fetch agent profile");
+      }
+      fetchBets(1);
+      fetchPredictions();
+    };
+    fetchAgentProfile();
+  }, []);
+
   const handleBetSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(e.target.value);
   };
@@ -273,9 +254,9 @@ export default function Dashboard() {
       <aside className="md:w-64 md:flex-col md:left-auto left-0 fixed top-0 text-sm w-full">
         <nav className="flex flex-row md:flex-col gap-4 text-normal justify-evenly py-8 px-4 ">
           <div className="flex flex-row md:flex-col justify-evenly w-full md:gap-4">
-            <div className="flex hidden md:inline-block items-center ">
+            <div className="flex md:inline-block items-center ">
               {/* Large logo for md+ screens */}
-              <span className="hidden md:inline-block hidden">
+              <span className="hidden md:inline-block ">
                 <Image
                   src={"/assets/images/logo-text.svg"}
                   alt="Dashboard Logo"
@@ -284,10 +265,8 @@ export default function Dashboard() {
                   className="mr-2 w-100"
                 />
               </span>
-
-              {/* Smaller logo for mobile screens */}
-
             </div>
+
             {/* Profile Photo */}
             <Link href="/profile" className="md:flex items-center p-2 border border-white/10 profile-border hidden gap-2 mb-2  ">
               <Image
@@ -299,15 +278,15 @@ export default function Dashboard() {
               />
               {/* Credits */}
               <div className="flex flex-col">
-              <span className="text-sm font-semibold font-kodemono w-full"> {agent?.name || 'Agent Name'} </span>
-              <span className="text-gradient">{agentBalance?.toLocaleString() || 0}</span>
+                <span className="text-sm font-semibold font-kodemono w-full"> {agent?.name || 'Agent Name'} </span>
+                <span className="text-gradient">{agentBalance?.toLocaleString() || 0}</span>
               </div>
 
             </Link>
             <Link href="/" className="flex items-center text-white font-kodemono md:gap-2">
               <span className="icon-dashboard-active md:gap-2" /> <span className="hidden md:inline-block">Overview</span>
             </Link>
-            
+
             <Link
               href="/markets"
               className="flex items-center group md:gap-2"
@@ -358,46 +337,44 @@ export default function Dashboard() {
       </aside>
 
       {/* Main Content */}
-
-
       <main className="flex-1 ml-0 md:ml-64 container mt-14 md:mt-0 mx-auto px-4 py-6 md:px-8 md:py-8 min-w-full md:min-w-[800px] max-w-full md:max-w-[800px]">
         {/* Top bar with toggles */}
 
         <div className="flex flex-row justify-between h-32">
-          
+
           <div className="pr-8 pt-2">
-              <h1 className="font-bold mb-2 font-kodemono ">
-                Overview
-              </h1>
-              <p className="text-gray-500 h1paragraph">
+            <h1 className="font-bold mb-2 font-kodemono ">
+              Overview
+            </h1>
+            <p className="text-gray-500 h1paragraph">
               See how your bets and predictions are performing. Get a quick overview of your success rate, bet size, and more.
-              </p>
+            </p>
           </div>
-          
+
           <div className="home hidden md:inline-block"></div>
         </div>
-        
+
 
         {predictions && predictions.length > 0 && (
           <div className="grid gap-6 md:grid-cols-4 mb-6">
-              
-              <StatCard
-                icon={<FaRocket />}
-                title="Bets"
-                
-                value={predictions
-                  .reduce((acc, curr) => acc + curr.bets_count, 0)
-                  .toString()}
-                  className="backbutton"
-              />
-         
-              <StatCard
-                icon={<FaDatabase />}
-                title="Predictions"
-                value={predictions.length.toString()}
-                className="backbutton"
-              />
-            
+
+            <StatCard
+              icon={<FaRocket />}
+              title="Bets"
+
+              value={predictions
+                .reduce((acc, curr) => acc + curr.bets_count, 0)
+                .toString()}
+              className="backbutton"
+            />
+
+            <StatCard
+              icon={<FaDatabase />}
+              title="Predictions"
+              value={predictions.length.toString()}
+              className="backbutton"
+            />
+
             <StatCard
               icon={<FaChartLine />}
               title="Success"
@@ -500,19 +477,32 @@ export default function Dashboard() {
                 <Spinner size="lg" />
               </div>
             )}
-            {!isLoadingBets && bets.length === 0 && (
-              <div className="text-center text-gray-500 py-8">No bets found</div>
-            )}
 
-            
+            {!isLoadingBets && (
+              (!agent || !agent.interests || agent.interests.length === 0) ? (
+                <div className="flex items-center justify-center text-center text-gray-500 w-full h-[500px] border border-gray-500 p-4 rounded-lg">
+                  <div className="flex flex-col items-center">
+                    <div className="map-center items-center "></div>
+                    <p className="text-gray-500 py-4 w-80">
+                      You haven’t created your AI agents strategy yet. Before it can bet create the strategy and choose your area of interest.
+                    </p>
+                    <Button onPress={() => router.push("/editProfile")} color="primary" variant="flat" className="min-w-[200px] h-[40px] text-white background-gradient-red">
+                      Create Strategy
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  {bets.length === 0 && (
+                    <div className="text-center text-gray-500 py-8">No bets found</div>
+                  )}
+                </>
+              )
+            )}
 
             {/* Table Header */}
             {bets.length > 0 && (
-              
-              
-
               <table className="w-full text-sm text-left">
-                
                 <tbody>
                   {filterBets(bets, searchTerm).map((bet, index) => (
                     <tr
@@ -543,7 +533,7 @@ export default function Dashboard() {
                             {/* A second line for date and chip, side by side at md */}
                             <div className="flex flex-row md:flex-row gap-2 items-start sm:items-start">
                               <span className="text-default-400">
-                              {bet.resolution_date
+                                {bet.resolution_date
                                   ? format(new Date(bet.resolution_date), "MM/dd/yy")
                                   : ""}
                               </span>
@@ -594,24 +584,9 @@ export default function Dashboard() {
               </div>
             )}
             {!hasMoreBets && bets.length > 0 && (
-              // <div className="text-center text-gray-500 py-4">
-              //   No more bets to load
-              // </div>
-
-              <div className="flex items-center justify-center text-center text-gray-500 w-full h-[500px] border border-gray-500 p-4 rounded-lg">
-                
-                <div className="flex flex-col items-center">
-                <div className="map-center items-center "></div>
-                
-                <p className="text-gray-500 py-4 w-80">
-                You haven’t created your AI agents strategy yet. Before it can bet create the strategy and choose your area of interest.
-                </p>
-                <Button color="primary" variant="flat" className="min-w-[200px] h-[40px] text-white background-gradient-red">
-                  Create Strategy
-                </Button>
-                </div>
+              <div className="text-center text-gray-500 py-4">
+                No more bets to load
               </div>
-
             )}
           </section>
         )}
@@ -624,13 +599,28 @@ export default function Dashboard() {
                 <Spinner size="lg" />
               </div>
             )}
-            {!isLoadingPredictions && predictions.length === 0 && (
-              <div className="text-center text-gray-500 py-8 container">
-                No predictions found
-              </div>
-            )}
 
-            
+            {!isLoadingPredictions && (
+              (!agent || !agent.interests || agent.interests.length === 0) ? (
+                <div className="flex items-center justify-center text-center text-gray-500 w-full h-[500px] border border-gray-500 p-4 rounded-lg">
+                  <div className="flex flex-col items-center">
+                    <div className="map-center items-center "></div>
+                    <p className="text-gray-500 py-4 w-80">
+                      You haven’t created your AI agents strategy yet. Before it can bet create the strategy and choose your area of interest.
+                    </p>
+                    <Button onPress={() => router.push("/editProfile")} color="primary" variant="flat" className="min-w-[200px] h-[40px] text-white background-gradient-red">
+                      Create Strategy
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  {predictions.length === 0 && (
+                    <div className="text-center text-gray-500 py-8">No predictions found</div>
+                  )}
+                </>
+              )
+            )}
 
             {/* Predictions Table */}
             {displayedPredictions.length > 0 && (
@@ -666,12 +656,12 @@ export default function Dashboard() {
                               {/* Date, bet count, and Chip row */}
                               <div className="flex flex-row gap-2 items-start sm:items-start">
                                 <span className="text-default-400">
-                                {prediction.resolution_date
-                                  ? format(new Date(prediction.resolution_date), "MM/dd/yy")
-                                  : ""}
+                                  {prediction.resolution_date
+                                    ? format(new Date(prediction.resolution_date), "MM/dd/yy")
+                                    : ""}
                                 </span>
                                 <span className="text-default-400">
-                                  {prediction.bets_count} 
+                                  {prediction.bets_count}
                                 </span>
                                 <Chip
                                   color={
@@ -685,8 +675,8 @@ export default function Dashboard() {
                                   {prediction.status === "open"
                                     ? "Open"
                                     : prediction.outcome === prediction.creator_choice
-                                    ? "Win"
-                                    : "Loss"}
+                                      ? "Win"
+                                      : "Loss"}
                                 </Chip>
                               </div>
                             </div>

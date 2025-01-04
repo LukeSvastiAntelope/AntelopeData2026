@@ -6,7 +6,6 @@ import { Progress } from "@nextui-org/progress";
 import { Divider } from "@nextui-org/divider";
 import { Skeleton } from "@nextui-org/skeleton";
 import { Button } from "@nextui-org/button";
-import { FaRocket, FaDatabase, FaChartLine, FaShieldAlt } from "react-icons/fa";
 import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
 import { useFetch } from "@/app/utils/lib";
@@ -163,9 +162,9 @@ export default function StrategyPage() {
   const [agent, setAgent] = useState<IAgentProfile | null>(null);
   const [resolutionDate, setResolutionDate] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [totalPredictions, setTotalPredictions] = useState(0);
-  const [totalBets, setTotalBets] = useState(0);
-  const [successRate, setSuccessRate] = useState(0);
+  const [, setTotalPredictions] = useState(0);
+  const [, setTotalBets] = useState(0);
+  const [, setSuccessRate] = useState(0);
   const [agentBalance, setAgentBalance] = useState(0);
   const fetch = useFetch();
 
@@ -454,25 +453,6 @@ export default function StrategyPage() {
     </div>
   );
 }
-
-interface StatCardProps {
-  icon: React.ReactNode;
-  title: string;
-  value: string;
-  className?: string;
-}
-
-const StatCard = ({ icon, title, value, className }: StatCardProps) => (
-  <Card className={`bg-content0 shadow-md hover:shadow-lg transition-shadow duration-300 ${className}`}>
-    <CardBody className="flex flex-row items-center gap-4">
-      <div className="text-primary text-xl">{icon}</div>
-      <div>
-        <p className="text-default-500">{title}</p>
-        <p className="text-2xl font-regular">{value}</p>
-      </div>
-    </CardBody>
-  </Card>
-);
 
 interface PrincipleCardProps {
   title: string;
