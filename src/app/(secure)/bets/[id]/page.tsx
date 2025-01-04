@@ -223,7 +223,7 @@ export default function BetDetailPage() {
                     color="default"
                     variant="light"
                     onPress={() => router.back()}
-                    className="mb-4 text-small p-0 bg-backbutton"
+                    className="mb-4 text-small p-0 subtlebackground backbutton"
                 >
                     ← Back
                 </Button>
@@ -242,7 +242,7 @@ export default function BetDetailPage() {
                                 <h3 className="text-lg font-semibold mb-2">{bet.description}</h3>
                                 <div className="flex gap-3 items-center">
                                     <Chip size="sm" color="default">{bet.source}</Chip>
-                                    <span className="text-default-400">
+                                    <span className="text-default-400 text-small">
                                         {bet.status === "open"
                                             ? `Created ${new Date(bet.created_at).toLocaleDateString()}`
                                             : `Resolved ${new Date(bet.resolution_date).toLocaleDateString()}`
@@ -258,7 +258,7 @@ export default function BetDetailPage() {
                             <p className="text-default-600 leading-relaxed">{bet.reason}</p>
                             <div className="w-full mt-8">
                                 <h2 className="text-lg font-semibold mb-4">Bet Details</h2>
-                                <div className="grid grid-cols-2 grid-rows-4 gap-8">
+                                <div className="grid grid-cols-2 grid-rows-4 gap-4">
                                     <div>
                                         <h3 className="text-sm font-medium text-default-400 mb-1 ">Status</h3>
                                         <Chip color={bet.status !== "open" ? (bet.outcome === bet.choice ? "success" : "danger") : "primary"} className="bg-primary/20">
@@ -293,7 +293,7 @@ export default function BetDetailPage() {
 
                             <div className="mt-8">
                                 {pineconeData && (
-                                    <div className="mt-8">
+                                    <div className="mt-0">
                                         <h2 className="text-xl font-semibold mb-4">Source Information</h2>
                                         <div className="bg-default-50 rounded-lg p-4 border border-default-200">
                                             <div className="grid gap-4">

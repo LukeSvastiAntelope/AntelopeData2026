@@ -501,23 +501,25 @@ export default function MarketsPage() {
                             )}
 
                             {/* Text block */}
-                            <div className="flex flex-col w-full md:flex-row gap-2 items-start">
+                            <div className="flex flex-col w-full md:flex-row gap-8 items-start">
                               {/* Description as its own line */}
                               <p className="mb-1 break-words w-full">
                                 {prediction.description}
                               </p>
 
                               {/* Next line for date, bet_amount, and chip */}
+                             
                               <div className="flex flex-row gap-2 items-start sm:items-center">
+                              <span className="text-default-400">
+                                  {prediction.bet_amount}
+                                </span>
                                 <span className="text-default-400">
                                   {formatDate(
                                     prediction.resolution_date || prediction.created_at,
-                                    "MM/dd/yyyy"
+                                    "MM/dd/yy"
                                   )}
                                 </span>
-                                <span className="text-default-400">
-                                  {prediction.bet_amount}
-                                </span>
+                              
                                 <Chip
                                   color={
                                     prediction.status !== "open"
@@ -600,7 +602,7 @@ export default function MarketsPage() {
                             )}
 
                             {/* Text block */}
-                            <div className="flex flex-col w-full md:flex-row gap-2 items-start">
+                            <div className="flex flex-col w-full md:flex-row gap-4 items-start">
                               {/* Description as its own line */}
                               <p className="break-words w-full">
                                 {item.description}
@@ -608,12 +610,13 @@ export default function MarketsPage() {
 
                               {/* A second row for date, bet_amount, and Chip */}
                               <div className="flex flex-row gap-2 items-start sm:items-center">
+                              <span className="text-default-400">
+                                  {item.bet_amount}
+                                </span>
                                 <span className="text-default-400">
                                   {formatDate(item.resolution_date || item.created_at, "MM/dd/yyyy")}
                                 </span>
-                                <span className="text-default-400">
-                                  {item.bet_amount}
-                                </span>
+                           
                                 <Chip
                                   color={
                                     item.status !== "open"
@@ -694,7 +697,7 @@ export default function MarketsPage() {
                             )}
 
                             {/* Text block */}
-                            <div className="flex flex-col w-full md:flex-row gap-2 items-start w-full">
+                            <div className="flex flex-col w-full md:flex-row gap-4 items-start w-full">
                               {/* Description on its own line */}
                               <p className="break-words w-full">
                                 {item.description}
@@ -706,12 +709,13 @@ export default function MarketsPage() {
 
                               {/* A second row for date, bet_amount, and Chip */}
                               <div className="flex flex-row gap-2 items-start sm:items-center">
+                              <span className="text-default-400">
+                                  {item.bet_amount}
+                                </span>
                                 <span className="text-default-400">
                                   {formatDate(item.resolution_date || item.created_at, "MM/dd/yyyy")}
                                 </span>
-                                <span className="text-default-400">
-                                  {item.bet_amount}
-                                </span>
+                            
                                 <Chip
                                   color={
                                     item.status !== "open"
