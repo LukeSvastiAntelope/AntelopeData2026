@@ -4,6 +4,7 @@ import { Pinecone } from '@pinecone-database/pinecone';
 import { getJson } from 'serpapi';
 import { IAgentProfile, Prediction, BetDecision, NewsItem, GroupedPredictions } from '../interface';
 import { PineconeRecord } from '@pinecone-database/pinecone';
+import axios from 'axios';
 
 interface SimilarPredictionMetadata {
     description: string;
@@ -43,12 +44,35 @@ interface PredictionAnalysis {
     riskAssessment: string;
 }
 
+interface MarketData {
+    symbol: string;
+    price: number;
+    change24h?: number;
+    volume24h?: number;
+    lastUpdated?: string;
+}
+
+interface SerpFinanceResult {
+    knowledge_graph?: {
+        stock_price?: string;
+        price_change?: string;
+        volume?: string;
+    };
+    financial_results?: {
+        price: string;
+        change: string;
+        volume: string;
+    }[];
+}
+
 export class AutomaticBettingAgent {
     private agent: IAgentProfile;
     private openai: OpenAI;
     private pinecone: Pinecone;
     private SERPAPI_API_KEY = process.env.SERPAPI_API_KEY!;
     private newsCache: Map<string, NewsItem[]> = new Map();
+    private COINMARKETCAP_API_KEY = process.env.COINMARKETCAP_API_KEY!;
+    private COINMARKETCAP_BASE_URL = 'https://pro-api.coinmarketcap.com/v1';
 
     constructor(agent: IAgentProfile) {
         this.agent = agent;
@@ -74,9 +98,16 @@ export class AutomaticBettingAgent {
     async analyzePredictions(predictions: Prediction[]): Promise<BetDecision[]> {
         try {
             const openPredictions = predictions.filter(p => p.creator_id !== this.agent.user_id);
-            const isSportsCategory = this.isSportsCategory();
-            const categoryPredictions = openPredictions.filter(p => isSportsCategory ? p.source == "sportDB" : p.source == "google_news");
+            const predictionSource = this.getPredictionSource();
             
+            // Filter predictions based on source
+            const categoryPredictions = openPredictions.filter(p => p.source === predictionSource);
+            
+            // Add market data enrichment if needed
+            if (predictionSource === 'google_finance' || predictionSource === 'coinmarketcap') {
+                await this.enrichPredictionsWithMarketData(categoryPredictions);
+            }
+
             // Fix: Use Promise.all with map first, then filter
             const interestingPredictions = (
                 await Promise.all(
@@ -141,8 +172,15 @@ export class AutomaticBettingAgent {
         AGENT INTERESTS: ${this.agent.interests.map(interest => interest.toLowerCase()).join(', ')}
         AGENT CATEGORY: ${this.agent.category}
         PREDICTION: ${prediction.description}
+        ${prediction.marketData ? `
+        MARKET DATA:
+        - Current Price: ${prediction.marketData.price}
+        - 24h Change: ${prediction.marketData.change24h || prediction.marketData.change}%
+        - Volume: ${prediction.marketData.volume24h || prediction.marketData.volume}
+        ` : ''}
 
         Rules:
+        - For markets/crypto predictions, consider current market data and trends
         - For sports predictions, only consider if they match agent's category
         - Consider both direct matches and indirect connections
         - Include related industries, topics, and potential impacts
@@ -666,6 +704,161 @@ export class AutomaticBettingAgent {
             console.error('Error storing bet in Pinecone:', error);
             return '';
         }
+    }
+
+    private getPredictionSource(): string {
+        const category = this.agent.category.toLowerCase();
+        if (category === 'markets') return 'google_finance';
+        if (category === 'crypto') return 'coinmarketcap';
+        if (this.isSportsCategory()) return 'sportDB';
+        return 'google_news';
+    }
+
+    private async enrichPredictionsWithMarketData(predictions: Prediction[]): Promise<void> {
+        const source = this.getPredictionSource();
+
+        for (const prediction of predictions) {
+            try {
+                let marketData: MarketData | null = null;
+
+                if (source === 'coinmarketcap') {
+                    marketData = await this.getCryptoMarketData(prediction);
+                } else if (source === 'google_finance') {
+                    marketData = await this.getStockMarketData(prediction);
+                }
+
+                if (marketData) {
+                    prediction.marketData = marketData;
+                    prediction.betReason = prediction.betReason || [];
+                    prediction.betReason.push({
+                        step: "marketData",
+                        reasoning: `Current price: $${marketData.price.toFixed(2)}${
+                            marketData.change24h ? `, 24h change: ${marketData.change24h.toFixed(2)}%` : ''
+                        }`
+                    });
+                }
+            } catch (error) {
+                console.error(`Error enriching prediction ${prediction.id} with market data:`, error);
+            }
+
+            // Add delay between API calls to respect rate limits
+            await new Promise(resolve => setTimeout(resolve, 1200)); // 1.2s delay
+        }
+    }
+
+    private async getCryptoMarketData(prediction: Prediction): Promise<MarketData | null> {
+        try {
+            const symbol = this.extractCryptoSymbol(prediction.description);
+            if (!symbol) return null;
+
+            // Using CoinMarketCap Basic plan endpoints
+            const response = await axios.get(`${this.COINMARKETCAP_BASE_URL}/cryptocurrency/quotes/latest`, {
+                headers: {
+                    'X-CMC_PRO_API_KEY': this.COINMARKETCAP_API_KEY,
+                },
+                params: {
+                    symbol: symbol,
+                    convert: 'USD'
+                }
+            });
+
+            const data = response.data.data[symbol];
+            if (!data) return null;
+
+            return {
+                symbol,
+                price: data.quote.USD.price,
+                change24h: data.quote.USD.percent_change_24h,
+                volume24h: data.quote.USD.volume_24h,
+                lastUpdated: data.quote.USD.last_updated
+            };
+        } catch (error) {
+            console.error('Error fetching crypto market data:', error);
+            if (axios.isAxiosError(error) && error.response) {
+                console.error('CoinMarketCap API error:', error.response.data);
+            }
+            return null;
+        }
+    }
+
+    private async getStockMarketData(prediction: Prediction): Promise<MarketData | null> {
+        try {
+            const symbol = this.extractStockSymbol(prediction.description);
+            if (!symbol) return null;
+
+            const result = await getJson({
+                engine: "google_finance",
+                q: symbol,
+                api_key: this.SERPAPI_API_KEY
+            }) as SerpFinanceResult;
+
+            // Try to get data from knowledge graph first, then fall back to financial results
+            let price: number = 0;
+            let change: number = 0;
+            let volume: string = '';
+
+            if (result.knowledge_graph) {
+                price = parseFloat(result.knowledge_graph.stock_price?.replace(/[^0-9.-]/g, '') || '0');
+                change = parseFloat(result.knowledge_graph.price_change?.replace(/[^0-9.-]/g, '') || '0');
+                volume = result.knowledge_graph.volume || '';
+            } else if (result.financial_results?.[0]) {
+                price = parseFloat(result.financial_results[0].price.replace(/[^0-9.-]/g, '') || '0');
+                change = parseFloat(result.financial_results[0].change.replace(/[^0-9.-]/g, '') || '0');
+                volume = result.financial_results[0].volume || '';
+            }
+
+            if (!price) return null;
+
+            return {
+                symbol,
+                price,
+                change24h: change,
+                volume24h: parseFloat(volume.replace(/[^0-9.-]/g, '') || '0'),
+                lastUpdated: new Date().toISOString()
+            };
+        } catch (error) {
+            console.error('Error fetching stock market data:', error);
+            return null;
+        }
+    }
+
+    private extractCryptoSymbol(description: string): string | null {
+        // Improved crypto symbol extraction
+        // Look for common patterns: (BTC), BTC/USD, $BTC, etc.
+        const patterns = [
+            /\(([A-Z]{3,})\)/, // (BTC)
+            /([A-Z]{3,})\/USD/, // BTC/USD
+            /\$([A-Z]{3,})/, // $BTC
+            /#([A-Z]{3,})/, // #BTC
+            /\b(BTC|ETH|USDT|BNB|XRP|ADA|SOL|DOT|DOGE|SHIB)\b/ // Common crypto symbols
+        ];
+
+        for (const pattern of patterns) {
+            const match = description.match(pattern);
+            if (match && match[1]) {
+                return match[1];
+            }
+        }
+        return null;
+    }
+
+    private extractStockSymbol(description: string): string | null {
+        // Improved stock symbol extraction
+        // Look for common patterns: $AAPL, (AAPL), AAPL stock, etc.
+        const patterns = [
+            /\$([A-Z]{1,5})\b/, // $AAPL
+            /\(([A-Z]{1,5})\)/, // (AAPL)
+            /\b([A-Z]{1,5})\s+(?:stock|share)/i, // AAPL stock
+            /\b([A-Z]{1,5})\b(?=.*(?:price|market|trading|nasdaq|nyse))/i // AAPL ... price/market/etc
+        ];
+
+        for (const pattern of patterns) {
+            const match = description.match(pattern);
+            if (match && match[1]) {
+                return match[1];
+            }
+        }
+        return null;
     }
 }
 

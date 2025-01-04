@@ -138,6 +138,13 @@ export interface Prediction {
         step: string;
         reasoning: string;
     }>;
+    marketData?: {
+        price: number;
+        change?: number;
+        change24h?: number;
+        volume24h?: number;
+        volume?: number;
+    };
 }
 
 export interface GroupAnalysis {
