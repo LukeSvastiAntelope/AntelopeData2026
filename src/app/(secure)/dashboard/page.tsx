@@ -542,11 +542,15 @@ export default function Dashboard() {
 
                             {/* A second line for date and chip, side by side at md */}
                             <div className="flex flex-row md:flex-row gap-2 items-start sm:items-start">
-                              <span className="text-default-400">
+                              
+                              <span className="icon-coin icon-text">
+                                {bet.amount}
+                              </span>
+                              {/* <span className="text-default-400">
                               {bet.resolution_date
                                   ? format(new Date(bet.resolution_date), "MM/dd/yy")
                                   : ""}
-                              </span>
+                              </span> */}
                               <Chip
                                 color={
                                   bet.status !== "open"
@@ -594,9 +598,14 @@ export default function Dashboard() {
               </div>
             )}
             {!hasMoreBets && bets.length > 0 && (
-              // <div className="text-center text-gray-500 py-4">
+           
+           
+           // <div className="text-center text-gray-500 py-4">
               //   No more bets to load
               // </div>
+              
+
+// FOR DEAN
 
               <div className="flex items-center justify-center text-center text-gray-500 w-full h-[500px] border border-gray-500 p-4 rounded-lg">
                 

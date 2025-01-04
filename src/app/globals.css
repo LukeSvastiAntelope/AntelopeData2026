@@ -217,6 +217,21 @@ max-width: 80px;
   min-height: 80px;
 }
 
+.icon-coin {
+  background-image: url('/assets/images/coin.svg');
+  background-size: 10px 10px;
+  background-repeat: no-repeat;
+  background-position: center;
+  padding-left: 16px;
+  margin-right: 16px;
+  width: 10px;
+  height: 20px;
+}
+
+.icon-text {
+  color: #f87719;
+}
+
 .home {
   background-image: url('/assets/images/home.svg');
   background-size: 100px 100px;
