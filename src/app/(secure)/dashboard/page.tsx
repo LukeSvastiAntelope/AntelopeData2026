@@ -532,11 +532,15 @@ export default function Dashboard() {
 
                             {/* A second line for date and chip, side by side at md */}
                             <div className="flex flex-row md:flex-row gap-2 items-start sm:items-start">
-                              <span className="text-default-400">
-                                {bet.resolution_date
+                              
+                              <span className="icon-coin icon-text">
+                                {bet.amount}
+                              </span>
+                              {/* <span className="text-default-400">
+                              {bet.resolution_date
                                   ? format(new Date(bet.resolution_date), "MM/dd/yy")
                                   : ""}
-                              </span>
+                              </span> */}
                               <Chip
                                 color={
                                   bet.status !== "open"
