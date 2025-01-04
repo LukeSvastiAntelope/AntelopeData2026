@@ -75,7 +75,7 @@ export default function AboutPage() {
                             <span className="icon-dashboard mr-2 block group-hover:hidden " />
                             {/* hover icon */}
                             <span className="icon-dashboard-active mr-2 hidden group-hover:block" />
-                            <span className="text-default-400 group-hover:text-white font-kodemono"><span className="hidden md:inline-block">Dashboard</span></span>
+                            <span className="text-default-400 group-hover:text-white font-kodemono"><span className="hidden md:inline-block">Overview</span></span>
                         </Link>
                         <Link
                             href="/markets"

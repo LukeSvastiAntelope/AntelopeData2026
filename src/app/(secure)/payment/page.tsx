@@ -275,7 +275,7 @@ const PaymentPage = () => {
 
             </Link>
           <Link href="/" className="flex items-center gap-2 mb-4 text-white font-kodemono">
-            <span className="icon-dashboard-active mr-2" /> <span className="hidden md:inline-block">Dashboard</span>
+            <span className="icon-dashboard-active mr-2" /> <span className="hidden md:inline-block">Overview</span>
           </Link>
           <Link 
                 href="/markets" 

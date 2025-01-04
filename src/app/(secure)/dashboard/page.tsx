@@ -10,6 +10,7 @@ import { Button } from "@nextui-org/button";
 import { Image } from "@nextui-org/image";
 import { FaRocket, FaDatabase, FaChartLine, FaShieldAlt } from "react-icons/fa";
 import { useFetch } from "@/app/utils/lib";
+import { format } from 'date-fns';
 
 interface IAgentProfile {
   image?: string;
@@ -304,7 +305,7 @@ export default function Dashboard() {
 
             </Link>
             <Link href="/" className="flex items-center text-white font-kodemono md:gap-2">
-              <span className="icon-dashboard-active md:gap-2" /> <span className="hidden md:inline-block">Dashboard</span>
+              <span className="icon-dashboard-active md:gap-2" /> <span className="hidden md:inline-block">Overview</span>
             </Link>
             
             <Link
@@ -362,6 +363,19 @@ export default function Dashboard() {
       <main className="flex-1 ml-0 md:ml-64 container mt-14 md:mt-0 mx-auto px-4 py-6 md:px-8 md:py-8 min-w-full md:min-w-[800px] max-w-full md:max-w-[800px]">
         {/* Top bar with toggles */}
 
+        <div className="flex flex-row justify-between h-32">
+          
+          <div className="pr-8 pt-2">
+              <h1 className="font-bold mb-2 font-kodemono ">
+                Overview
+              </h1>
+              <p className="text-gray-500 h1paragraph">
+              See how your bets and predictions are performing. Get a quick overview of your success rate, bet size, and more.
+              </p>
+          </div>
+          
+          <div className="home hidden md:inline-block"></div>
+        </div>
         
 
         {predictions && predictions.length > 0 && (
@@ -529,9 +543,9 @@ export default function Dashboard() {
                             {/* A second line for date and chip, side by side at md */}
                             <div className="flex flex-row md:flex-row gap-2 items-start sm:items-start">
                               <span className="text-default-400">
-                                {bet.status === "open"
-                                  ? formatDate(bet.resolution_date)
-                                  : formatDate(bet.resolution_date)}
+                              {bet.resolution_date
+                                  ? format(new Date(bet.resolution_date), "MM/dd/yy")
+                                  : ""}
                               </span>
                               <Chip
                                 color={
@@ -580,9 +594,24 @@ export default function Dashboard() {
               </div>
             )}
             {!hasMoreBets && bets.length > 0 && (
-              <div className="text-center text-gray-500 py-4">
-                No more bets to load
+              // <div className="text-center text-gray-500 py-4">
+              //   No more bets to load
+              // </div>
+
+              <div className="flex items-center justify-center text-center text-gray-500 w-full h-[500px] border border-gray-500 p-4 rounded-lg">
+                
+                <div className="flex flex-col items-center">
+                <div className="map-center items-center "></div>
+                
+                <p className="text-gray-500 py-4 w-80">
+                You haven’t created your AI agents strategy yet. Before it can bet create the strategy and choose your area of interest.
+                </p>
+                <Button color="primary" variant="flat" className="min-w-[200px] h-[40px] text-white background-gradient-red">
+                  Create Strategy
+                </Button>
+                </div>
               </div>
+
             )}
           </section>
         )}
@@ -637,7 +666,9 @@ export default function Dashboard() {
                               {/* Date, bet count, and Chip row */}
                               <div className="flex flex-row gap-2 items-start sm:items-start">
                                 <span className="text-default-400">
-                                  {formatDate(prediction.resolution_date)}
+                                {prediction.resolution_date
+                                  ? format(new Date(prediction.resolution_date), "MM/dd/yy")
+                                  : ""}
                                 </span>
                                 <span className="text-default-400">
                                   {prediction.bets_count} 

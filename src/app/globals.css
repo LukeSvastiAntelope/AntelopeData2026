@@ -207,6 +207,27 @@ max-width: 80px;
   min-height: 100px;
 }
 
+.map-center {
+  background-image: url('/assets/images/map.svg');
+  background-size: 80px 80px;
+  background-repeat: no-repeat;
+  background-position: center;
+ 
+  min-width: 80px;
+  min-height: 80px;
+}
+
+.home {
+  background-image: url('/assets/images/home.svg');
+  background-size: 100px 100px;
+  background-repeat: no-repeat;
+  background-position: center;
+  width: 100px;
+  height: 100px;
+  min-width: 100px;
+  min-height: 100px;
+}
+
 .strategy-holder::before {
   content: '';
   background-image: url('/assets/images/strategy_color.svg');
@@ -352,6 +373,15 @@ max-width: 80px;
   background-clip: text;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
+}
+
+.background-gradient {
+  background: linear-gradient(86deg, #7A34E2 -3.84%, #1DA1F2 100%);
+}
+
+.background-gradient-red {
+  background: linear-gradient(223deg, #F88418 15.01%, #F81818 84.75%);
+  
 }
 
 .border-gradient {

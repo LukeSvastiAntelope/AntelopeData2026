@@ -277,7 +277,7 @@ export default function MarketsPage() {
             >
               <span className="icon-dashboard md:gap-2  block group-hover:hidden" />
               <span className="icon-dashboard-active  hidden sm:enlarge-icon group-hover:block" />
-              <span className="text-default-400 group-hover:text-white font-kodemono "><span className="hidden md:inline-block">Dashboard</span>
+              <span className="text-default-400 group-hover:text-white font-kodemono "><span className="hidden md:inline-block">Overview</span>
               </span>
             </Link>
           
@@ -614,7 +614,7 @@ export default function MarketsPage() {
                                   {item.bet_amount}
                                 </span>
                                 <span className="text-default-400">
-                                  {formatDate(item.resolution_date || item.created_at, "MM/dd/yyyy")}
+                                  {formatDate(item.resolution_date || item.created_at, "MM/dd/yy")}
                                 </span>
                            
                                 <Chip
@@ -713,7 +713,7 @@ export default function MarketsPage() {
                                   {item.bet_amount}
                                 </span>
                                 <span className="text-default-400">
-                                  {formatDate(item.resolution_date || item.created_at, "MM/dd/yyyy")}
+                                  {formatDate(item.resolution_date || item.created_at, "MM/dd/yy")}
                                 </span>
                             
                                 <Chip
