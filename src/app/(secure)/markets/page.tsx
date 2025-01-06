@@ -274,7 +274,7 @@ export default function MarketsPage() {
         // Assign ranks handling ties
         let currentRank = 1;
         let previousWinnings = response.leaderboard[0]?.total_winnings;
-        
+
         response.leaderboard.forEach((item: ILeaderboardData) => {
           if (item.total_winnings < previousWinnings) {
             currentRank = currentRank + 1;
@@ -282,7 +282,7 @@ export default function MarketsPage() {
           }
           item.rank = currentRank;
         });
-        
+
         setLeaderboardData(response.leaderboard);
       } else {
         toast.error(response.message || "Failed to fetch leaderboard data");
@@ -299,9 +299,9 @@ export default function MarketsPage() {
     <div className="flex text-white max-w-[1200px]">
       {/* Sidebar */}
       <aside className="md:w-64 md:flex-col md:left-auto left-0 fixed top-0 text-sm w-full">
-      <nav className="flex flex-row md:flex-col gap-4 text-normal justify-evenly py-8 px-4 ">
-        <div className="flex flex-row md:flex-col justify-evenly w-full md:gap-4">
-        <div className="flex hidden md:inline-block items-center ">
+        <nav className="flex flex-row md:flex-col gap-4 text-normal justify-evenly py-8 px-4 ">
+          <div className="flex flex-row md:flex-col justify-evenly w-full md:gap-4">
+            <div className="flex hidden md:inline-block items-center ">
               {/* Large logo for md+ screens */}
               <span className="hidden md:inline-block">
                 <Image
@@ -314,7 +314,7 @@ export default function MarketsPage() {
               </span>
 
               {/* Smaller logo for mobile screens */}
-             
+
             </div>
             {/* Profile Photo */}
             <Link href="/profile" className="md:flex items-center p-2 border border-white/10 profile-border hidden gap-2 mb-2  ">
@@ -327,8 +327,8 @@ export default function MarketsPage() {
               />
               {/* Credits */}
               <div className="flex flex-col">
-              <span className="text-sm font-semibold font-kodemono w-full"> {agent?.name || 'Agent Name'} </span>
-              <span className="text-gradient">{agentBalance?.toLocaleString() || 0}</span>
+                <span className="text-sm font-semibold font-kodemono w-full"> {agent?.name || 'Agent Name'} </span>
+                <span className="text-gradient">{agentBalance?.toLocaleString() || 0}</span>
               </div>
 
             </Link>
@@ -341,10 +341,10 @@ export default function MarketsPage() {
               <span className="text-default-400 group-hover:text-white font-kodemono "><span className="hidden md:inline-block">Overview</span>
               </span>
             </Link>
-          
+
             <Link href="/markets" className="flex items-center md:gap-2 text-white font-kodemono">
-            <span className="icon-markets-active" /> <span className="hidden md:inline-block">Markets</span>
-          </Link>
+              <span className="icon-markets-active" /> <span className="hidden md:inline-block">Markets</span>
+            </Link>
 
             <Link href="/strategy" className="flex items-center md:gap-2 group text-default-400">
               {/* default icon */}
@@ -355,8 +355,8 @@ export default function MarketsPage() {
             </Link>
           </div>
 
-                  <div className="md:hidden min-w-40px min-h-40px max-w-40px max-h-40px center-logo">
-                  </div>
+          <div className="md:hidden min-w-40px min-h-40px max-w-40px max-h-40px center-logo">
+          </div>
 
           <div className="flex flex-row md:flex-col justify-evenly w-full md:gap-4">
             <Link href="/about" className="flex items-center md:gap-2 text-default-400 group">
@@ -385,17 +385,18 @@ export default function MarketsPage() {
       </aside>
       {/* Main Content */}
       <main className="flex-1 ml-0 md:ml-64 container mt-14 md:mt-0  mx-auto py-6 px-4 md:px-8 md:py-8 min-w-full md:min-w-[800px] max-w-full md:max-w-[800px]">
-        
+
         <div className="flex flex-row justify-between h-32">
-          
+
           <div className="pr-8 pt-2">
-              <h1 className="font-bold mb-2 font-kodemono ">
-                Markets
-              </h1>
-              <p className="text-gray-500 h1paragraph">
+            <h1 className="font-bold mb-2 font-kodemono ">
+              Markets
+            </h1>
+            <p className="text-gray-500 h1paragraph">
               Explore other categories, find interesting predictions, refine your approach, and see how top bettors fare.
-              </p>
+            </p>
           </div>
+<<<<<<< Updated upstream
           
           {/* <div className="pie-chart hidden md:inline-block"></div> */}
         </div>
@@ -423,38 +424,39 @@ export default function MarketsPage() {
             value={`${averageBetSize.toFixed(2)}`}
           />
         </div>
+=======
+
+          <div className="pie-chart hidden md:inline-block"></div>
+        </div>
+>>>>>>> Stashed changes
 
         {/* Tabs */}
         <div className="flex gap-2 font-kodemono text-small">
           <button
             onClick={() => setActiveTab("predictions")}
-            className={`px-1 py-2 hover:text-white ${
-              activeTab === "predictions" ? "text-white" : "text-gray-700"
-            }`}
+            className={`px-1 py-2 hover:text-white ${activeTab === "predictions" ? "text-white" : "text-gray-700"
+              }`}
           >
             Predictions
           </button>
           <button
             onClick={() => setActiveTab("sports")}
-            className={`px-1 py-2 hover:text-white ${
-              activeTab === "sports" ? "text-white" : "text-gray-700"
-            }`}
+            className={`px-1 py-2 hover:text-white ${activeTab === "sports" ? "text-white" : "text-gray-700"
+              }`}
           >
             Sports
           </button>
           <button
             onClick={() => setActiveTab("general")}
-            className={`px-1 py-2 hover:text-white ${
-              activeTab === "general" ? "text-white" : "text-gray-700"
-            }`}
+            className={`px-1 py-2 hover:text-white ${activeTab === "general" ? "text-white" : "text-gray-700"
+              }`}
           >
             General
           </button>
           <button
             onClick={() => setActiveTab("leaderboard")}
-            className={`px-1 py-2 hover:text-white ${
-              activeTab === "leaderboard" ? "text-white" : "text-gray-700"
-            }`}
+            className={`px-1 py-2 hover:text-white ${activeTab === "leaderboard" ? "text-white" : "text-gray-700"
+              }`}
           >
             Leaderboard
           </button>
@@ -593,9 +595,13 @@ export default function MarketsPage() {
                               </p>
 
                               {/* Next line for date, bet_amount, and chip */}
-                             
+
                               <div className="flex flex-row gap-2 items-start sm:items-center">
+<<<<<<< Updated upstream
                               <span className="icon-coin icon-text">
+=======
+                                <span className="text-default-400">
+>>>>>>> Stashed changes
                                   {prediction.bet_amount}
                                 </span>
                                 {/* <span className="text-default-400">
@@ -603,9 +609,15 @@ export default function MarketsPage() {
                                     prediction.resolution_date || prediction.created_at,
                                     "MM/dd/yy"
                                   )}
+<<<<<<< Updated upstream
                                 </span> */}
                               
                                 <Chip className="flex-1 text-center text-inherit font-normal w-9 px-1"
+=======
+                                </span>
+
+                                <Chip
+>>>>>>> Stashed changes
                                   color={
                                     prediction.status !== "open"
                                       ? prediction.outcome === prediction.creator_choice
@@ -664,7 +676,7 @@ export default function MarketsPage() {
             )}
 
             {displayedSports.length > 0 && (
-             <div className="rounded-lg p-0 overflow-x-auto">
+              <div className="rounded-lg p-0 overflow-x-auto">
                 <table className="w-full text-sm text-left">
                   <tbody>
                     {displayedSports.map((item, index) => (
@@ -673,8 +685,8 @@ export default function MarketsPage() {
                         className=""
                         onClick={() => router.push(`/sports/${item.id}`)}
                       >
-                       <td colSpan={4} className="p-2 cursor-pointer backbutton ">
-                       <div className="flex flex-row gap-4 items-start">
+                        <td colSpan={4} className="p-2 cursor-pointer backbutton ">
+                          <div className="flex flex-row gap-4 items-start">
                             {/* Thumbnail */}
                             {item.str_thumb && (
                               <Image
@@ -695,13 +707,22 @@ export default function MarketsPage() {
 
                               {/* A second row for date, bet_amount, and Chip */}
                               <div className="flex flex-row gap-2 items-start sm:items-center">
+<<<<<<< Updated upstream
                               <span className="icon-coin icon-text">
+=======
+                                <span className="text-default-400">
+>>>>>>> Stashed changes
                                   {item.bet_amount}
                                 </span>
                                 {/* <span className="text-default-400">
                                   {formatDate(item.resolution_date || item.created_at, "MM/dd/yy")}
+<<<<<<< Updated upstream
                                 </span> */}
                            
+=======
+                                </span>
+
+>>>>>>> Stashed changes
                                 <Chip
                                   color={
                                     item.status !== "open"
@@ -794,7 +815,11 @@ export default function MarketsPage() {
 
                               {/* A second row for date, bet_amount, and Chip */}
                               <div className="flex flex-row gap-2 items-start sm:items-center">
+<<<<<<< Updated upstream
                               <span className="icon-coin icon-text">
+=======
+                                <span className="text-default-400">
+>>>>>>> Stashed changes
                                   {item.bet_amount}
                                 </span>
 
@@ -802,8 +827,13 @@ export default function MarketsPage() {
                          
                                 {/* <span className="text-default-400">
                                   {formatDate(item.resolution_date || item.created_at, "MM/dd/yy")}
+<<<<<<< Updated upstream
                                 </span> */}
                             
+=======
+                                </span>
+
+>>>>>>> Stashed changes
                                 <Chip
                                   color={
                                     item.status !== "open"
@@ -870,7 +900,7 @@ export default function MarketsPage() {
 
                 {/* Rows */}
                 {leaderboardData.map((item) => (
-                  <div 
+                  <div
                     key={item.id}
                     className={`px-6 py-4 grid grid-cols-12 gap-4 border-b border-content3 hover:bg-content2 transition-colors
                       ${item.rank === 1 ? 'bg-content0' : ''} 
@@ -905,7 +935,7 @@ export default function MarketsPage() {
                       {item.total_winnings}
                     </div>
                     <div className="col-span-2 text-foreground-600">{item.bets_count}</div>
-                    <div className="col-span-2 text-primary font-medium">{(item.total_winnings * 100 /item.bets_count).toFixed(2)}%</div>
+                    <div className="col-span-2 text-primary font-medium">{(item.total_winnings * 100 / item.bets_count).toFixed(2)}%</div>
                   </div>
                 ))}
               </div>

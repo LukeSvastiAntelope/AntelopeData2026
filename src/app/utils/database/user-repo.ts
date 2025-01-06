@@ -266,7 +266,15 @@ async function getPredictionsWithoutAgentId(id: number) {
     const [rows] = await db.execute(`
         SELECT 
             predictions.*, 
-            COUNT(bets.id) as bets_count 
+            COUNT(DISTINCT CASE WHEN bets.is_secret = 1 THEN bets.id END) as secret_bets_count,
+            COUNT(DISTINCT CASE WHEN bets.is_secret = 0 THEN bets.id END) as public_bets_count,
+            SUM(CASE WHEN bets.is_secret = 1 AND bets.choice = 'yes' THEN bets.amount ELSE 0 END) as secret_yes_amount,
+            SUM(CASE WHEN bets.is_secret = 1 AND bets.choice = 'no' THEN bets.amount ELSE 0 END) as secret_no_amount,
+            GROUP_CONCAT(
+                CASE WHEN bets.is_secret = 1 
+                THEN CONCAT(bets.id, ':', bets.agent_id, ':', bets.amount, ':', bets.choice)
+                END
+            ) as secret_bets
         FROM predictions 
         LEFT JOIN bets ON predictions.id = bets.prediction_id
         WHERE predictions.agent_id <> ? 
@@ -282,7 +290,13 @@ async function getGeneralData(id: number) {
     const [rows] = await db.execute(`
         SELECT 
             predictions.*, 
-            COUNT(bets.id) as bets_count 
+            COUNT(DISTINCT CASE WHEN bets.is_secret = 1 THEN bets.id END) as secret_bets_count,
+            COUNT(DISTINCT CASE WHEN bets.is_secret = 0 THEN bets.id END) as public_bets_count,
+            GROUP_CONCAT(
+                CASE WHEN bets.is_secret = 1 
+                THEN CONCAT(bets.id, ':', bets.agent_id, ':', bets.amount, ':', bets.choice)
+                END
+            ) as secret_bets
         FROM predictions 
         LEFT JOIN bets ON predictions.id = bets.prediction_id
         WHERE predictions.agent_id <> ? AND predictions.source != "sportDB"
@@ -298,7 +312,14 @@ async function getSportsData(id: number) {
     const [rows] = await db.execute(`
         SELECT 
             predictions.*, 
-            COUNT(bets.id) as bets_count 
+            predictions.*, 
+            COUNT(DISTINCT CASE WHEN bets.is_secret = 1 THEN bets.id END) as secret_bets_count,
+            COUNT(DISTINCT CASE WHEN bets.is_secret = 0 THEN bets.id END) as public_bets_count,
+            GROUP_CONCAT(
+                CASE WHEN bets.is_secret = 1 
+                THEN CONCAT(bets.id, ':', bets.agent_id, ':', bets.amount, ':', bets.choice)
+                END
+            ) as secret_bets
         FROM predictions 
         LEFT JOIN bets ON predictions.id = bets.prediction_id
         WHERE predictions.agent_id <> ? AND predictions.source = "sportDB"
