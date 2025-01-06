@@ -54,7 +54,7 @@ const EditAgentProfile = () => {
     const formData = new FormData();
     formData.append('name', agent.name || "");
     formData.append('description', agent.description || "");
-    formData.append('maxBetSize', agent.maxBetSize.toString() || "0");
+    formData.append('maxBetSize', agent.maxBetSize?.toString() || "0");
     formData.append('interests', agent.interests.join(',') || "");
     formData.append('riskLevel', agent.riskLevel);
     formData.append('conservativeBetSize', agent.conservativeBetSize.toString());
