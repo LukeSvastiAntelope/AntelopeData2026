@@ -201,6 +201,7 @@ export interface IBet {
     pinecone_id: string;
     agent_id: number;
     bet_id?: number;
+
 }
 
 export interface SerpApiNewsResult {
@@ -299,6 +300,8 @@ export interface IPrediction {
     str_thumb: string;
     outcome: string;
     created_at: string;
+    yes_amount?: number;
+    no_amount?: number;
 }
 
 export interface ILeaderboardData {

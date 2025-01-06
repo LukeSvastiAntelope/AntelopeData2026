@@ -177,11 +177,58 @@ async function getBetsByAgentId(id: number) {
 
 async function getBetHistoryByAgentId(id: number, limit: number, offset: number) {
     const db = await getMySQLConnection();
-    const [rows] = await db.execute(
-        `SELECT *, bets.id as bet_id FROM bets JOIN predictions ON bets.prediction_id = predictions.id WHERE bets.agent_id = ? AND is_secret = ? ORDER BY bets.created_at DESC LIMIT ${limit} OFFSET ${offset}`,
-        [id, 0]
+    const [rows] = await db.execute<(RowDataPacket)[]>(
+        `SELECT 
+            b.*, p.*,
+            b.id as bet_id,
+            (
+                SELECT GROUP_CONCAT(
+                    JSON_OBJECT(
+                        'id', id,
+                        'agent_id', agent_id,
+                        'amount', amount,
+                        'choice', choice,
+                        'created_at', created_at
+                    )
+                )
+                FROM bets 
+                WHERE prediction_id = p.id 
+                    AND agent_id != 0 
+                    AND agent_id != ? 
+                    AND choice = 'yes' 
+                    AND is_secret = 0
+            ) as yes_bets,
+            (
+                SELECT GROUP_CONCAT(
+                    JSON_OBJECT(
+                        'id', id,
+                        'agent_id', agent_id,
+                        'amount', amount,
+                        'choice', choice,
+                        'created_at', created_at
+                    )
+                )
+                FROM bets 
+                WHERE prediction_id = p.id 
+                    AND agent_id != 0 
+                    AND agent_id != ? 
+                    AND choice = 'no' 
+                    AND is_secret = 0
+            ) as no_bets
+        FROM bets b 
+        JOIN predictions p ON b.prediction_id = p.id 
+        WHERE b.agent_id = ? AND b.is_secret = 0
+        ORDER BY b.created_at DESC 
+        LIMIT ${limit} OFFSET ${offset}`,
+        [id, id, id]
     );
-    return rows;
+
+    // Parse the JSON strings into arrays
+    return rows.map(row => ({
+        ...row,
+        yes_bets: row.yes_bets ? JSON.parse(`[${row.yes_bets}]`) : [],
+        no_bets: row.no_bets ? JSON.parse(`[${row.no_bets}]`) : []
+    }));
 }
 
 async function createPaymentIntent(paymentId: string, userId: string, agentId: number, amount: number, creditAmount: number, paymentMethod: string, fromAddress: string) {
@@ -266,15 +313,9 @@ async function getPredictionsWithoutAgentId(id: number) {
     const [rows] = await db.execute(`
         SELECT 
             predictions.*, 
-            COUNT(DISTINCT CASE WHEN bets.is_secret = 1 THEN bets.id END) as secret_bets_count,
-            COUNT(DISTINCT CASE WHEN bets.is_secret = 0 THEN bets.id END) as public_bets_count,
-            SUM(CASE WHEN bets.is_secret = 1 AND bets.choice = 'yes' THEN bets.amount ELSE 0 END) as secret_yes_amount,
-            SUM(CASE WHEN bets.is_secret = 1 AND bets.choice = 'no' THEN bets.amount ELSE 0 END) as secret_no_amount,
-            GROUP_CONCAT(
-                CASE WHEN bets.is_secret = 1 
-                THEN CONCAT(bets.id, ':', bets.agent_id, ':', bets.amount, ':', bets.choice)
-                END
-            ) as secret_bets
+            COUNT(DISTINCT CASE WHEN bets.is_secret = 0 THEN bets.id END) as bets_count,
+            SUM(CASE WHEN bets.is_secret = 0 AND bets.choice = 'yes' THEN bets.amount ELSE 0 END) as yes_amount,
+            SUM(CASE WHEN bets.is_secret = 0 AND bets.choice = 'no' THEN bets.amount ELSE 0 END) as no_amount
         FROM predictions 
         LEFT JOIN bets ON predictions.id = bets.prediction_id
         WHERE predictions.agent_id <> ? 
@@ -335,7 +376,7 @@ async function getLeaderboard() {
     const [rows] = await db.execute(`
         SELECT 
             agents.*,
-            COUNT(DISTINCT bets.id) as bets_count
+            COUNT(CASE WHEN bets.is_secret = 0 THEN bets.id END) as bets_count
         FROM agents 
         LEFT JOIN bets ON agents.id = bets.agent_id
         GROUP BY agents.id, agents.total_winnings
@@ -349,11 +390,13 @@ async function getPredictionsByUserId(id: string) {
     const [rows] = await db.execute(`
         SELECT 
             predictions.*, 
-            COUNT(bets.id) as bets_count 
+            COUNT(bets.id) as bets_count,
+            SUM(CASE WHEN bets.choice = 'yes' THEN bets.amount ELSE 0 END) as yes_total_amount,
+            SUM(CASE WHEN bets.choice = 'no' THEN bets.amount ELSE 0 END) as no_total_amount
         FROM predictions 
         LEFT JOIN bets ON predictions.id = bets.prediction_id
-        WHERE predictions.creator_id = ? 
-        GROUP BY predictions.id 
+        WHERE predictions.creator_id = ? AND predictions.agent_id = 0 AND bets.is_secret = 0
+        GROUP BY predictions.id
         ORDER BY predictions.created_at DESC`,
         [id]
     );

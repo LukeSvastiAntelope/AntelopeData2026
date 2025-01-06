@@ -10,7 +10,6 @@ import { Button } from "@nextui-org/button";
 import { Image } from "@nextui-org/image";
 import { FaRocket, FaDatabase, FaChartLine, FaShieldAlt } from "react-icons/fa";
 import { useFetch } from "@/app/utils/lib";
-import { format } from 'date-fns';
 import { IAgentProfile } from "@/app/utils/interface";
 
 
@@ -26,6 +25,7 @@ import {
   PointElement,
   LineElement,
   TimeScale,
+  TooltipItem,
 } from "chart.js";
 import { Scatter } from "react-chartjs-2";
 import 'chartjs-adapter-date-fns';
@@ -55,6 +55,8 @@ interface IPrediction {
   resolution_date: string;
   str_thumb: string;
   outcome: string;
+  yes_total_amount: number;
+  no_total_amount: number;
 }
 
 interface IBet {
@@ -72,6 +74,8 @@ interface IBet {
   resolution_date: string;
   str_thumb?: string;
   bet_id: number;
+  yes_bets: IBet[];
+  no_bets: IBet[];
 }
 
 const ITEMS_PER_PAGE_BETS = 50;
@@ -313,9 +317,8 @@ export default function Dashboard() {
     plugins: {
       tooltip: {
         callbacks: {
-          label: function (context: any) {
-            const rawData = context.raw;
-            return rawData.betName || "Unknown Bet";
+          label: function(context: TooltipItem<'scatter'>) {
+            return (context.raw as {betName: string}).betName || "Unknown Bet";
           },
         },
       },
@@ -330,20 +333,16 @@ export default function Dashboard() {
     },
     scales: {
       x: {
-        type: "time" as const,
+        type: 'time' as const,
         time: {
-          unit: "day",
+          unit: 'day' as const,
         },
-        ticks: {
-          color: "#ccc",
-        },
+        ticks: { color: '#ccc' }
       },
       y: {
-        ticks: {
-          color: "#ccc",
-        },
-      },
-    },
+        ticks: { color: '#ccc' }
+      }
+    }
   };
   // -------------------------------------------------------------------------
 
@@ -368,7 +367,7 @@ export default function Dashboard() {
 
             {/* Profile Photo */}
             <div className="md:flex items-center p-2 border border-white/10 profile-border hidden gap-2 mb-2">
-            
+
               <Image
                 src={agent?.image || "/assets/images/logo-simple.svg"}
                 alt="Profile"
@@ -378,18 +377,18 @@ export default function Dashboard() {
               />
 
               <div className="flex flex-col">
-                
+
                 <Link className="text-sm font-semibold font-kodemono w-full"
-              href="/profile">{agent?.name || "Agent Name"}</Link>
-                
+                  href="/profile">{agent?.name || "Agent Name"}</Link>
+
                 <Link className="text-gradient-red hover-white" href="/payment">
                   <span className="icon-coin-red icon-text">
-                  {agentBalance?.toLocaleString() || 0}
+                    {agentBalance?.toLocaleString() || 0}
                   </span>
                 </Link>
               </div>
             </div>
-            
+
 
             <Link href="/" className="flex items-center text-white font-kodemono md:gap-2">
               <span className="icon-dashboard-active md:gap-2" />
@@ -451,9 +450,6 @@ export default function Dashboard() {
       <main className="flex-1 ml-0 md:ml-64 container mt-14 md:mt-0 mx-auto px-4 py-6 md:px-8 md:py-8 min-w-full md:min-w-[800px] max-w-full md:max-w-[800px]">
         {/* Top bar with toggles */}
 
-        
-
-
         <div className="flex flex-row justify-between h-32">
           <div className="pr-8 pt-2">
             <h1 className="font-bold mb-2 font-kodemono ">Overview</h1>
@@ -465,11 +461,11 @@ export default function Dashboard() {
           {/* <div className="home hidden md:inline-block"></div> */}
         </div>
 
-         {/* Stats Overview */}
-         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8 text-small">
+        {/* Stats Overview */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8 text-small">
           <Link href="/bets">
             <StatCard icon={<FaRocket />} title="Bets" value={totalBets.toString()}
-            className="border border-white/10" />
+              className="border border-white/10" />
           </Link>
           <Link href="/predictions">
             <StatCard
@@ -493,11 +489,9 @@ export default function Dashboard() {
         {/* Graphs */}
         <div className="my-6 w-full" style={{ height: "200px", width: "100%" }}>
           {bets && bets.length > 0 ? (
-            <Scatter 
-            data={scatterData} 
-            options={scatterOptions}
-
-           
+            <Scatter
+              data={scatterData}
+              options={scatterOptions}
             />
           ) : (
             <p>No bets to display in graph.</p>
@@ -527,28 +521,28 @@ export default function Dashboard() {
         {activeTab === "bets" && (
           <section className="rounded-lg overflow-x-auto">
             <div className="flex items-center relative">
-            <span className="absolute inset-y-0 left-0 flex items-center pl-2 pointer-events-none">
-              {/* Search Icon */}
-              <svg
-                aria-hidden="true"
-                className="w-5 h-5 text-gray-700"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                viewBox="0 0 24 24"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <circle cx="10" cy="10" r="7"></circle>
-                <path d="M21 21l-4.35-4.35"></path>
-              </svg>
-            </span>
-            <input
+              <span className="absolute inset-y-0 left-0 flex items-center pl-2 pointer-events-none">
+                {/* Search Icon */}
+                <svg
+                  aria-hidden="true"
+                  className="w-5 h-5 text-gray-700"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  viewBox="0 0 24 24"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <circle cx="10" cy="10" r="7"></circle>
+                  <path d="M21 21l-4.35-4.35"></path>
+                </svg>
+              </span>
+              <input
                 type="text"
                 value={searchTerm}
                 onChange={handleBetSearch}
-                placeholder="Search predictions..."
-              className="w-full p-2 pl-9 rounded-md text-gray-700 focus:outline-none text-small input-search bg-gray-800 placeholder-gray-700"
+                placeholder="Search bets..."
+                className="w-full p-2 pl-9 rounded-md text-gray-700 focus:outline-none text-small input-search bg-gray-800 placeholder-gray-700"
               />
             </div>
 
@@ -568,13 +562,13 @@ export default function Dashboard() {
                 <tbody>
                   {filterBets(bets, searchTerm).map((bet, index) => (
                     <tr
-                      key={bet.bet_id}
+                      key={index}
                       className="cursor-pointer transition-colors hover:bg-gray-700/20"
                       onClick={() => router.push(`/bets/${bet.bet_id}`)}
                     >
                       <td colSpan={5} className="p-2">
                         <div className="flex flex-row gap-4 items-start">
-                          {bet.str_thumb && (
+                          {bet.str_thumb ? (
                             <Image
                               src={bet.str_thumb}
                               alt={bet.description}
@@ -582,6 +576,8 @@ export default function Dashboard() {
                               height={40}
                               className="w-[40px] h-[40px] rounded-full max-w-[40px] max-h-[40px] min-w-[40px] min-h-[40px]"
                             />
+                          ) : (
+                            <div className="w-[40px] h-[40px] rounded-full max-w-[40px] max-h-[40px] min-w-[40px] min-h-[40px] bg-gray-700"></div>
                           )}
                           <div className="flex flex-col md:flex-row gap-2 items-start w-full">
                             <p className="break-words w-full">{bet.description}</p>
@@ -589,6 +585,28 @@ export default function Dashboard() {
                               <span className="icon-coin icon-text">
                                 {bet.amount}
                               </span>
+                              {
+                                bet.yes_bets && bet.yes_bets.length > 0 && (
+                                  <Chip
+                                    color="primary"
+                                    variant="flat"
+                                    size="sm"
+                                  >
+                                    Yes: {bet.yes_bets.reduce((acc, bet) => acc + bet.amount, 0)}
+                                  </Chip>
+                                )
+                              }
+                              {
+                                bet.no_bets && bet.no_bets.length > 0 && (
+                                  <Chip
+                                    color="secondary"
+                                    variant="flat"
+                                    size="sm"
+                                  >
+                                    No: {bet.no_bets.reduce((acc, bet) => acc + bet.amount, 0)}
+                                  </Chip>
+                                )
+                              }
                               <Chip
                                 color={
                                   bet.status !== "open"
@@ -600,11 +618,13 @@ export default function Dashboard() {
                                 variant="flat"
                                 size="sm"
                               >
-                                {bet.status !== "open"
+                                {bet.status === "resolved"
                                   ? bet.outcome === bet.choice
                                     ? "Won"
                                     : "Lost"
-                                  : bet.status}
+                                  : bet.status == "awaiting_confirmation"
+                                    ? "Awaiting"
+                                    : bet.status}
                               </Chip>
                             </div>
                           </div>
@@ -646,29 +666,29 @@ export default function Dashboard() {
         {/* Predictions */}
         {activeTab === "predictions" && (
           <section className="rounded-lg overflow-x-auto mb-8">
-                        <div className="flex items-center relative">
-            <span className="absolute inset-y-0 left-0 flex items-center pl-2 pointer-events-none">
-              {/* Search Icon */}
-              <svg
-                aria-hidden="true"
-                className="w-5 h-5 text-gray-700"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                viewBox="0 0 24 24"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <circle cx="10" cy="10" r="7"></circle>
-                <path d="M21 21l-4.35-4.35"></path>
-              </svg>
-            </span>
-            <input
+            <div className="flex items-center relative">
+              <span className="absolute inset-y-0 left-0 flex items-center pl-2 pointer-events-none">
+                {/* Search Icon */}
+                <svg
+                  aria-hidden="true"
+                  className="w-5 h-5 text-gray-700"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  viewBox="0 0 24 24"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <circle cx="10" cy="10" r="7"></circle>
+                  <path d="M21 21l-4.35-4.35"></path>
+                </svg>
+              </span>
+              <input
                 type="text"
                 value={searchTerm}
                 onChange={handlePredictionSearch}
                 placeholder="Search predictions..."
-              className="w-full p-2 pl-9 rounded-md text-gray-700 focus:outline-none text-small input-search bg-gray-800 placeholder-gray-700"
+                className="w-full p-2 pl-9 rounded-md text-gray-700 focus:outline-none text-small input-search bg-gray-800 placeholder-gray-700"
               />
             </div>
 
@@ -695,7 +715,7 @@ export default function Dashboard() {
                       >
                         <td colSpan={5} className="p-2">
                           <div className="flex flex-row gap-4 items-start w-full">
-                            {prediction.str_thumb && (
+                            {prediction.str_thumb ? (
                               <Image
                                 src={prediction.str_thumb}
                                 alt={prediction.description}
@@ -703,6 +723,8 @@ export default function Dashboard() {
                                 height={40}
                                 className="w-[40px] h-[40px] min-w-[40px] min-h-[40px] rounded-full"
                               />
+                            ) : (
+                              <div className="w-[40px] h-[40px] min-w-[40px] min-h-[40px] rounded-full bg-gray-700"></div>
                             )}
                             <div className="flex flex-col w-full md:flex-row gap-2 items-start">
                               <p className="break-words w-full">
@@ -714,9 +736,23 @@ export default function Dashboard() {
                                     ? format(new Date(prediction.resolution_date), "MM/dd/yy")
                                     : ""}
                                 </span> */}
-                                <span className="text-default-400 icon-user text-primary">
+                                <span className="icon-user text-primary">
                                   {prediction.bets_count}
                                 </span>
+                                <Chip
+                                  color="primary"
+                                  variant="flat"
+                                  size="sm"
+                                >
+                                  Yes: {prediction.yes_total_amount}
+                                </Chip>
+                                <Chip
+                                  color="secondary"
+                                  variant="flat"
+                                  size="sm"
+                                >
+                                  No: {prediction.no_total_amount}
+                                </Chip>
                                 <Chip
                                   color={
                                     prediction.status === "open"
@@ -726,11 +762,13 @@ export default function Dashboard() {
                                   variant="flat"
                                   size="sm"
                                 >
-                                  {prediction.status === "open"
-                                    ? "Open"
-                                    : prediction.outcome === prediction.creator_choice
-                                    ? "Win"
-                                    : "Loss"}
+                                  {prediction.status === "resolved"
+                                    ? prediction.outcome === prediction.creator_choice
+                                      ? "Win"
+                                      : "Loss"
+                                    : prediction.status === "open"
+                                      ? "Open"
+                                      : "Awaiting"}
                                 </Chip>
                               </div>
                             </div>

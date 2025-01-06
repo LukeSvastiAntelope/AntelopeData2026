@@ -5,43 +5,19 @@ import { Image } from "@nextui-org/image";
 import Link from "next/link";
 import { Button } from "@nextui-org/button";
 import { Spinner } from "@nextui-org/spinner";
-import { Chip } from "@nextui-org/chip";
 import { IAgentProfile, IPrediction, ILeaderboardData } from "@/app/utils/interface";
 import { useFetch } from "@/app/utils/lib";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
-import { formatDate } from "date-fns";
-import { FaRocket, FaDatabase, FaChartLine, FaShieldAlt } from "react-icons/fa";
-
-function StatCard({
-  icon,
-  title,
-  value,
-  className = "",
-}: {
-  icon: React.ReactNode;
-  title: string;
-  value: string;
-  className?: string;
-}) {
-  return (
-    <div
-      className={`rounded-lg subtlebackground shadow-md p-4 flex items-center gap-2 ${className}`}
-    >
-      <div className="text-primary text-lg">{icon}</div>
-      <div className="flex flex-row gap-1">
-        <p className="text-default-500 text-small">{title}</p>
-        <p className="text-small font-regular">{value}</p>
-      </div>
-    </div>
-  );
-}
+import { PredictionItem } from "@/app/components/PredictionItem";
 
 export default function MarketsPage() {
-  const [activeTab, setActiveTab] = useState<"predictions" | "sports" | "general" | "leaderboard">("predictions");
+  const [activeTab, setActiveTab] = useState<"predictions" | "sports" | "general" | "crypto" | "markets" | "leaderboard">("predictions");
   const [searchPredictions, setSearchPredictions] = useState("");
   const [searchSports, setSearchSports] = useState("");
   const [searchGeneral, setSearchGeneral] = useState("");
+  const [searchCrypto, setSearchCrypto] = useState("");
+  const [searchMarkets, setSearchMarkets] = useState("");
   const [agent, setAgent] = useState<IAgentProfile | null>(null);
   const [agentBalance, setAgentBalance] = useState(0);
 
@@ -54,58 +30,34 @@ export default function MarketsPage() {
 
   // Additional data placeholders
   const [sportsData, setSportsData] = useState<IPrediction[]>([]);
-  const [isLoadingSports, setIsLoadingSports] = useState<boolean>(false);
+  const [cryptoData, setCryptoData] = useState<IPrediction[]>([]);
   const [generalData, setGeneralData] = useState<IPrediction[]>([]);
+  const [marketsData, setMarketsData] = useState<IPrediction[]>([]);
+  const [isLoadingSports, setIsLoadingSports] = useState<boolean>(false);
+  const [isLoadingCrypto, setIsLoadingCrypto] = useState<boolean>(false);
   const [isLoadingGeneral, setIsLoadingGeneral] = useState<boolean>(false);
+  const [isLoadingMarkets, setIsLoadingMarkets] = useState<boolean>(false);
 
   const [pageSports, setPageSports] = useState<number>(1);
   const [pageGeneral, setPageGeneral] = useState<number>(1);
+  const [pageMarkets, setPageMarkets] = useState<number>(1);
+  const [pageCrypto, setPageCrypto] = useState<number>(1);
   const [hasMoreSports, setHasMoreSports] = useState<boolean>(true);
   const [hasMoreGeneral, setHasMoreGeneral] = useState<boolean>(true);
+  const [hasMoreMarkets, setHasMoreMarkets] = useState<boolean>(true);
+  const [hasMoreCrypto, setHasMoreCrypto] = useState<boolean>(true);
   const [displayedSports, setDisplayedSports] = useState<IPrediction[]>([]);
   const [displayedGeneral, setDisplayedGeneral] = useState<IPrediction[]>([]);
+  const [displayedMarkets, setDisplayedMarkets] = useState<IPrediction[]>([]);
+  const [displayedCrypto, setDisplayedCrypto] = useState<IPrediction[]>([]);
   // Add leaderboard states (after other state declarations)
   const [leaderboardData, setLeaderboardData] = useState<ILeaderboardData[]>([]);
   const [isLoadingLeaderboard, setIsLoadingLeaderboard] = useState<boolean>(false);
-
-  // New state variables for global market stats
-  const [totalMarkets, setTotalMarkets] = useState<number>(0);
-  const [totalBets, setTotalBets] = useState<number>(0);
-  const [averageBetSize, setAverageBetSize] = useState<number>(0);
-  const [successRate, setSuccessRate] = useState<number>(0);
 
   const ITEMS_PER_PAGE_PREDICTIONS = 50;
 
   const router = useRouter();
   const fetch = useFetch();
-
-  // Example fetch function for aggregated market stats
-  const fetchMarketStats = async () => {
-    try {
-      const response = await fetch.get("/api/getMarketStats");
-      // Suppose our API returns something like:
-      // {
-      //   status: true,
-      //   data: {
-      //     total_markets: number,
-      //     total_bets: number,
-      //     avg_bet_size: number,
-      //     success_rate: number
-      //   }
-      // }
-      if (response.status) {
-        setTotalMarkets(response.data.total_markets || 0);
-        setTotalBets(response.data.total_bets || 0);
-        setAverageBetSize(response.data.avg_bet_size || 0);
-        setSuccessRate(response.data.success_rate || 0);
-      } else {
-        toast.error(response.message || "Failed to fetch market stats");
-      }
-    } catch (error) {
-      console.error("Failed to fetch market stats:", error);
-      toast.error("Failed to fetch market stats.");
-    }
-  };
 
   // Fetch Agent
   useEffect(() => {
@@ -124,14 +76,16 @@ export default function MarketsPage() {
       }
     };
     fetchAgentProfile();
-    // Also fetch overall market stats
-    fetchMarketStats();
   }, []);
 
   // Fetch Predictions
   const fetchPredictions = async () => {
     if (isLoadingPredictions) return;
     setIsLoadingPredictions(true);
+    setIsLoadingSports(true);
+    setIsLoadingGeneral(true);
+    setIsLoadingCrypto(true);
+    setIsLoadingMarkets(true);
 
     try {
       const response = await fetch.get("/api/getPredictions");
@@ -139,6 +93,22 @@ export default function MarketsPage() {
         setPredictions(response.predictions);
         setDisplayedPredictions(response.predictions.slice(0, ITEMS_PER_PAGE_PREDICTIONS));
         setHasMorePredictions(response.predictions.length > ITEMS_PER_PAGE_PREDICTIONS);
+        const sports = response.predictions.filter((prediction: IPrediction) => prediction.source === "sportDB");
+        setSportsData(sports || []);
+        setDisplayedSports(sports.slice(0, ITEMS_PER_PAGE_PREDICTIONS));
+        setHasMoreSports(sports.length > ITEMS_PER_PAGE_PREDICTIONS);
+        const general = response.predictions.filter((prediction: IPrediction) => prediction.source === "google_news");
+        setGeneralData(general || []);
+        setDisplayedGeneral(general.slice(0, ITEMS_PER_PAGE_PREDICTIONS));
+        setHasMoreGeneral(general.length > ITEMS_PER_PAGE_PREDICTIONS);
+        const crypto = response.predictions.filter((prediction: IPrediction) => prediction.source === "coinmarketcap");
+        setCryptoData(crypto || []);
+        setDisplayedCrypto(crypto.slice(0, ITEMS_PER_PAGE_PREDICTIONS));
+        setHasMoreCrypto(crypto.length > ITEMS_PER_PAGE_PREDICTIONS);
+        const markets = response.predictions.filter((prediction: IPrediction) => prediction.source === "google_finance");
+        setMarketsData(markets || []);
+        setDisplayedMarkets(markets.slice(0, ITEMS_PER_PAGE_PREDICTIONS));
+        setHasMoreMarkets(markets.length > ITEMS_PER_PAGE_PREDICTIONS);
       } else {
         toast.error(response.message);
       }
@@ -147,6 +117,10 @@ export default function MarketsPage() {
       setHasMorePredictions(false);
     } finally {
       setIsLoadingPredictions(false);
+      setIsLoadingSports(false);
+      setIsLoadingGeneral(false);
+      setIsLoadingCrypto(false);
+      setIsLoadingMarkets(false);
     }
   };
 
@@ -160,63 +134,9 @@ export default function MarketsPage() {
     }
   };
 
-  // Fetch Sports (placeholder)
-  const fetchSportsData = async () => {
-    if (isLoadingSports) return;
-    setIsLoadingSports(true);
-
-    try {
-      const response = await fetch.get("/api/getSportsData");
-      if (response.status) {
-        setSportsData(response.predictions || []);
-        setDisplayedSports(response.predictions.slice(0, ITEMS_PER_PAGE_PREDICTIONS));
-        setHasMoreSports(response.predictions.length > ITEMS_PER_PAGE_PREDICTIONS);
-      } else {
-        toast.error(response.message);
-      }
-    } catch (error) {
-      console.log(error);
-      toast.error("Failed to fetch sports data");
-      setHasMoreSports(false);
-    } finally {
-      setIsLoadingSports(false);
-    }
-  };
-
-  // Fetch General (placeholder)
-  const fetchGeneralData = async () => {
-    if (isLoadingGeneral) return;
-    setIsLoadingGeneral(true);
-
-    try {
-      const response = await fetch.get("/api/getGeneralData");
-      if (response.status) {
-        setGeneralData(response.predictions || []);
-        setDisplayedGeneral(response.predictions.slice(0, ITEMS_PER_PAGE_PREDICTIONS));
-        setHasMoreGeneral(response.predictions.length > ITEMS_PER_PAGE_PREDICTIONS);
-      } else {
-        toast.error(response.message);
-      }
-    } catch (error) {
-      console.log(error);
-      toast.error("Failed to fetch general data");
-      setHasMoreGeneral(false);
-    } finally {
-      setIsLoadingGeneral(false);
-    }
-  };
 
   // Lazy-load data based on current tab
   useEffect(() => {
-    if (activeTab === "predictions" && predictions.length === 0) {
-      fetchPredictions();
-    }
-    if (activeTab === "sports" && sportsData.length === 0) {
-      fetchSportsData();
-    }
-    if (activeTab === "general" && generalData.length === 0) {
-      fetchGeneralData();
-    }
     if (activeTab == "leaderboard" && leaderboardData.length === 0) {
       fetchLeaderboardData()
     }
@@ -243,6 +163,16 @@ export default function MarketsPage() {
     setPageGeneral(1);
   };
 
+  const handleCryptoSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchCrypto(e.target.value);
+    setPageCrypto(1);
+  };
+
+  const handleMarketsSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchMarkets(e.target.value);
+    setPageMarkets(1);
+  };
+
   const loadMoreSports = () => {
     if (!isLoadingSports && hasMoreSports) {
       const newPage = pageSports + 1;
@@ -260,6 +190,26 @@ export default function MarketsPage() {
       setDisplayedGeneral(nextItems);
       setHasMoreGeneral(nextItems.length < generalData.length);
       setPageGeneral(newPage);
+    }
+  };
+
+  const loadMoreCrypto = () => {
+    if (!isLoadingCrypto && hasMoreCrypto) {
+      const newPage = pageCrypto + 1;
+      const nextItems = cryptoData.slice(0, newPage * ITEMS_PER_PAGE_PREDICTIONS);
+      setDisplayedCrypto(nextItems);
+      setHasMoreCrypto(nextItems.length < cryptoData.length);
+      setPageCrypto(newPage);
+    }
+  };
+
+  const loadMoreMarkets = () => {
+    if (!isLoadingMarkets && hasMoreMarkets) {
+      const newPage = pageMarkets + 1;
+      const nextItems = marketsData.slice(0, newPage * ITEMS_PER_PAGE_PREDICTIONS);
+      setDisplayedMarkets(nextItems);
+      setHasMoreMarkets(nextItems.length < marketsData.length);
+      setPageMarkets(newPage);
     }
   };
 
@@ -301,7 +251,7 @@ export default function MarketsPage() {
       <aside className="md:w-64 md:flex-col md:left-auto left-0 fixed top-0 text-sm w-full">
         <nav className="flex flex-row md:flex-col gap-4 text-normal justify-evenly py-8 px-4 ">
           <div className="flex flex-row md:flex-col justify-evenly w-full md:gap-4">
-            <div className="flex hidden md:inline-block items-center ">
+            <div className="hidden md:inline-block items-center ">
               {/* Large logo for md+ screens */}
               <span className="hidden md:inline-block">
                 <Image
@@ -387,7 +337,6 @@ export default function MarketsPage() {
       <main className="flex-1 ml-0 md:ml-64 container mt-14 md:mt-0  mx-auto py-6 px-4 md:px-8 md:py-8 min-w-full md:min-w-[800px] max-w-full md:max-w-[800px]">
 
         <div className="flex flex-row justify-between h-32">
-
           <div className="pr-8 pt-2">
             <h1 className="font-bold mb-2 font-kodemono ">
               Markets
@@ -396,39 +345,9 @@ export default function MarketsPage() {
               Explore other categories, find interesting predictions, refine your approach, and see how top bettors fare.
             </p>
           </div>
-<<<<<<< Updated upstream
-          
-          {/* <div className="pie-chart hidden md:inline-block"></div> */}
-        </div>
-        
-        {/* New Stats Overview for all markets */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8 text-small">
-          <StatCard
-            icon={<FaRocket />}
-            title="Markets"
-            value={totalMarkets.toString()}
-          />
-          <StatCard
-            icon={<FaDatabase />}
-            title="Bets Placed"
-            value={totalBets.toString()}
-          />
-          <StatCard
-            icon={<FaChartLine />}
-            title="Performance"
-            value={`${successRate.toFixed(2)}%`}
-          />
-          <StatCard
-            icon={<FaShieldAlt />}
-            title="Avg Bet"
-            value={`${averageBetSize.toFixed(2)}`}
-          />
-        </div>
-=======
 
           <div className="pie-chart hidden md:inline-block"></div>
         </div>
->>>>>>> Stashed changes
 
         {/* Tabs */}
         <div className="flex gap-2 font-kodemono text-small">
@@ -452,6 +371,20 @@ export default function MarketsPage() {
               }`}
           >
             General
+          </button>
+          <button
+            onClick={() => setActiveTab("crypto")}
+            className={`px-1 py-2 hover:text-white ${activeTab === "crypto" ? "text-white" : "text-gray-700"
+              }`}
+          >
+            Crypto
+          </button>
+          <button
+            onClick={() => setActiveTab("markets")}
+            className={`px-1 py-2 hover:text-white ${activeTab === "markets" ? "text-white" : "text-gray-700"
+              }`}
+          >
+            Markets
           </button>
           <button
             onClick={() => setActiveTab("leaderboard")}
@@ -549,6 +482,63 @@ export default function MarketsPage() {
           </div>
         )}
 
+        {/* Search Field for General */}
+        {activeTab === "crypto" && (
+          <div className="my-4 relative">
+            <span className="absolute inset-y-0 left-0 flex items-center pl-2 pointer-events-none">
+              {/* Search Icon */}
+              <svg
+                aria-hidden="true"
+                className="w-5 h-5 text-gray-700"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                viewBox="0 0 24 24"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <circle cx="10" cy="10" r="7"></circle>
+                <path d="M21 21l-4.35-4.35"></path>
+              </svg>
+            </span>
+            <input
+              type="text"
+              value={searchCrypto}
+              onChange={handleCryptoSearch}
+              placeholder="Search crypto..."
+              className="w-full p-2 pl-9 rounded-md text-gray-700 focus:outline-none text-small input-search bg-gray-800 placeholder-gray-700"
+            />
+          </div>
+        )}
+
+        {activeTab === "markets" && (
+          <div className="my-4 relative">
+            <span className="absolute inset-y-0 left-0 flex items-center pl-2 pointer-events-none">
+              {/* Search Icon */}
+              <svg
+                aria-hidden="true"
+                className="w-5 h-5 text-gray-700"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                viewBox="0 0 24 24"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <circle cx="10" cy="10" r="7"></circle>
+                <path d="M21 21l-4.35-4.35"></path>
+              </svg>
+            </span>
+            <input
+              type="text"
+              value={searchMarkets}
+              onChange={handleMarketsSearch}
+              placeholder="Search markets..."
+              className="w-full p-2 pl-9 rounded-md text-gray-700 focus:outline-none text-small input-search bg-gray-800 placeholder-gray-700"
+            />
+          </div>
+        )}
+
         {/* PREDICTIONS SECTION */}
         {activeTab === "predictions" && (
           <section className="rounded-lg">
@@ -568,77 +558,11 @@ export default function MarketsPage() {
                 <table className="w-full text-sm text-left">
                   <tbody>
                     {displayedPredictions.map((prediction, index) => (
-                      <tr
+                      <PredictionItem 
                         key={index}
-                        className=""
-                        onClick={() => router.push(`/predictions/${prediction.id}`)}
-                      >
-                        {/* Single cell with flex container to handle responsive layout */}
-                        <td colSpan={4} className="p-2 cursor-pointer backbutton">
-                          <div className="flex flex-row gap-4 items-start">
-                            {/* Thumbnail */}
-                            {prediction.str_thumb && (
-                              <Image
-                                src={prediction.str_thumb}
-                                alt={prediction.description}
-                                width={40}
-                                height={40}
-                                className="w-[40px] h-[40px] min-w-[40px] min-h-[40px] max-w-[40px] max-h-[40px] rounded-full"
-                              />
-                            )}
-
-                            {/* Text block */}
-                            <div className="flex flex-col w-full md:flex-row gap-8 items-start">
-                              {/* Description as its own line */}
-                              <p className="mb-1 break-words w-full">
-                                {prediction.description}
-                              </p>
-
-                              {/* Next line for date, bet_amount, and chip */}
-
-                              <div className="flex flex-row gap-2 items-start sm:items-center">
-<<<<<<< Updated upstream
-                              <span className="icon-coin icon-text">
-=======
-                                <span className="text-default-400">
->>>>>>> Stashed changes
-                                  {prediction.bet_amount}
-                                </span>
-                                {/* <span className="text-default-400">
-                                  {formatDate(
-                                    prediction.resolution_date || prediction.created_at,
-                                    "MM/dd/yy"
-                                  )}
-<<<<<<< Updated upstream
-                                </span> */}
-                              
-                                <Chip className="flex-1 text-center text-inherit font-normal w-9 px-1"
-=======
-                                </span>
-
-                                <Chip
->>>>>>> Stashed changes
-                                  color={
-                                    prediction.status !== "open"
-                                      ? prediction.outcome === prediction.creator_choice
-                                        ? "success"
-                                        : "danger"
-                                      : "primary"
-                                  }
-                                  variant="flat"
-                                  size="sm"
-                                >
-                                  {prediction.status !== "open"
-                                    ? prediction.outcome === prediction.creator_choice
-                                      ? "Won"
-                                      : "Lost"
-                                    : prediction.status}
-                                </Chip>
-                              </div>
-                            </div>
-                          </div>
-                        </td>
-                      </tr>
+                        prediction={prediction}
+                        onClick={(id) => router.push(`/predictions/${id}`)}
+                      />
                     ))}
                   </tbody>
                 </table>
@@ -680,71 +604,11 @@ export default function MarketsPage() {
                 <table className="w-full text-sm text-left">
                   <tbody>
                     {displayedSports.map((item, index) => (
-                      <tr
+                      <PredictionItem 
                         key={index}
-                        className=""
-                        onClick={() => router.push(`/sports/${item.id}`)}
-                      >
-                        <td colSpan={4} className="p-2 cursor-pointer backbutton ">
-                          <div className="flex flex-row gap-4 items-start">
-                            {/* Thumbnail */}
-                            {item.str_thumb && (
-                              <Image
-                                src={item.str_thumb}
-                                alt={item.description}
-                                width={40}
-                                height={40}
-                                className="w-[40px] h-[40px] min-w-[40px] min-h-[40px] max-w-[40px] max-h-[40px] rounded-full"
-                              />
-                            )}
-
-                            {/* Text block */}
-                            <div className="flex flex-col w-full md:flex-row gap-4 items-start">
-                              {/* Description as its own line */}
-                              <p className="break-words w-full">
-                                {item.description}
-                              </p>
-
-                              {/* A second row for date, bet_amount, and Chip */}
-                              <div className="flex flex-row gap-2 items-start sm:items-center">
-<<<<<<< Updated upstream
-                              <span className="icon-coin icon-text">
-=======
-                                <span className="text-default-400">
->>>>>>> Stashed changes
-                                  {item.bet_amount}
-                                </span>
-                                {/* <span className="text-default-400">
-                                  {formatDate(item.resolution_date || item.created_at, "MM/dd/yy")}
-<<<<<<< Updated upstream
-                                </span> */}
-                           
-=======
-                                </span>
-
->>>>>>> Stashed changes
-                                <Chip
-                                  color={
-                                    item.status !== "open"
-                                      ? item.outcome === item.creator_choice
-                                        ? "success"
-                                        : "danger"
-                                      : "primary"
-                                  }
-                                  variant="flat"
-                                  size="sm"
-                                >
-                                  {item.status !== "open"
-                                    ? item.outcome === item.creator_choice
-                                      ? "Won"
-                                      : "Lost"
-                                    : item.status}
-                                </Chip>
-                              </div>
-                            </div>
-                          </div>
-                        </td>
-                      </tr>
+                        prediction={item}
+                        onClick={(id) => router.push(`/predictions/${id}`)}
+                      />
                     ))}
                   </tbody>
                 </table>
@@ -784,78 +648,11 @@ export default function MarketsPage() {
                 <table className="w-full text-sm text-left">
                   <tbody>
                     {displayedGeneral.map((item, index) => (
-                      <tr
+                      <PredictionItem 
                         key={index}
-                        className=""
-                        onClick={() => router.push(`/general/${item.id /* or appropriate link */}`)}
-                      >
-                        <td colSpan={4} className="p-2 cursor-pointer backbutton">
-                          <div className="flex flex-row gap-4 items-start">
-                            {/* Thumbnail */}
-                            {item.str_thumb && (
-                              <Image
-                                src={item.str_thumb}
-                                alt={item.description}
-                                width={40}
-                                height={40}
-                                className="rounded-full max-w-[40px] max-h-[40px] min-w-[40px] min-h-[40px] w-[40px] h-[40px]"
-                              />
-                            )}
-
-                            {/* Text block */}
-                            <div className="flex flex-col w-full md:flex-row gap-4 items-start w-full">
-                              {/* Description on its own line */}
-                              <p className="break-words w-full">
-                                {item.description}
-                              </p>
-                              {/* (Optional) Source on a new line, or combined as needed */}
-                              {/* <p className="mb-1 text-default-400">
-                                {item.source}
-                              </p> */}
-
-                              {/* A second row for date, bet_amount, and Chip */}
-                              <div className="flex flex-row gap-2 items-start sm:items-center">
-<<<<<<< Updated upstream
-                              <span className="icon-coin icon-text">
-=======
-                                <span className="text-default-400">
->>>>>>> Stashed changes
-                                  {item.bet_amount}
-                                </span>
-
-                                
-                         
-                                {/* <span className="text-default-400">
-                                  {formatDate(item.resolution_date || item.created_at, "MM/dd/yy")}
-<<<<<<< Updated upstream
-                                </span> */}
-                            
-=======
-                                </span>
-
->>>>>>> Stashed changes
-                                <Chip
-                                  color={
-                                    item.status !== "open"
-                                      ? item.outcome === item.creator_choice
-                                        ? "success"
-                                        : "danger"
-                                      : "primary"
-                                  }
-                                  variant="flat"
-                                  size="sm"
-                                >
-                                  {item.status !== "open"
-                                    ? item.outcome === item.creator_choice
-                                      ? "Won"
-                                      : "Lost"
-                                    : item.status}
-                                </Chip>
-                              </div>
-                            </div>
-                          </div>
-                        </td>
-                      </tr>
+                        prediction={item}
+                        onClick={(id) => router.push(`/predictions/${id}`)}
+                      />
                     ))}
                   </tbody>
                 </table>
@@ -867,6 +664,92 @@ export default function MarketsPage() {
                   color="primary"
                   variant="flat"
                   onPress={loadMoreGeneral}
+                  className="min-w-[200px]"
+                >
+                  Show More
+                </Button>
+              </div>
+            )}
+          </section>
+        )}
+
+        {/* CRYPTO SECTION */}
+        {activeTab === "crypto" && (
+          <section className="rounded-lg">
+            {isLoadingCrypto && cryptoData.length === 0 && (
+              <div className="flex justify-center items-center py-8">
+                <Spinner size="lg" />
+              </div>
+            )}
+            {!isLoadingCrypto && cryptoData.length === 0 && (
+              <div className="text-center text-gray-500 py-8 container">
+                No crypto data found
+              </div>
+            )}
+            {displayedCrypto.length > 0 && (
+              <div className="rounded-lg p-0 overflow-x-auto">
+                <table className="w-full text-sm text-left">
+                  <tbody>
+                    {displayedCrypto.map((item, index) => (
+                      <PredictionItem 
+                        key={index}
+                        prediction={item}
+                        onClick={(id) => router.push(`/predictions/${id}`)}
+                      />
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            {hasMoreCrypto && !isLoadingCrypto && displayedCrypto.length > 0 && (
+              <div className="flex justify-center mt-4">
+                <Button
+                  color="primary"
+                  variant="flat"
+                  onPress={loadMoreCrypto}
+                  className="min-w-[200px]"
+                >
+                  Show More
+                </Button>
+              </div>
+            )}
+          </section>
+        )}
+
+        {/* MARKETS SECTION */}
+        {activeTab === "markets" && (
+          <section className="rounded-lg">
+            {isLoadingMarkets && marketsData.length === 0 && (
+              <div className="flex justify-center items-center py-8">
+                <Spinner size="lg" />
+              </div>
+            )}
+            {!isLoadingMarkets && marketsData.length === 0 && (
+              <div className="text-center text-gray-500 py-8 container">
+                No markets data found
+              </div>
+            )}
+            {displayedMarkets.length > 0 && (
+              <div className="rounded-lg p-0 overflow-x-auto">
+                <table className="w-full text-sm text-left">
+                  <tbody>
+                    {displayedMarkets.map((item, index) => (
+                      <PredictionItem 
+                        key={index}
+                        prediction={item}
+                        onClick={(id) => router.push(`/predictions/${id}`)}
+                      />
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            {hasMoreMarkets && !isLoadingMarkets && displayedMarkets.length > 0 && (
+              <div className="flex justify-center mt-4">
+                <Button
+                  color="primary"
+                  variant="flat"
+                  onPress={loadMoreMarkets}
                   className="min-w-[200px]"
                 >
                   Show More
