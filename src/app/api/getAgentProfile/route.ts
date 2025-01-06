@@ -14,6 +14,7 @@ export async function GET(req: NextRequest) {
         if (!agent) {
             agent = await UserRepo.createAgent(jwtPayload.email as string);
         }
+        agent.interests = agent.interests ? agent.interests : [];
         if (typeof agent.interests === 'string') {
             agent.interests = agent.interests.split(',');
         }
