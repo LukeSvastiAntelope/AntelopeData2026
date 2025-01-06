@@ -13,6 +13,36 @@ import { useFetch } from "@/app/utils/lib";
 import { format } from 'date-fns';
 import { IAgentProfile } from "@/app/utils/interface";
 
+
+// ------------- ADDED: Chart.js imports -------------
+import {
+  Chart as ChartJS,
+  BarElement,
+  CategoryScale,
+  LinearScale,
+  Title,
+  Tooltip,
+  Legend,
+  PointElement,
+  LineElement,
+  TimeScale,
+} from "chart.js";
+import { Scatter } from "react-chartjs-2";
+import 'chartjs-adapter-date-fns';
+
+ChartJS.register(
+  BarElement,
+  CategoryScale,
+  LinearScale,
+  Title,
+  Tooltip,
+  Legend,
+  PointElement,
+  LineElement,
+  TimeScale
+);
+// ----------------------------------------------------
+
 interface IPrediction {
   id: string;
   description: string;
@@ -78,9 +108,9 @@ function StatCard({
 }) {
   return (
     <div
-      className={`rounded-lg subtlebackground shadow-md p-4 flex items-center gap-2 ${className}`}
+      className={`rounded-lg border border-white/10 shadow-md p-4 flex justify-center items-center gap-2 ${className}`}
     >
-      <div className="text-primary text-lg">{icon}</div>
+      <div className="text-primary text-sm">{icon}</div>
       <div className="flex flex-row gap-1">
         <p className="text-default-500 text-small">{title}</p>
         <p className="text-small font-regular">{value}</p>
@@ -110,6 +140,16 @@ export default function Dashboard() {
   const [displayedPredictions, setDisplayedPredictions] = useState<IPrediction[]>([]);
   const [pagePredictions, setPagePredictions] = useState<number>(1);
   const [hasMorePredictions, setHasMorePredictions] = useState<boolean>(true);
+
+  const totalBets = bets.length;
+  const totalPredictions = predictions.length;
+
+  // For success rate -- example approach
+  const closedBets = bets.filter((bet) => bet.status !== "open");
+  const wonBets = closedBets.filter((bet) => bet.outcome === bet.choice);
+  const successRate = closedBets.length > 0
+    ? (wonBets.length / closedBets.length) * 100
+    : 0;
 
   const fetch = useFetch();
   const router = useRouter();
@@ -186,7 +226,7 @@ export default function Dashboard() {
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries[0].isIntersecting && hasMorePredictions) {
-          setPagePredictions(prev => prev + 1);
+          setPagePredictions((prev) => prev + 1);
         }
       },
       { threshold: 0.1 }
@@ -199,7 +239,7 @@ export default function Dashboard() {
     loadMorePredictions();
 
     return () => observer.disconnect();
-  }, [activeTab, predictions, pagePredictions, searchPredictions]);
+  }, [activeTab, predictions, pagePredictions, searchPredictions, hasMorePredictions]);
 
   // Reset pagination when search term changes
   useEffect(() => {
@@ -209,7 +249,7 @@ export default function Dashboard() {
       setDisplayedPredictions(filteredPredictions.slice(0, ITEMS_PER_PAGE_PREDICTIONS));
       setHasMorePredictions(filteredPredictions.length > ITEMS_PER_PAGE_PREDICTIONS);
     }
-  }, [searchPredictions, activeTab]);
+  }, [searchPredictions, activeTab, predictions]);
 
   // Lazy-fetch predictions
   useEffect(() => {
@@ -217,9 +257,9 @@ export default function Dashboard() {
       fetchPredictions();
       console.log("fetching predictions");
     }
-  }, [activeTab]);
+  }, [activeTab, predictions]);
 
-  // Fetch Agent to show their image
+  // Fetch Agent + Bets + Predictions
   useEffect(() => {
     const fetchAgentProfile = async () => {
       try {
@@ -248,6 +288,65 @@ export default function Dashboard() {
     setSearchPredictions(e.target.value);
   };
 
+  // --------------------------- CREATE SCATTER DATA --------------------------
+  // For each bet, create a single dot with x= resolution date, y= index
+  // We'll show the bet description in a custom tooltip.
+  const scatterData = {
+    datasets: [
+      {
+        label: "Bets Timeline",
+        data: bets.map((bet, index) => {
+          return {
+            x: bet.resolution_date ? new Date(bet.resolution_date) : null,
+            y: index + 1, // or any number that spaces them out
+            betName: bet.description,
+          };
+        }),
+        backgroundColor: "#36A2EB",
+      },
+    ],
+  };
+
+  const scatterOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      tooltip: {
+        callbacks: {
+          label: function (context: any) {
+            const rawData = context.raw;
+            return rawData.betName || "Unknown Bet";
+          },
+        },
+      },
+      legend: {
+        display: false,
+      },
+      title: {
+        display: true,
+        text: "Bet Resolution Timeline",
+        color: "#fff",
+      },
+    },
+    scales: {
+      x: {
+        type: "time" as const,
+        time: {
+          unit: "day",
+        },
+        ticks: {
+          color: "#ccc",
+        },
+      },
+      y: {
+        ticks: {
+          color: "#ccc",
+        },
+      },
+    },
+  };
+  // -------------------------------------------------------------------------
+
   return (
     <div className="flex text-white max-w-[1200px]">
       {/* Sidebar */}
@@ -255,7 +354,7 @@ export default function Dashboard() {
         <nav className="flex flex-row md:flex-col gap-4 text-normal justify-evenly py-8 px-4 ">
           <div className="flex flex-row md:flex-col justify-evenly w-full md:gap-4">
             <div className="flex md:inline-block items-center ">
-              {/* Large logo for md+ screens */}
+              {/* Large logo for md+ */}
               <span className="hidden md:inline-block ">
                 <Image
                   src={"/assets/images/logo-text.svg"}
@@ -268,7 +367,8 @@ export default function Dashboard() {
             </div>
 
             {/* Profile Photo */}
-            <Link href="/profile" className="md:flex items-center p-2 border border-white/10 profile-border hidden gap-2 mb-2  ">
+            <div className="md:flex items-center p-2 border border-white/10 profile-border hidden gap-2 mb-2">
+            
               <Image
                 src={agent?.image || "/assets/images/logo-simple.svg"}
                 alt="Profile"
@@ -276,61 +376,72 @@ export default function Dashboard() {
                 height={32}
                 className="rounded-full bg-gray-700 sm-hidden"
               />
-              {/* Credits */}
-              <div className="flex flex-col">
-                <span className="text-sm font-semibold font-kodemono w-full"> {agent?.name || 'Agent Name'} </span>
-                <span className="text-gradient">{agentBalance?.toLocaleString() || 0}</span>
-              </div>
 
-            </Link>
+              <div className="flex flex-col">
+                
+                <Link className="text-sm font-semibold font-kodemono w-full"
+              href="/profile">{agent?.name || "Agent Name"}</Link>
+                
+                <Link className="text-gradient-red hover-white" href="/payment">
+                  <span className="icon-coin-red icon-text">
+                  {agentBalance?.toLocaleString() || 0}
+                  </span>
+                </Link>
+              </div>
+            </div>
+            
+
             <Link href="/" className="flex items-center text-white font-kodemono md:gap-2">
-              <span className="icon-dashboard-active md:gap-2" /> <span className="hidden md:inline-block">Overview</span>
+              <span className="icon-dashboard-active md:gap-2" />
+              <span className="hidden md:inline-block">Overview</span>
+            </Link>
+
+            <Link href="/markets" className="flex items-center group md:gap-2">
+              <span className="icon-markets block group-hover:hidden " />
+              <span className="icon-markets-active hidden group-hover:block" />
+              <span className="text-default-400 group-hover:text-white font-kodemono">
+                <span className="hidden md:inline-block">Markets</span>
+              </span>
             </Link>
 
             <Link
-              href="/markets"
-              className="flex items-center group md:gap-2"
+              href="/strategy"
+              className="flex items-center group text-default-400 md:gap-2"
             >
-              {/* default icon */}
-              <span className="icon-markets block group-hover:hidden " />
-              {/* hover icon */}
-              <span className="icon-markets-active  hidden group-hover:block" />
-              <span className="text-default-400 group-hover:text-white font-kodemono"><span className="hidden md:inline-block">Markets</span></span>
-            </Link>
-
-            <Link href="/strategy" className="flex items-center group  text-default-400 md:gap-2">
-              {/* default icon */}
               <span className="icon-strategy block group-hover:hidden" />
-              {/* hover icon */}
               <span className="icon-strategy-active hidden sm:enlarge-icon group-hover:block" />
-              <span className="text-default-400 group-hover:text-white font-kodemono"><span className="hidden md:inline-block">Strategy</span></span>
+              <span className="text-default-400 group-hover:text-white font-kodemono">
+                <span className="hidden md:inline-block">Strategy</span>
+              </span>
             </Link>
           </div>
 
-          <div className="md:hidden min-w-40px min-h-40px max-w-40px max-h-40px center-logo">
-          </div>
+          <div className="md:hidden min-w-40px min-h-40px max-w-40px max-h-40px center-logo"></div>
 
           <div className="flex flex-row md:flex-col justify-evenly w-full md:gap-4 ">
             <Link href="/about" className="flex items-center text-default-400 group md:gap-2">
-              {/* default icon */}
-              <span className="icon-about  block group-hover:hidden" />
-              {/* hover icon */}
-              <span className="icon-about-active  hidden group-hover:block" />
-              <span className="text-default-400 group-hover:text-white font-kodemono"><span className="hidden md:inline-block">About</span></span>
+              <span className="icon-about block group-hover:hidden" />
+              <span className="icon-about-active hidden group-hover:block" />
+              <span className="text-default-400 group-hover:text-white font-kodemono">
+                <span className="hidden md:inline-block">About</span>
+              </span>
             </Link>
-            <Link href="https://discord.gg/dSEV8YCDQ2" className="flex items-center md:gap-2  text-default-400 group">
-              {/* default icon */}
+            <Link
+              href="https://discord.gg/dSEV8YCDQ2"
+              className="flex items-center md:gap-2 text-default-400 group"
+            >
               <span className="icon-support block group-hover:hidden" />
-              {/* hover icon */}
-              <span className="icon-support-active  hidden group-hover:block" />
-              <span className="text-default-400 group-hover:text-white font-kodemono"><span className="hidden md:inline-block">Community</span></span>
+              <span className="icon-support-active hidden group-hover:block" />
+              <span className="text-default-400 group-hover:text-white font-kodemono">
+                <span className="hidden md:inline-block">Community</span>
+              </span>
             </Link>
             <Link href="/logout" className="flex items-center text-default-400 group md:gap-2">
-              {/* default icon */}
               <span className="icon-logout block group-hover:hidden" />
-              {/* hover icon */}
-              <span className="icon-logout-active  hidden group-hover:block" />
-              <span className="text-default-400 group-hover:text-white font-kodemono"><span className="hidden md:inline-block">Log out</span></span>
+              <span className="icon-logout-active hidden group-hover:block" />
+              <span className="text-default-400 group-hover:text-white font-kodemono">
+                <span className="hidden md:inline-block">Log out</span>
+              </span>
             </Link>
           </div>
         </nav>
@@ -340,83 +451,84 @@ export default function Dashboard() {
       <main className="flex-1 ml-0 md:ml-64 container mt-14 md:mt-0 mx-auto px-4 py-6 md:px-8 md:py-8 min-w-full md:min-w-[800px] max-w-full md:max-w-[800px]">
         {/* Top bar with toggles */}
 
-        <div className="flex flex-row justify-between h-32">
+        
 
+
+        <div className="flex flex-row justify-between h-32">
           <div className="pr-8 pt-2">
-            <h1 className="font-bold mb-2 font-kodemono ">
-              Overview
-            </h1>
+            <h1 className="font-bold mb-2 font-kodemono ">Overview</h1>
             <p className="text-gray-500 h1paragraph">
-              See how your bets and predictions are performing. Get a quick overview of your success rate, bet size, and more.
+              See how your bets and predictions are performing. Get a quick
+              overview of your success rate, bet size, and more.
             </p>
           </div>
-
-          <div className="home hidden md:inline-block"></div>
+          {/* <div className="home hidden md:inline-block"></div> */}
         </div>
 
-
-        {predictions && predictions.length > 0 && (
-          <div className="grid gap-6 md:grid-cols-4 mb-6">
-
-            <StatCard
-              icon={<FaRocket />}
-              title="Bets"
-
-              value={predictions
-                .reduce((acc, curr) => acc + curr.bets_count, 0)
-                .toString()}
-              className="backbutton"
-            />
-
+         {/* Stats Overview */}
+         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8 text-small">
+          <Link href="/bets">
+            <StatCard icon={<FaRocket />} title="Bets" value={totalBets.toString()}
+            className="border border-white/10" />
+          </Link>
+          <Link href="/predictions">
             <StatCard
               icon={<FaDatabase />}
               title="Predictions"
-              value={predictions.length.toString()}
-              className="backbutton"
+              value={totalPredictions.toString()}
             />
-
-            <StatCard
-              icon={<FaChartLine />}
-              title="Success"
-              value={(
-                (predictions.filter((p) => p.outcome === p.creator_choice).length /
-                  (predictions.length || 1)) *
-                100
-              ).toFixed(2).concat("%")}
-              className="backbutton"
-            />
-
-            <StatCard
-              icon={<FaShieldAlt />}
-              title="Bet Size"
-              value={`${agent?.maxBetSize || 0}`}
-              className="backbutton"
-            />
-
-          </div>
-        )}
-
-        <div className="flex gap-2 font-kodemono text-small">
-          <button
-            onClick={() => setActiveTab("bets")}
-            className={`px-0 py-2 hover:text-white ${activeTab === "bets" ? "text-white" : "text-gray-500"
-              }`}
-          >
-            Bets
-          </button>
-          <button
-            onClick={() => setActiveTab("predictions")}
-            className={`px-1 py-2 hover:text-white ${activeTab === "predictions" ? "text-white" : "text-gray-500"
-              }`}
-          >
-            Predictions
-          </button>
+          </Link>
+          <StatCard
+            icon={<FaChartLine />}
+            title="Success"
+            value={`${Number(successRate || 0).toFixed(2)}%`}
+          />
+          <StatCard
+            icon={<FaShieldAlt />}
+            title="Bet Size"
+            value={`${agent?.maxBetSize || 0}`}
+          />
         </div>
 
-        {/* Search Field for Bets */}
+        {/* Graphs */}
+        <div className="my-6 w-full" style={{ height: "200px", width: "100%" }}>
+          {bets && bets.length > 0 ? (
+            <Scatter 
+            data={scatterData} 
+            options={scatterOptions}
+
+           
+            />
+          ) : (
+            <p>No bets to display in graph.</p>
+          )}
+        </div>
+
+        {/* The rest of your existing code remains the same */}
+        {/* Tabs, bet list, predictions list, etc. */}
+        <div className="flex gap-4 mb-4 mt-8">
+          <Button
+            color={activeTab === "bets" ? "primary" : "default"}
+            variant="flat"
+            onPress={() => setActiveTab("bets")}
+          >
+            Bets
+          </Button>
+          <Button
+            color={activeTab === "predictions" ? "primary" : "default"}
+            variant="flat"
+            onPress={() => setActiveTab("predictions")}
+          >
+            Predictions
+          </Button>
+        </div>
+
+        {/* BETS TAB */}
         {activeTab === "bets" && (
-          <div className="my-4 relative">
+          <section className="rounded-lg overflow-x-auto">
+            <div className="flex items-center relative">
             <span className="absolute inset-y-0 left-0 flex items-center pl-2 pointer-events-none">
+              {/* Search Icon */}
               <svg
                 aria-hidden="true"
                 className="w-5 h-5 text-gray-700"
@@ -432,87 +544,36 @@ export default function Dashboard() {
               </svg>
             </span>
             <input
-              type="text"
-              value={searchTerm}
-              onChange={handleBetSearch}
-              placeholder="Search bets..."
+                type="text"
+                value={searchTerm}
+                onChange={handleBetSearch}
+                placeholder="Search predictions..."
               className="w-full p-2 pl-9 rounded-md text-gray-700 focus:outline-none text-small input-search bg-gray-800 placeholder-gray-700"
-            />
-          </div>
-        )}
+              />
+            </div>
 
-        {/* Search Field for Predictions */}
-        {activeTab === "predictions" && (
-          <div className="my-4 relative">
-            <span className="absolute inset-y-0 left-0 flex items-center pl-2 pointer-events-none">
-              <svg
-                aria-hidden="true"
-                className="w-5 h-5 text-gray-700"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                viewBox="0 0 24 24"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <circle cx="10" cy="10" r="7"></circle>
-                <path d="M21 21l-4.35-4.35"></path>
-              </svg>
-            </span>
-            <input
-              type="text"
-              value={searchPredictions}
-              onChange={handlePredictionSearch}
-              placeholder="Search predictions..."
-              className="w-full p-2 pl-9 rounded-md text-gray-700 focus:outline-none text-small input-search bg-gray-800 placeholder-gray-700"
-            />
-          </div>
-        )}
-
-        {/* BETS SECTION */}
-        {activeTab === "bets" && (
-          <section className="rounded-lg overflow-x-auto mb-8">
             {isLoadingBets && bets.length === 0 && (
               <div className="flex justify-center items-center py-8">
                 <Spinner size="lg" />
               </div>
             )}
-
-            {!isLoadingBets && (
-              (!agent || !agent.interests || agent.interests.length === 0) ? (
-                <div className="flex items-center justify-center text-center text-gray-500 w-full h-[500px] border border-gray-500 p-4 rounded-lg">
-                  <div className="flex flex-col items-center">
-                    <div className="map-center items-center "></div>
-                    <p className="text-gray-500 py-4 w-80">
-                      You haven’t created your AI agents strategy yet. Before it can bet create the strategy and choose your area of interest.
-                    </p>
-                    <Button onPress={() => router.push("/editProfile")} color="primary" variant="flat" className="min-w-[200px] h-[40px] text-white background-gradient-red">
-                      Create Strategy
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <>
-                  {bets.length === 0 && (
-                    <div className="text-center text-gray-500 py-8">No bets found</div>
-                  )}
-                </>
-              )
+            {!isLoadingBets && bets.length === 0 && (
+              <div className="text-center text-gray-500 py-8">
+                No bets found
+              </div>
             )}
 
-            {/* Table Header */}
             {bets.length > 0 && (
               <table className="w-full text-sm text-left">
                 <tbody>
                   {filterBets(bets, searchTerm).map((bet, index) => (
                     <tr
-                      key={index}
-                      className="cursor-pointer backbutton"
+                      key={bet.bet_id}
+                      className="cursor-pointer transition-colors hover:bg-gray-700/20"
                       onClick={() => router.push(`/bets/${bet.bet_id}`)}
                     >
-                      <td colSpan={4} className="p-2 cursor-pointer backbutton">
+                      <td colSpan={5} className="p-2">
                         <div className="flex flex-row gap-4 items-start">
-                          {/* Thumbnail */}
                           {bet.str_thumb && (
                             <Image
                               src={bet.str_thumb}
@@ -522,25 +583,12 @@ export default function Dashboard() {
                               className="w-[40px] h-[40px] rounded-full max-w-[40px] max-h-[40px] min-w-[40px] min-h-[40px]"
                             />
                           )}
-
-                          {/* Text block */}
                           <div className="flex flex-col md:flex-row gap-2 items-start w-full">
-                            {/* Description on its own line */}
-                            <p className="break-words w-full">
-                              {bet.description}
-                            </p>
-
-                            {/* A second line for date and chip, side by side at md */}
+                            <p className="break-words w-full">{bet.description}</p>
                             <div className="flex flex-row md:flex-row gap-2 items-start sm:items-start">
-                              
                               <span className="icon-coin icon-text">
                                 {bet.amount}
                               </span>
-                              {/* <span className="text-default-400">
-                              {bet.resolution_date
-                                  ? format(new Date(bet.resolution_date), "MM/dd/yy")
-                                  : ""}
-                              </span> */}
                               <Chip
                                 color={
                                   bet.status !== "open"
@@ -568,7 +616,7 @@ export default function Dashboard() {
               </table>
             )}
 
-            {/* Show More Button */}
+            {/* Show More */}
             {hasMoreBets && !isLoadingBets && bets.length > 0 && (
               <div className="flex justify-center mt-4">
                 <Button
@@ -595,38 +643,46 @@ export default function Dashboard() {
           </section>
         )}
 
-        {/* PREDICTIONS SECTION */}
+        {/* Predictions */}
         {activeTab === "predictions" && (
           <section className="rounded-lg overflow-x-auto mb-8">
+                        <div className="flex items-center relative">
+            <span className="absolute inset-y-0 left-0 flex items-center pl-2 pointer-events-none">
+              {/* Search Icon */}
+              <svg
+                aria-hidden="true"
+                className="w-5 h-5 text-gray-700"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                viewBox="0 0 24 24"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <circle cx="10" cy="10" r="7"></circle>
+                <path d="M21 21l-4.35-4.35"></path>
+              </svg>
+            </span>
+            <input
+                type="text"
+                value={searchTerm}
+                onChange={handlePredictionSearch}
+                placeholder="Search predictions..."
+              className="w-full p-2 pl-9 rounded-md text-gray-700 focus:outline-none text-small input-search bg-gray-800 placeholder-gray-700"
+              />
+            </div>
+
             {isLoadingPredictions && predictions.length === 0 && (
               <div className="flex justify-center items-center py-8">
                 <Spinner size="lg" />
               </div>
             )}
-
-            {!isLoadingPredictions && (
-              (!agent || !agent.interests || agent.interests.length === 0) ? (
-                <div className="flex items-center justify-center text-center text-gray-500 w-full h-[500px] border border-gray-500 p-4 rounded-lg">
-                  <div className="flex flex-col items-center">
-                    <div className="map-center items-center "></div>
-                    <p className="text-gray-500 py-4 w-80">
-                      You haven’t created your AI agents strategy yet. Before it can bet create the strategy and choose your area of interest.
-                    </p>
-                    <Button onPress={() => router.push("/editProfile")} color="primary" variant="flat" className="min-w-[200px] h-[40px] text-white background-gradient-red">
-                      Create Strategy
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <>
-                  {predictions.length === 0 && (
-                    <div className="text-center text-gray-500 py-8">No predictions found</div>
-                  )}
-                </>
-              )
+            {displayedPredictions.length === 0 && !isLoadingPredictions && (
+              <div className="text-center text-gray-500 py-8">
+                No predictions found
+              </div>
             )}
 
-            {/* Predictions Table */}
             {displayedPredictions.length > 0 && (
               <section className="rounded-lg overflow-x-auto">
                 <table className="w-full text-sm text-left">
@@ -639,7 +695,6 @@ export default function Dashboard() {
                       >
                         <td colSpan={5} className="p-2">
                           <div className="flex flex-row gap-4 items-start w-full">
-                            {/* Thumbnail */}
                             {prediction.str_thumb && (
                               <Image
                                 src={prediction.str_thumb}
@@ -649,22 +704,17 @@ export default function Dashboard() {
                                 className="w-[40px] h-[40px] min-w-[40px] min-h-[40px] rounded-full"
                               />
                             )}
-
-                            {/* Text + details */}
                             <div className="flex flex-col w-full md:flex-row gap-2 items-start">
-                              {/* Description on its own line */}
                               <p className="break-words w-full">
                                 {prediction.description}
                               </p>
-
-                              {/* Date, bet count, and Chip row */}
                               <div className="flex flex-row gap-2 items-start sm:items-start">
-                                <span className="text-default-400">
+                                {/* <span className="text-default-400">
                                   {prediction.resolution_date
                                     ? format(new Date(prediction.resolution_date), "MM/dd/yy")
                                     : ""}
-                                </span>
-                                <span className="text-default-400">
+                                </span> */}
+                                <span className="text-default-400 icon-user text-primary">
                                   {prediction.bets_count}
                                 </span>
                                 <Chip
@@ -679,8 +729,8 @@ export default function Dashboard() {
                                   {prediction.status === "open"
                                     ? "Open"
                                     : prediction.outcome === prediction.creator_choice
-                                      ? "Win"
-                                      : "Loss"}
+                                    ? "Win"
+                                    : "Loss"}
                                 </Chip>
                               </div>
                             </div>
@@ -693,7 +743,6 @@ export default function Dashboard() {
               </section>
             )}
 
-            {/* Sentinel */}
             <div id="sentinel" className="flex justify-center p-4">
               {hasMorePredictions && displayedPredictions.length > 0 && (
                 <Spinner size="sm" />

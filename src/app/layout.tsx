@@ -21,9 +21,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" style={{ backgroundColor: '#16181c' }}>
+    <html lang="en" className="bg-mainGradient min-h-screen" style={{ backgroundColor: '#16181c' }}>
       <body
-        className={`${rubik.className} antialiased dark text-foreground bg-background min-h-screen`}
+        className={`${rubik.className} antialiased dark text-foreground bg-mainGradient `}
       >
         <Toaster
           position="top-right"
@@ -31,7 +31,7 @@ export default function RootLayout({
         />
         <Providers>
           <SolProvider>
-            <main className="min-h-screen bg-mainGradient">
+            <main className="min-h-screen">
               {children}
             </main>
           </SolProvider>

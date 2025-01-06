@@ -11,6 +11,31 @@ import { useFetch } from "@/app/utils/lib";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import { formatDate } from "date-fns";
+import { FaRocket, FaDatabase, FaChartLine, FaShieldAlt } from "react-icons/fa";
+
+function StatCard({
+  icon,
+  title,
+  value,
+  className = "",
+}: {
+  icon: React.ReactNode;
+  title: string;
+  value: string;
+  className?: string;
+}) {
+  return (
+    <div
+      className={`rounded-lg subtlebackground shadow-md p-4 flex items-center gap-2 ${className}`}
+    >
+      <div className="text-primary text-lg">{icon}</div>
+      <div className="flex flex-row gap-1">
+        <p className="text-default-500 text-small">{title}</p>
+        <p className="text-small font-regular">{value}</p>
+      </div>
+    </div>
+  );
+}
 
 export default function MarketsPage() {
   const [activeTab, setActiveTab] = useState<"predictions" | "sports" | "general" | "leaderboard">("predictions");
@@ -43,10 +68,44 @@ export default function MarketsPage() {
   const [leaderboardData, setLeaderboardData] = useState<ILeaderboardData[]>([]);
   const [isLoadingLeaderboard, setIsLoadingLeaderboard] = useState<boolean>(false);
 
+  // New state variables for global market stats
+  const [totalMarkets, setTotalMarkets] = useState<number>(0);
+  const [totalBets, setTotalBets] = useState<number>(0);
+  const [averageBetSize, setAverageBetSize] = useState<number>(0);
+  const [successRate, setSuccessRate] = useState<number>(0);
+
   const ITEMS_PER_PAGE_PREDICTIONS = 50;
 
   const router = useRouter();
   const fetch = useFetch();
+
+  // Example fetch function for aggregated market stats
+  const fetchMarketStats = async () => {
+    try {
+      const response = await fetch.get("/api/getMarketStats");
+      // Suppose our API returns something like:
+      // {
+      //   status: true,
+      //   data: {
+      //     total_markets: number,
+      //     total_bets: number,
+      //     avg_bet_size: number,
+      //     success_rate: number
+      //   }
+      // }
+      if (response.status) {
+        setTotalMarkets(response.data.total_markets || 0);
+        setTotalBets(response.data.total_bets || 0);
+        setAverageBetSize(response.data.avg_bet_size || 0);
+        setSuccessRate(response.data.success_rate || 0);
+      } else {
+        toast.error(response.message || "Failed to fetch market stats");
+      }
+    } catch (error) {
+      console.error("Failed to fetch market stats:", error);
+      toast.error("Failed to fetch market stats.");
+    }
+  };
 
   // Fetch Agent
   useEffect(() => {
@@ -65,6 +124,8 @@ export default function MarketsPage() {
       }
     };
     fetchAgentProfile();
+    // Also fetch overall market stats
+    fetchMarketStats();
   }, []);
 
   // Fetch Predictions
@@ -336,9 +397,33 @@ export default function MarketsPage() {
               </p>
           </div>
           
-          <div className="pie-chart hidden md:inline-block"></div>
+          {/* <div className="pie-chart hidden md:inline-block"></div> */}
         </div>
         
+        {/* New Stats Overview for all markets */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8 text-small">
+          <StatCard
+            icon={<FaRocket />}
+            title="Markets"
+            value={totalMarkets.toString()}
+          />
+          <StatCard
+            icon={<FaDatabase />}
+            title="Bets Placed"
+            value={totalBets.toString()}
+          />
+          <StatCard
+            icon={<FaChartLine />}
+            title="Performance"
+            value={`${successRate.toFixed(2)}%`}
+          />
+          <StatCard
+            icon={<FaShieldAlt />}
+            title="Avg Bet"
+            value={`${averageBetSize.toFixed(2)}`}
+          />
+        </div>
+
         {/* Tabs */}
         <div className="flex gap-2 font-kodemono text-small">
           <button
@@ -510,17 +595,17 @@ export default function MarketsPage() {
                               {/* Next line for date, bet_amount, and chip */}
                              
                               <div className="flex flex-row gap-2 items-start sm:items-center">
-                              <span className="text-default-400">
+                              <span className="icon-coin icon-text">
                                   {prediction.bet_amount}
                                 </span>
-                                <span className="text-default-400">
+                                {/* <span className="text-default-400">
                                   {formatDate(
                                     prediction.resolution_date || prediction.created_at,
                                     "MM/dd/yy"
                                   )}
-                                </span>
+                                </span> */}
                               
-                                <Chip
+                                <Chip className="flex-1 text-center text-inherit font-normal w-9 px-1"
                                   color={
                                     prediction.status !== "open"
                                       ? prediction.outcome === prediction.creator_choice
@@ -610,12 +695,12 @@ export default function MarketsPage() {
 
                               {/* A second row for date, bet_amount, and Chip */}
                               <div className="flex flex-row gap-2 items-start sm:items-center">
-                              <span className="text-default-400">
+                              <span className="icon-coin icon-text">
                                   {item.bet_amount}
                                 </span>
-                                <span className="text-default-400">
+                                {/* <span className="text-default-400">
                                   {formatDate(item.resolution_date || item.created_at, "MM/dd/yy")}
-                                </span>
+                                </span> */}
                            
                                 <Chip
                                   color={
@@ -709,12 +794,15 @@ export default function MarketsPage() {
 
                               {/* A second row for date, bet_amount, and Chip */}
                               <div className="flex flex-row gap-2 items-start sm:items-center">
-                              <span className="text-default-400">
+                              <span className="icon-coin icon-text">
                                   {item.bet_amount}
                                 </span>
-                                <span className="text-default-400">
+
+                                
+                         
+                                {/* <span className="text-default-400">
                                   {formatDate(item.resolution_date || item.created_at, "MM/dd/yy")}
-                                </span>
+                                </span> */}
                             
                                 <Chip
                                   color={

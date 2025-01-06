@@ -228,6 +228,39 @@ max-width: 80px;
   height: 20px;
 }
 
+.icon-user {
+  background-image: url('/assets/images/users.svg');
+  background-size: 16px 16px;
+  background-repeat: no-repeat;
+  background-position: center;
+  padding-left: 16px;
+  margin-right: 16px;
+  width: 10px;
+  height: 20px;
+}
+
+.icon-coin-red {
+  background-image: url('/assets/images/coin.svg');
+  background-size: 12px 12px;
+  background-repeat: no-repeat;
+  background-position: left center;
+  padding-left: 16px;
+ 
+  width: 12px;
+  height: 20px;
+}
+
+.icon-coin-bigger {
+  background-image: url('/assets/images/coin.svg');
+  background-size: 12px 12px;
+  background-repeat: no-repeat;
+  background-position: center;
+  padding-left: 16px;
+  margin-right: 16px;
+  width: 12px;
+  height: 12px;
+}
+
 .icon-text {
   color: #f87719;
 }

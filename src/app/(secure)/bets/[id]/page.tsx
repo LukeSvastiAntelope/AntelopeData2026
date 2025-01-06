@@ -9,6 +9,25 @@ import { IBet, PredictionDB } from "@/app/utils/interface";
 import toast from "react-hot-toast";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import { Bar } from "react-chartjs-2";
+import {
+  Chart as ChartJS,
+  BarElement,
+  CategoryScale,
+  LinearScale,
+  Title,
+  Tooltip,
+  Legend,
+} from "chart.js";
+
+ChartJS.register(
+  BarElement,
+  CategoryScale,
+  LinearScale,
+  Title,
+  Tooltip,
+  Legend
+);
 
 interface IAgentProfile {
     image?: string;
@@ -119,6 +138,43 @@ export default function BetDetailPage() {
     if (!bet) {
         return <div>Bet not found</div>;
     }
+
+    // Prepare data for Chart.js
+    const chartData = {
+        labels: ["Yes Bets", "No Bets"],
+        datasets: [
+            {
+                label: "Bet Distribution",
+                data: [totalYes, totalNo],
+                backgroundColor: ["#36A2EB", "#71717a"],
+            },
+        ],
+    };
+
+    // Simple chart options example
+    const chartOptions = {
+        responsive: true,
+        plugins: {
+            legend: { display: false },
+            title: {
+                display: true,
+                text: "Bet Distribution by Agent Choice",
+                color: "#E3EDF5",
+            },
+        },
+        scales: {
+            x: {
+                ticks: {
+                    color: "#71717a",
+                },
+            },
+            y: {
+                ticks: {
+                    color: "#71717a",
+                },
+            },
+        },
+    };
 
     return (
         <div className="flex text-white">
@@ -231,34 +287,34 @@ export default function BetDetailPage() {
                 <div>
                     <div className="px-0 max-w-[800px]">
                         {/* Header Section */}
-                        <div className="flex gap-6 mb-8 flex-col w-full imagecut">
-                            <Image
+                        <div className="flex gap-6 mb-8 flex-col w-full imagecut bg-content0 rounded-xl p-8">
+                            {/* Chart area replaces commented Image */}
+                            <div className="w-full  rounded-xl p-4">
+                                <Bar data={chartData} options={chartOptions} />
+                            </div>
+
+
+                                     {/* <Image
                                 src={bet.str_thumb}
                                 alt="Event"
                                 className="w-full object-cover rounded-xl imagecut"
-                                style={{ maxWidth: "100%" }}
-                            />
+                                style={{ maxWidth: "100%", minWidth: "-webkit-fill-available;" }}
+                            /> */}
+
                             <div>
                                 <h3 className="text-lg font-semibold mb-2">{bet.description}</h3>
-                                <div className="flex gap-3 items-center">
-                                    <Chip size="sm" color="default">{bet.source}</Chip>
-                                    <span className="text-default-400 text-small">
-                                        {bet.status === "open"
-                                            ? `Created ${new Date(bet.created_at).toLocaleDateString()}`
-                                            : `Resolved ${new Date(bet.resolution_date).toLocaleDateString()}`
-                                        }
-                                    </span>
-                                </div>
+                                
                             </div>
-                        </div>
+
+                        
 
                         {/* Bet Details */}
-                        <div className="">
+                        <div className="color-white">
                             <h2 className="text-lg font-semibold mb-4">Reasoning</h2>
-                            <p className="text-default-600 leading-relaxed">{bet.reason}</p>
+                            <p className="text-default-400 leading-relaxed ">{bet.reason}</p>
                             <div className="w-full mt-8">
                                 <h2 className="text-lg font-semibold mb-4">Bet Details</h2>
-                                <div className="grid grid-cols-2 grid-rows-4 gap-4">
+                                <div className="grid grid-cols-2 grid-rows-4 md:grid-cols-4 md:grid-rows-2 gap-4">
                                     <div>
                                         <h3 className="text-sm font-medium text-default-400 mb-1 ">Status</h3>
                                         <Chip color={bet.status !== "open" ? (bet.outcome === bet.choice ? "success" : "danger") : "primary"} className="bg-primary/20">
@@ -270,7 +326,7 @@ export default function BetDetailPage() {
                                     </div>
                                     <div>
                                         <h3 className="text-sm font-medium text-default-400 mb-1">Credits</h3>
-                                        <p className="text-sm font-semibold"><span className="icon-credits inline-block px-6">{bet.amount}</span></p>
+                                        <p className="text-sm font-semibold"><span className=" inline-block ">{bet.amount}</span></p>
                                     </div>
                                     <div>
                                         <h3 className="text-sm font-medium text-default-400 mb-1">Your Choice</h3>
@@ -282,16 +338,35 @@ export default function BetDetailPage() {
                                     </div>
                                     <div>
                                         <h3 className="text-sm font-medium text-default-400 mb-1">Yes Votes</h3>
-                                        <p className="text-sm font-semibold">{prediction?.yes_count} votes ({totalYes} credits)</p>
+                                        <p className="text-sm font-semibold">{prediction?.yes_count} {totalYes} </p>
                                     </div>
                                     <div>
                                         <h3 className="text-sm font-medium text-default-400 mb-1">No Votes</h3>
-                                        <p className="text-sm font-semibold">{prediction?.no_count} votes ({totalNo} credits)</p>
+                                        <p className="text-sm font-semibold">{prediction?.no_count} {totalNo}</p>
                                     </div>
+                                    <div>
+                                    <h3 className="text-sm font-medium text-default-400 mb-1">Validation Source</h3>
+                                    <p className="text-sm font-semibold">{bet.source}</p>
+                                    </div>
+                                  
+                                    <div className="flex flex-col gap-1">
+                                        {bet.status === "open" ? (
+                                        <>
+                                        <h3 className="text-sm font-medium text-default-400">Created</h3>
+                                        <p className="text-sm font-semibold">{new Date(bet.created_at).toLocaleDateString()}</p>
+                                        </>
+                                        ) : (
+                                        <>
+                                        <h3 className="text-sm font-medium text-default-400">Resolved</h3>
+                                        <p className="text-sm font-semibold">{new Date(bet.resolution_date).toLocaleDateString()}</p>
+                                        </>
+                                        )}
+                                        </div>
+                                </div>
                                 </div>
                             </div>
-
-                            <div className="mt-0">
+                            </div>
+                            <div className="mt-8">
                                 {pineconeData && (
                                     <div className="mt-0">
                                         
@@ -351,7 +426,7 @@ export default function BetDetailPage() {
                             </div>
                         </div>
                     </div>
-                </div>
+                
             </main>
         </div>
     );
