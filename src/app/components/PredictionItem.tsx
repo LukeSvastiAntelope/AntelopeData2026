@@ -1,6 +1,5 @@
 import { Image } from "@nextui-org/image";
 import { Chip } from "@nextui-org/chip";
-import { formatDate } from "date-fns";
 import { IPrediction } from "@/app/utils/interface";
 
 interface PredictionItemProps {

@@ -3,14 +3,12 @@
 import { Chip } from "@nextui-org/chip";
 import { Image } from "@nextui-org/image";
 import { Button } from "@nextui-org/button";
-import { Input } from "@nextui-org/input";
 import { useState, useEffect } from "react";
 import { useFetch } from "@/app/utils/lib";
 import { IBet, PredictionDB } from "@/app/utils/interface";
 import toast from "react-hot-toast";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { Bar } from "react-chartjs-2";
 import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter } from "@nextui-org/react";
 import {
     Chart as ChartJS,
@@ -21,7 +19,6 @@ import {
     Tooltip,
     Legend,
 } from "chart.js";
-import { Textarea } from "@nextui-org/input";
 
 ChartJS.register(
     BarElement,
@@ -70,9 +67,7 @@ export default function BetDetailPage() {
     const [prediction, setPrediction] = useState<PredictionDB | null>(null);
     const [showCommentModal, setShowCommentModal] = useState(false);
     const [newComment, setNewComment] = useState("");
-    const [isSubmitting, setIsSubmitting] = useState(false);
     const fetch = useFetch();
-    const fetchData = useFetch();
 
     const [agent, setAgent] = useState<IAgentProfile | null>(null);
     const [agentBalance, setAgentBalance] = useState(0);
@@ -81,16 +76,17 @@ export default function BetDetailPage() {
 
     const handleSaveComment = async () => {
         try {
-            const response = await fetch.post("/api/updateBetComment", {
-                betId: params.id,
+            const response = await fetch.post("/api/getBet", {
+                id: params.id,
                 comment: newComment
             });
             if (response.status) {
-                toast.success("Comment saved successfully");
+                setPineconeData(response.vector);
+                setNewComment(""); // Clear input
                 setShowCommentModal(false);
-                fetchBetDetails(); // Refresh bet details
+                toast.success("Comment updated successfully!");
             } else {
-                toast.error(response.message || "Failed to save comment");
+                toast.error(response.message);
             }
         } catch (error) {
             console.error("Error saving comment:", error);
@@ -147,33 +143,6 @@ export default function BetDetailPage() {
         }
     };
 
-    const handleSubmitComment = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!newComment.trim()) return;
-
-        setIsSubmitting(true);
-        try {
-            const response = await fetch.post("/api/getBet", {
-                id: params.id,
-                comment: newComment
-            });
-
-            if (response.status) {
-                // Update local state with new vector data
-                setPineconeData(response.vector);
-                setNewComment(""); // Clear input
-                toast.success("Comment updated successfully!");
-            } else {
-                toast.error(response.message);
-            }
-        } catch (error) {
-            console.error("Failed to update comment:", error);
-            toast.error("Failed to update comment");
-        } finally {
-            setIsSubmitting(false);
-        }
-    };
-
     useEffect(() => {
         // Call both in the same effect
         fetchAgentProfile();
@@ -187,43 +156,6 @@ export default function BetDetailPage() {
     if (!bet) {
         return <div>Bet not found</div>;
     }
-
-    // Prepare data for Chart.js
-    const chartData = {
-        labels: ["Yes Bets", "No Bets"],
-        datasets: [
-            {
-                label: "Bet Distribution",
-                data: [totalYes, totalNo],
-                backgroundColor: ["#36A2EB", "#71717a"],
-            },
-        ],
-    };
-
-    // Simple chart options example
-    const chartOptions = {
-        responsive: true,
-        plugins: {
-            legend: { display: false },
-            title: {
-                display: true,
-                text: "Bet Distribution by Agent Choice",
-                color: "#E3EDF5",
-            },
-        },
-        scales: {
-            x: {
-                ticks: {
-                    color: "#71717a",
-                },
-            },
-            y: {
-                ticks: {
-                    color: "#71717a",
-                },
-            },
-        },
-    };
 
     return (
         <div className="flex text-white">
@@ -337,13 +269,7 @@ export default function BetDetailPage() {
                     <div className="px-0 max-w-[800px]">
                         {/* Header Section */}
                         <div className="flex gap-6 mb-8 flex-col w-full imagecut bg-content0 rounded-xl p-8">
-                            {/* Chart area replaces commented Image */}
-                            {/* <div className="w-full  rounded-xl p-4">
-                                <Bar data={chartData} options={chartOptions} />
-                            </div> */}
-
-
-                                     <Image
+                            <Image
                                 src={bet.str_thumb}
                                 alt="Event"
                                 className="w-full object-cover rounded-xl imagecut"
@@ -354,71 +280,79 @@ export default function BetDetailPage() {
                                 <h3 className="text-lg font-semibold mb-2">{bet.description}</h3>
                             </div>
 
-                        
 
-                        {/* Bet Details */}
-                        <div className="color-white">
-                            <div className="p-4 border border-white/10 rounded-lg">
-                            <h2 className="text-lg font-semibold mb-4">Reasoning</h2>
-                            <p className="text-default-400 leading-relaxed ">{bet.reason}</p>
-                            <Button
-                                color="primary"
-                                variant="light"
-                                className="text-primary bg-primary/20 underline text-sm mt-2 hover:bg-primary/40"
-                                onClick={() => setShowCommentModal(true)}
-                            >
-                                Adjust Reasoning
-                                </Button>
-                            </div>
-                            <div className="w-full mt-8">
-                                <h2 className="text-lg font-semibold mb-4">Bet Details</h2>
-                                <div className="grid grid-cols-2 grid-rows-4 md:grid-cols-4 md:grid-rows-2 gap-4">
-                                    <div>
-                                        <h3 className="text-sm font-medium text-default-400 mb-1 ">Status</h3>
-                                        <Chip color={bet.status !== "open" ? (bet.outcome === bet.choice ? "success" : "danger") : "primary"} className="bg-primary/20">
-                                            {bet.status !== "open"
-                                                ? (bet.outcome === bet.choice ? "Won" : "Lost")
-                                                : bet.status
-                                            }
-                                        </Chip>
-                                    </div>
-                                    <div>
-                                        <h3 className="text-sm font-medium text-default-400 mb-1">Credits</h3>
-                                        <p className="text-sm font-semibold"><span className=" inline-block ">{bet.amount}</span></p>
-                                    </div>
-                                    <div>
-                                        <h3 className="text-sm font-medium text-default-400 mb-1">Your Choice</h3>
-                                        <Chip color="secondary" className="bg-primary/20">{bet.choice}</Chip>
-                                    </div>
-                                    <div>
-                                        <h3 className="text-sm font-medium text-default-400 mb-1">Creator&apos;s Choice</h3>
-                                        <Chip color="secondary" className="bg-primary/20">{bet.predicted_outcome || bet.creator_choice}</Chip>
-                                    </div>
-                                    <div>
-                                        <h3 className="text-sm font-medium text-default-400 mb-1">Yes Votes</h3>
-                                        <p className="text-sm font-semibold">{prediction?.yes_count} {totalYes} </p>
-                                    </div>
-                                    <div>
-                                        <h3 className="text-sm font-medium text-default-400 mb-1">No Votes</h3>
-                                        <p className="text-sm font-semibold">{prediction?.no_count} {totalNo}</p>
-                                    </div>
-                                    <div>
-                                    <h3 className="text-sm font-medium text-default-400 mb-1">Validation Source</h3>
-                                    <p className="text-sm font-semibold">{bet.source}</p>
-                                    </div>
-                                  
-                                    <div className="flex flex-col gap-1">
-                                        {bet.status === "open" ? (
-                                        <>
-                                        <h3 className="text-sm font-medium text-default-400">Created</h3>
-                                        <p className="text-sm font-semibold">{new Date(bet.created_at).toLocaleDateString()}</p>
-                                        </>
-                                        ) : (
-                                        <>
-                                        <h3 className="text-sm font-medium text-default-400">Resolved</h3>
-                                        <p className="text-sm font-semibold">{new Date(bet.resolution_date).toLocaleDateString()}</p>
-                                        </>
-                                        )}
+
+                            {/* Bet Details */}
+                            <div className="color-white">
+                                <div className="p-4 border border-white/10 rounded-lg">
+                                    <h2 className="text-lg font-semibold mb-4">Reasoning</h2>
+                                    <p className="text-default-400 leading-relaxed ">{bet.reason}</p>
+                                    {
+                                        pineconeData && pineconeData.metadata?.comment && (
+                                            <>
+                                                <h2 className="text-lg font-semibold mb-4 mt-4">Comment</h2>
+                                                <p className="text-default-400 leading-relaxed ">{pineconeData.metadata.comment as string}</p>
+                                            </>
+                                        )
+                                    }
+                                    <Button
+                                        color="primary"
+                                        variant="light"
+                                        className="text-primary bg-primary/20 underline text-sm mt-2 hover:bg-primary/40"
+                                        onPress={() => setShowCommentModal(true)}
+                                    >
+                                        Adjust Reasoning
+                                    </Button>
+                                </div>
+                                <div className="w-full mt-8">
+                                    <h2 className="text-lg font-semibold mb-4">Bet Details</h2>
+                                    <div className="grid grid-cols-2 grid-rows-4 md:grid-cols-4 md:grid-rows-2 gap-4">
+                                        <div>
+                                            <h3 className="text-sm font-medium text-default-400 mb-1 ">Status</h3>
+                                            <Chip color={bet.status !== "open" ? (bet.outcome === bet.choice ? "success" : "danger") : "primary"} className="bg-primary/20">
+                                                {bet.status !== "open"
+                                                    ? (bet.outcome === bet.choice ? "Won" : "Lost")
+                                                    : bet.status
+                                                }
+                                            </Chip>
+                                        </div>
+                                        <div>
+                                            <h3 className="text-sm font-medium text-default-400 mb-1">Credits</h3>
+                                            <p className="text-sm font-semibold"><span className=" inline-block ">{bet.amount}</span></p>
+                                        </div>
+                                        <div>
+                                            <h3 className="text-sm font-medium text-default-400 mb-1">Your Choice</h3>
+                                            <Chip color="secondary" className="bg-primary/20">{bet.choice}</Chip>
+                                        </div>
+                                        <div>
+                                            <h3 className="text-sm font-medium text-default-400 mb-1">Creator&apos;s Choice</h3>
+                                            <Chip color="secondary" className="bg-primary/20">{bet.predicted_outcome || bet.creator_choice}</Chip>
+                                        </div>
+                                        <div>
+                                            <h3 className="text-sm font-medium text-default-400 mb-1">Yes Votes</h3>
+                                            <p className="text-sm font-semibold">{prediction?.yes_count} {totalYes} </p>
+                                        </div>
+                                        <div>
+                                            <h3 className="text-sm font-medium text-default-400 mb-1">No Votes</h3>
+                                            <p className="text-sm font-semibold">{prediction?.no_count} {totalNo}</p>
+                                        </div>
+                                        <div>
+                                            <h3 className="text-sm font-medium text-default-400 mb-1">Validation Source</h3>
+                                            <p className="text-sm font-semibold">{bet.source}</p>
+                                        </div>
+
+                                        <div className="flex flex-col gap-1">
+                                            {bet.status === "open" ? (
+                                                <>
+                                                    <h3 className="text-sm font-medium text-default-400">Created</h3>
+                                                    <p className="text-sm font-semibold">{new Date(bet.created_at).toLocaleDateString()}</p>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <h3 className="text-sm font-medium text-default-400">Resolved</h3>
+                                                    <p className="text-sm font-semibold">{new Date(bet.resolution_date).toLocaleDateString()}</p>
+                                                </>
+                                            )}
                                         </div>
                                     </div>
                                 </div>
@@ -433,7 +367,7 @@ export default function BetDetailPage() {
                                             <h2 className="text-xl font-semibold mb-4">Reasoning Log</h2>
                                             {Object.entries(pineconeData.metadata || {}).map(([key, value]) => {
                                                 return (
-                                                    (key != "agent_id" && key != "choice" && key != "amount" && key != "created_at" && key != "prediction_id" && key != "log") ? (
+                                                    (key != "agent_id" && key != "choice" && key != "amount" && key != "created_at" && key != "prediction_id" && key != "log" && key != "reasoning") ? (
                                                         <div key={key}>
                                                             <h3 className="text-sm font-medium text-default-400 capitalize mb-1">
                                                                 {key.replace(/_/g, ' ')}
@@ -479,40 +413,6 @@ export default function BetDetailPage() {
                                 </div>
                             )}
                         </div>
-                        {
-                            pineconeData && (
-                                <div className="mt-8">
-                                    <div className="bg-content0 rounded-lg p-8">
-                                        <h2 className="text-xl font-semibold mb-4">Comment</h2>
-
-                                        {/* Display existing comment if any */}
-                                        {pineconeData?.metadata?.comment && (
-                                            <div className="text-default-600 mb-4">
-                                                <p>{pineconeData.metadata.comment as string}</p>
-                                            </div>
-                                        )}
-
-                                        {/* Comment Form - always shown for updating */}
-                                        <form onSubmit={handleSubmitComment} className="space-y-4">
-                                            <Textarea
-                                                placeholder={pineconeData?.metadata?.comment ? "Update comment..." : "Add a comment..."}
-                                                value={newComment}
-                                                onChange={(e) => setNewComment(e.target.value)}
-                                                className="w-full"
-                                            />
-                                            <Button
-                                                type="submit"
-                                                color="primary"
-                                                isLoading={isSubmitting}
-                                                className="w-full md:w-auto"
-                                            >
-                                                {pineconeData?.metadata?.comment ? "Update Comment" : "Post Comment"}
-                                            </Button>
-                                        </form>
-                                    </div>
-                                </div>
-                            )
-                        }
                     </div>
                 </div>
 
@@ -522,7 +422,7 @@ export default function BetDetailPage() {
                 isOpen={showCommentModal}
                 onOpenChange={(open) => setShowCommentModal(open)}
             >
-                <ModalContent className="w-full h-full max-w-[640px] max-h-[400px]">
+                <ModalContent className="w-full max-w-[640px] min-h-[500px]">
                     <ModalHeader>
                         <h3 className="font-bold">Add Comment to Agent Reasoning</h3>
                     </ModalHeader>
@@ -530,13 +430,16 @@ export default function BetDetailPage() {
                         <p className="text-base text-gray-500 mb-2">
                             Original Reason: {bet.reason}
                         </p>
+                        <p className="text-base text-gray-500 mb-2">
+                            Comment: {pineconeData?.metadata?.comment as string}
+                        </p>
                         <textarea
-                        className="w-full border border-white/10 text-white rounded-md p-2 text-black "
-                        placeholder="Enter more context here..."
-                        value={newComment}
-                        onChange={(e) => setNewComment(e.target.value)}
-                        rows={4}
-          />
+                            className="w-full border border-white/10 text-white rounded-md p-2"
+                            placeholder="Enter more context here..."
+                            value={newComment}
+                            onChange={(e) => setNewComment(e.target.value)}
+                            rows={4}
+                        />
                     </ModalBody>
                     <ModalFooter>
                         <Button variant="light" onPress={() => setShowCommentModal(false)}>
