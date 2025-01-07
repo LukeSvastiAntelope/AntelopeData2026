@@ -10,8 +10,8 @@ interface PredictionItemProps {
 
 export function PredictionItem({ prediction, onClick }: PredictionItemProps) {
   return (
-    <tr onClick={() => onClick(prediction.id)} className="hover:bg-default-100">
-      <td colSpan={4} className="p-4 cursor-pointer">
+    <tr onClick={() => onClick(prediction.id)} className="">
+      <td colSpan={4} className="p-4 cursor-pointer backbutton">
         <div className="flex flex-row gap-4 items-start">
           {/* Thumbnail */}
           {prediction.str_thumb ? (
@@ -34,21 +34,21 @@ export function PredictionItem({ prediction, onClick }: PredictionItemProps) {
             </p>
 
             <div className="flex flex-wrap gap-4 items-center text-sm">
-              <div className="flex items-center gap-2 text-default-500">
-                <span>{prediction.bets_count} bets</span>
-                <span>•</span>
-                <span>Yes: {prediction.yes_amount}</span>
-                <span>•</span>
-                <span>No: {prediction.no_amount}</span>
+              <div className="flex items-center gap-1 text-default-500">
+                <span className="icon-user text-primary pl-4">{prediction.bets_count}</span>
+               
+                <span className="text-danger">{prediction.yes_amount}</span>
+                <span className="px-0 mx-0">/</span>
+                <span className="text-success">{prediction.no_amount}</span>
               </div>
 
               <div className="flex items-center gap-2">
-                <span className="text-default-400">
+                {/* <span className="text-default-400">
                   {formatDate(
                     prediction.resolution_date || prediction.created_at,
                     "MM/dd/yy"
                   )}
-                </span>
+                </span> */}
 
                 <Chip
                   color={

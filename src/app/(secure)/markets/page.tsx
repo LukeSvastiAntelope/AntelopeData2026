@@ -346,7 +346,7 @@ export default function MarketsPage() {
             </p>
           </div>
 
-          <div className="pie-chart hidden md:inline-block"></div>
+         
         </div>
 
         {/* Tabs */}

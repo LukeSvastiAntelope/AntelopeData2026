@@ -299,7 +299,7 @@ export default function StrategyPage() {
         <div className="flex flex-row justify-between h-32">
           
           <div className="pr-8 pt-2">
-              <h1 className="font-bold mb-2 ">
+              <h1 className="font-bold mb-2 font-kodemono ">
                 Strategy
               </h1>
               <p className="text-gray-500 h1paragraph">
@@ -314,7 +314,7 @@ export default function StrategyPage() {
               {agent?.description || "Refine your personal betting approach"}
             </p> */}
     
-            <div className="map hidden md:inline-block"></div>
+            {/* <div className="map hidden md:inline-block"></div> */}
           </div>
           
           

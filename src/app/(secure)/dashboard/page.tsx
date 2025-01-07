@@ -116,7 +116,7 @@ function StatCard({
     >
       <div className="text-primary text-sm">{icon}</div>
       <div className="flex flex-row gap-1">
-        <p className="text-default-500 text-small">{title}</p>
+        <p className="text-gray-500 text-small">{title}</p>
         <p className="text-small font-regular">{value}</p>
       </div>
     </div>
@@ -326,7 +326,7 @@ export default function Dashboard() {
         display: false,
       },
       title: {
-        display: true,
+        display: false,
         text: "Bet Resolution Timeline",
         color: "#fff",
       },
@@ -337,10 +337,10 @@ export default function Dashboard() {
         time: {
           unit: 'day' as const,
         },
-        ticks: { color: '#ccc' }
+        ticks: { color: '#6b7280' }
       },
       y: {
-        ticks: { color: '#ccc' }
+        ticks: { color: '#6b7280' }
       }
     }
   };
@@ -462,7 +462,7 @@ export default function Dashboard() {
         </div>
 
         {/* Stats Overview */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8 text-small">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-small">
           <Link href="/bets">
             <StatCard icon={<FaRocket />} title="Bets" value={totalBets.toString()}
               className="border border-white/10" />
@@ -483,11 +483,12 @@ export default function Dashboard() {
             icon={<FaShieldAlt />}
             title="Bet Size"
             value={`${agent?.maxBetSize || 0}`}
+            
           />
         </div>
 
         {/* Graphs */}
-        <div className="my-6 w-full" style={{ height: "200px", width: "100%" }}>
+        <div className="my-6 w-full hidden md:inline-block" style={{ height: "200px", width: "100%" }}>
           {bets && bets.length > 0 ? (
             <Scatter
               data={scatterData}
@@ -500,7 +501,7 @@ export default function Dashboard() {
 
         {/* The rest of your existing code remains the same */}
         {/* Tabs, bet list, predictions list, etc. */}
-        <div className="flex gap-4 mb-4 mt-8">
+        <div className="flex gap-4 mb-4 mt-4 font-kodemono">
           <Button
             color={activeTab === "bets" ? "primary" : "default"}
             variant="flat"
@@ -520,7 +521,7 @@ export default function Dashboard() {
         {/* BETS TAB */}
         {activeTab === "bets" && (
           <section className="rounded-lg overflow-x-auto">
-            <div className="flex items-center relative">
+            <div className="flex items-center relative mb-4">
               <span className="absolute inset-y-0 left-0 flex items-center pl-2 pointer-events-none">
                 {/* Search Icon */}
                 <svg
@@ -542,7 +543,7 @@ export default function Dashboard() {
                 value={searchTerm}
                 onChange={handleBetSearch}
                 placeholder="Search bets..."
-                className="w-full p-2 pl-9 rounded-md text-gray-700 focus:outline-none text-small input-search bg-gray-800 placeholder-gray-700"
+                className="w-full p-2 pl-9 rounded-md text-gray-500 focus:outline-none text-small input-search bg-gray-800 placeholder-gray-700"
               />
             </div>
 
@@ -563,10 +564,10 @@ export default function Dashboard() {
                   {filterBets(bets, searchTerm).map((bet, index) => (
                     <tr
                       key={index}
-                      className="cursor-pointer transition-colors hover:bg-gray-700/20"
+                      className="transition-colors0"
                       onClick={() => router.push(`/bets/${bet.bet_id}`)}
                     >
-                      <td colSpan={5} className="p-2">
+                      <td colSpan={5} className="p-2 backbutton cursor-pointer">
                         <div className="flex flex-row gap-4 items-start">
                           {bet.str_thumb ? (
                             <Image
@@ -580,7 +581,7 @@ export default function Dashboard() {
                             <div className="w-[40px] h-[40px] rounded-full max-w-[40px] max-h-[40px] min-w-[40px] min-h-[40px] bg-gray-700"></div>
                           )}
                           <div className="flex flex-col md:flex-row gap-2 items-start w-full">
-                            <p className="break-words w-full">{bet.description}</p>
+                            <p className="break-words w-full text-base">{bet.description}</p>
                             <div className="flex flex-row md:flex-row gap-2 items-start sm:items-start">
                               <span className="icon-coin icon-text">
                                 {bet.amount}
@@ -666,7 +667,7 @@ export default function Dashboard() {
         {/* Predictions */}
         {activeTab === "predictions" && (
           <section className="rounded-lg overflow-x-auto mb-8">
-            <div className="flex items-center relative">
+            <div className="flex items-center relative mb-4">
               <span className="absolute inset-y-0 left-0 flex items-center pl-2 pointer-events-none">
                 {/* Search Icon */}
                 <svg
@@ -704,7 +705,7 @@ export default function Dashboard() {
             )}
 
             {displayedPredictions.length > 0 && (
-              <section className="rounded-lg overflow-x-auto">
+              <section className="rounded-lg overflow-x-auto mb-8">
                 <table className="w-full text-sm text-left">
                   <tbody>
                     {displayedPredictions.map((prediction, index) => (
@@ -713,8 +714,8 @@ export default function Dashboard() {
                         className="cursor-pointer backbutton"
                         onClick={() => router.push(`/predictions/${prediction.id}`)}
                       >
-                        <td colSpan={5} className="p-2">
-                          <div className="flex flex-row gap-4 items-start w-full">
+                        <td colSpan={5} className="p-2 backbutton cursor-pointer mb-4">
+                        <div className="flex flex-row gap-4 items-start">
                             {prediction.str_thumb ? (
                               <Image
                                 src={prediction.str_thumb}
@@ -727,7 +728,7 @@ export default function Dashboard() {
                               <div className="w-[40px] h-[40px] min-w-[40px] min-h-[40px] rounded-full bg-gray-700"></div>
                             )}
                             <div className="flex flex-col w-full md:flex-row gap-2 items-start">
-                              <p className="break-words w-full">
+                              <p className="break-words text-base w-full">
                                 {prediction.description}
                               </p>
                               <div className="flex flex-row gap-2 items-start sm:items-start">
