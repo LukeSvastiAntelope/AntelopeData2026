@@ -70,6 +70,7 @@ export default function BetDetailPage() {
     const [prediction, setPrediction] = useState<PredictionDB | null>(null);
     const [showCommentModal, setShowCommentModal] = useState(false);
     const [newComment, setNewComment] = useState("");
+    const [isSubmitting, setIsSubmitting] = useState(false);
     const fetch = useFetch();
     const fetchData = useFetch();
 
@@ -96,11 +97,6 @@ export default function BetDetailPage() {
             toast.error("Failed to save comment");
         }
     };
-
-    const [newComment, setNewComment] = useState("");
-    const [isSubmitting, setIsSubmitting] = useState(false);
-
-
 
     const fetchAgentProfile = async () => {
         try {
