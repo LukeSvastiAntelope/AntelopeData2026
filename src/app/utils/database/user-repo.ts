@@ -297,10 +297,10 @@ async function getPredictionById(id: string) {
     }
 }
 
-async function getBetById(id: string) {
+async function getBetById(id: string, userId: string) {
     try {
         const db = await getMySQLConnection();
-        const [rows] = await db.execute<(IBet & RowDataPacket)[]>('SELECT *, bets.pinecone_id as pinecone_id FROM bets JOIN predictions ON bets.prediction_id = predictions.id WHERE bets.id = ?', [id]);
+        const [rows] = await db.execute<(IBet & RowDataPacket)[]>('SELECT *, bets.pinecone_id as pinecone_id FROM bets JOIN predictions ON bets.prediction_id = predictions.id WHERE bets.id = ? AND bets.user_id = ?', [id, userId]);
         return rows[0];
     } catch (error) {
         console.error("Error in getBetById: ", error);

@@ -11,22 +11,23 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Bar } from "react-chartjs-2";
 import {
-  Chart as ChartJS,
-  BarElement,
-  CategoryScale,
-  LinearScale,
-  Title,
-  Tooltip,
-  Legend,
+    Chart as ChartJS,
+    BarElement,
+    CategoryScale,
+    LinearScale,
+    Title,
+    Tooltip,
+    Legend,
 } from "chart.js";
+import { Textarea } from "@nextui-org/input";
 
 ChartJS.register(
-  BarElement,
-  CategoryScale,
-  LinearScale,
-  Title,
-  Tooltip,
-  Legend
+    BarElement,
+    CategoryScale,
+    LinearScale,
+    Title,
+    Tooltip,
+    Legend
 );
 
 interface IAgentProfile {
@@ -72,9 +73,8 @@ export default function BetDetailPage() {
     const [totalYes, setTotalYes] = useState(0);
     const [totalNo, setTotalNo] = useState(0);
 
-    // useEffect(() => {
-    //     fetchBetDetails();
-    // }, [params.id]);
+    const [newComment, setNewComment] = useState("");
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     const fetchAgentProfile = async () => {
         try {
@@ -122,6 +122,33 @@ export default function BetDetailPage() {
         } catch (error) {
             console.error('Failed to fetch bet details:', error);
             setIsLoading(false);
+        }
+    };
+
+    const handleSubmitComment = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!newComment.trim()) return;
+
+        setIsSubmitting(true);
+        try {
+            const response = await fetch.post("/api/getBet", {
+                id: params.id,
+                comment: newComment
+            });
+
+            if (response.status) {
+                // Update local state with new vector data
+                setPineconeData(response.vector);
+                setNewComment(""); // Clear input
+                toast.success("Comment updated successfully!");
+            } else {
+                toast.error(response.message);
+            }
+        } catch (error) {
+            console.error("Failed to update comment:", error);
+            toast.error("Failed to update comment");
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
@@ -198,7 +225,7 @@ export default function BetDetailPage() {
 
                         </div>
                         {/* Profile Photo */}
-                                                <Link href="/profile" className="md:flex items-center gap-2 mb-4 hidden p-2 border border-white/10 profile-border ">
+                        <Link href="/profile" className="md:flex items-center gap-2 mb-4 hidden p-2 border border-white/10 profile-border ">
                             <Image
                                 src={agent?.image || "/assets/images/logo-simple.svg"}
                                 alt="Profile"
@@ -293,140 +320,160 @@ export default function BetDetailPage() {
                                 <Bar data={chartData} options={chartOptions} />
                             </div>
 
-
-                                     {/* <Image
-                                src={bet.str_thumb}
-                                alt="Event"
-                                className="w-full object-cover rounded-xl imagecut"
-                                style={{ maxWidth: "100%", minWidth: "-webkit-fill-available;" }}
-                            /> */}
-
                             <div>
                                 <h3 className="text-lg font-semibold mb-2">{bet.description}</h3>
-                                
                             </div>
 
-                        
+                            {/* Bet Details */}
+                            <div className="color-white">
+                                <h2 className="text-lg font-semibold mb-4">Reasoning</h2>
+                                <p className="text-default-400 leading-relaxed ">{bet.reason}</p>
+                                <div className="w-full mt-8">
+                                    <h2 className="text-lg font-semibold mb-4">Bet Details</h2>
+                                    <div className="grid grid-cols-2 grid-rows-4 md:grid-cols-4 md:grid-rows-2 gap-4">
+                                        <div>
+                                            <h3 className="text-sm font-medium text-default-400 mb-1 ">Status</h3>
+                                            <Chip color={bet.status !== "open" ? (bet.outcome === bet.choice ? "success" : "danger") : "primary"} className="bg-primary/20">
+                                                {bet.status !== "open"
+                                                    ? (bet.outcome === bet.choice ? "Won" : "Lost")
+                                                    : bet.status
+                                                }
+                                            </Chip>
+                                        </div>
+                                        <div>
+                                            <h3 className="text-sm font-medium text-default-400 mb-1">Credits</h3>
+                                            <p className="text-sm font-semibold"><span className=" inline-block ">{bet.amount}</span></p>
+                                        </div>
+                                        <div>
+                                            <h3 className="text-sm font-medium text-default-400 mb-1">Your Choice</h3>
+                                            <Chip color="secondary" className="bg-primary/20">{bet.choice}</Chip>
+                                        </div>
+                                        <div>
+                                            <h3 className="text-sm font-medium text-default-400 mb-1">Creator&apos;s Choice</h3>
+                                            <Chip color="secondary" className="bg-primary/20">{bet.predicted_outcome || bet.creator_choice}</Chip>
+                                        </div>
+                                        <div>
+                                            <h3 className="text-sm font-medium text-default-400 mb-1">Yes Votes</h3>
+                                            <p className="text-sm font-semibold">{prediction?.yes_count} {totalYes} </p>
+                                        </div>
+                                        <div>
+                                            <h3 className="text-sm font-medium text-default-400 mb-1">No Votes</h3>
+                                            <p className="text-sm font-semibold">{prediction?.no_count} {totalNo}</p>
+                                        </div>
+                                        <div>
+                                            <h3 className="text-sm font-medium text-default-400 mb-1">Validation Source</h3>
+                                            <p className="text-sm font-semibold">{bet.source}</p>
+                                        </div>
 
-                        {/* Bet Details */}
-                        <div className="color-white">
-                            <h2 className="text-lg font-semibold mb-4">Reasoning</h2>
-                            <p className="text-default-400 leading-relaxed ">{bet.reason}</p>
-                            <div className="w-full mt-8">
-                                <h2 className="text-lg font-semibold mb-4">Bet Details</h2>
-                                <div className="grid grid-cols-2 grid-rows-4 md:grid-cols-4 md:grid-rows-2 gap-4">
-                                    <div>
-                                        <h3 className="text-sm font-medium text-default-400 mb-1 ">Status</h3>
-                                        <Chip color={bet.status !== "open" ? (bet.outcome === bet.choice ? "success" : "danger") : "primary"} className="bg-primary/20">
-                                            {bet.status !== "open"
-                                                ? (bet.outcome === bet.choice ? "Won" : "Lost")
-                                                : bet.status
-                                            }
-                                        </Chip>
-                                    </div>
-                                    <div>
-                                        <h3 className="text-sm font-medium text-default-400 mb-1">Credits</h3>
-                                        <p className="text-sm font-semibold"><span className=" inline-block ">{bet.amount}</span></p>
-                                    </div>
-                                    <div>
-                                        <h3 className="text-sm font-medium text-default-400 mb-1">Your Choice</h3>
-                                        <Chip color="secondary" className="bg-primary/20">{bet.choice}</Chip>
-                                    </div>
-                                    <div>
-                                        <h3 className="text-sm font-medium text-default-400 mb-1">Creator&apos;s Choice</h3>
-                                        <Chip color="secondary" className="bg-primary/20">{bet.predicted_outcome || bet.creator_choice}</Chip>
-                                    </div>
-                                    <div>
-                                        <h3 className="text-sm font-medium text-default-400 mb-1">Yes Votes</h3>
-                                        <p className="text-sm font-semibold">{prediction?.yes_count} {totalYes} </p>
-                                    </div>
-                                    <div>
-                                        <h3 className="text-sm font-medium text-default-400 mb-1">No Votes</h3>
-                                        <p className="text-sm font-semibold">{prediction?.no_count} {totalNo}</p>
-                                    </div>
-                                    <div>
-                                    <h3 className="text-sm font-medium text-default-400 mb-1">Validation Source</h3>
-                                    <p className="text-sm font-semibold">{bet.source}</p>
-                                    </div>
-                                  
-                                    <div className="flex flex-col gap-1">
-                                        {bet.status === "open" ? (
-                                        <>
-                                        <h3 className="text-sm font-medium text-default-400">Created</h3>
-                                        <p className="text-sm font-semibold">{new Date(bet.created_at).toLocaleDateString()}</p>
-                                        </>
-                                        ) : (
-                                        <>
-                                        <h3 className="text-sm font-medium text-default-400">Resolved</h3>
-                                        <p className="text-sm font-semibold">{new Date(bet.resolution_date).toLocaleDateString()}</p>
-                                        </>
-                                        )}
-                                        </div>
-                                </div>
-                                </div>
-                            </div>
-                            </div>
-                            <div className="mt-8">
-                                {pineconeData && (
-                                    <div className="mt-0">
-                                        
-                                        <div className="bg-content0 rounded-lg p-8 ">
-                                            <div className="flex flex-col gap-4 font-kodemono">
-                                            <h2 className="text-xl font-semibold mb-4">Reasoning Log</h2>
-                                                {Object.entries(pineconeData.metadata || {}).map(([key, value]) => {
-                                                    return (
-                                                        (key != "agent_id" && key != "choice" && key != "amount" && key != "created_at" && key != "prediction_id" && key != "log") ? (
-                                                            <div key={key}>
-                                                                <h3 className="text-sm font-medium text-default-400 capitalize mb-1">
-                                                                    {key.replace(/_/g, ' ')}
-                                                                </h3>
-                                                                <p className="text-sm text-default-600">
-                                                                    {typeof value === 'string' ? value : JSON.stringify(value)}
-                                                                </p>
-                                                            </div>
-                                                        ) : (
-                                                            key === "log" ? (
-                                                                <div key={key} className="space-y-4">
-                                                                    {/* <h3 className="text-lg font-semibold text-white mb-2">
-                                                                        Analysis Log
-                                                                    </h3> */}
-                                                                    <div className="space-y-4">
-                                                                        {JSON.parse(value as string).map((log: AnalysisLog, index: number) => (
-                                                                            <div
-                                                                                key={`${log.step}-${index}`}
-                                                                                className=""
-                                                                            >
-                                                                                <div className="flex items-center gap-2 mb-2">
-                                                                                    <span className="text-primary font-medium">
-                                                                                        Step {index + 1}:
-                                                                                    </span>
-                                                                                    <span className="text-default-400 capitalize">
-                                                                                        {log.step.replace(/_/g, ' ')}
-                                                                                    </span>
-                                                                                </div>
-                                                                                {log.reasoning && (
-                                                                                    <p className="text-default-600 text-sm leading-relaxed">
-                                                                                        {log.reasoning}
-                                                                                    </p>
-                                                                                )}
-                                                                            </div>
-                                                                        ))}
-                                                                    </div>
-                                                                </div>
-                                                            ) : (
-                                                                ""
-                                                            )
-                                                        )
-                                                    )
-                                                })}
-                                            </div>
+                                        <div className="flex flex-col gap-1">
+                                            {bet.status === "open" ? (
+                                                <>
+                                                    <h3 className="text-sm font-medium text-default-400">Created</h3>
+                                                    <p className="text-sm font-semibold">{new Date(bet.created_at).toLocaleDateString()}</p>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <h3 className="text-sm font-medium text-default-400">Resolved</h3>
+                                                    <p className="text-sm font-semibold">{new Date(bet.resolution_date).toLocaleDateString()}</p>
+                                                </>
+                                            )}
                                         </div>
                                     </div>
-                                )}
+                                </div>
                             </div>
                         </div>
+                        <div className="mt-8">
+                            {pineconeData && (
+                                <div className="mt-0">
+
+                                    <div className="bg-content0 rounded-lg p-8 ">
+                                        <div className="flex flex-col gap-4 font-kodemono">
+                                            <h2 className="text-xl font-semibold mb-4">Reasoning Log</h2>
+                                            {Object.entries(pineconeData.metadata || {}).map(([key, value]) => {
+                                                return (
+                                                    (key != "agent_id" && key != "choice" && key != "amount" && key != "created_at" && key != "prediction_id" && key != "log") ? (
+                                                        <div key={key}>
+                                                            <h3 className="text-sm font-medium text-default-400 capitalize mb-1">
+                                                                {key.replace(/_/g, ' ')}
+                                                            </h3>
+                                                            <p className="text-sm text-default-600">
+                                                                {typeof value === 'string' ? value : JSON.stringify(value)}
+                                                            </p>
+                                                        </div>
+                                                    ) : (
+                                                        key === "log" ? (
+                                                            <div key={key} className="space-y-4">
+                                                                <div className="space-y-4">
+                                                                    {JSON.parse(value as string).map((log: AnalysisLog, index: number) => (
+                                                                        <div
+                                                                            key={`${log.step}-${index}`}
+                                                                            className=""
+                                                                        >
+                                                                            <div className="flex items-center gap-2 mb-2">
+                                                                                <span className="text-primary font-medium">
+                                                                                    Step {index + 1}:
+                                                                                </span>
+                                                                                <span className="text-default-400 capitalize">
+                                                                                    {log.step.replace(/_/g, ' ')}
+                                                                                </span>
+                                                                            </div>
+                                                                            {log.reasoning && (
+                                                                                <p className="text-default-600 text-sm leading-relaxed">
+                                                                                    {log.reasoning}
+                                                                                </p>
+                                                                            )}
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                            </div>
+                                                        ) : (
+                                                            ""
+                                                        )
+                                                    )
+                                                )
+                                            })}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                        {
+                            pineconeData && (
+                                <div className="mt-8">
+                                    <div className="bg-content0 rounded-lg p-8">
+                                        <h2 className="text-xl font-semibold mb-4">Comment</h2>
+
+                                        {/* Display existing comment if any */}
+                                        {pineconeData?.metadata?.comment && (
+                                            <div className="text-default-600 mb-4">
+                                                <p>{pineconeData.metadata.comment as string}</p>
+                                            </div>
+                                        )}
+
+                                        {/* Comment Form - always shown for updating */}
+                                        <form onSubmit={handleSubmitComment} className="space-y-4">
+                                            <Textarea
+                                                placeholder={pineconeData?.metadata?.comment ? "Update comment..." : "Add a comment..."}
+                                                value={newComment}
+                                                onChange={(e) => setNewComment(e.target.value)}
+                                                className="w-full"
+                                            />
+                                            <Button
+                                                type="submit"
+                                                color="primary"
+                                                isLoading={isSubmitting}
+                                                className="w-full md:w-auto"
+                                            >
+                                                {pineconeData?.metadata?.comment ? "Update Comment" : "Post Comment"}
+                                            </Button>
+                                        </form>
+                                    </div>
+                                </div>
+                            )
+                        }
                     </div>
-                
+                </div>
+
             </main>
         </div>
     );

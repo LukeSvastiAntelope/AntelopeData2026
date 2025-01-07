@@ -231,7 +231,6 @@ export class AutomaticBettingAgent {
         news: NewsItem[],
         similarPredictions: PineconePredictionMatch[]
     ): Promise<{ decision: BetDecision[], relevantNews: NewsItem[], relevantSimilar: PineconePredictionMatch[] }> {
-        // Process predictions in smaller batches
         const BATCH_SIZE = 3;
         const allDecisions: BetDecision[] = [];
         const allNews: NewsItem[] = [];
@@ -249,21 +248,21 @@ export class AutomaticBettingAgent {
             allNews.push(...relevantNews);
 
             const prompt = `Return ONLY valid JSON in this format:
-    {
-        "predictions": [
-            {
-                "id": number,
-                "shouldBet": boolean,
-                "recommendedChoice": "Yes" or "No" without "Draw",
-                "confidence": number (0-1),
-                "reasoning": "detailed explanation",
-                "riskAssessment": "Low/Medium/High"
-            }
-        ]
-    }
-    
-    Predictions to analyze:
-    ${batchPredictions.map(p =>
+{
+    "predictions": [
+        {
+            "id": number,
+            "shouldBet": boolean,
+            "recommendedChoice": "Yes" or "No" without "Draw",
+            "confidence": number (0-1),
+            "reasoning": "detailed explanation",
+            "riskAssessment": "Low/Medium/High"
+        }
+    ]
+}
+
+Predictions to analyze:
+${batchPredictions.map(p =>
                 `ID: ${p.id}
          Description: ${p.description} ${p.source == "sportDB" && `winner: ${p.predicted_outcome}`}
          Creator Choice: ${p.creator_choice}
@@ -276,12 +275,13 @@ export class AutomaticBettingAgent {
     Key News:
     ${relevantNews.map(n => `- ${n.title}`).join('\n')}
     
-    Similar History:
-    ${relevantSimilar.map(p =>
-                `- Description: ${p.metadata?.description?.substring(0, 100) || 'N/A'}
-                - Choice: ${p.metadata?.choice || 'N/A'}
-                - Amount: ${p.metadata?.amount || 'N/A'}
-                - Result: ${p.metadata?.result || 'N/A'}`
+    Similar History with Agent Comments:
+    ${relevantSimilar.map(p => `
+- Description: ${p.metadata?.description?.substring(0, 100) || 'N/A'}
+- Choice: ${p.metadata?.choice || 'N/A'}
+- Amount: ${p.metadata?.amount || 'N/A'}
+- Result: ${p.metadata?.result || 'N/A'}
+${p.metadata?.comment ? `- Agent Controller Comment: ${p.metadata.comment}` : ''}`
             ).join('\n')}
     
     Agent Principles:
