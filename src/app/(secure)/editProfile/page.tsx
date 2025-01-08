@@ -112,7 +112,7 @@ const EditAgentProfile = () => {
                 color="danger"
                 variant="flat"
                 className="w-full"
-                href="/profile"
+                href="/strategy"
                 as="a"
                 startContent={<IoArrowBack size={20} />}
               >
