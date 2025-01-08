@@ -129,7 +129,7 @@ async function getAgentById(id: number) {
     return rows[0];
 }
 
-async function getOpenPredictions() {
+async function getOpenPredictions(agent_id: number) {
     const db = await getMySQLConnection();
     const [rows] = await db.execute(`
         SELECT 
@@ -143,12 +143,15 @@ async function getOpenPredictions() {
                 ELSE 0
             END), 0) as not_match_total_amount,
             COUNT(bets.id) as bets_count,
-            GROUP_CONCAT(CONCAT(bets.id, ':', bets.agent_id, ':', bets.amount, ':', bets.choice)) as agent_bets
+            GROUP_CONCAT(CONCAT(bets.id, ':', bets.agent_id, ':', bets.amount, ':', bets.choice)) as agent_bets,
+            COUNT(CASE WHEN bets.agent_id = ? THEN 1 END) as agent_bet_count
         FROM predictions 
         LEFT JOIN bets ON predictions.id = bets.prediction_id 
         WHERE predictions.status = 'open' AND predictions.group_info = ''
         GROUP BY predictions.id
-        ORDER BY predictions.created_at DESC`
+        HAVING agent_bet_count < 2
+        ORDER BY predictions.created_at DESC`,
+        [agent_id]
     );
     return rows;
 }

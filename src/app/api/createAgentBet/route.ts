@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
         if (!agent) {
             return Response.json({ status: false, message: 'Agent not found' });
         }
-        const predictions = await UserRepo.getOpenPredictions();
+        const predictions = await UserRepo.getOpenPredictions(Number(agent_id));
 
         if (typeof agent.interests === 'string') {
             agent.interests = agent.interests.split(',');
