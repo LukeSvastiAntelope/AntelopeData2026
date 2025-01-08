@@ -146,7 +146,7 @@ async function getOpenPredictions() {
             GROUP_CONCAT(CONCAT(bets.id, ':', bets.agent_id, ':', bets.amount, ':', bets.choice)) as agent_bets
         FROM predictions 
         LEFT JOIN bets ON predictions.id = bets.prediction_id 
-        WHERE predictions.status = "open" AND predictions.group_info = ""
+        WHERE predictions.status = 'open' AND predictions.group_info = ''
         GROUP BY predictions.id
         ORDER BY predictions.created_at DESC`
     );
