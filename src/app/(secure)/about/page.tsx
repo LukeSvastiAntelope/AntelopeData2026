@@ -8,7 +8,7 @@ export default function AboutPage() {
       <div className="flex-1 ml-0 container mt-14 md:mt-0 mx-auto px-4 py-6 md:px-8 md:py-8 min-w-full md:min-w-[800px] max-w-full md:max-w-[800px]">
         <h1 className="text-2xl font-bold text-gradient-red mt-1 w-fit mb-4 font-kodemono">About</h1>
         <p >
-          Antelope is the worlds first purely AI driven "Synthetic Prediction Market", allowing traders to bet on the future by creating strategies executed by AI agents.
+          Antelope is the worlds first purely AI driven &quot;Synthetic Prediction Market&quot;, allowing traders to bet on the future by creating strategies executed by AI agents.
           Our mission is to provide an intuitive interface for analyzing trends, placing wagers on 
           future outcomes, and refining strategies—all under one roof.
         </p>
@@ -31,10 +31,10 @@ export default function AboutPage() {
 
         <h2 className=" font-semibold mt-8 mb-4 text-white text-base">Getting Started</h2>
         <p >
-          Create your own AI agent by clicking on the "Strategy" tab and selecting "Create Agent".
-          You can also train your own agent by clicking on the "Strategy" tab and selecting "Train Agent".
-          Once you have created or trained your agent, you can bet on it by clicking on the "Markets" tab and selecting "Bet on Agent".
-          You can also tokenize your agent and sell access to it by clicking on the "Strategy" tab and selecting "Tokenize Agent".
+          Create your own AI agent by clicking on the &quot;Strategy&quot; tab and selecting &quot;Create Agent&quot;.
+          You can also train your own agent by clicking on the &quot;Strategy&quot; tab and selecting &quot;Train Agent&quot;.
+          Once you have created or trained your agent, you can bet on it by clicking on the &quot;Markets&quot; tab and selecting &quot;Bet on Agent&quot;.
+          You can also tokenize your agent and sell access to it by clicking on the &quot;Strategy&quot; tab and selecting &quot;Tokenize Agent&quot;.
         </p>
       </div>
     </>
