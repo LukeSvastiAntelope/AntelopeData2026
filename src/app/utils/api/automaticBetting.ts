@@ -97,64 +97,71 @@ export class AutomaticBettingAgent {
 
     async analyzePredictions(predictions: Prediction[]): Promise<BetDecision[]> {
         try {
-            const openPredictions = predictions.filter(p => p.creator_id !== this.agent.user_id);
-            const predictionSource = this.getPredictionSource();
+            // Process predictions in smaller chunks
+            const CHUNK_SIZE = 5;
+            const allDecisions: BetDecision[] = [];
             
-            // Filter predictions based on source
-            const categoryPredictions = openPredictions.filter(p => p.source === predictionSource);
+            // Process predictions in chunks
+            for (let i = 0; i < predictions.length; i += CHUNK_SIZE) {
+                const chunk = predictions.slice(i, i + CHUNK_SIZE);
+                
+                // Process this chunk
+                const chunkResults = await this.processChunk(chunk);
+                allDecisions.push(...chunkResults);
+                
+                // Add a small delay between chunks to prevent overload
+                if (i + CHUNK_SIZE < predictions.length) {
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                }
+            }
             
-            // Add market data enrichment if needed
-            if (predictionSource === 'google_finance' || predictionSource === 'coinmarketcap') {
-                await this.enrichPredictionsWithMarketData(categoryPredictions);
-            }
-
-            // Fix: Use Promise.all with map first, then filter
-            const interestingPredictions = (
-                await Promise.all(
-                    categoryPredictions.map(async p => {
-                        const { shouldBet, reasoning } = await this.isInterestingPredictionWithAI(p);
-                        console.log("reasoning", shouldBet, reasoning);
-                        p.betReason = reasoning ? [{ step: "interesting", reasoning: reasoning }] : [];
-                        return { prediction: p, shouldBet };
-                    })
-                )
-            ).filter(result => result.shouldBet)
-             .map(result => result.prediction);
-            if (interestingPredictions.length === 0) {
-                return [];
-            }
-
-            const groupedPredictions = this.groupPredictionsByTopic(interestingPredictions);
-
-            const betDecisionsPromises = Object.entries(groupedPredictions)
-                .map(async ([, topicPredictions]) => {
-                    const news = await this.gatherRelevantNews(topicPredictions);
-                    const similarPredictions = await this.findSimilarPredictions(topicPredictions);
-                    const { decision, relevantNews, relevantSimilar } = await this.analyzeGroupWithGPT(topicPredictions, news, similarPredictions);
-                    
-                    // Store each bet decision in Pinecone
-                    await Promise.all(decision.map(async (decision) => {
-                        const prediction = topicPredictions.find(p => p.id === decision.predictionId);
-                        if (prediction) {
-                            if (!prediction.betReason) {
-                                prediction.betReason = [];
-                            }
-                            prediction.betReason.push({ step: "relevantNews", reasoning: relevantNews.slice(0, 3).map(n => n.title).join(', ') });
-                            prediction.betReason.push({ step: "similarPredictions", reasoning: relevantSimilar.map(p => p.metadata?.description).join(', ') });
-                            const pineconeId = await this.storeBetInPinecone(decision, prediction);
-                            decision.pineconeId = pineconeId;
-                        }
-                    }));
-
-                    return decision;
-                });
-
-            const groupResults = await Promise.all(betDecisionsPromises);
-            return groupResults.flat();
+            return allDecisions;
         } catch (error) {
             console.error('Error in batch prediction analysis:', error);
             return [];
         }
+    }
+
+    private async processChunk(predictions: Prediction[]): Promise<BetDecision[]> {
+        const openPredictions = predictions.filter(p => p.creator_id !== this.agent.user_id);
+        const predictionSource = this.getPredictionSource();
+        const categoryPredictions = openPredictions.filter(p => p.source === predictionSource);
+        
+        // Add market data enrichment if needed
+        if (predictionSource === 'google_finance' || predictionSource === 'coinmarketcap') {
+            await this.enrichPredictionsWithMarketData(categoryPredictions);
+        }
+
+        const interestingPredictions = (
+            await Promise.all(
+                categoryPredictions.map(async p => {
+                    const { shouldBet, reasoning } = await this.isInterestingPredictionWithAI(p);
+                    p.betReason = reasoning ? [{ step: "interesting", reasoning: reasoning }] : [];
+                    return { prediction: p, shouldBet };
+                })
+            )
+        ).filter(result => result.shouldBet)
+         .map(result => result.prediction);
+
+        if (interestingPredictions.length === 0) {
+            return [];
+        }
+
+        const groupedPredictions = this.groupPredictionsByTopic(interestingPredictions);
+        const decisions = await Promise.all(
+            Object.entries(groupedPredictions).map(async ([, topicPredictions]) => {
+                const news = await this.gatherRelevantNews(topicPredictions);
+                const similarPredictions = await this.findSimilarPredictions(topicPredictions);
+                const { decision } = await this.analyzeGroupWithGPT(
+                    topicPredictions,
+                    news,
+                    similarPredictions
+                );
+                return decision;
+            })
+        );
+
+        return decisions.flat();
     }
 
     private isSportsCategory(): boolean {
@@ -655,17 +662,33 @@ ${p.metadata?.comment ? `- Agent Controller Comment: ${p.metadata.comment}` : ''
             const embedding = await this.getEmbedding(descriptions);
             const index = this.pinecone.Index('prediction-results');
 
+            // Add category-based filtering
+            const category = this.getPredictionSource();
             const queryResponse = await index.query({
                 vector: embedding,
                 topK: 5,
                 includeMetadata: true,
                 filter: {
                     status: { $eq: 'resolved' },
-                    agent_id: { $eq: this.agent.id }  // Add filter for agent's predictions
+                    agent_id: { $eq: this.agent.id },
+                    category: { $eq: category }  // Add category filter
                 }
             });
 
-            return queryResponse.matches as PineconePredictionMatch[];
+            // Additional relevance check
+            const matches = queryResponse.matches as PineconePredictionMatch[];
+            return matches.filter(match => {
+                const description = match.metadata?.description?.toLowerCase() || '';
+                // For crypto predictions, ensure they contain relevant terms
+                if (category === 'coinmarketcap') {
+                    return description.includes('bitcoin') || 
+                           description.includes('crypto') || 
+                           description.includes('btc') ||
+                           description.includes('eth') ||
+                           description.includes('cryptocurrency');
+                }
+                return true;
+            });
         } catch (error) {
             console.error('Error finding similar predictions:', error);
             return [];
