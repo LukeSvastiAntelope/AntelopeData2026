@@ -51,6 +51,19 @@ interface AnalysisLog {
     reasoning?: string;
 }
 
+const parseLogEntries = (logString: string) => {
+    return logString.split('\n').map(entry => {
+        const match = entry.match(/\[(.*?)\] (.*)/);
+        if (match) {
+            return {
+                timestamp: match[1],
+                message: match[2]
+            };
+        }
+        return null;
+    }).filter(Boolean);
+};
+
 export default function BetDetailPage() {
     const params = useParams();
     const router = useRouter();
@@ -93,7 +106,7 @@ export default function BetDetailPage() {
                 if (response.bet.pinecone_id) {
                     setPineconeData(response.vector);
                 }
-
+                setPrediction(response.prediction);
                 // Parse the bets string and calculate totals
                 if (response.prediction?.bets) {
                     const betsArray: BetData[] = response.prediction.bets;
@@ -105,7 +118,6 @@ export default function BetDetailPage() {
                     setTotalYes(yesTotal);
                     setTotalNo(noTotal);
                 }
-                setPrediction(response.prediction);
             } else {
                 toast.error(response.message);
             }
@@ -230,6 +242,25 @@ export default function BetDetailPage() {
                                     </div>
                                 </div>
                             </div>
+                            {prediction?.log && (
+                                <div className="mt-8">
+                                    <div className="bg-content0 rounded-lg p-8">
+                                        <h2 className="text-xl font-semibold mb-4">Resolution Log</h2>
+                                        <div className="space-y-4 font-kodemono">
+                                            {parseLogEntries(prediction.log).map((entry, index) => (
+                                                <div key={index} className="flex flex-col gap-1">
+                                                    <span className="text-primary text-sm">
+                                                        {new Date(entry?.timestamp || "").toLocaleString()}
+                                                    </span>
+                                                    <span className="text-default-600">
+                                                        {entry?.message}
+                                                    </span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                             <div className="mt-8">
                                 {pineconeData && (
                                     <div className="mt-0">

@@ -285,6 +285,7 @@ export interface PredictionDB {
     bets?: IBet[];
     yes_count: number;
     no_count: number;
+    log?: string;
 }
 
 export interface IPrediction {

@@ -762,20 +762,30 @@ ${p.metadata?.comment ? `- Agent Controller Comment: ${p.metadata.comment}` : ''
                 }
             });
 
-            const data = response.data.data[symbol];
-            if (!data) return null;
+            // Add debug logging
+            console.log('CoinMarketCap API Response:', JSON.stringify(response.data, null, 2));
+
+            // Safely access nested properties
+            const cryptoData = response.data?.data?.[symbol]?.[0] || response.data?.data?.[symbol];
+            if (!cryptoData?.quote?.USD) {
+                console.error('Invalid data structure from CoinMarketCap:', cryptoData);
+                return null;
+            }
 
             return {
                 symbol,
-                price: data.quote.USD.price,
-                change24h: data.quote.USD.percent_change_24h,
-                volume24h: data.quote.USD.volume_24h,
-                lastUpdated: data.quote.USD.last_updated
+                price: cryptoData.quote.USD.price || 0,
+                change24h: cryptoData.quote.USD.percent_change_24h || 0,
+                volume24h: cryptoData.quote.USD.volume_24h || 0,
+                lastUpdated: cryptoData.quote.USD.last_updated || new Date().toISOString()
             };
         } catch (error) {
             console.error('Error fetching crypto market data:', error);
             if (axios.isAxiosError(error) && error.response) {
-                console.error('CoinMarketCap API error:', error.response.data);
+                console.error('CoinMarketCap API error details:', {
+                    status: error.response.status,
+                    data: error.response.data
+                });
             }
             return null;
         }
