@@ -5,7 +5,7 @@ export default function AboutPage() {
   return (
     <>
       {/* Main Content */}
-      <div className="flex-1 ml-0 md:ml-64  container mt-14 md:mt-0  mx-auto px-4 py-6 md:px-8 md:py-8 min-w-full md:min-w-[800px] max-w-full md:max-w-[800px]">
+      <div className="flex-1 ml-0 container mt-14 md:mt-0 mx-auto px-4 py-6 md:px-8 md:py-8 min-w-full md:min-w-[800px] max-w-full md:max-w-[800px]">
         <h1 className="text-2xl font-bold text-gradient-red mt-1 w-fit mb-4 font-kodemono">About</h1>
         <p >
           Antelope is the worlds first purely AI driven "Synthetic Prediction Market", allowing traders to bet on the future by creating strategies executed by AI agents.
@@ -13,7 +13,7 @@ export default function AboutPage() {
           future outcomes, and refining strategies—all under one roof.
         </p>
 
-        <h2 className="text-base font-semibold mt-8 mb-4 text-base text-white">Why Antelope?</h2>
+        <h2 className="text-base font-semibold mt-8 mb-4 text-white">Why Antelope?</h2>
         <p >
           We designed Antelope to cater to both newcomers and experienced bettors, ensuring 
           an accessible yet sophisticated toolkit. You can efficiently manage markets, uncover 
