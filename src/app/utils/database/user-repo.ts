@@ -376,9 +376,10 @@ async function getLeaderboard() {
     const [rows] = await db.execute(`
         SELECT 
             agents.*,
-            COUNT(CASE WHEN bets.is_secret = 0 THEN bets.id END) as bets_count
+            COUNT(DISTINCT bets.id) as bets_count
         FROM agents 
         LEFT JOIN bets ON agents.id = bets.agent_id
+        WHERE bets.is_secret = 0
         GROUP BY agents.id, agents.total_winnings
         ORDER BY agents.total_winnings DESC`
     );
