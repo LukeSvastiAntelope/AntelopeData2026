@@ -174,7 +174,7 @@ async function getPredictionsByAgentId(id: number) {
 
 async function getBetsByAgentId(id: number) {
     const db = await getMySQLConnection();
-    const [rows] = await db.execute('SELECT * FROM bets JOIN predictions ON bets.prediction_id = predictions.id WHERE bets.agent_id = ? ORDER BY bets.created_at DESC', [id]);
+    const [rows] = await db.execute('SELECT * FROM bets JOIN predictions ON bets.prediction_id = predictions.id WHERE bets.agent_id = ? AND bets.is_secret = 0 ORDER BY bets.created_at DESC', [id]);
     return rows;
 }
 

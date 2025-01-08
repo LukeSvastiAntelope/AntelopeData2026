@@ -1,10 +1,10 @@
 'use client';
 
 import { Card, CardBody, CardHeader } from "@nextui-org/card";
-import { Input, Textarea } from "@nextui-org/input";
+import { Input } from "@nextui-org/input";
 import { Button } from "@nextui-org/button";
-import Image from "next/image";
-import { useState, useCallback, useRef, useEffect } from "react";
+import { Select, SelectItem } from "@nextui-org/select";
+import { useState, useEffect } from "react";
 import { IoArrowBack, IoSave } from "react-icons/io5";
 import { IAgentProfile } from "@/app/utils/interface";
 import { useFetch } from "@/app/utils/lib";
@@ -14,7 +14,6 @@ const EditAgentProfile = () => {
   const [agent, setAgent] = useState<IAgentProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const fetchData = useFetch();
-  const fileRef = useRef<HTMLInputElement | null>(null);
 
   const saveAgentProfile = async () => {
     if (!agent) return;
@@ -28,10 +27,6 @@ const EditAgentProfile = () => {
     formData.append('moderateBetSize', agent.moderateBetSize.toString());
     formData.append('aggressiveBetSize', agent.aggressiveBetSize.toString());
     formData.append('principles', JSON.stringify(agent.principles));
-    const avatarFile = fileRef?.current?.files?.[0];
-    if (avatarFile) {
-        formData.append('avatar', avatarFile);
-    }
     formData.append('image', agent.image || "");
     formData.append('maxTimelineLimit', agent.maxTimelineLimit.toString());
     formData.append('category', agent.category || "");
@@ -79,30 +74,54 @@ const EditAgentProfile = () => {
     <div className="min-h-screen  min-w-[625px]">
       <header className="bg-content0 text-white py-8 rounded-b-2xl">
         <div className="container mx-auto px-4 text-center">
-            <h1 className="text-3xl font-bold">Edit Agent Profile</h1>
-            <p className="mt-2 opacity-80">Customize your betting agent settings</p>
+          <h1 className="text-3xl font-bold">Edit Agent Profile</h1>
+          <p className="mt-2 opacity-80">Customize your betting agent settings</p>
         </div>
       </header>
 
       {
         !isLoading && agent && (
           <main className="container mx-auto px-4 py-8">
-            <ImageUpload fileRef={fileRef} avatar={agent.image} />
             <Card className="mb-8 bg-content0">
-              <CardHeader className="text-xl font-regular">Basic Profile</CardHeader>
+              <CardHeader className="text-xl font-regular">Risk Settings</CardHeader>
               <CardBody className="space-y-6">
+                <Select
+                  label="Default Risk Level"
+                  variant="bordered"
+                  defaultSelectedKeys={[agent?.riskLevel]}
+                  onChange={(e) => setAgent({ ...agent, riskLevel: e.target.value as 'conservative' | 'moderate' | 'aggressive' })}
+                >
+                  <SelectItem key="conservative" value="conservative">Conservative</SelectItem>
+                  <SelectItem key="moderate" value="moderate">Moderate</SelectItem>
+                  <SelectItem key="aggressive" value="aggressive">Aggressive</SelectItem>
+                </Select>
+
                 <Input
-                  label="Agent Name"
+                  label="Conservative Bet Size"
+                  type="number"
+                  endContent={<span className="text-default-400">credits</span>}
                   variant="bordered"
-                  value={agent?.name}
-                  onChange={(e) => setAgent({ ...agent, name: e.target.value })}
+                  value={agent?.conservativeBetSize?.toString() || '0'}
+                  onChange={(e) => setAgent({ ...agent, conservativeBetSize: parseInt(e.target.value) })}
+                  min={0}
                 />
-                <Textarea
-                  label="Description"
-                  defaultValue="Specialized in space industry predictions"
+                <Input
+                  label="Moderate Bet Size"
+                  type="number"
+                  endContent={<span className="text-default-400">credits</span>}
                   variant="bordered"
-                  value={agent?.description}
-                  onChange={(e) => setAgent({ ...agent, description: e.target.value })}
+                  value={agent?.moderateBetSize?.toString() || '0'}
+                  onChange={(e) => setAgent({ ...agent, moderateBetSize: parseInt(e.target.value) })}
+                  min={0}
+                />
+                <Input
+                  label="Aggressive Bet Size"
+                  type="number"
+                  endContent={<span className="text-default-400">credits</span>}
+                  variant="bordered"
+                  value={agent?.aggressiveBetSize?.toString() || '0'}
+                  onChange={(e) => setAgent({ ...agent, aggressiveBetSize: parseInt(e.target.value) })}
+                  min={0}
                 />
               </CardBody>
             </Card>
@@ -112,7 +131,7 @@ const EditAgentProfile = () => {
                 color="danger"
                 variant="flat"
                 className="w-full"
-                href="/profile"
+                href="/strategy"
                 as="a"
                 startContent={<IoArrowBack size={20} />}
               >
@@ -131,72 +150,6 @@ const EditAgentProfile = () => {
         )
       }
     </div>
-  );
-};
-
-
-const ImageUpload = ({ fileRef, avatar }: { fileRef: React.RefObject<HTMLInputElement>, avatar: string }) => {
-  const [image, setImage] = useState<string | null>(avatar);
-
-  const handleImageUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImage(reader.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
-  }, []);
-
-  return (
-    <Card className="mb-8 bg-content0">
-      <CardHeader className="text-xl font-regular">Profile Image</CardHeader>
-      <CardBody>
-        <div className="flex flex-col items-center gap-4">
-          <div className="relative w-32 h-32 rounded-full overflow-hidden bg-content0 cursor-pointer" onClick={() => fileRef && fileRef.current?.click()}>
-            {image ? (
-              <Image
-                src={image}
-                alt="Profile"
-                fill
-                className="object-cover"
-              />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center text-default-400 text-6xl">
-                +
-              </div>
-            )}
-          </div>
-
-          <div className="flex gap-2">
-            <Button
-              as="label"
-              color="primary"
-              className="cursor-pointer"
-            >
-              Upload Image
-              <input
-                type="file"
-                className="hidden"
-                accept="image/*"
-                onChange={handleImageUpload}
-                ref={fileRef}
-              />
-            </Button>
-            {image && (
-              <Button
-                color="danger"
-                variant="flat"
-                onPress={() => setImage(null)}
-              >
-                Remove
-              </Button>
-            )}
-          </div>
-        </div>
-      </CardBody>
-    </Card>
   );
 };
 

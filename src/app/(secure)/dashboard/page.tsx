@@ -127,11 +127,8 @@ export default function Dashboard() {
   const [activeTab, setActiveTab] = useState<"bets" | "predictions">("bets");
   const [searchTerm, setSearchTerm] = useState('');
   const [searchPredictions, setSearchPredictions] = useState('');
-  const [agentBalance, setAgentBalance] = useState(0);
-
   // Agent
   const [agent, setAgent] = useState<IAgentProfile | null>(null);
-
   // Bets state
   const [bets, setBets] = useState<IBet[]>([]);
   const [isLoadingBets, setIsLoadingBets] = useState<boolean>(true);
@@ -270,7 +267,6 @@ export default function Dashboard() {
         const response = await fetch.get("/api/getAgentProfile");
         if (response.status) {
           setAgent(response.agent);
-          setAgentBalance(response.agent.wallet_balance ?? 0);
         } else {
           toast.error(response.message);
         }
@@ -317,8 +313,8 @@ export default function Dashboard() {
     plugins: {
       tooltip: {
         callbacks: {
-          label: function(context: TooltipItem<'scatter'>) {
-            return (context.raw as {betName: string}).betName || "Unknown Bet";
+          label: function (context: TooltipItem<'scatter'>) {
+            return (context.raw as { betName: string }).betName || "Unknown Bet";
           },
         },
       },
@@ -347,285 +343,327 @@ export default function Dashboard() {
   // -------------------------------------------------------------------------
 
   return (
-    <div className="flex text-white max-w-[1200px]">
-      {/* Sidebar */}
-      <aside className="md:w-64 md:flex-col md:left-auto left-0 fixed top-0 text-sm w-full">
-        <nav className="flex flex-row md:flex-col gap-4 text-normal justify-evenly py-8 px-4 ">
-          <div className="flex flex-row md:flex-col justify-evenly w-full md:gap-4">
-            <div className="flex md:inline-block items-center ">
-              {/* Large logo for md+ */}
-              <span className="hidden md:inline-block ">
-                <Image
-                  src={"/assets/images/logo-text.svg"}
-                  alt="Dashboard Logo"
-                  width={160}
-                  height={40}
-                  className="mr-2 w-100"
-                />
-              </span>
-            </div>
-
-            {/* Profile Photo */}
-            <div className="md:flex items-center p-2 border border-white/10 profile-border hidden gap-2 mb-2">
-
-              <Image
-                src={agent?.image || "/assets/images/logo-simple.svg"}
-                alt="Profile"
-                width={32}
-                height={32}
-                className="rounded-full bg-gray-700 sm-hidden"
-              />
-
-              <div className="flex flex-col">
-
-                <Link className="text-sm font-semibold font-kodemono w-full"
-                  href="/profile">{agent?.name || "Agent Name"}</Link>
-
-                <Link className="text-gradient-red hover-white" href="/payment">
-                  <span className="icon-coin-red icon-text">
-                    {agentBalance?.toLocaleString() || 0}
-                  </span>
-                </Link>
-              </div>
-            </div>
-
-
-            <Link href="/" className="flex items-center text-white font-kodemono md:gap-2">
-              <span className="icon-dashboard-active md:gap-2" />
-              <span className="hidden md:inline-block">Overview</span>
-            </Link>
-
-            <Link href="/markets" className="flex items-center group md:gap-2">
-              <span className="icon-markets block group-hover:hidden " />
-              <span className="icon-markets-active hidden group-hover:block" />
-              <span className="text-default-400 group-hover:text-white font-kodemono">
-                <span className="hidden md:inline-block">Markets</span>
-              </span>
-            </Link>
-
-            <Link
-              href="/strategy"
-              className="flex items-center group text-default-400 md:gap-2"
-            >
-              <span className="icon-strategy block group-hover:hidden" />
-              <span className="icon-strategy-active hidden sm:enlarge-icon group-hover:block" />
-              <span className="text-default-400 group-hover:text-white font-kodemono">
-                <span className="hidden md:inline-block">Strategy</span>
-              </span>
-            </Link>
-          </div>
-
-          <div className="md:hidden min-w-40px min-h-40px max-w-40px max-h-40px center-logo"></div>
-
-          <div className="flex flex-row md:flex-col justify-evenly w-full md:gap-4 ">
-            <Link href="/about" className="flex items-center text-default-400 group md:gap-2">
-              <span className="icon-about block group-hover:hidden" />
-              <span className="icon-about-active hidden group-hover:block" />
-              <span className="text-default-400 group-hover:text-white font-kodemono">
-                <span className="hidden md:inline-block">About</span>
-              </span>
-            </Link>
-            <Link
-              href="https://discord.gg/dSEV8YCDQ2"
-              className="flex items-center md:gap-2 text-default-400 group"
-            >
-              <span className="icon-support block group-hover:hidden" />
-              <span className="icon-support-active hidden group-hover:block" />
-              <span className="text-default-400 group-hover:text-white font-kodemono">
-                <span className="hidden md:inline-block">Community</span>
-              </span>
-            </Link>
-            <Link href="/logout" className="flex items-center text-default-400 group md:gap-2">
-              <span className="icon-logout block group-hover:hidden" />
-              <span className="icon-logout-active hidden group-hover:block" />
-              <span className="text-default-400 group-hover:text-white font-kodemono">
-                <span className="hidden md:inline-block">Log out</span>
-              </span>
-            </Link>
-          </div>
-        </nav>
-      </aside>
-
-      {/* Main Content */}
-      <main className="flex-1 ml-0 md:ml-64 container mt-14 md:mt-0 mx-auto px-4 py-6 md:px-8 md:py-8 min-w-full md:min-w-[800px] max-w-full md:max-w-[800px]">
-        {/* Top bar with toggles */}
-
-        <div className="flex flex-row justify-between h-32">
-          <div className="pr-8 pt-2">
-            <h1 className="font-bold mb-2 font-kodemono ">Overview</h1>
-            <p className="text-gray-500 h1paragraph">
-              See how your bets and predictions are performing. Get a quick
-              overview of your success rate, bet size, and more.
-            </p>
-          </div>
-          {/* <div className="home hidden md:inline-block"></div> */}
+    <>
+      <div className="flex flex-row justify-between h-32">
+        <div className="pr-8 pt-2">
+          <h1 className="font-bold mb-2 font-kodemono ">Overview</h1>
+          <p className="text-gray-500 h1paragraph">
+            See how your bets and predictions are performing. Get a quick
+            overview of your success rate, bet size, and more.
+          </p>
         </div>
+        {/* <div className="home hidden md:inline-block"></div> */}
+      </div>
 
-        {/* Stats Overview */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-small">
-          <Link href="/bets">
-            <StatCard icon={<FaRocket />} title="Bets" value={totalBets.toString()}
-              className="border border-white/10" />
-          </Link>
-          <Link href="/predictions">
-            <StatCard
-              icon={<FaDatabase />}
-              title="Predictions"
-              value={totalPredictions.toString()}
-            />
-          </Link>
+      {/* Stats Overview */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-small">
+        <Link href="/bets">
+          <StatCard icon={<FaRocket />} title="Bets" value={totalBets.toString()}
+            className="border border-white/10" />
+        </Link>
+        <Link href="/predictions">
           <StatCard
-            icon={<FaChartLine />}
-            title="Success"
-            value={`${Number(successRate || 0).toFixed(2)}%`}
+            icon={<FaDatabase />}
+            title="Predictions"
+            value={totalPredictions.toString()}
           />
-          <StatCard
-            icon={<FaShieldAlt />}
-            title="Bet Size"
-            value={`${agent?.maxBetSize || 0}`}
-            
-          />
-        </div>
+        </Link>
+        <StatCard
+          icon={<FaChartLine />}
+          title="Success"
+          value={`${Number(successRate || 0).toFixed(2)}%`}
+        />
+        <StatCard
+          icon={<FaShieldAlt />}
+          title="Bet Size"
+          value={`${agent?.maxBetSize || 0}`}
 
-        {/* Graphs */}
-        <div className="my-6 w-full hidden md:inline-block" style={{ height: "200px", width: "100%" }}>
-          {bets && bets.length > 0 ? (
-            <Scatter
-              data={scatterData}
-              options={scatterOptions}
+        />
+      </div>
+
+      {/* Graphs */}
+      <div className="my-6 w-full hidden md:inline-block" style={{ height: "200px", width: "100%" }}>
+        {bets && bets.length > 0 ? (
+          <Scatter
+            data={scatterData}
+            options={scatterOptions}
+          />
+        ) : (
+          <p>No bets to display in graph.</p>
+        )}
+      </div>
+
+      {/* The rest of your existing code remains the same */}
+      {/* Tabs, bet list, predictions list, etc. */}
+      <div className="flex gap-4 mb-4 mt-4 font-kodemono">
+        <Button
+          color={activeTab === "bets" ? "primary" : "default"}
+          variant="flat"
+          onPress={() => setActiveTab("bets")}
+        >
+          Bets
+        </Button>
+        <Button
+          color={activeTab === "predictions" ? "primary" : "default"}
+          variant="flat"
+          onPress={() => setActiveTab("predictions")}
+        >
+          Predictions
+        </Button>
+      </div>
+
+      {/* BETS TAB */}
+      {activeTab === "bets" && (
+        <section className="rounded-lg overflow-x-auto">
+          <div className="flex items-center relative mb-4">
+            <span className="absolute inset-y-0 left-0 flex items-center pl-2 pointer-events-none">
+              {/* Search Icon */}
+              <svg
+                aria-hidden="true"
+                className="w-5 h-5 text-gray-700"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                viewBox="0 0 24 24"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <circle cx="10" cy="10" r="7"></circle>
+                <path d="M21 21l-4.35-4.35"></path>
+              </svg>
+            </span>
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={handleBetSearch}
+              placeholder="Search bets..."
+              className="w-full p-2 pl-9 rounded-md text-gray-500 focus:outline-none text-small input-search bg-gray-800 placeholder-gray-700"
             />
-          ) : (
-            <p>No bets to display in graph.</p>
+          </div>
+
+          {isLoadingBets && bets.length === 0 && (
+            <div className="flex justify-center items-center py-8">
+              <Spinner size="lg" />
+            </div>
           )}
-        </div>
-
-        {/* The rest of your existing code remains the same */}
-        {/* Tabs, bet list, predictions list, etc. */}
-        <div className="flex gap-4 mb-4 mt-4 font-kodemono">
-          <Button
-            color={activeTab === "bets" ? "primary" : "default"}
-            variant="flat"
-            onPress={() => setActiveTab("bets")}
-          >
-            Bets
-          </Button>
-          <Button
-            color={activeTab === "predictions" ? "primary" : "default"}
-            variant="flat"
-            onPress={() => setActiveTab("predictions")}
-          >
-            Predictions
-          </Button>
-        </div>
-
-        {/* BETS TAB */}
-        {activeTab === "bets" && (
-          <section className="rounded-lg overflow-x-auto">
-            <div className="flex items-center relative mb-4">
-              <span className="absolute inset-y-0 left-0 flex items-center pl-2 pointer-events-none">
-                {/* Search Icon */}
-                <svg
-                  aria-hidden="true"
-                  className="w-5 h-5 text-gray-700"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  viewBox="0 0 24 24"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <circle cx="10" cy="10" r="7"></circle>
-                  <path d="M21 21l-4.35-4.35"></path>
-                </svg>
-              </span>
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={handleBetSearch}
-                placeholder="Search bets..."
-                className="w-full p-2 pl-9 rounded-md text-gray-500 focus:outline-none text-small input-search bg-gray-800 placeholder-gray-700"
-              />
+          {!isLoadingBets && bets.length === 0 && (
+            <div className="text-center text-gray-500 py-8">
+              No bets found
             </div>
+          )}
 
-            {isLoadingBets && bets.length === 0 && (
-              <div className="flex justify-center items-center py-8">
-                <Spinner size="lg" />
-              </div>
-            )}
-            {!isLoadingBets && bets.length === 0 && (
-              <div className="text-center text-gray-500 py-8">
-                No bets found
-              </div>
-            )}
+          {bets.length > 0 && (
+            <table className="w-full text-sm text-left">
+              <tbody>
+                {filterBets(bets, searchTerm).map((bet, index) => (
+                  <tr
+                    key={index}
+                    className="transition-colors0"
+                    onClick={() => router.push(`/bets/${bet.bet_id}`)}
+                  >
+                    <td colSpan={5} className="p-2 backbutton cursor-pointer">
+                      <div className="flex flex-row gap-4 items-start">
+                        {bet.str_thumb ? (
+                          <Image
+                            src={bet.str_thumb}
+                            alt={bet.description}
+                            width={40}
+                            height={40}
+                            className="w-[40px] h-[40px] rounded-full max-w-[40px] max-h-[40px] min-w-[40px] min-h-[40px]"
+                          />
+                        ) : (
+                          <div className="w-[40px] h-[40px] rounded-full max-w-[40px] max-h-[40px] min-w-[40px] min-h-[40px] bg-gray-700"></div>
+                        )}
+                        <div className="flex flex-col md:flex-row gap-2 items-start w-full">
+                          <p className="break-words w-full text-base">{bet.description}</p>
+                          <div className="flex flex-row md:flex-row gap-2 items-start sm:items-start">
+                            <span className="icon-coin icon-text">
+                              {bet.amount}
+                            </span>
+                            {
+                              bet.yes_bets && bet.yes_bets.length > 0 && (
+                                <Chip
+                                  color="primary"
+                                  variant="flat"
+                                  size="sm"
+                                >
+                                  Yes: {bet.yes_bets.reduce((acc, bet) => acc + bet.amount, 0)}
+                                </Chip>
+                              )
+                            }
+                            {
+                              bet.no_bets && bet.no_bets.length > 0 && (
+                                <Chip
+                                  color="secondary"
+                                  variant="flat"
+                                  size="sm"
+                                >
+                                  No: {bet.no_bets.reduce((acc, bet) => acc + bet.amount, 0)}
+                                </Chip>
+                              )
+                            }
+                            <Chip
+                              color={
+                                bet.status !== "open"
+                                  ? bet.outcome === bet.choice
+                                    ? "success"
+                                    : "danger"
+                                  : "primary"
+                              }
+                              variant="flat"
+                              size="sm"
+                            >
+                              {bet.status === "resolved"
+                                ? bet.outcome === bet.choice
+                                  ? "Won"
+                                  : "Lost"
+                                : bet.status == "awaiting_confirmation"
+                                  ? "Awaiting"
+                                  : bet.status}
+                            </Chip>
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
 
-            {bets.length > 0 && (
+          {/* Show More */}
+          {hasMoreBets && !isLoadingBets && bets.length > 0 && (
+            <div className="flex justify-center mt-4">
+              <Button
+                color="primary"
+                variant="flat"
+                onPress={loadMoreBets}
+                isLoading={isLoadingBets}
+                className="min-w-[200px]"
+              >
+                {isLoadingBets ? "Loading..." : "Show More"}
+              </Button>
+            </div>
+          )}
+          {isLoadingBets && bets.length > 0 && (
+            <div className="flex justify-center items-center py-4">
+              <Spinner size="sm" />
+            </div>
+          )}
+          {!hasMoreBets && bets.length > 0 && (
+            <div className="text-center text-gray-500 py-4">
+              No more bets to load
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* Predictions */}
+      {activeTab === "predictions" && (
+        <section className="rounded-lg overflow-x-auto mb-8">
+          <div className="flex items-center relative mb-4">
+            <span className="absolute inset-y-0 left-0 flex items-center pl-2 pointer-events-none">
+              {/* Search Icon */}
+              <svg
+                aria-hidden="true"
+                className="w-5 h-5 text-gray-700"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                viewBox="0 0 24 24"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <circle cx="10" cy="10" r="7"></circle>
+                <path d="M21 21l-4.35-4.35"></path>
+              </svg>
+            </span>
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={handlePredictionSearch}
+              placeholder="Search predictions..."
+              className="w-full p-2 pl-9 rounded-md text-gray-700 focus:outline-none text-small input-search bg-gray-800 placeholder-gray-700"
+            />
+          </div>
+
+          {isLoadingPredictions && predictions.length === 0 && (
+            <div className="flex justify-center items-center py-8">
+              <Spinner size="lg" />
+            </div>
+          )}
+          {displayedPredictions.length === 0 && !isLoadingPredictions && (
+            <div className="text-center text-gray-500 py-8">
+              No predictions found
+            </div>
+          )}
+
+          {displayedPredictions.length > 0 && (
+            <section className="rounded-lg overflow-x-auto mb-8">
               <table className="w-full text-sm text-left">
                 <tbody>
-                  {filterBets(bets, searchTerm).map((bet, index) => (
+                  {displayedPredictions.map((prediction, index) => (
                     <tr
                       key={index}
-                      className="transition-colors0"
-                      onClick={() => router.push(`/bets/${bet.bet_id}`)}
+                      className="cursor-pointer backbutton"
+                      onClick={() => router.push(`/predictions/${prediction.id}`)}
                     >
-                      <td colSpan={5} className="p-2 backbutton cursor-pointer">
+                      <td colSpan={5} className="p-2 backbutton cursor-pointer mb-4">
                         <div className="flex flex-row gap-4 items-start">
-                          {bet.str_thumb ? (
+                          {prediction.str_thumb ? (
                             <Image
-                              src={bet.str_thumb}
-                              alt={bet.description}
+                              src={prediction.str_thumb}
+                              alt={prediction.description}
                               width={40}
                               height={40}
-                              className="w-[40px] h-[40px] rounded-full max-w-[40px] max-h-[40px] min-w-[40px] min-h-[40px]"
+                              className="w-[40px] h-[40px] min-w-[40px] min-h-[40px] rounded-full"
                             />
                           ) : (
-                            <div className="w-[40px] h-[40px] rounded-full max-w-[40px] max-h-[40px] min-w-[40px] min-h-[40px] bg-gray-700"></div>
+                            <div className="w-[40px] h-[40px] min-w-[40px] min-h-[40px] rounded-full bg-gray-700"></div>
                           )}
-                          <div className="flex flex-col md:flex-row gap-2 items-start w-full">
-                            <p className="break-words w-full text-base">{bet.description}</p>
-                            <div className="flex flex-row md:flex-row gap-2 items-start sm:items-start">
-                              <span className="icon-coin icon-text">
-                                {bet.amount}
+                          <div className="flex flex-col w-full md:flex-row gap-2 items-start">
+                            <p className="break-words text-base w-full">
+                              {prediction.description}
+                            </p>
+                            <div className="flex flex-row gap-2 items-start sm:items-start">
+                              {/* <span className="text-default-400">
+                                  {prediction.resolution_date
+                                    ? format(new Date(prediction.resolution_date), "MM/dd/yy")
+                                    : ""}
+                                </span> */}
+                              <span className="icon-user text-primary">
+                                {prediction.bets_count}
                               </span>
-                              {
-                                bet.yes_bets && bet.yes_bets.length > 0 && (
-                                  <Chip
-                                    color="primary"
-                                    variant="flat"
-                                    size="sm"
-                                  >
-                                    Yes: {bet.yes_bets.reduce((acc, bet) => acc + bet.amount, 0)}
-                                  </Chip>
-                                )
-                              }
-                              {
-                                bet.no_bets && bet.no_bets.length > 0 && (
-                                  <Chip
-                                    color="secondary"
-                                    variant="flat"
-                                    size="sm"
-                                  >
-                                    No: {bet.no_bets.reduce((acc, bet) => acc + bet.amount, 0)}
-                                  </Chip>
-                                )
-                              }
+                              <Chip
+                                color="primary"
+                                variant="flat"
+                                size="sm"
+                              >
+                                Yes: {prediction.yes_total_amount}
+                              </Chip>
+                              <Chip
+                                color="secondary"
+                                variant="flat"
+                                size="sm"
+                              >
+                                No: {prediction.no_total_amount}
+                              </Chip>
                               <Chip
                                 color={
-                                  bet.status !== "open"
-                                    ? bet.outcome === bet.choice
-                                      ? "success"
-                                      : "danger"
-                                    : "primary"
+                                  prediction.status === "open"
+                                    ? "primary"
+                                    : "secondary"
                                 }
                                 variant="flat"
                                 size="sm"
                               >
-                                {bet.status === "resolved"
-                                  ? bet.outcome === bet.choice
-                                    ? "Won"
-                                    : "Lost"
-                                  : bet.status == "awaiting_confirmation"
-                                    ? "Awaiting"
-                                    : bet.status}
+                                {prediction.status === "resolved"
+                                  ? prediction.outcome === prediction.creator_choice
+                                    ? "Win"
+                                    : "Loss"
+                                  : prediction.status === "open"
+                                    ? "Open"
+                                    : "Awaiting"}
                               </Chip>
                             </div>
                           </div>
@@ -635,164 +673,19 @@ export default function Dashboard() {
                   ))}
                 </tbody>
               </table>
-            )}
+            </section>
+          )}
 
-            {/* Show More */}
-            {hasMoreBets && !isLoadingBets && bets.length > 0 && (
-              <div className="flex justify-center mt-4">
-                <Button
-                  color="primary"
-                  variant="flat"
-                  onPress={loadMoreBets}
-                  isLoading={isLoadingBets}
-                  className="min-w-[200px]"
-                >
-                  {isLoadingBets ? "Loading..." : "Show More"}
-                </Button>
-              </div>
+          <div id="sentinel" className="flex justify-center p-4">
+            {hasMorePredictions && displayedPredictions.length > 0 && (
+              <Spinner size="sm" />
             )}
-            {isLoadingBets && bets.length > 0 && (
-              <div className="flex justify-center items-center py-4">
-                <Spinner size="sm" />
-              </div>
+            {!hasMorePredictions && predictions.length > 0 && (
+              <p className="text-gray-500">No more predictions to load</p>
             )}
-            {!hasMoreBets && bets.length > 0 && (
-              <div className="text-center text-gray-500 py-4">
-                No more bets to load
-              </div>
-            )}
-          </section>
-        )}
-
-        {/* Predictions */}
-        {activeTab === "predictions" && (
-          <section className="rounded-lg overflow-x-auto mb-8">
-            <div className="flex items-center relative mb-4">
-              <span className="absolute inset-y-0 left-0 flex items-center pl-2 pointer-events-none">
-                {/* Search Icon */}
-                <svg
-                  aria-hidden="true"
-                  className="w-5 h-5 text-gray-700"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  viewBox="0 0 24 24"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <circle cx="10" cy="10" r="7"></circle>
-                  <path d="M21 21l-4.35-4.35"></path>
-                </svg>
-              </span>
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={handlePredictionSearch}
-                placeholder="Search predictions..."
-                className="w-full p-2 pl-9 rounded-md text-gray-700 focus:outline-none text-small input-search bg-gray-800 placeholder-gray-700"
-              />
-            </div>
-
-            {isLoadingPredictions && predictions.length === 0 && (
-              <div className="flex justify-center items-center py-8">
-                <Spinner size="lg" />
-              </div>
-            )}
-            {displayedPredictions.length === 0 && !isLoadingPredictions && (
-              <div className="text-center text-gray-500 py-8">
-                No predictions found
-              </div>
-            )}
-
-            {displayedPredictions.length > 0 && (
-              <section className="rounded-lg overflow-x-auto mb-8">
-                <table className="w-full text-sm text-left">
-                  <tbody>
-                    {displayedPredictions.map((prediction, index) => (
-                      <tr
-                        key={index}
-                        className="cursor-pointer backbutton"
-                        onClick={() => router.push(`/predictions/${prediction.id}`)}
-                      >
-                        <td colSpan={5} className="p-2 backbutton cursor-pointer mb-4">
-                        <div className="flex flex-row gap-4 items-start">
-                            {prediction.str_thumb ? (
-                              <Image
-                                src={prediction.str_thumb}
-                                alt={prediction.description}
-                                width={40}
-                                height={40}
-                                className="w-[40px] h-[40px] min-w-[40px] min-h-[40px] rounded-full"
-                              />
-                            ) : (
-                              <div className="w-[40px] h-[40px] min-w-[40px] min-h-[40px] rounded-full bg-gray-700"></div>
-                            )}
-                            <div className="flex flex-col w-full md:flex-row gap-2 items-start">
-                              <p className="break-words text-base w-full">
-                                {prediction.description}
-                              </p>
-                              <div className="flex flex-row gap-2 items-start sm:items-start">
-                                {/* <span className="text-default-400">
-                                  {prediction.resolution_date
-                                    ? format(new Date(prediction.resolution_date), "MM/dd/yy")
-                                    : ""}
-                                </span> */}
-                                <span className="icon-user text-primary">
-                                  {prediction.bets_count}
-                                </span>
-                                <Chip
-                                  color="primary"
-                                  variant="flat"
-                                  size="sm"
-                                >
-                                  Yes: {prediction.yes_total_amount}
-                                </Chip>
-                                <Chip
-                                  color="secondary"
-                                  variant="flat"
-                                  size="sm"
-                                >
-                                  No: {prediction.no_total_amount}
-                                </Chip>
-                                <Chip
-                                  color={
-                                    prediction.status === "open"
-                                      ? "primary"
-                                      : "secondary"
-                                  }
-                                  variant="flat"
-                                  size="sm"
-                                >
-                                  {prediction.status === "resolved"
-                                    ? prediction.outcome === prediction.creator_choice
-                                      ? "Win"
-                                      : "Loss"
-                                    : prediction.status === "open"
-                                      ? "Open"
-                                      : "Awaiting"}
-                                </Chip>
-                              </div>
-                            </div>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </section>
-            )}
-
-            <div id="sentinel" className="flex justify-center p-4">
-              {hasMorePredictions && displayedPredictions.length > 0 && (
-                <Spinner size="sm" />
-              )}
-              {!hasMorePredictions && predictions.length > 0 && (
-                <p className="text-gray-500">No more predictions to load</p>
-              )}
-            </div>
-          </section>
-        )}
-      </main>
-    </div>
+          </div>
+        </section>
+      )}
+    </>
   );
 } 

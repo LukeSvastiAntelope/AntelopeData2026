@@ -9,11 +9,9 @@ import { Button } from "@nextui-org/button";
 import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
 import { useFetch } from "@/app/utils/lib";
-import Image from "next/image";
 import { IAgentProfile } from "@/app/utils/interface";
 import { convertDaysToYMD } from "@/app/utils/lib";
 import { CATEGORIES } from "@/app/utils/const";
-import Link from "next/link";
 
 /**
  * StrategySkeleton: Skeleton loader that matches the layout for “Strategy Page”
@@ -21,134 +19,111 @@ import Link from "next/link";
  */
 const StrategySkeleton = () => {
   return (
-    <div className="flex text-white max-w-[1200px]">
-      {/* Sidebar Skeleton */}
-      <aside className="md:w-64 md:flex-col md:left-auto left-0 fixed top-0 text-sm w-full">
-        <nav className="flex flex-row md:flex-col gap-4 text-normal justify-evenly py-8 px-4">
-          <div className="flex flex-row md:flex-col justify-evenly w-full">
-            <Skeleton className="h-10 w-40 rounded-lg mb-4" /> {/* Logo */}
-            {[...Array(4)].map((_, i) => (
-              <Skeleton key={i} className="h-8 w-32 rounded-lg mb-4" />
-            ))}
-          </div>
-          <div className="flex flex-row md:flex-col justify-evenly w-full">
-            {[...Array(3)].map((_, i) => (
-              <Skeleton key={i} className="h-8 w-32 rounded-lg mb-4" />
-            ))}
-          </div>
-        </nav>
-      </aside>
-
-      {/* Main Content Skeleton */}
-      <div className="flex-1 ml-0 md:ml-64 container mt-14 md:mt-0 mx-auto px-4 py-6 md:px-8 md:py-8 min-w-full md:min-w-[800px] max-w-full md:max-w-[800px]">
-        {/* Logo Skeleton */}
-        <div className="fixed top-0 left-0">
-          <Skeleton className="w-[80px] h-[80px] rounded-full" />
+    <div>
+      {/* Header Section */}
+      <div className="flex flex-row justify-between h-32">
+        <div className="pr-8 pt-2">
+          <Skeleton className="h-8 w-48 rounded-lg mb-2" /> {/* Strategy title */}
+          <Skeleton className="h-4 w-96 rounded-lg" /> {/* Description */}
         </div>
+      </div>
 
-        <div className="container mx-auto px-4 py-8">
-          {/* Header Skeleton */}
-          <div className="py-8 flex justify-between items-center px-2 rounded-b-2xl flex-row">
-            <div className="container mx-auto px-4">
-              <Skeleton className="h-10 w-64 rounded-lg mb-2" />
-              <Skeleton className="h-4 w-48 rounded-lg mb-4" />
-              <Skeleton className="h-9 w-28 rounded-lg" />
+      {/* Strategy Adjustment Banner */}
+      <div className="flex flex-row justify-between bg-content0 p-2 my-8 rounded-lg items-center">
+        <Skeleton className="h-6 w-64 rounded-lg" />
+        <Skeleton className="h-10 w-32 rounded-lg" />
+      </div>
+
+      {/* Betting Settings Card */}
+      <Card className="mb-8 bg-content0">
+        <CardHeader>
+          <Skeleton className="h-6 w-36 rounded-lg" />
+        </CardHeader>
+        <Divider />
+        <CardBody>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <Skeleton className="h-4 w-32 rounded-lg mb-2" />
+              <Skeleton className="h-8 w-24 rounded-full" />
             </div>
-            <Skeleton className="w-[100px] h-[100px] rounded-full" />
+            <div>
+              <Skeleton className="h-4 w-40 rounded-lg mb-2" />
+              <Skeleton className="h-6 w-48 rounded-lg" />
+            </div>
           </div>
+        </CardBody>
+      </Card>
 
-          {/* Stats Skeleton */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8 text-small">
-            {[...Array(4)].map((_, i) => (
-              <Card key={i} className="bg-content0 text-small">
-                <CardBody className="flex flex-row items-center gap-4 text-small">
-                  <Skeleton className="w-6 h-6 rounded-lg text-small" />
-                  <div>
-                    <Skeleton className="h-4 w-24 rounded-lg mb-2 text-small" />
-                    <Skeleton className="h-6 w-20 rounded-lg text-small" />
-                  </div>
+      {/* Stats Skeleton */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8 text-small">
+        {[...Array(4)].map((_, i) => (
+          <Card key={i} className="bg-content0 text-small">
+            <CardBody className="flex flex-row items-center gap-4 text-small">
+              <Skeleton className="w-6 h-6 rounded-lg text-small" />
+              <div>
+                <Skeleton className="h-4 w-24 rounded-lg mb-2 text-small" />
+                <Skeleton className="h-6 w-20 rounded-lg text-small" />
+              </div>
+            </CardBody>
+          </Card>
+        ))}
+      </div>
+
+      {/* Interests Skeleton */}
+      <Card className="mb-8">
+        <CardHeader>
+          <Skeleton className="h-6 w-32 rounded-lg" />
+        </CardHeader>
+        <Divider />
+        <CardBody>
+          <div className="flex flex-wrap gap-2">
+            {[...Array(5)].map((_, i) => (
+              <Skeleton key={i} className="h-8 w-24 rounded-full" />
+            ))}
+          </div>
+        </CardBody>
+      </Card>
+
+      {/* Principles Skeleton */}
+      <Card className="mb-8">
+        <CardHeader>
+          <Skeleton className="h-6 w-40 rounded-lg" />
+        </CardHeader>
+        <Divider />
+        <CardBody>
+          <div className="space-y-4">
+            {[...Array(2)].map((_, i) => (
+              <Card key={i} shadow="sm">
+                <CardBody className="p-2 bg-none">
+                  <Skeleton className="h-5 w-32 rounded-lg mb-2" />
+                  <Skeleton className="h-4 w-full rounded-lg" />
                 </CardBody>
               </Card>
             ))}
           </div>
+        </CardBody>
+      </Card>
 
-          {/* Betting Settings Skeleton */}
-          <Card className="mb-8">
-            <CardHeader>
-              <Skeleton className="h-6 w-36 rounded-lg" />
-            </CardHeader>
-            <Divider />
-            <CardBody>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <Skeleton className="h-4 w-32 rounded-lg mb-2" />
-                  <Skeleton className="h-8 w-24 rounded-full" />
+      {/* Risk Profile Skeleton */}
+      <Card>
+        <CardHeader>
+          <Skeleton className="h-6 w-32 rounded-lg" />
+        </CardHeader>
+        <Divider />
+        <CardBody>
+          <div className="space-y-6">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <Skeleton className="h-4 w-24 rounded-lg" />
+                  <Skeleton className="h-4 w-32 rounded-lg" />
                 </div>
-                <div>
-                  <Skeleton className="h-4 w-40 rounded-lg mb-2" />
-                  <Skeleton className="h-6 w-48 rounded-lg" />
-                </div>
+                <Skeleton className="h-2 w-full rounded-lg" />
               </div>
-            </CardBody>
-          </Card>
-
-          {/* Interests Skeleton */}
-          <Card className="mb-8">
-            <CardHeader>
-              <Skeleton className="h-6 w-32 rounded-lg" />
-            </CardHeader>
-            <Divider />
-            <CardBody>
-              <div className="flex flex-wrap gap-2">
-                {[...Array(5)].map((_, i) => (
-                  <Skeleton key={i} className="h-8 w-24 rounded-full" />
-                ))}
-              </div>
-            </CardBody>
-          </Card>
-
-          {/* Principles Skeleton */}
-          <Card className="mb-8">
-            <CardHeader>
-              <Skeleton className="h-6 w-40 rounded-lg" />
-            </CardHeader>
-            <Divider />
-            <CardBody>
-              <div className="space-y-4">
-                {[...Array(2)].map((_, i) => (
-                  <Card key={i} shadow="sm">
-                    <CardBody className="p-2 bg-none">
-                      <Skeleton className="h-5 w-32 rounded-lg mb-2" />
-                      <Skeleton className="h-4 w-full rounded-lg" />
-                    </CardBody>
-                  </Card>
-                ))}
-              </div>
-            </CardBody>
-          </Card>
-
-          {/* Risk Profile Skeleton */}
-          <Card>
-            <CardHeader>
-              <Skeleton className="h-6 w-32 rounded-lg" />
-            </CardHeader>
-            <Divider />
-            <CardBody>
-              <div className="space-y-6">
-                {[...Array(3)].map((_, i) => (
-                  <div key={i} className="space-y-2">
-                    <div className="flex justify-between items-center">
-                      <Skeleton className="h-4 w-24 rounded-lg" />
-                      <Skeleton className="h-4 w-32 rounded-lg" />
-                    </div>
-                    <Skeleton className="h-2 w-full rounded-lg" />
-                  </div>
-                ))}
-              </div>
-            </CardBody>
-          </Card>
-        </div>
-      </div>
+            ))}
+          </div>
+        </CardBody>
+      </Card>
     </div>
   );
 };
@@ -162,10 +137,6 @@ export default function StrategyPage() {
   const [agent, setAgent] = useState<IAgentProfile | null>(null);
   const [resolutionDate, setResolutionDate] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [, setTotalPredictions] = useState(0);
-  const [, setTotalBets] = useState(0);
-  const [, setSuccessRate] = useState(0);
-  const [agentBalance, setAgentBalance] = useState(0);
   const fetch = useFetch();
 
   useEffect(() => {
@@ -176,16 +147,11 @@ export default function StrategyPage() {
         const response = await fetch.get("/api/getAgentProfile");
         if (response.status) {
           setAgent(response.agent);
-          setAgentBalance(response.agent.wallet_balance ?? 0);
           const { years, months, days } = convertDaysToYMD(response.agent.maxTimelineLimit);
           setResolutionDate(
-            `${years ? `${years} years ` : ""}${
-              months ? `${months} months ` : ""
+            `${years ? `${years} years ` : ""}${months ? `${months} months ` : ""
             }${days ? `${days} days` : ""}`
           );
-          setTotalPredictions(response.totalPredictions);
-          setTotalBets(response.totalBets);
-          setSuccessRate(response.successRate);
         } else {
           toast.error(response.message);
         }
@@ -202,255 +168,143 @@ export default function StrategyPage() {
   if (isLoading) return <StrategySkeleton />;
 
   return (
-    <div className="flex text-white max-w-[1200px]">
-      {/* Sidebar */}
-      <aside className="md:w-64 md:flex-col md:left-auto left-0 fixed top-0 text-sm w-full">
-        <nav className="flex flex-row md:flex-col gap-4 text-normal justify-evenly py-8 px-4 ">
-          <div className="flex flex-row md:flex-col justify-evenly w-full md:gap-4">
-            <div className="flex hidden md:inline-block items-center ">
-              {/* Large logo for md+ screens */}
-              <span className="hidden md:inline-block hidden">
-                <Image
-                  src={"/assets/images/logo-text.svg"}
-                  alt="Dashboard Logo"
-                  width={160}
-                  height={40}
-                  className="mr-2 w-100"
-                />
-              </span>
-
-              {/* Smaller logo for mobile screens */}
-             
-            </div>
-            {/* Profile Photo */}
-            <Link href="/profile" className="md:flex items-center p-2 border border-white/10 profile-border hidden gap-2 mb-2  ">
-              <Image
-                src={agent?.image || "/assets/images/logo-simple.svg"}
-                alt="Profile"
-                width={32}
-                height={32}
-                className="rounded-full bg-gray-700  sm-hidden"
-              />
-              {/* Credits */}
-              <div className="flex flex-col">
-              <span className="text-sm font-semibold font-kodemono w-full"> {agent?.name || 'Agent Name'} </span>
-              <span className="text-gradient">{agentBalance?.toLocaleString() || 0}</span>
-              </div>
-            </Link>
-
-            <Link
-                href="/dashboard"
-                className="flex items-center group md:gap-2"
-            >
-              <span className="icon-dashboard md:gap-2  block group-hover:hidden" />
-              <span className="icon-dashboard-active  hidden sm:enlarge-icon group-hover:block" />
-              <span className="text-default-400 group-hover:text-white font-kodemono "><span className="hidden md:inline-block">Overview</span>
-              </span>
-            </Link>
-
-            <Link
-              href="/markets"
-              className="flex items-center group md:gap-2"
-            >
-            {/* default icon */}
-            <span className="icon-markets block group-hover:hidden " />
-            {/* hover icon */}
-             <span className="icon-markets-active  hidden group-hover:block" />
-             <span className="text-default-400 group-hover:text-white font-kodemono"><span className="hidden md:inline-block">Markets</span></span>
-            </Link>
-
-            <Link href="/strategy" className="flex items-center md:gap-2 text-white font-kodemono">
-            <span className="icon-strategy-active md:gap-2" /> <span className="hidden md:inline-block">Strategy</span>
-            </Link>
-          </div>
-
-                  <div className="md:hidden min-w-40px min-h-40px max-w-40px max-h-40px center-logo">
-                  </div>
-
-                  <div className="flex flex-row md:flex-col justify-evenly w-full md:gap-4">
-            <Link href="/about" className="flex items-center md:gap-2 text-default-400 group">
-              {/* default icon */}
-              <span className="icon-about  block group-hover:hidden" />
-              {/* hover icon */}
-              <span className="icon-about-active hidden group-hover:block" />
-              <span className="text-default-400 group-hover:text-white font-kodemono"><span className="hidden md:inline-block">About</span></span>
-            </Link>
-            <Link href="https://discord.gg/dSEV8YCDQ2" className="flex items-center md:gap-2 text-default-400 group">
-              {/* default icon */}
-              <span className="icon-support  block group-hover:hidden" />
-              {/* hover icon */}
-              <span className="icon-support-active  hidden group-hover:block" />
-              <span className="text-default-400 group-hover:text-white font-kodemono"><span className="hidden md:inline-block">Community</span></span>
-            </Link>
-            <Link href="/logout" className="flex items-center md:gap-2 text-default-400 group">
-              {/* default icon */}
-              <span className="icon-logout  block group-hover:hidden" />
-              {/* hover icon */}
-              <span className="icon-logout-active hidden group-hover:block" />
-              <span className="text-default-400 group-hover:text-white font-kodemono"><span className="hidden md:inline-block">Log out</span></span>
-            </Link>
-          </div>
-        </nav>
-      </aside>
-
-      {/* Main Content Area */}
-      <main className="flex-1 ml-0 md:ml-64 container mt-14 md:mt-0  mx-auto px-4 py-6 md:px-8 md:py-8 min-w-full md:min-w-[800px] max-w-full md:max-w-[800px]">
-        {/* Header */}
-        <div className="flex flex-row justify-between h-32">
-          
-          <div className="pr-8 pt-2">
-              <h1 className="font-bold mb-2 font-kodemono ">
-                Strategy
-              </h1>
-              <p className="text-gray-500 h1paragraph">
-                Refine the core principles of your betting approach, manage risk levels, and set preferred categories and timelines. 
-              </p>
-              
-          </div>
-          
-          <div className="mx-auto px-4">
-            {/* <h1 className="text-3xl font-bold">My Strategy</h1>
-            <p className="mt-2 opacity-80">
-              {agent?.description || "Refine your personal betting approach"}
-            </p> */}
-    
-            {/* <div className="map hidden md:inline-block"></div> */}
-          </div>
-          
-          
-
+    <>
+      <div className="flex flex-row justify-between h-fit">
+        <div className="pr-8 pt-2">
+          <h1 className="font-bold mb-2 font-kodemono ">
+            Strategy
+          </h1>
+          <p className="text-gray-500 h1paragraph">
+            Refine the core principles of your betting approach, manage risk levels, and set preferred categories and timelines.
+          </p>
         </div>
-        <div className="flex flex-row justify-between bg-content0 p-2 my-8 rounded-lg items-center">
+      </div>
 
-            <div className="text-sm font-bold pl-1 strategy-holder">Adjust your strategy to fit your needs</div>
-
+      {/* Betting Settings */}
+      <Card className="my-8 bg-content0">
+        <CardHeader className="text-medium font-regular flex justify-between">
+          Betting Basic
           <Button
-              color="default"
-              variant="flat"
-              className=""
-              href="/editProfile"
-              as="a"
-            >
-              Edit Strategy
-            </Button></div>
-
-        {/* Stats Overview */}
-        {/* <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8 text-small">
-          <Link href="/bets">
-            <StatCard icon={<FaRocket />} title="Bets" value={totalBets.toString()} />
-          </Link>
-          <Link href="/predictions">
-            <StatCard
-              icon={<FaDatabase />}
-              title="Predictions"
-              value={totalPredictions.toString()}
-            />
-          </Link>
-          <StatCard
-            icon={<FaChartLine />}
-            title="Success"
-            value={`${Number(successRate || 0).toFixed(2)}%`}
-          />
-          <StatCard
-            icon={<FaShieldAlt />}
-            title="Bet Size"
-            value={`${agent?.maxBetSize || 0} credits`}
-          />
-        </div> */}
-
-        {/* Betting Settings */}
-        <Card className="mb-8 bg-content0">
-          <CardHeader className="text-medium font-regular">Betting Category</CardHeader>
-          <Divider />
-          <CardBody>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <h3 className="text-default-500 mb-2">Main Category</h3>
-                <Chip color="primary" variant="flat">
-                  {agent?.category
-                    ? CATEGORIES.find(
-                        (category) =>
-                          category.toLowerCase() === agent?.category.toLowerCase()
-                      ) || "General"
-                    : "General"}
-                </Chip>
-              </div>
-              <div>
-                <h3 className="text-default-500 mb-2">Resolution Preference</h3>
-                <p className="text-lg font-semibold">{resolutionDate}</p>
-              </div>
+            color="default"
+            variant="flat"
+            className=""
+            href="/editBasicStrategy"
+            as="a"
+          >
+            Edit Strategy
+          </Button>
+        </CardHeader>
+        <Divider />
+        <CardBody>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <h3 className="text-default-500 mb-2">Main Category</h3>
+              <Chip color="primary" variant="flat">
+                {agent?.category
+                  ? CATEGORIES.find(
+                    (category) =>
+                      category.toLowerCase() === agent?.category.toLowerCase()
+                  ) || "General"
+                  : "General"}
+              </Chip>
             </div>
-            </CardBody>
+            <div>
+              <h3 className="text-default-500 mb-2">Resolution Preference</h3>
+              <p className="text-lg font-semibold">{resolutionDate}</p>
+            </div>
+          </div>
+        </CardBody>
 
         {/* Core Interests */}
-       
-          <CardHeader className="text-medium font-regular">Sub-category Interests</CardHeader>
-          <Divider />
-          <CardBody>
-            <div className="flex flex-wrap gap-2">
-              {agent?.interests && agent?.interests.length > 0 ? (
-                agent?.interests.map((interest) => (
-                  <Chip key={interest} color="primary" variant="flat">
-                    {interest}
-                  </Chip>
-                ))
-              ) : (
-                <p className="text-default-500">No interests listed.</p>
-              )}
-            </div>
-          </CardBody>
-        </Card>
-        <Divider />
-        {/* Betting Principles */}
-        <Card className="mb-8 max-w-[1024px] bg-content0">
-          <CardHeader className="text-medium font-regular">Betting Principles</CardHeader>
-          <Divider />
-          <CardBody>
-            <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
-              {agent?.principles && agent?.principles.length > 0 ? (
-                agent?.principles.map((principle) => (
-                  <PrincipleCard
-                    key={principle.title}
-                    title={principle.title}
-                    description={principle.description}
-                  />
-                ))
-              ) : (
-                <p className="text-default-500">No principles added.</p>
-              )}
-            </div>
-          </CardBody>
-        </Card>
 
-        {/* Risk Profile */}
-        <Card className="bg-content0">
-          <CardHeader className="text-medium font-regular">Risk Profile</CardHeader>
-          <Divider />
-          <CardBody>
-            <div className="space-y-6">
-              <RiskItem
-                level="Conservative"
-                description={agent?.conservativeBetSize?.toString() || "0"}
-                value={agent?.conservativeBetSize || 0}
-                color="success"
-              />
-              <RiskItem
-                level="Moderate"
-                description={agent?.moderateBetSize?.toString() || "0"}
-                value={agent?.moderateBetSize || 0}
-                color="warning"
-              />
-              <RiskItem
-                level="Strategic"
-                description={agent?.aggressiveBetSize?.toString() || "0"}
-                value={agent?.aggressiveBetSize || 0}
-                color="danger"
-              />
-            </div>
-          </CardBody>
-        </Card>
-      </main>
-    </div>
+        <CardHeader className="text-medium font-regular">Sub-category Interests</CardHeader>
+        <Divider />
+        <CardBody>
+          <div className="flex flex-wrap gap-2">
+            {agent?.interests && agent?.interests.length > 0 ? (
+              agent?.interests.map((interest) => (
+                <Chip key={interest} color="primary" variant="flat">
+                  {interest}
+                </Chip>
+              ))
+            ) : (
+              <p className="text-default-500">No interests listed.</p>
+            )}
+          </div>
+        </CardBody>
+      </Card>
+      <Divider />
+      {/* Betting Principles */}
+      <Card className="mb-8 max-w-[1024px] bg-content0">
+        <CardHeader className="text-medium font-regular flex justify-between">
+          Betting Principles
+          <Button
+            color="default"
+            variant="flat"
+            className=""
+            href="/editPrinciples"
+            as="a"
+          >
+            Edit Principles
+          </Button>
+        </CardHeader>
+        <Divider />
+        <CardBody>
+          <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
+            {agent?.principles && agent?.principles.length > 0 ? (
+              agent?.principles.map((principle) => (
+                <PrincipleCard
+                  key={principle.title}
+                  title={principle.title}
+                  description={principle.description}
+                />
+              ))
+            ) : (
+              <p className="text-default-500">No principles added.</p>
+            )}
+          </div>
+        </CardBody>
+      </Card>
+
+      {/* Risk Profile */}
+      <Card className="bg-content0">
+        <CardHeader className="text-medium font-regular flex justify-between">
+          Risk Profile ({agent?.riskLevel})
+          <Button
+            color="default"
+            variant="flat"
+            className=""
+            href="/editRiskStrategy"
+            as="a"
+          >
+            Edit Risk Profile
+          </Button>
+        </CardHeader>
+        <Divider />
+        <CardBody>
+          <div className="space-y-6">
+            <RiskItem
+              level="Conservative"
+              description={agent?.conservativeBetSize?.toString() || "0"}
+              value={(agent?.conservativeBetSize ?? 0) * 100 / (agent?.maxBetSize ?? 1)}
+              color="success"
+            />
+            <RiskItem
+              level="Moderate"
+              description={agent?.moderateBetSize?.toString() || "0"}
+              value={(agent?.moderateBetSize ?? 0) * 100 / (agent?.maxBetSize ?? 1)}
+              color="warning"
+            />
+            <RiskItem
+              level="Aggressive"
+              description={agent?.aggressiveBetSize?.toString() || "0"}
+              value={(agent?.aggressiveBetSize ?? 0) * 100 / (agent?.maxBetSize ?? 1)}
+              color="danger"
+            />
+          </div>
+        </CardBody>
+      </Card>
+    </>
   );
 }
 

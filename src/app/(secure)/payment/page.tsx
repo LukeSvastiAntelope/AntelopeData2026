@@ -28,8 +28,6 @@ import { CircularProgress } from '@nextui-org/progress';
 import { buyTransaction } from '@/app/utils/buyTransaction';
 import { loadStripe } from '@stripe/stripe-js';
 import { mintNft } from '@/app/utils/mintNft';
-import Link from 'next/link';
-import Image from 'next/image';
 
 const PaymentPage = () => {
     const wallet = useWallet();
@@ -238,311 +236,221 @@ const PaymentPage = () => {
     }, []);
 
     return (
-        <div className="min-h-screen">
-            {/* Responsive Navigation */}
-             {/* Sidebar */}
-             <aside className="md:w-64 md:flex-col md:left-auto left-0 fixed top-0 text-sm w-full">
-                <nav className="flex flex-row md:flex-col gap-4 text-normal justify-evenly py-8 px-4 ">
-                <div className="flex flex-row md:flex-col justify-evenly w-full">
-                <div className="flex items-center mb-4">
-                    {/* Large logo for md+ screens */}
-                    <span className="hidden md:inline-block">
-                        <Image
-                        src={"/assets/images/logo-text.svg"}
-                        alt="Dashboard Logo"
-                        width={160}
-                        height={40}
-                        className="mr-2 w-100"
-                        />
-                    </span>
-
-              {/* Smaller logo for mobile screens */}
-             
+        <>
+            <div className="flex justify-between items-center mb-8">
+                <h1 className="text-lg font-bold">Payment & Credits</h1>
+                <WalletMultiButton />
             </div>
-            {/* Profile Photo */}
-            <Link href="/profile" className="md:flex items-center gap-2 mb-4 hidden">
-              <Image
-                src={agent?.image || "/assets/images/logo-simple.svg"}
-                alt="Profile"
-                width={24}
-                height={24}
-                className="rounded-full bg-gray-700 mr-2 sm-hidden"
-              />
-              {/* Credits */}
-              <span className="text-sm font-semibold font-kodemono">
-                <span className="text-gradient">83940</span>
-              </span>
 
-            </Link>
-          <Link href="/" className="flex items-center gap-2 mb-4 text-white font-kodemono">
-            <span className="icon-dashboard-active mr-2" /> <span className="hidden md:inline-block">Overview</span>
-          </Link>
-          <Link 
-                href="/markets" 
-                className="flex items-center gap-2 mb-4 group"
-                >
-                {/* default icon */}
-                <span className="icon-markets mr-2 block group-hover:hidden " />
-                {/* hover icon */}
-                <span className="icon-markets-active mr-2 hidden group-hover:block" />
-                <span className="text-default-400 group-hover:text-white font-kodemono"><span className="hidden md:inline-block">Markets</span></span>
-            </Link>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Buy Credits Card */}
+                <Card className="p-4 bg-content0">
+                    <CardHeader className="pb-2">
+                        <div className="flex items-center space-x-2">
+                            <IconCreditCard />
+                            <h2 className="text-lg font-bold">Buy Credits</h2>
+                        </div>
+                    </CardHeader>
+                    <CardBody className="space-y-6">
+                        <div className="text-center bg-content0 p-4 rounded-lg">
+                            <p className="text-lg mb-2">Current Balance</p>
+                            {
+                                isLoading ?
+                                    <Skeleton className="w-full h-10" /> :
+                                    <p className="text-xl font-bold text-primary">{agentBalance?.toLocaleString() || 0} Credits</p>
+                            }
+                        </div>
+                        <Input
+                            type="number"
+                            label="Amount"
+                            placeholder="Enter amount"
+                            value={amount}
+                            onChange={handleAmountChange}
+                            isDisabled={isLoading}
 
-            <Link href="/strategy" className="flex items-center gap-2 mb-4 group text-default-400">
-              {/* default icon */}
-              <span className="icon-strategy mr-2 block group-hover:hidden" />
-              {/* hover icon */}
-              <span className="icon-strategy-active mr-2 hidden sm:enlarge-icon group-hover:block" />
-              <span className="text-default-400 group-hover:text-white font-kodemono"><span className="hidden md:inline-block">Strategy</span></span>
-            </Link>
-          </div>
+                            startContent={
+                                <div className="pointer-events-none flex items-center">
+                                    <span className="text-default-400 text-small">$</span>
+                                </div>
+                            }
+                            description={amount ? `You will receive ${creditAmount.toLocaleString()} Credits` : ""}
 
-                  <div className="md:hidden min-w-40px min-h-40px max-w-40px max-h-40px center-logo">
-                  </div>
+                        />
+                        <Select
+                            label="Payment Method"
+                            placeholder="Select payment method"
+                            value={paymentMethod}
+                            onChange={(e) => handlePaymentMethodChange(e.target.value)}
+                            isDisabled={isLoading}
+                            description={amount && paymentAmount ?
+                                `You will pay ${paymentAmount} ${paymentMethod.toUpperCase()}` :
+                                ""}
+                            defaultSelectedKeys={['sol']}
+                            classNames={{
+                                trigger: "bg-content0"
+                            }}
+                        >
+                            <SelectItem key="sol" value="sol" startContent={<IconWallet />}>
+                                Pay with SOL
+                            </SelectItem>
+                            <SelectItem key="usdt" value="usdt" startContent={<IconWallet />}>
+                                Pay with USDT
+                            </SelectItem>
+                            <SelectItem key="stripe" value="stripe" startContent={<IconCreditCard />}>
+                                Credit Card
+                            </SelectItem>
+                        </Select>
+                        <Button
+                            color="primary"
+                            size="lg"
+                            className="w-full"
+                            onPress={handleBuyCredits}
+                            isDisabled={isLoading}
+                        >
+                            Buy Credits
+                        </Button>
+                    </CardBody>
+                </Card>
 
-          <div className="flex flex-row md:flex-col justify-evenly w-full">
-            <Link href="/about" className="flex items-center gap-2 mb-4 text-default-400 group">
-              {/* default icon */}
-              <span className="icon-about mr-2 block group-hover:hidden" />
-              {/* hover icon */}
-              <span className="icon-about-active mr-2 hidden group-hover:block" />
-              <span className="text-default-400 group-hover:text-white font-kodemono"><span className="hidden md:inline-block">About</span></span>
-            </Link>
-            <Link href="https://discord.gg/dSEV8YCDQ2" className="flex items-center gap-2 mb-4 text-default-400 group">
-              {/* default icon */}
-              <span className="icon-support mr-2 block group-hover:hidden" />
-              {/* hover icon */}
-              <span className="icon-support-active mr-2 hidden group-hover:block" />
-              <span className="text-default-400 group-hover:text-white font-kodemono"><span className="hidden md:inline-block">Community</span></span>
-            </Link>
-            <Link href="/logout" className="flex items-center gap-2 mb-4 text-default-400 group">
-              {/* default icon */}
-              <span className="icon-logout mr-2 block group-hover:hidden" />
-              {/* hover icon */}
-              <span className="icon-logout-active mr-2 hidden group-hover:block" />
-              <span className="text-default-400 group-hover:text-white font-kodemono"><span className="hidden md:inline-block">Log out</span></span>
-            </Link>
-          </div>
-        </nav>
-      </aside>
+                {/* Withdraw Card */}
+                <Card className="p-4 bg-content0">
+                    <CardHeader className="pb-2">
+                        <div className="flex items-center space-x-2">
+                            <IconWallet />
+                            <h2 className="text-lg font-bold">Withdraw Funds</h2>
+                        </div>
+                    </CardHeader>
+                    <CardBody className="space-y-6">
+                        <div className="text-center bg-content0 p-4 rounded-lg">
+                            <p className="text-lg mb-2">Available to Withdraw</p>
+                            <p className="text-xl font-bold text-success">{availableBalance} Credits</p>
+                        </div>
+                        <Input
+                            type="number"
+                            label="Withdrawal Amount"
+                            placeholder="Enter amount to withdraw"
+                            value={withdrawAmount}
+                            onChange={(e) => setWithdrawAmount(e.target.value)}
+                            isDisabled={!wallet.publicKey || availableBalance <= 0}
+                            startContent={
+                                <div className="pointer-events-none flex items-center">
+                                    <span className="text-default-400 text-small">$</span>
+                                </div>
+                            }
+                            errorMessage={
+                                withdrawAmount && Number(withdrawAmount) > availableBalance
+                                    ? "Amount exceeds available balance"
+                                    : ""
+                            }
+                        />
+                        <Select
+                            label="Withdrawal Method"
+                            placeholder="Select withdrawal method"
+                            value={withdrawMethod}
+                            onChange={(e) => setWithdrawMethod(e.target.value)}
+                            isDisabled={!wallet.publicKey || availableBalance <= 0}
+                        >
+                            <SelectItem key="sol" value="sol" startContent={<IconWallet />}>
+                                Withdraw as SOL
+                            </SelectItem>
+                            <SelectItem key="usdt" value="usdt" startContent={<IconWallet />}>
+                                Withdraw as USDT
+                            </SelectItem>
+                            <SelectItem key="bank" value="bank" startContent={<IconCreditCard />}>
+                                Bank Transfer
+                            </SelectItem>
+                        </Select>
+                        <Button
+                            color="success"
+                            size="lg"
+                            className="w-full"
+                            onClick={handleWithdraw}
+                            isDisabled={isWithdrawDisabled()}
+                        >
+                            {!wallet.publicKey
+                                ? "Connect Wallet to Withdraw"
+                                : availableBalance <= 0
+                                    ? "No Funds Available"
+                                    : "Withdraw Funds"
+                            }
+                        </Button>
+                        {isWithdrawDisabled() && (
+                            <p className="text-warning text-sm text-center">
+                                No Available Withdrawals
+                            </p>
+                        )}
+                    </CardBody>
+                </Card>
+            </div>
 
-            
-            <div className="flex-1 ml-0 md:ml-64 container mt-14 md:mt-0  mx-auto px-4 py-6 md:px-8 md:py-8 min-w-full md:min-w-[800px] max-w-full md:max-w-[800px]">
-                <div className="flex justify-between items-center mb-8">
-                    <h1 className="text-lg font-bold">Payment & Credits</h1>
-                    <WalletMultiButton />
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* Buy Credits Card */}
-                    <Card className="p-4 bg-content0">
-                        <CardHeader className="pb-2">
-                            <div className="flex items-center space-x-2">
-                                <IconCreditCard />
-                                <h2 className="text-lg font-bold">Buy Credits</h2>
-                            </div>
-                        </CardHeader>
-                        <CardBody className="space-y-6">
-                            <div className="text-center bg-content0 p-4 rounded-lg">
-                                <p className="text-lg mb-2">Current Balance</p>
-                                {
-                                    isLoading ?
-                                        <Skeleton className="w-full h-10" /> :
-                                        <p className="text-xl font-bold text-primary">{agentBalance?.toLocaleString() || 0} Credits</p>
-                                }
-                            </div>
-                            <Input
-                                type="number"
-                                label="Amount"
-                                placeholder="Enter amount"
-                                value={amount}
-                                onChange={handleAmountChange}
-                                isDisabled={isLoading}
-                                
-                                startContent={
-                                    <div className="pointer-events-none flex items-center">
-                                        <span className="text-default-400 text-small">$</span>
-                                    </div>
-                                }
-                                description={amount ? `You will receive ${creditAmount.toLocaleString()} Credits` : ""}
-                                
-                            />
-                            <Select
-                                label="Payment Method"
-                                placeholder="Select payment method"
-                                value={paymentMethod}
-                                onChange={(e) => handlePaymentMethodChange(e.target.value)}
-                                isDisabled={isLoading}
-                                description={amount && paymentAmount ?
-                                    `You will pay ${paymentAmount} ${paymentMethod.toUpperCase()}` :
-                                    ""}
-                                defaultSelectedKeys={['sol']}
-                                classNames={{
-                                    trigger: "bg-content0"
-                                }}
-                            >
-                                <SelectItem key="sol" value="sol" startContent={<IconWallet />}>
-                                    Pay with SOL
-                                </SelectItem>
-                                <SelectItem key="usdt" value="usdt" startContent={<IconWallet />}>
-                                    Pay with USDT
-                                </SelectItem>
-                                <SelectItem key="stripe" value="stripe" startContent={<IconCreditCard />}>
-                                    Credit Card
-                                </SelectItem>
-                            </Select>
+            {/* NFT Card */}
+            <Card className="p-4 mt-6 bg-content0">
+                <CardHeader className="pb-2">
+                    <div className="flex items-center space-x-2">
+                        <IconNft />
+                        <h2 className="text-2xl font-bold">NFT Marketplace</h2>
+                    </div>
+                </CardHeader>
+                <CardBody className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-4">
+                            <h3 className="text-xl font-semibold">Mint NFT with your agent</h3>
+                            <p className="text-default-500">
+                                Create your unique NFT on the Solana blockchain. Each NFT represents exclusive benefits in our platform.
+                            </p>
                             <Button
                                 color="primary"
                                 size="lg"
                                 className="w-full"
-                                onPress={handleBuyCredits}
-                                isDisabled={isLoading}
+                                onPress={handleMintNFT}
+                                isDisabled={isMinting ? true : false}
                             >
-                                Buy Credits
+                                {isMinting ? <CircularProgress size="sm" color="primary" /> : agent?.nft_address ? "Update NFT" : "Mint NFT"}
                             </Button>
-                        </CardBody>
-                    </Card>
-
-                    {/* Withdraw Card */}
-                    <Card className="p-4 bg-content0">
-                        <CardHeader className="pb-2">
-                            <div className="flex items-center space-x-2">
-                                <IconWallet />
-                                <h2 className="text-lg font-bold">Withdraw Funds</h2>
-                            </div>
-                        </CardHeader>
-                        <CardBody className="space-y-6">
-                            <div className="text-center bg-content0 p-4 rounded-lg">
-                                <p className="text-lg mb-2">Available to Withdraw</p>
-                                <p className="text-xl font-bold text-success">{availableBalance} Credits</p>
-                            </div>
-                            <Input
-                                type="number"
-                                label="Withdrawal Amount"
-                                placeholder="Enter amount to withdraw"
-                                value={withdrawAmount}
-                                onChange={(e) => setWithdrawAmount(e.target.value)}
-                                isDisabled={!wallet.publicKey || availableBalance <= 0}
-                                startContent={
-                                    <div className="pointer-events-none flex items-center">
-                                        <span className="text-default-400 text-small">$</span>
-                                    </div>
-                                }
-                                errorMessage={
-                                    withdrawAmount && Number(withdrawAmount) > availableBalance
-                                        ? "Amount exceeds available balance"
-                                        : ""
-                                }
-                            />
-                            <Select
-                                label="Withdrawal Method"
-                                placeholder="Select withdrawal method"
-                                value={withdrawMethod}
-                                onChange={(e) => setWithdrawMethod(e.target.value)}
-                                isDisabled={!wallet.publicKey || availableBalance <= 0}
-                            >
-                                <SelectItem key="sol" value="sol" startContent={<IconWallet />}>
-                                    Withdraw as SOL
-                                </SelectItem>
-                                <SelectItem key="usdt" value="usdt" startContent={<IconWallet />}>
-                                    Withdraw as USDT
-                                </SelectItem>
-                                <SelectItem key="bank" value="bank" startContent={<IconCreditCard />}>
-                                    Bank Transfer
-                                </SelectItem>
-                            </Select>
-                            <Button
-                                color="success"
-                                size="lg"
-                                className="w-full"
-                                onClick={handleWithdraw}
-                                isDisabled={isWithdrawDisabled()}
-                            >
-                                {!wallet.publicKey
-                                    ? "Connect Wallet to Withdraw"
-                                    : availableBalance <= 0
-                                        ? "No Funds Available"
-                                        : "Withdraw Funds"
-                                }
-                            </Button>
-                            {isWithdrawDisabled() && (
-                                <p className="text-warning text-sm text-center">
-                                    No Available Withdrawals
-                                </p>
-                            )}
-                        </CardBody>
-                    </Card>
-                </div>
-
-                {/* NFT Card */}
-                <Card className="p-4 mt-6 bg-content0">
-                    <CardHeader className="pb-2">
-                        <div className="flex items-center space-x-2">
-                            <IconNft />
-                            <h2 className="text-2xl font-bold">NFT Marketplace</h2>
                         </div>
-                    </CardHeader>
-                    <CardBody className="space-y-6">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="space-y-4">
-                                <h3 className="text-xl font-semibold">Mint NFT with your agent</h3>
-                                <p className="text-default-500">
-                                    Create your unique NFT on the Solana blockchain. Each NFT represents exclusive benefits in our platform.
-                                </p>
-                                <Button
-                                    color="primary"
-                                    size="lg"
-                                    className="w-full"
-                                    onPress={handleMintNFT}
-                                    isDisabled={isMinting ? true : false}
-                                >
-                                    {isMinting ? <CircularProgress size="sm" color="primary" /> : agent?.nft_address ? "Update NFT" : "Mint NFT"}
+                        <div className="bg-default-100 rounded-lg p-4 text-center">
+                            <h3 className="text-xl font-semibold mb-2">Your NFT Collection</h3>
+                            <p className="text-default-500">
+                                {
+                                    agent?.nft_address ?
+                                        <p className="text-default-500">Your NFT address: {agent?.nft_address}</p> :
+                                        <p className="text-default-500">You have not minted an NFT yet.</p>
+                                }
+                            </p>
+                        </div>
+                    </div>
+                </CardBody>
+            </Card>
+
+            <Modal
+                isOpen={isOpen}
+                onClose={onClose}
+                isDismissable={false}
+                isKeyboardDismissDisabled={true}
+            >
+                <ModalContent>
+                    {(onClose) => (
+                        <>
+                            <ModalHeader className="flex flex-col gap-1">Confirm Purchase</ModalHeader>
+                            <ModalBody>
+                                <p>You are about to purchase:</p>
+                                <p className="font-bold">{creditAmount.toLocaleString()} Credits</p>
+                                <p>Payment details:</p>
+                                <p className="font-bold">{paymentAmount} {paymentMethod.toUpperCase()}</p>
+                            </ModalBody>
+                            <ModalFooter>
+                                <Button color="danger" variant="light" onPress={onClose} isDisabled={isProcessing}>
+                                    Cancel
                                 </Button>
-                            </div>
-                            <div className="bg-default-100 rounded-lg p-4 text-center">
-                                <h3 className="text-xl font-semibold mb-2">Your NFT Collection</h3>
-                                <p className="text-default-500">
-                                    {
-                                        agent?.nft_address ?
-                                            <p className="text-default-500">Your NFT address: {agent?.nft_address}</p> :
-                                            <p className="text-default-500">You have not minted an NFT yet.</p>
-                                    }
-                                </p>
-                            </div>
-                        </div>
-                    </CardBody>
-                </Card>
-
-                <Modal
-                    isOpen={isOpen}
-                    onClose={onClose}
-                    isDismissable={false}
-                    isKeyboardDismissDisabled={true}
-                >
-                    <ModalContent>
-                        {(onClose) => (
-                            <>
-                                <ModalHeader className="flex flex-col gap-1">Confirm Purchase</ModalHeader>
-                                <ModalBody>
-                                    <p>You are about to purchase:</p>
-                                    <p className="font-bold">{creditAmount.toLocaleString()} Credits</p>
-                                    <p>Payment details:</p>
-                                    <p className="font-bold">{paymentAmount} {paymentMethod.toUpperCase()}</p>
-                                </ModalBody>
-                                <ModalFooter>
-                                    <Button color="danger" variant="light" onPress={onClose} isDisabled={isProcessing}>
-                                        Cancel
-                                    </Button>
-                                    <Button color="primary" onPress={confirmPurchase} isDisabled={isProcessing}>
-                                        {isProcessing ? <CircularProgress size="sm" color="primary" /> : "Confirm Purchase"}
-                                    </Button>
-                                </ModalFooter>
-                            </>
-                        )}
-                    </ModalContent>
-                </Modal>
-            </div>
-        </div>
+                                <Button color="primary" onPress={confirmPurchase} isDisabled={isProcessing}>
+                                    {isProcessing ? <CircularProgress size="sm" color="primary" /> : "Confirm Purchase"}
+                                </Button>
+                            </ModalFooter>
+                        </>
+                    )}
+                </ModalContent>
+            </Modal>
+        </>
     );
 };
 

@@ -13,6 +13,7 @@ export async function POST(req: NextRequest) {
     }
 
     try {
+        const agent = await UserRepo.getAgentByUserId(jwtPayload.email as string);
         const formData = await req.formData();
         const file = formData.get("avatar") as File;
         if (file) {
@@ -23,20 +24,20 @@ export async function POST(req: NextRequest) {
         }
 
         const updateParams: Partial<IFormDataAgentProfile> = {
-            id: parseInt(formData.get("id") as string),
-            user_id: parseInt(formData.get("user_id") as string),
-            name: formData.get("name") as string,
-            description: formData.get("description") as string,
-            maxBetSize: parseInt(formData.get("maxBetSize") as string),
-            interests: formData.get("interests") as string,
-            riskLevel: formData.get("riskLevel") as string,
-            conservativeBetSize: parseInt(formData.get("conservativeBetSize") as string),
-            moderateBetSize: parseInt(formData.get("moderateBetSize") as string),
-            aggressiveBetSize: parseInt(formData.get("aggressiveBetSize") as string),
-            principles: formData.get("principles") as string,
-            image: file ? `/avatar/${file.name}` : formData.get("image") as string,
-            maxTimelineLimit: parseInt(formData.get("maxTimelineLimit") as string),
-            category: formData.get("category") as string
+            id: agent.id,
+            user_id: agent.user_id,
+            name: formData.get("name") ? formData.get("name") as string : agent.name,
+            description: formData.get("description") ? formData.get("description") as string : agent.description,
+            maxBetSize: formData.get("maxBetSize") ? parseInt(formData.get("maxBetSize") as string) : agent.maxBetSize,
+            interests: formData.get("interests") ? formData.get("interests") as string : agent.interests as string,
+            riskLevel: formData.get("riskLevel") ? formData.get("riskLevel") as string : agent.riskLevel,
+            conservativeBetSize: formData.get("conservativeBetSize") ? parseInt(formData.get("conservativeBetSize") as string) : agent.conservativeBetSize,
+            moderateBetSize: formData.get("moderateBetSize") ? parseInt(formData.get("moderateBetSize") as string) : agent.moderateBetSize,
+            aggressiveBetSize: formData.get("aggressiveBetSize") ? parseInt(formData.get("aggressiveBetSize") as string) : agent.aggressiveBetSize,
+            principles: formData.get("principles") ? formData.get("principles") as string : agent.principles as string,
+            image: file ? `/avatar/${file.name}` : formData.get("image") ? formData.get("image") as string : agent.image,
+            maxTimelineLimit: formData.get("maxTimelineLimit") ? parseInt(formData.get("maxTimelineLimit") as string) : agent.maxTimelineLimit,
+            category: formData.get("category") ? formData.get("category") as string : agent.category
         };
 
         await UserRepo.updateAgent(jwtPayload.email as string, updateParams as IFormDataAgentProfile);

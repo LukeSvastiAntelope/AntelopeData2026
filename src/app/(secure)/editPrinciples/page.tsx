@@ -3,8 +3,7 @@
 import { Card, CardBody, CardHeader } from "@nextui-org/card";
 import { Input, Textarea } from "@nextui-org/input";
 import { Button } from "@nextui-org/button";
-import Image from "next/image";
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { IoArrowBack, IoSave } from "react-icons/io5";
 import { IAgentProfile } from "@/app/utils/interface";
 import { useFetch } from "@/app/utils/lib";
@@ -14,7 +13,22 @@ const EditAgentProfile = () => {
   const [agent, setAgent] = useState<IAgentProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const fetchData = useFetch();
-  const fileRef = useRef<HTMLInputElement | null>(null);
+
+  const updatePrinciple = (index: number, field: 'title' | 'description', value: string) => {
+    setAgent(agent ? {
+      ...agent, principles: agent.principles.map((principle, i) =>
+        i === index ? { ...principle, [field]: value } : principle
+      )
+    } : null);
+  };
+
+  const addPrinciple = () => {
+    setAgent(agent ? { ...agent, principles: [...agent.principles, { title: "New Principle", description: "Description" }] } : null);
+  };
+
+  const deletePrinciple = (index: number) => {
+    setAgent(agent ? { ...agent, principles: agent.principles.filter((_, i) => i !== index) } : null);
+  };
 
   const saveAgentProfile = async () => {
     if (!agent) return;
@@ -28,10 +42,6 @@ const EditAgentProfile = () => {
     formData.append('moderateBetSize', agent.moderateBetSize.toString());
     formData.append('aggressiveBetSize', agent.aggressiveBetSize.toString());
     formData.append('principles', JSON.stringify(agent.principles));
-    const avatarFile = fileRef?.current?.files?.[0];
-    if (avatarFile) {
-        formData.append('avatar', avatarFile);
-    }
     formData.append('image', agent.image || "");
     formData.append('maxTimelineLimit', agent.maxTimelineLimit.toString());
     formData.append('category', agent.category || "");
@@ -79,40 +89,46 @@ const EditAgentProfile = () => {
     <div className="min-h-screen  min-w-[625px]">
       <header className="bg-content0 text-white py-8 rounded-b-2xl">
         <div className="container mx-auto px-4 text-center">
-            <h1 className="text-3xl font-bold">Edit Agent Profile</h1>
-            <p className="mt-2 opacity-80">Customize your betting agent settings</p>
+          <h1 className="text-3xl font-bold">Edit Agent Profile</h1>
+          <p className="mt-2 opacity-80">Customize your betting agent settings</p>
         </div>
       </header>
 
       {
         !isLoading && agent && (
           <main className="container mx-auto px-4 py-8">
-            <ImageUpload fileRef={fileRef} avatar={agent.image} />
-            <Card className="mb-8 bg-content0">
-              <CardHeader className="text-xl font-regular">Basic Profile</CardHeader>
-              <CardBody className="space-y-6">
-                <Input
-                  label="Agent Name"
-                  variant="bordered"
-                  value={agent?.name}
-                  onChange={(e) => setAgent({ ...agent, name: e.target.value })}
-                />
-                <Textarea
-                  label="Description"
-                  defaultValue="Specialized in space industry predictions"
-                  variant="bordered"
-                  value={agent?.description}
-                  onChange={(e) => setAgent({ ...agent, description: e.target.value })}
-                />
+            <Card className="mb-8 bg-background0">
+              <CardHeader className="flex justify-between items-center">
+                <h2 className="text-xl font-regular">Betting Principles</h2>
+                <Button
+                  color="primary"
+                  size="sm"
+                  onPress={addPrinciple}
+                >
+                  Add Principle
+                </Button>
+              </CardHeader>
+              <CardBody>
+                <div className="grid grid-cols-1 md:grid-cols-1 gap-4 ">
+                  {agent.principles.length > 0 && agent.principles.map((principle, index) => (
+                    <EditablePrincipleCard
+                      key={index}
+                      title={principle.title}
+                      description={principle.description}
+                      onTitleChange={(value) => updatePrinciple(index, 'title', value)}
+                      onDescriptionChange={(value) => updatePrinciple(index, 'description', value)}
+                      onDelete={() => deletePrinciple(index)}
+                    />
+                  ))}
+                </div>
               </CardBody>
             </Card>
-
             <div className="flex justify-end gap-2 mt-6">
               <Button
                 color="danger"
                 variant="flat"
                 className="w-full"
-                href="/profile"
+                href="/strategy"
                 as="a"
                 startContent={<IoArrowBack size={20} />}
               >
@@ -134,70 +150,49 @@ const EditAgentProfile = () => {
   );
 };
 
+interface EditablePrincipleCardProps {
+  title: string;
+  description: string;
+  onTitleChange: (value: string) => void;
+  onDescriptionChange: (value: string) => void;
+  onDelete: () => void;
+}
 
-const ImageUpload = ({ fileRef, avatar }: { fileRef: React.RefObject<HTMLInputElement>, avatar: string }) => {
-  const [image, setImage] = useState<string | null>(avatar);
-
-  const handleImageUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImage(reader.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
-  }, []);
-
-  return (
-    <Card className="mb-8 bg-content0">
-      <CardHeader className="text-xl font-regular">Profile Image</CardHeader>
-      <CardBody>
-        <div className="flex flex-col items-center gap-4">
-          <div className="relative w-32 h-32 rounded-full overflow-hidden bg-content0 cursor-pointer" onClick={() => fileRef && fileRef.current?.click()}>
-            {image ? (
-              <Image
-                src={image}
-                alt="Profile"
-                fill
-                className="object-cover"
-              />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center text-default-400 text-6xl">
-                +
-              </div>
-            )}
-          </div>
-
-          <div className="flex gap-2">
-            <Button
-              as="label"
-              color="primary"
-              className="cursor-pointer"
-            >
-              Upload Image
-              <input
-                type="file"
-                className="hidden"
-                accept="image/*"
-                onChange={handleImageUpload}
-                ref={fileRef}
-              />
-            </Button>
-            {image && (
-              <Button
-                color="danger"
-                variant="flat"
-                onPress={() => setImage(null)}
-              >
-                Remove
-              </Button>
-            )}
-          </div>
-        </div>
-      </CardBody>
-    </Card>
-  );
-};
+const EditablePrincipleCard = ({
+  title,
+  description,
+  onTitleChange,
+  onDescriptionChange,
+  onDelete
+}: EditablePrincipleCardProps) => (
+  <Card shadow="sm" className="">
+    <CardBody className="space-y-4">
+      <div className="flex justify-between items-start">
+        <Input
+          label="Title"
+          value={title}
+          onChange={(e) => onTitleChange(e.target.value)}
+          variant="bordered"
+          className="flex-grow"
+        />
+        <Button
+          isIconOnly
+          color="danger"
+          variant="light"
+          onPress={onDelete}
+          className="ml-2"
+        >
+          ✕
+        </Button>
+      </div>
+      <Textarea
+        label="Description"
+        value={description}
+        onChange={(e) => onDescriptionChange(e.target.value)}
+        variant="bordered"
+      />
+    </CardBody>
+  </Card>
+);
 
 export default EditAgentProfile;

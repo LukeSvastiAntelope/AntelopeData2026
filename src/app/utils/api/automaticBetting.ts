@@ -72,7 +72,7 @@ export class AutomaticBettingAgent {
     private SERPAPI_API_KEY = process.env.SERPAPI_API_KEY!;
     private newsCache: Map<string, NewsItem[]> = new Map();
     private COINMARKETCAP_API_KEY = process.env.COINMARKETCAP_API_KEY!;
-    private COINMARKETCAP_BASE_URL = 'https://pro-api.coinmarketcap.com/v1';
+    private COINMARKETCAP_BASE_URL = 'https://pro-api.coinmarketcap.com/v2';
 
     constructor(agent: IAgentProfile) {
         this.agent = agent;
