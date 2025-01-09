@@ -157,7 +157,18 @@ export class AutomaticBettingAgent {
                     news,
                     similarPredictions
                 );
-                return decision;
+                
+                // Store each bet decision in Pinecone and update with pineconeId
+                const updatedDecisions = await Promise.all(decision.map(async bet => {
+                    const prediction = topicPredictions.find(p => p.id === bet.predictionId);
+                    if (prediction) {
+                        const pineconeId = await this.storeBetInPinecone(bet, prediction);
+                        return { ...bet, pineconeId };
+                    }
+                    return bet;
+                }));
+
+                return updatedDecisions;
             })
         );
 
