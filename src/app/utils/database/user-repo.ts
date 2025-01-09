@@ -268,14 +268,14 @@ async function getPredictionById(id: string) {
                 p.*,
                 (SELECT COUNT(*) FROM bets WHERE prediction_id = p.id AND agent_id != 0 AND choice = 'yes' AND is_secret = 1) as yes_count,
                 (SELECT COUNT(*) FROM bets WHERE prediction_id = p.id AND agent_id != 0 AND choice = 'no' AND is_secret = 1) as no_count,
-                GROUP_CONCAT(
+                JSON_ARRAYAGG(
                     JSON_OBJECT(
                         'id', b.id,
                         'agent_id', b.agent_id,
                         'amount', b.amount,
                         'choice', b.choice,
-                        'reason', b.reason,
-                        'pinecone_id', b.pinecone_id,
+                        'reason', IFNULL(b.reason, ''),
+                        'pinecone_id', IFNULL(b.pinecone_id, ''),
                         'created_at', b.created_at
                     )
                 ) as bets
@@ -286,11 +286,13 @@ async function getPredictionById(id: string) {
             [1, id]
         );
 
-        console.log(id, rows);
-        
-        // Parse the GROUP_CONCAT result into a proper array
+        // Handle null bets array
         if (rows[0]) {
-            rows[0].bets = rows[0].bets ? JSON.parse(`[${rows[0].bets}]`) : [];
+            rows[0].bets = rows[0].bets || [];
+            // Filter out null entries that might come from the LEFT JOIN
+            if (Array.isArray(rows[0].bets)) {
+                rows[0].bets = rows[0].bets.filter(bet => bet.id !== null);
+            }
         }
         
         return rows[0];
