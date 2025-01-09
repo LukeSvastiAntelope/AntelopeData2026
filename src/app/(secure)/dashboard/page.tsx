@@ -480,28 +480,36 @@ export default function Dashboard() {
                             <span className="icon-coin icon-text">
                               {bet.amount}
                             </span>
-                            {
-                              bet.yes_bets && bet.yes_bets.length > 0 && (
-                                <Chip
-                                  color="primary"
-                                  variant="flat"
-                                  size="sm"
-                                >
-                                  Yes: {bet.yes_bets.reduce((acc, bet) => acc + bet.amount, 0)}
-                                </Chip>
-                              )
-                            }
-                            {
-                              bet.no_bets && bet.no_bets.length > 0 && (
-                                <Chip
-                                  color="secondary"
-                                  variant="flat"
-                                  size="sm"
-                                >
-                                  No: {bet.no_bets.reduce((acc, bet) => acc + bet.amount, 0)}
-                                </Chip>
-                              )
-                            }
+                            <Chip
+                              color="primary"
+                              variant="flat"
+                              size="sm"
+                            >
+                              Yes: {bet.yes_bets.reduce((acc, bet) => acc + bet.amount, 0)} (
+                              {(() => {
+                                const yesTotal = bet.yes_bets.reduce((acc, bet) => acc + bet.amount, 0);
+                                const noTotal = bet.no_bets?.reduce((acc, bet) => acc + bet.amount, 0) || 0;
+                                const total = yesTotal + noTotal;
+                                const percentage = total > 0 ? (yesTotal / total) * 100 : 0;
+                                const decimalOdds = percentage > 0 ? (100 / percentage).toFixed(2) : "∞";
+                                return `${decimalOdds}x`;
+                              })()})
+                            </Chip>
+                            <Chip
+                              color="secondary"
+                              variant="flat"
+                              size="sm"
+                            >
+                              No: {bet.no_bets.reduce((acc, bet) => acc + bet.amount, 0)} (
+                              {(() => {
+                                const yesTotal = bet.yes_bets?.reduce((acc, bet) => acc + bet.amount, 0) || 0;
+                                const noTotal = bet.no_bets.reduce((acc, bet) => acc + bet.amount, 0);
+                                const total = yesTotal + noTotal;
+                                const percentage = total > 0 ? (noTotal / total) * 100 : 0;
+                                const decimalOdds = percentage > 0 ? (100 / percentage).toFixed(2) : "∞";
+                                return `${decimalOdds}x`;
+                              })()})
+                            </Chip>
                             <Chip
                               color={
                                 bet.status !== "open"
@@ -639,14 +647,24 @@ export default function Dashboard() {
                                 variant="flat"
                                 size="sm"
                               >
-                                Yes: {prediction.yes_total_amount}
+                                Yes: {prediction.yes_total_amount} ({(() => {
+                                  const total = Number(prediction.yes_total_amount) + Number(prediction.no_total_amount);
+                                  const percentage = total > 0 ? (Number(prediction.yes_total_amount) / total) * 100 : 0;
+                                  const decimalOdds = percentage > 0 ? (100 / percentage).toFixed(2) : "∞";
+                                  return `${decimalOdds}x`;
+                                })()})
                               </Chip>
                               <Chip
                                 color="secondary"
                                 variant="flat"
                                 size="sm"
                               >
-                                No: {prediction.no_total_amount}
+                                No: {prediction.no_total_amount} ({(() => {
+                                  const total = Number(prediction.yes_total_amount) + Number(prediction.no_total_amount);
+                                  const percentage = total > 0 ? (Number(prediction.no_total_amount) / total) * 100 : 0;
+                                  const decimalOdds = percentage > 0 ? (100 / percentage).toFixed(2) : "∞";
+                                  return `${decimalOdds}x`;
+                                })()})
                               </Chip>
                               <Chip
                                 color={

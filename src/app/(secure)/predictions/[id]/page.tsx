@@ -113,6 +113,16 @@ export default function PredictionDetail() {
                                         <p className="font-semibold">
                                             Yes: {prediction.yes_count} | No: {prediction.no_count}
                                         </p>
+                                        <p className="text-sm text-gray-500 mt-1">
+                                            {(() => {
+                                                const yes_amount = prediction?.bets?.filter(bet => bet.choice === "yes").reduce((acc, bet) => acc + Number(bet.amount), 0) || 0;
+                                                const no_amount = prediction?.bets?.filter(bet => bet.choice === "no").reduce((acc, bet) => acc + Number(bet.amount), 0) || 0;
+                                                const total = yes_amount + no_amount;
+                                                const yesOdds = total > 0 ? (100 / (yes_amount * 100 / total)).toFixed(2) : "∞";
+                                                const noOdds = total > 0 ? (100 / (no_amount * 100 / total)).toFixed(2) : "∞";
+                                                return `(${yesOdds}x/${noOdds}x)`;
+                                            })()}
+                                        </p>
                                     </div>
                                 </div>
                             </div>

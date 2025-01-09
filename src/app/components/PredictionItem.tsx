@@ -39,6 +39,18 @@ export function PredictionItem({ prediction, onClick }: PredictionItemProps) {
                 <span className="text-danger">{prediction.yes_amount}</span>
                 <span className="px-0 mx-0">/</span>
                 <span className="text-success">{prediction.no_amount}</span>
+
+                {/* Decimal odds for both YES and NO */}
+                <span className="pl-2">
+                  {(() => {
+                    const total = (Number(prediction.yes_amount) || 0) + (Number(prediction.no_amount) || 0);
+                    const yesPercentage = total > 0 ? (Number(prediction.yes_amount) || 0) / total * 100 : 0;
+                    const noPercentage = total > 0 ? (Number(prediction.no_amount) || 0) / total * 100 : 0;
+                    const yesOdds = yesPercentage > 0 ? (100 / yesPercentage).toFixed(2) : "∞";
+                    const noOdds = noPercentage > 0 ? (100 / noPercentage).toFixed(2) : "∞";
+                    return `(${yesOdds}x/${noOdds}x)`;
+                  })()}
+                </span>
               </div>
 
               <div className="flex items-center gap-2">

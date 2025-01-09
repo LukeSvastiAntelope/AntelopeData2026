@@ -214,11 +214,19 @@ export default function BetDetailPage() {
                                             </div>
                                             <div>
                                                 <h3 className="text-sm font-medium text-default-400 mb-1">Yes Votes</h3>
-                                                <p className="text-sm font-semibold">{prediction?.yes_count} {totalYes} </p>
+                                                <p className="text-sm font-semibold">{prediction?.yes_count} ({totalYes})</p>
                                             </div>
                                             <div>
                                                 <h3 className="text-sm font-medium text-default-400 mb-1">No Votes</h3>
-                                                <p className="text-sm font-semibold">{prediction?.no_count} {totalNo}</p>
+                                                <p className="text-sm font-semibold">{prediction?.no_count} ({totalNo})</p>
+                                            </div>
+                                            <div>
+                                                <h3 className="text-sm font-medium text-default-400 mb-1">Odds</h3>
+                                                <p className="text-sm font-semibold">
+                                                    Yes: {totalYes > 0 ? (1 / (totalYes / (totalYes + totalNo || 1))).toFixed(2) : "∞"}x
+                                                    <br />
+                                                    No: {totalNo > 0 ? (1 / (totalNo / (totalYes + totalNo || 1))).toFixed(2) : "∞"}x
+                                                </p>
                                             </div>
                                             <div>
                                                 <h3 className="text-sm font-medium text-default-400 mb-1">Validation Source</h3>
