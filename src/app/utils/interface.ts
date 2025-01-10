@@ -119,6 +119,21 @@ export interface BetDecision {
     pineconeId?: string;
 }
 
+export interface BetReasonStep {
+    step: 'interesting' | 'marketData' | 'similarPredictions' | 'newsAnalysis' | 'finalDecision';
+    reasoning: string;
+}
+
+export interface MarketData {
+    symbol: string;
+    price: number;
+    change24h?: number;
+    volume24h?: number;
+    lastUpdated?: string;
+    change?: number;
+    volume?: number;
+}
+
 export interface Prediction {
     id: number;
     creator_id: number;
@@ -134,17 +149,8 @@ export interface Prediction {
     outcome: string;
     team_a?: string;
     team_b?: string;
-    betReason?: Array<{
-        step: string;
-        reasoning: string;
-    }>;
-    marketData?: {
-        price: number;
-        change?: number;
-        change24h?: number;
-        volume24h?: number;
-        volume?: number;
-    };
+    betReason?: BetReasonStep[];
+    marketData?: MarketData;
 }
 
 export interface GroupAnalysis {

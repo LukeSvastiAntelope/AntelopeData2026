@@ -1,8 +1,7 @@
-// src/utils/AutomaticBettingAgent.ts
 import OpenAI from 'openai';
 import { Pinecone } from '@pinecone-database/pinecone';
 import { getJson } from 'serpapi';
-import { IAgentProfile, Prediction, BetDecision, NewsItem, GroupedPredictions } from '../interface';
+import { IAgentProfile, BetDecision, NewsItem, GroupedPredictions, Prediction, MarketData } from '../interface';
 import { PineconeRecord } from '@pinecone-database/pinecone';
 import axios from 'axios';
 
@@ -44,14 +43,6 @@ interface PredictionAnalysis {
     riskAssessment: string;
 }
 
-interface MarketData {
-    symbol: string;
-    price: number;
-    change24h?: number;
-    volume24h?: number;
-    lastUpdated?: string;
-}
-
 interface SerpFinanceResult {
     knowledge_graph?: {
         stock_price?: string;
@@ -64,6 +55,7 @@ interface SerpFinanceResult {
         volume: string;
     }[];
 }
+
 
 export class AutomaticBettingAgent {
     private agent: IAgentProfile;
@@ -136,7 +128,13 @@ export class AutomaticBettingAgent {
             await Promise.all(
                 categoryPredictions.map(async p => {
                     const { shouldBet, reasoning } = await this.isInterestingPredictionWithAI(p);
-                    p.betReason = reasoning ? [{ step: "interesting", reasoning: reasoning }] : [];
+                    p.betReason = [];
+                    if (reasoning) {
+                        p.betReason.push({
+                            step: "interesting",
+                            reasoning: reasoning
+                        });
+                    }
                     return { prediction: p, shouldBet };
                 })
             )
@@ -256,12 +254,37 @@ export class AutomaticBettingAgent {
 
         for (let i = 0; i < predictions.length; i += BATCH_SIZE) {
             const batchPredictions = predictions.slice(i, i + BATCH_SIZE);
-
-            // Limit news items per batch
+            
+            // Get relevant news for this batch
             const relevantNews = this.filterRelevantNews(news, batchPredictions, 3);
-
-            // Limit similar predictions
             const relevantSimilar = this.filterSimilarPredictions(similarPredictions, batchPredictions, 2);
+
+            // Add news analysis reason
+            if (relevantNews.length > 0) {
+                batchPredictions.forEach(prediction => {
+                    prediction.betReason = prediction.betReason || [];
+                    prediction.betReason.push({
+                        step: "newsAnalysis",
+                        reasoning: `Analyzed ${relevantNews.length} relevant news articles: ${
+                            relevantNews.map(n => n.title.substring(0, 50)).join('; ')
+                        }`
+                    });
+                });
+            }
+
+            // Add similar predictions analysis
+            if (relevantSimilar.length > 0) {
+                batchPredictions.forEach(prediction => {
+                    prediction.betReason = prediction.betReason || [];
+                    prediction.betReason.push({
+                        step: "similarPredictions",
+                        reasoning: `Found ${relevantSimilar.length} similar predictions with ${
+                            relevantSimilar.filter(p => p.metadata?.result === 'win').length
+                        } successful outcomes`
+                    });
+                });
+            }
+
             allSimilar.push(...relevantSimilar);
             allNews.push(...relevantNews);
 
@@ -476,17 +499,27 @@ ${p.metadata?.comment ? `- Agent Controller Comment: ${p.metadata.comment}` : ''
 
                     return isValid && p.shouldBet && p.confidence > 0;
                 })
-                .map((p: PredictionAnalysis) => ({
-                    predictionId: p.id,
-                    agentId: this.agent.id,
-                    betAmount: this.calculateBetAmount(p.confidence),
-                    choice: p.recommendedChoice,
-                    confidence: p.confidence,
-                    reasoning: p.reasoning || 'No specific reasoning provided',
-                    timestamp: new Date(),
-                    riskAssessment: p.riskAssessment || 'Moderate risk',
-                    userId: this.agent.user_id
-                }));
+                .map((p: PredictionAnalysis) => {
+                    const prediction = predictions.find(pred => pred.id === p.id);
+                    if (prediction) {
+                        prediction.betReason = prediction.betReason || [];
+                        prediction.betReason.push({
+                            step: "finalDecision",
+                            reasoning: p.reasoning || 'No specific reasoning provided'
+                        });
+                    }
+                    return {
+                        predictionId: p.id,
+                        agentId: this.agent.id,
+                        betAmount: this.calculateBetAmount(p.confidence),
+                        choice: p.recommendedChoice,
+                        confidence: p.confidence,
+                        reasoning: p.reasoning || 'No specific reasoning provided',
+                        timestamp: new Date(),
+                        riskAssessment: p.riskAssessment || 'Moderate risk',
+                        userId: this.agent.user_id
+                    };
+                });
         } catch (error) {
             console.error('Error parsing analysis response:', error);
             return [];
