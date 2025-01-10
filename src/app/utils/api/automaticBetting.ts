@@ -38,7 +38,7 @@ interface SerpApiNewsResult {
 interface PredictionAnalysis {
     id: number;
     shouldBet: boolean;
-    recommendedChoice: 'Yes' | 'No';
+    recommendedChoice: string;
     confidence: number;
     reasoning: string;
     riskAssessment: string;
@@ -271,7 +271,7 @@ export class AutomaticBettingAgent {
         {
             "id": number,
             "shouldBet": boolean,
-            "recommendedChoice": "Yes" or "No" without "Draw",
+            "recommendedChoice": "string (for sports: use 'draw' or exact team name from team_a or team_b, for others: 'Yes' or 'No')",
             "confidence": number (0-1),
             "reasoning": "detailed explanation",
             "riskAssessment": "Low/Medium/High"
@@ -280,16 +280,48 @@ export class AutomaticBettingAgent {
 }
 
 Predictions to analyze:
-${batchPredictions.map(p =>
-                `ID: ${p.id}
-         Description: ${p.description} ${p.source == "sportDB" && `winner: ${p.predicted_outcome}`}
-         Creator Choice: ${p.creator_choice}
-         Creator Betting Amount: ${p.bet_amount}
-         Match Total Bet Amount: ${p.match_total_amount}
-         Not Match Total Bet Amount: ${p.not_match_total_amount}
-         You Are Already Bet: ${p.agent_bets ? this.parseAgentBets(p.agent_bets)[this.agent.id] ? `${this.parseAgentBets(p.agent_bets)[this.agent.id].amount} to ${this.parseAgentBets(p.agent_bets)[this.agent.id].choice}` : 'No bets made yet' : 'No bets made yet'}`
-            ).join('\n')}
-    
+${batchPredictions.map(p => {
+    // Parse all bets to calculate odds
+    const bets = p.agent_bets ? p.agent_bets.split(',').map(bet => {
+        const [, , amount, choice] = bet.split(':');
+        return { amount: Number(amount), choice };
+    }) : [];
+
+    // Group and sum bets by choice
+    const betsByChoice = bets.reduce((acc, bet) => {
+        acc[bet.choice] = (acc[bet.choice] || 0) + bet.amount;
+        return acc;
+    }, {} as Record<string, number>);
+
+    const totalAmount = Object.values(betsByChoice).reduce((sum, amount) => sum + amount, 0);
+
+    // Calculate odds for each unique choice made by betters
+    const oddsDisplay = totalAmount > 0 
+        ? Object.entries(betsByChoice)
+            .map(([choice, amount]) => {
+                const percentage = (amount / totalAmount * 100).toFixed(1);
+                return `${choice}: ${percentage}%`;
+            })
+            .join(' vs ')
+        : p.source === "sportDB"
+            ? `${p.team_a}: 33.3% vs ${p.team_b}: 33.3% vs draw: 33.3%` // Default for sports
+            : `${p.creator_choice}: 50.0% vs No: 50.0%`; // Default for binary
+
+    return `ID: ${p.id}
+     Description: ${p.description}
+     ${p.source === "sportDB" ? 
+        `Team A: ${p.team_a}
+     Team B: ${p.team_b}
+     Predicted Winner: ${p.predicted_outcome}` :
+        `Creator Choice: ${p.creator_choice}`}
+     Creator Betting Amount: ${p.bet_amount}
+     Market Odds: ${oddsDisplay}
+     Total Bet Amount: ${totalAmount}
+     You Are Already Bet: ${p.agent_bets ? this.parseAgentBets(p.agent_bets)[this.agent.id] ? 
+        `${this.parseAgentBets(p.agent_bets)[this.agent.id].amount} to ${this.parseAgentBets(p.agent_bets)[this.agent.id].choice}` : 
+        'No bets made yet' : 'No bets made yet'}`
+}).join('\n')}
+
     Key News:
     ${relevantNews.map(n => `- ${n.title}`).join('\n')}
     
@@ -420,10 +452,10 @@ ${p.metadata?.comment ? `- Agent Controller Comment: ${p.metadata.comment}` : ''
 
             return analysis.predictions
                 .filter((p: PredictionAnalysis) => {
+                    const prediction = predictions.find(pred => pred.id === p.id);
                     const isValid =
                         typeof p.id === 'number' &&
                         typeof p.shouldBet === 'boolean' &&
-                        (p.recommendedChoice === 'Yes' || p.recommendedChoice === 'No' || p.recommendedChoice === 'Draw') &&
                         typeof p.confidence === 'number' &&
                         p.confidence >= 0 && p.confidence <= 1;
 
@@ -432,7 +464,6 @@ ${p.metadata?.comment ? `- Agent Controller Comment: ${p.metadata.comment}` : ''
                         return false;
                     }
 
-                    const prediction = predictions.find(pred => pred.id === p.id);
                     const existingBet = prediction?.agent_bets ?
                         this.parseAgentBets(prediction.agent_bets)[this.agent.id] :
                         null;
@@ -449,7 +480,7 @@ ${p.metadata?.comment ? `- Agent Controller Comment: ${p.metadata.comment}` : ''
                     predictionId: p.id,
                     agentId: this.agent.id,
                     betAmount: this.calculateBetAmount(p.confidence),
-                    choice: p.recommendedChoice as 'Yes' | 'No',
+                    choice: p.recommendedChoice,
                     confidence: p.confidence,
                     reasoning: p.reasoning || 'No specific reasoning provided',
                     timestamp: new Date(),

@@ -133,15 +133,7 @@ async function getOpenPredictions(agent_id: number) {
     const db = await getMySQLConnection();
     const [rows] = await db.execute(`
         SELECT 
-            predictions.*, 
-            COALESCE(SUM(CASE 
-                WHEN bets.choice = predictions.creator_choice THEN bets.amount
-                ELSE 0
-            END), 0) as match_total_amount,
-            COALESCE(SUM(CASE 
-                WHEN bets.choice != predictions.creator_choice THEN bets.amount
-                ELSE 0
-            END), 0) as not_match_total_amount,
+            predictions.*,
             COUNT(bets.id) as bets_count,
             GROUP_CONCAT(CONCAT(bets.id, ':', bets.agent_id, ':', bets.amount, ':', bets.choice)) as agent_bets,
             COUNT(CASE WHEN bets.agent_id = ? THEN 1 END) as agent_bet_count
