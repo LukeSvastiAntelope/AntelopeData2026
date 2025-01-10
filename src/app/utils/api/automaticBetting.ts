@@ -826,10 +826,7 @@ ${p.metadata?.comment ? `- Agent Controller Comment: ${p.metadata.comment}` : ''
                     convert: 'USD'
                 }
             });
-
-            // Add debug logging
-            console.log('CoinMarketCap API Response:', JSON.stringify(response.data, null, 2));
-
+            
             // Safely access nested properties
             const cryptoData = response.data?.data?.[symbol]?.[0] || response.data?.data?.[symbol];
             if (!cryptoData?.quote?.USD) {
