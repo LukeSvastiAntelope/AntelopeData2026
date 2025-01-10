@@ -348,337 +348,350 @@ export default function Dashboard() {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <Link href="/bets">
-          <StatCard
-            icon={<FaRocket />}
-            title="Total Bets"
-            value={totalBets.toString()}
-          />
-        </Link>
-        <Link href="/predictions">
-          <StatCard
-            icon={<FaDatabase />}
-            title="Predictions"
-            value={totalPredictions.toString()}
-          />
-        </Link>
-        <StatCard
-          icon={<FaChartLine />}
-          title="Success"
-          value={`${Number(successRate || 0).toFixed(2)}%`}
-        />
-        <StatCard
-          icon={<FaShieldAlt />}
-          title="Bet Size"
-          value={`${agent?.maxBetSize || 0}`}
-        />
-      </div>
-
-      <div className="bg-gray-900/50 border border-white/10 rounded-xl p-6 mb-8">
-        <h2 className="text-lg font-semibold mb-4">Betting Timeline</h2>
-        <div className="h-[300px]">
-          {bets && bets.length > 0 ? (
-            <Scatter data={scatterData} options={scatterOptions} />
-          ) : (
-            <div className="flex items-center justify-center h-full text-gray-400">
-              No bets to display in graph
+      {
+        !agent || !agent.interests || agent.interests.length === 0 || !agent.principles || agent.principles.length === 0 ?
+          <div className="flex flex-col gap-2 mb-8">
+            <p className="text-gray-400">
+              Please set your interests and principles to see your dashboard
+            </p>
+            <Button onPress={() => router.push("/strategy")}>
+              Set Interests and Principles
+            </Button>
+          </div> :
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+              <Link href="/bets">
+                <StatCard
+                  icon={<FaRocket />}
+                  title="Total Bets"
+                  value={totalBets.toString()}
+                />
+              </Link>
+              <Link href="/predictions">
+                <StatCard
+                  icon={<FaDatabase />}
+                  title="Predictions"
+                  value={totalPredictions.toString()}
+                />
+              </Link>
+              <StatCard
+                icon={<FaChartLine />}
+                title="Success"
+                value={`${Number(successRate || 0).toFixed(2)}%`}
+              />
+              <StatCard
+                icon={<FaShieldAlt />}
+                title="Bet Size"
+                value={`${agent?.maxBetSize || 0}`}
+              />
             </div>
-          )}
-        </div>
-      </div>
 
-      <div className="flex gap-4 mb-6">
-        <Button
-          className={`px-6 py-2 rounded-lg ${activeTab === "bets"
-            ? "bg-primary text-white"
-            : "bg-gray-800 text-gray-400 hover:bg-gray-700"
-            }`}
-          onPress={() => setActiveTab("bets")}
-        >
-          Bets History
-        </Button>
-        <Button
-          className={`px-6 py-2 rounded-lg ${activeTab === "predictions"
-            ? "bg-primary text-white"
-            : "bg-gray-800 text-gray-400 hover:bg-gray-700"
-            }`}
-          onPress={() => setActiveTab("predictions")}
-        >
-          Predictions
-        </Button>
-      </div>
-
-      <div className="relative mb-6">
-        <input
-          type="text"
-          value={activeTab === "bets" ? searchTerm : searchPredictions}
-          onChange={activeTab === "bets" ? handleBetSearch : handlePredictionSearch}
-          placeholder={`Search ${activeTab}...`}
-          className="w-full px-12 py-3 bg-gray-900/50 border border-white/10 rounded-xl text-gray-300 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary/50"
-        />
-        <svg
-          className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-        </svg>
-      </div>
-
-      {activeTab === "bets" && (
-        <section className="rounded-lg overflow-x-auto">
-          {isLoadingBets && bets.length === 0 && (
-            <div className="flex justify-center items-center py-8">
-              <Spinner size="lg" />
+            <div className="bg-gray-900/50 border border-white/10 rounded-xl p-6 mb-8">
+              <h2 className="text-lg font-semibold mb-4">Betting Timeline</h2>
+              <div className="h-[300px]">
+                {bets && bets.length > 0 ? (
+                  <Scatter data={scatterData} options={scatterOptions} />
+                ) : (
+                  <div className="flex items-center justify-center h-full text-gray-400">
+                    No bets to display in graph
+                  </div>
+                )}
+              </div>
             </div>
-          )}
-          {!isLoadingBets && bets.length === 0 && (
-            <div className="text-center text-gray-500 py-8">
-              No bets found
+
+            <div className="flex gap-4 mb-6">
+              <Button
+                className={`px-6 py-2 rounded-lg ${activeTab === "bets"
+                  ? "bg-primary text-white"
+                  : "bg-gray-800 text-gray-400 hover:bg-gray-700"
+                  }`}
+                onPress={() => setActiveTab("bets")}
+              >
+                Bets History
+              </Button>
+              <Button
+                className={`px-6 py-2 rounded-lg ${activeTab === "predictions"
+                  ? "bg-primary text-white"
+                  : "bg-gray-800 text-gray-400 hover:bg-gray-700"
+                  }`}
+                onPress={() => setActiveTab("predictions")}
+              >
+                Predictions
+              </Button>
             </div>
-          )}
 
-          {bets.length > 0 && (
-            <table className="w-full text-sm text-left">
-              <tbody>
-                {filterBets(bets, searchTerm).map((bet, index) => {
-                  // Group bets by choice and calculate totals
-                  const choiceTotals = bet.agent_bets?.reduce((acc, b) => {
-                    acc[b.choice] = (acc[b.choice] || 0) + b.amount;
-                    return acc;
-                  }, {} as Record<string, number>) || {};
+            <div className="relative mb-6">
+              <input
+                type="text"
+                value={activeTab === "bets" ? searchTerm : searchPredictions}
+                onChange={activeTab === "bets" ? handleBetSearch : handlePredictionSearch}
+                placeholder={`Search ${activeTab}...`}
+                className="w-full px-12 py-3 bg-gray-900/50 border border-white/10 rounded-xl text-gray-300 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary/50"
+              />
+              <svg
+                className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </div>
 
-                  const totalAmount = Object.values(choiceTotals).reduce((sum, amount) => sum + amount, 0);
+            {activeTab === "bets" && (
+              <section className="rounded-lg overflow-x-auto">
+                {isLoadingBets && bets.length === 0 && (
+                  <div className="flex justify-center items-center py-8">
+                    <Spinner size="lg" />
+                  </div>
+                )}
+                {!isLoadingBets && bets.length === 0 && (
+                  <div className="text-center text-gray-500 py-8">
+                    No bets found
+                  </div>
+                )}
 
-                  // Calculate odds for each choice
-                  const choiceOdds = Object.entries(choiceTotals).map(([choice, amount]) => {
-                    const percentage = totalAmount > 0 ? (amount / totalAmount) * 100 : 0;
-                    const odds = percentage > 0 ? (100 / percentage).toFixed(2) : "∞";
-                    return {
-                      choice,
-                      amount,
-                      odds,
-                      percentage: percentage.toFixed(1)
-                    };
-                  });
+                {bets.length > 0 && (
+                  <table className="w-full text-sm text-left">
+                    <tbody>
+                      {filterBets(bets, searchTerm).map((bet, index) => {
+                        // Group bets by choice and calculate totals
+                        const choiceTotals = bet.agent_bets?.reduce((acc, b) => {
+                          acc[b.choice] = (acc[b.choice] || 0) + b.amount;
+                          return acc;
+                        }, {} as Record<string, number>) || {};
 
-                  return (
-                    <tr
-                      key={index}
-                      className="transition-all hover:bg-gray-800/50 border-b border-gray-800/50"
-                      onClick={() => router.push(`/bets/${bet.bet_id}`)}
+                        const totalAmount = Object.values(choiceTotals).reduce((sum, amount) => sum + amount, 0);
+
+                        // Calculate odds for each choice
+                        const choiceOdds = Object.entries(choiceTotals).map(([choice, amount]) => {
+                          const percentage = totalAmount > 0 ? (amount / totalAmount) * 100 : 0;
+                          const odds = percentage > 0 ? (100 / percentage).toFixed(2) : "∞";
+                          return {
+                            choice,
+                            amount,
+                            odds,
+                            percentage: percentage.toFixed(1)
+                          };
+                        });
+
+                        return (
+                          <tr
+                            key={index}
+                            className="transition-all hover:bg-gray-800/50 border-b border-gray-800/50"
+                            onClick={() => router.push(`/bets/${bet.bet_id}`)}
+                          >
+                            <td className="p-4 cursor-pointer">
+                              <div className="flex items-start gap-4">
+                                {/* Thumbnail */}
+                                {bet.str_thumb ? (
+                                  <Image
+                                    src={bet.str_thumb}
+                                    alt={bet.description}
+                                    width={48}
+                                    height={48}
+                                    className="rounded-lg object-cover w-12 h-12"
+                                  />
+                                ) : (
+                                  <div className="rounded-lg bg-gray-700/50 w-12 h-12 flex items-center justify-center">
+                                    <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                    </svg>
+                                  </div>
+                                )}
+
+                                {/* Content */}
+                                <div className="flex-1 space-y-2">
+                                  {/* Description */}
+                                  <p className="text-sm text-gray-200 font-medium leading-snug">
+                                    {bet.description}
+                                  </p>
+
+                                  {/* Stats & Chips */}
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    {/* Bet Amount */}
+                                    <div className="flex items-center gap-1 bg-gray-700/30 px-2 py-1 rounded-md">
+                                      <span className="icon-coin text-amber-500" />
+                                      <span className="text-sm text-gray-300">{bet.amount}</span>
+                                    </div>
+
+                                    {/* Market Odds */}
+                                    {choiceOdds.map(({ choice, amount, odds, percentage }) => (
+                                      <Chip
+                                        key={choice}
+                                        className={`${choice === bet.choice
+                                          ? 'bg-primary/20 text-primary-500'
+                                          : 'bg-gray-700/30 text-gray-300'
+                                          }`}
+                                        size="sm"
+                                      >
+                                        {choice}: {amount} ({odds}x) {percentage}%
+                                      </Chip>
+                                    ))}
+
+                                    {/* Status */}
+                                    <Chip
+                                      className={`${bet.status === "resolved"
+                                        ? bet.outcome === bet.choice
+                                          ? "bg-green-500/20 text-green-400"
+                                          : "bg-red-500/20 text-red-400"
+                                        : bet.status === "awaiting_confirmation"
+                                          ? "bg-yellow-500/20 text-yellow-400"
+                                          : "bg-blue-500/20 text-blue-400"
+                                        }`}
+                                      size="sm"
+                                    >
+                                      {bet.status === "resolved"
+                                        ? bet.outcome === bet.choice
+                                          ? "Won"
+                                          : "Lost"
+                                        : bet.status === "awaiting_confirmation"
+                                          ? "Awaiting"
+                                          : bet.status}
+                                    </Chip>
+                                  </div>
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                )}
+
+                {hasMoreBets && !isLoadingBets && bets.length > 0 && (
+                  <div className="flex justify-center mt-4">
+                    <Button
+                      color="primary"
+                      variant="flat"
+                      onPress={loadMoreBets}
+                      isLoading={isLoadingBets}
+                      className="min-w-[200px]"
                     >
-                      <td className="p-4 cursor-pointer">
-                        <div className="flex items-start gap-4">
-                          {/* Thumbnail */}
-                          {bet.str_thumb ? (
-                            <Image
-                              src={bet.str_thumb}
-                              alt={bet.description}
-                              width={48}
-                              height={48}
-                              className="rounded-lg object-cover w-12 h-12"
-                            />
-                          ) : (
-                            <div className="rounded-lg bg-gray-700/50 w-12 h-12 flex items-center justify-center">
-                              <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                              </svg>
+                      {isLoadingBets ? "Loading..." : "Show More"}
+                    </Button>
+                  </div>
+                )}
+                {isLoadingBets && bets.length > 0 && (
+                  <div className="flex justify-center items-center py-4">
+                    <Spinner size="sm" />
+                  </div>
+                )}
+                {!hasMoreBets && bets.length > 0 && (
+                  <div className="text-center text-gray-500 py-4">
+                    No more bets to load
+                  </div>
+                )}
+              </section>
+            )}
+
+            {activeTab === "predictions" && (
+              <section className="rounded-lg overflow-x-auto mb-8">
+                {isLoadingPredictions && predictions.length === 0 ? (
+                  <div className="flex justify-center items-center py-8">
+                    <Spinner size="lg" />
+                  </div>
+                ) : displayedPredictions.length === 0 && !isLoadingPredictions ? (
+                  <div className="text-center text-gray-500 py-8">
+                    No predictions found
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-2">
+                    {
+                      displayedPredictions.map((prediction, index) => {
+                        const choiceTotals = prediction.agent_bets?.reduce((acc, b) => {
+                          acc[b.choice] = (acc[b.choice] || 0) + b.amount;
+                          return acc;
+                        }, {} as Record<string, number>) || {};
+
+                        const totalAmount = Object.values(choiceTotals).reduce((sum, amount) => sum + amount, 0);
+
+                        // Calculate odds for each choice
+                        const choiceOdds = Object.entries(choiceTotals).map(([choice, amount]) => {
+                          const percentage = totalAmount > 0 ? (amount / totalAmount) * 100 : 0;
+                          const odds = percentage > 0 ? (100 / percentage).toFixed(2) : "∞";
+                          return {
+                            choice,
+                            amount,
+                            odds,
+                            percentage: percentage.toFixed(1)
+                          };
+                        });
+                        return (
+                          <div
+                            key={index}
+                            onClick={() => router.push(`/predictions/${prediction.id}`)}
+                            className="flex items-center gap-4 p-4 bg-gray-900/30 rounded-xl hover:bg-gray-900/50 transition-colors cursor-pointer"
+                          >
+                            <div className="flex-shrink-0">
+                              {prediction.str_thumb ? (
+                                <Image
+                                  src={prediction.str_thumb}
+                                  alt=""
+                                  width={40}
+                                  height={40}
+                                  className="w-10 h-10 rounded-full"
+                                />
+                              ) : (
+                                <div className="w-10 h-10 rounded-full bg-gray-800" />
+                              )}
                             </div>
-                          )}
 
-                          {/* Content */}
-                          <div className="flex-1 space-y-2">
-                            {/* Description */}
-                            <p className="text-sm text-gray-200 font-medium leading-snug">
-                              {bet.description}
-                            </p>
-
-                            {/* Stats & Chips */}
-                            <div className="flex flex-wrap items-center gap-2">
-                              {/* Bet Amount */}
-                              <div className="flex items-center gap-1 bg-gray-700/30 px-2 py-1 rounded-md">
-                                <span className="icon-coin text-amber-500" />
-                                <span className="text-sm text-gray-300">{bet.amount}</span>
+                            <div className="flex flex-col flex-grow gap-2">
+                              <div className="text-sm text-gray-100">
+                                {prediction.description}
                               </div>
 
-                              {/* Market Odds */}
-                              {choiceOdds.map(({ choice, amount, odds, percentage }) => (
+                              <div className="flex flex-wrap gap-2 items-center">
+                                {/* Bets count */}
+                                <div className="flex items-center gap-1 text-sm text-gray-400">
+                                  <span>{prediction.agent_bets.length}</span>
+                                  <span>bets</span>
+                                </div>
+                                {choiceOdds.map(({ choice, amount, odds, percentage }) => (
+                                  <Chip
+                                    key={choice}
+                                    className={`${choice === prediction.creator_choice
+                                      ? 'bg-primary/20 text-primary-500'
+                                      : 'bg-gray-700/30 text-gray-300'
+                                      }`}
+                                    size="sm"
+                                  >
+                                    {choice}: {amount} ({odds}x) {percentage}%
+                                  </Chip>
+                                ))}
+
+                                {/* Status */}
                                 <Chip
-                                  key={choice}
-                                  className={`${choice === bet.choice
-                                    ? 'bg-primary/20 text-primary-500'
-                                    : 'bg-gray-700/30 text-gray-300'
+                                  className={`${prediction.status === "open"
+                                    ? "bg-green-500/20 text-green-400"
+                                    : "bg-gray-500/20 text-gray-400"
                                     }`}
                                   size="sm"
                                 >
-                                  {choice}: {amount} ({odds}x) {percentage}%
+                                  {prediction.status}
                                 </Chip>
-                              ))}
-
-                              {/* Status */}
-                              <Chip
-                                className={`${bet.status === "resolved"
-                                  ? bet.outcome === bet.choice
-                                    ? "bg-green-500/20 text-green-400"
-                                    : "bg-red-500/20 text-red-400"
-                                  : bet.status === "awaiting_confirmation"
-                                    ? "bg-yellow-500/20 text-yellow-400"
-                                    : "bg-blue-500/20 text-blue-400"
-                                  }`}
-                                size="sm"
-                              >
-                                {bet.status === "resolved"
-                                  ? bet.outcome === bet.choice
-                                    ? "Won"
-                                    : "Lost"
-                                  : bet.status === "awaiting_confirmation"
-                                    ? "Awaiting"
-                                    : bet.status}
-                              </Chip>
+                              </div>
                             </div>
-                          </div>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          )}
+                          </div>)
+                      })
+                    }
+                  </div>
+                )}
 
-          {hasMoreBets && !isLoadingBets && bets.length > 0 && (
-            <div className="flex justify-center mt-4">
-              <Button
-                color="primary"
-                variant="flat"
-                onPress={loadMoreBets}
-                isLoading={isLoadingBets}
-                className="min-w-[200px]"
-              >
-                {isLoadingBets ? "Loading..." : "Show More"}
-              </Button>
-            </div>
-          )}
-          {isLoadingBets && bets.length > 0 && (
-            <div className="flex justify-center items-center py-4">
-              <Spinner size="sm" />
-            </div>
-          )}
-          {!hasMoreBets && bets.length > 0 && (
-            <div className="text-center text-gray-500 py-4">
-              No more bets to load
-            </div>
-          )}
-        </section>
-      )}
-
-      {activeTab === "predictions" && (
-        <section className="rounded-lg overflow-x-auto mb-8">
-          {isLoadingPredictions && predictions.length === 0 ? (
-            <div className="flex justify-center items-center py-8">
-              <Spinner size="lg" />
-            </div>
-          ) : displayedPredictions.length === 0 && !isLoadingPredictions ? (
-            <div className="text-center text-gray-500 py-8">
-              No predictions found
-            </div>
-          ) : (
-            <div className="flex flex-col gap-2">
-              {
-                displayedPredictions.map((prediction, index) => {
-                  const choiceTotals = prediction.agent_bets?.reduce((acc, b) => {
-                    acc[b.choice] = (acc[b.choice] || 0) + b.amount;
-                    return acc;
-                  }, {} as Record<string, number>) || {};
-
-                  const totalAmount = Object.values(choiceTotals).reduce((sum, amount) => sum + amount, 0);
-
-                  // Calculate odds for each choice
-                  const choiceOdds = Object.entries(choiceTotals).map(([choice, amount]) => {
-                    const percentage = totalAmount > 0 ? (amount / totalAmount) * 100 : 0;
-                    const odds = percentage > 0 ? (100 / percentage).toFixed(2) : "∞";
-                    return {
-                      choice,
-                      amount,
-                      odds,
-                      percentage: percentage.toFixed(1)
-                    };
-                  });
-                  return (
-                    <div
-                      key={index}
-                      onClick={() => router.push(`/predictions/${prediction.id}`)}
-                      className="flex items-center gap-4 p-4 bg-gray-900/30 rounded-xl hover:bg-gray-900/50 transition-colors cursor-pointer"
-                    >
-                      <div className="flex-shrink-0">
-                        {prediction.str_thumb ? (
-                          <Image
-                            src={prediction.str_thumb}
-                            alt=""
-                            width={40}
-                            height={40}
-                            className="w-10 h-10 rounded-full"
-                          />
-                        ) : (
-                          <div className="w-10 h-10 rounded-full bg-gray-800" />
-                        )}
-                      </div>
-
-                      <div className="flex flex-col flex-grow gap-2">
-                        <div className="text-sm text-gray-100">
-                          {prediction.description}
-                        </div>
-
-                        <div className="flex flex-wrap gap-2 items-center">
-                          {/* Bets count */}
-                          <div className="flex items-center gap-1 text-sm text-gray-400">
-                            <span>{prediction.agent_bets.length}</span>
-                            <span>bets</span>
-                          </div>
-                          {choiceOdds.map(({ choice, amount, odds, percentage }) => (
-                            <Chip
-                              key={choice}
-                              className={`${choice === prediction.creator_choice
-                                ? 'bg-primary/20 text-primary-500'
-                                : 'bg-gray-700/30 text-gray-300'
-                                }`}
-                              size="sm"
-                            >
-                              {choice}: {amount} ({odds}x) {percentage}%
-                            </Chip>
-                          ))}
-
-                          {/* Status */}
-                          <Chip
-                            className={`${prediction.status === "open"
-                              ? "bg-green-500/20 text-green-400"
-                              : "bg-gray-500/20 text-gray-400"
-                              }`}
-                            size="sm"
-                          >
-                            {prediction.status}
-                          </Chip>
-                        </div>
-                      </div>
-                    </div>)
-                })
-              }
-            </div>
-          )}
-
-          <div id="sentinel" className="flex justify-center p-4">
-            {hasMorePredictions && displayedPredictions.length > 0 && (
-              <Spinner size="sm" />
+                <div id="sentinel" className="flex justify-center p-4">
+                  {hasMorePredictions && displayedPredictions.length > 0 && (
+                    <Spinner size="sm" />
+                  )}
+                  {!hasMorePredictions && predictions.length > 0 && (
+                    <p className="text-gray-500">No more predictions to load</p>
+                  )}
+                </div>
+              </section>
             )}
-            {!hasMorePredictions && predictions.length > 0 && (
-              <p className="text-gray-500">No more predictions to load</p>
-            )}
-          </div>
-        </section>
-      )}
+          </>
+      }
     </>
   );
 } 
