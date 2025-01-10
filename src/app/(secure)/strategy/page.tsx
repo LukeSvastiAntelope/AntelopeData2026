@@ -98,10 +98,13 @@ const StrategySkeleton = () => {
                   <Skeleton className="h-5 w-32 rounded-lg mb-2" />
                   <Skeleton className="h-4 w-full rounded-lg" />
                 </CardBody>
+                
               </Card>
+              
             ))}
           </div>
         </CardBody>
+      
       </Card>
 
       {/* Risk Profile Skeleton */}
@@ -191,14 +194,14 @@ export default function StrategyPage() {
             href="/editBasicStrategy"
             as="a"
           >
-            Edit Strategy
+            Edit
           </Button>
         </CardHeader>
         <Divider />
         <CardBody>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <h3 className="text-default-500 mb-2">Main Category</h3>
+            <h3 className="text-default-500 mb-2">Main Category</h3>
               <Chip color="primary" variant="flat">
                 {agent?.category
                   ? CATEGORIES.find(
@@ -208,18 +211,23 @@ export default function StrategyPage() {
                   : "General"}
               </Chip>
             </div>
+            
             <div>
               <h3 className="text-default-500 mb-2">Resolution Preference</h3>
-              <p className="text-lg font-semibold">{resolutionDate}</p>
+              <p className="text-base font-semibold">{resolutionDate}</p>
             </div>
+            
           </div>
         </CardBody>
 
+        <Divider />
+
         {/* Core Interests */}
 
-        <CardHeader className="text-medium font-regular">Sub-category Interests</CardHeader>
-        <Divider />
+       
+       
         <CardBody>
+        <CardHeader className="text-medium font-regular px-0 pt-0 text-default-500">Sub-category Interests</CardHeader>
           <div className="flex flex-wrap gap-2">
             {agent?.interests && agent?.interests.length > 0 ? (
               agent?.interests.map((interest) => (
@@ -233,9 +241,11 @@ export default function StrategyPage() {
           </div>
         </CardBody>
       </Card>
-      <Divider />
+
+    
+
       {/* Betting Principles */}
-      <Card className="mb-8 max-w-[1024px] bg-content0">
+      <Card className="mb-8 bg-content0">
         <CardHeader className="text-medium font-regular flex justify-between">
           Betting Principles
           <Button
@@ -245,7 +255,7 @@ export default function StrategyPage() {
             href="/editPrinciples"
             as="a"
           >
-            Edit Principles
+            Edit
           </Button>
         </CardHeader>
         <Divider />
@@ -253,17 +263,23 @@ export default function StrategyPage() {
           <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
             {agent?.principles && agent?.principles.length > 0 ? (
               agent?.principles.map((principle) => (
+                
                 <PrincipleCard
                   key={principle.title}
                   title={principle.title}
                   description={principle.description}
+                  
                 />
+         
               ))
+              
             ) : (
               <p className="text-default-500">No principles added.</p>
             )}
           </div>
+          
         </CardBody>
+        
       </Card>
 
       {/* Risk Profile */}
@@ -277,7 +293,7 @@ export default function StrategyPage() {
             href="/editRiskStrategy"
             as="a"
           >
-            Edit Risk Profile
+            Edit
           </Button>
         </CardHeader>
         <Divider />

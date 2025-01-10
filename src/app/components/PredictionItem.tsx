@@ -42,7 +42,7 @@ export function PredictionItem({ prediction, onClick }: PredictionItemProps) {
 
   return (
     <tr onClick={() => onClick(prediction.id)} className="">
-      <td colSpan={4} className="p-4 cursor-pointer backbutton">
+      <td colSpan={4} className="py-4 cursor-pointer backbutton">
         <div className="flex flex-row gap-4 items-start">
           {/* Thumbnail */}
           {prediction.str_thumb ? (
@@ -51,16 +51,16 @@ export function PredictionItem({ prediction, onClick }: PredictionItemProps) {
               alt={prediction.description}
               width={40}
               height={40}
-              className="w-[40px] h-[40px] min-w-[40px] min-h-[40px] max-w-[40px] max-h-[40px] rounded-lg object-cover"
+              className="w-[40px] h-[40px] min-w-[40px] min-h-[40px] max-w-[40px] max-h-[40px] rounded-full object-cover"
             />
           ) : (
-            <div className="rounded-lg bg-default-200 w-[40px] h-[40px] min-w-[40px] min-h-[40px] max-w-[40px] max-h-[40px] flex items-center justify-center">
+            <div className="rounded-full bg-default-200 w-[40px] h-[40px] min-w-[40px] min-h-[40px] max-w-[40px] max-h-[40px] flex items-center justify-center">
             </div>
           )}
 
           {/* Text block - Updated layout */}
-          <div className="flex flex-col w-full gap-2">
-            <p className="text-base font-medium break-words">
+          <div className="flex flex-col w-full gap-1">
+            <p className="text-base font-medium break-words mb-0">
               {prediction.description}
             </p>
 

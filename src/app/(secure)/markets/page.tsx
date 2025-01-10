@@ -240,6 +240,9 @@ export default function MarketsPage() {
 
       {/* Tabs */}
       <div className="flex gap-2 font-kodemono text-small">
+        
+        
+        
         <button
           onClick={() => setActiveTab("predictions")}
           className={`px-1 py-2 hover:text-white ${activeTab === "predictions" ? "text-white" : "text-gray-700"
