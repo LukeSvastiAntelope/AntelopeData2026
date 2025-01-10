@@ -12,7 +12,6 @@ import { FaRocket, FaDatabase, FaChartLine, FaShieldAlt } from "react-icons/fa";
 import { useFetch } from "@/app/utils/lib";
 import { IAgentProfile } from "@/app/utils/interface";
 
-
 // ------------- ADDED: Chart.js imports -------------
 import {
   Chart as ChartJS,
@@ -355,355 +354,366 @@ export default function Dashboard() {
         {/* <div className="home hidden md:inline-block"></div> */}
       </div>
 
-      {/* Stats Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-small">
-        <Link href="/bets">
-          <StatCard icon={<FaRocket />} title="Bets" value={totalBets.toString()}
-            className="border border-white/10" />
-        </Link>
-        <Link href="/predictions">
-          <StatCard
-            icon={<FaDatabase />}
-            title="Predictions"
-            value={totalPredictions.toString()}
-          />
-        </Link>
-        <StatCard
-          icon={<FaChartLine />}
-          title="Success"
-          value={`${Number(successRate || 0).toFixed(2)}%`}
-        />
-        <StatCard
-          icon={<FaShieldAlt />}
-          title="Bet Size"
-          value={`${agent?.maxBetSize || 0}`}
+      {
+        (!agent?.principles || agent.principles.length == 0 || !agent.interests || agent.interests.length == 0) ?
+          <div className="flex flex-col items-center justify-center h-full">
+            <p>Please set your principles and interests in your profile to see your stats.</p>
+            <Button color="primary" variant="flat" onPress={() => router.push("/strategy")}>
+              Set Principles and Interests
+            </Button>
+          </div> :
+          <>
+            {/* Stats Overview */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-small">
+              <Link href="/bets">
+                <StatCard icon={<FaRocket />} title="Bets" value={totalBets.toString()}
+                  className="border border-white/10" />
+              </Link>
+              <Link href="/predictions">
+                <StatCard
+                  icon={<FaDatabase />}
+                  title="Predictions"
+                  value={totalPredictions.toString()}
+                />
+              </Link>
+              <StatCard
+                icon={<FaChartLine />}
+                title="Success"
+                value={`${Number(successRate || 0).toFixed(2)}%`}
+              />
+              <StatCard
+                icon={<FaShieldAlt />}
+                title="Bet Size"
+                value={`${agent?.maxBetSize || 0}`}
 
-        />
-      </div>
-
-      {/* Graphs */}
-      <div className="my-6 w-full hidden md:inline-block" style={{ height: "200px", width: "100%" }}>
-        {bets && bets.length > 0 ? (
-          <Scatter
-            data={scatterData}
-            options={scatterOptions}
-          />
-        ) : (
-          <p>No bets to display in graph.</p>
-        )}
-      </div>
-
-      {/* The rest of your existing code remains the same */}
-      {/* Tabs, bet list, predictions list, etc. */}
-      <div className="flex gap-4 mb-4 mt-4 font-kodemono">
-        <Button
-          color={activeTab === "bets" ? "primary" : "default"}
-          variant="flat"
-          onPress={() => setActiveTab("bets")}
-        >
-          Bets
-        </Button>
-        <Button
-          color={activeTab === "predictions" ? "primary" : "default"}
-          variant="flat"
-          onPress={() => setActiveTab("predictions")}
-        >
-          Predictions
-        </Button>
-      </div>
-
-      {/* BETS TAB */}
-      {activeTab === "bets" && (
-        <section className="rounded-lg overflow-x-auto">
-          <div className="flex items-center relative mb-4">
-            <span className="absolute inset-y-0 left-0 flex items-center pl-2 pointer-events-none">
-              {/* Search Icon */}
-              <svg
-                aria-hidden="true"
-                className="w-5 h-5 text-gray-700"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                viewBox="0 0 24 24"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <circle cx="10" cy="10" r="7"></circle>
-                <path d="M21 21l-4.35-4.35"></path>
-              </svg>
-            </span>
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={handleBetSearch}
-              placeholder="Search bets..."
-              className="w-full p-2 pl-9 rounded-md text-gray-500 focus:outline-none text-small input-search bg-gray-800 placeholder-gray-700"
-            />
-          </div>
-
-          {isLoadingBets && bets.length === 0 && (
-            <div className="flex justify-center items-center py-8">
-              <Spinner size="lg" />
+              />
             </div>
-          )}
-          {!isLoadingBets && bets.length === 0 && (
-            <div className="text-center text-gray-500 py-8">
-              No bets found
+
+            {/* Graphs */}
+            <div className="my-6 w-full hidden md:inline-block" style={{ height: "200px", width: "100%" }}>
+              {bets && bets.length > 0 ? (
+                <Scatter
+                  data={scatterData}
+                  options={scatterOptions}
+                />
+              ) : (
+                <p>No bets to display in graph.</p>
+              )}
             </div>
-          )}
 
-          {bets.length > 0 && (
-            <table className="w-full text-sm text-left">
-              <tbody>
-                {filterBets(bets, searchTerm).map((bet, index) => (
-                  <tr
-                    key={index}
-                    className="transition-colors0"
-                    onClick={() => router.push(`/bets/${bet.bet_id}`)}
-                  >
-                    <td colSpan={5} className="p-2 backbutton cursor-pointer">
-                      <div className="flex flex-row gap-4 items-start">
-                        {bet.str_thumb ? (
-                          <Image
-                            src={bet.str_thumb}
-                            alt={bet.description}
-                            width={40}
-                            height={40}
-                            className="w-[40px] h-[40px] rounded-full max-w-[40px] max-h-[40px] min-w-[40px] min-h-[40px]"
-                          />
-                        ) : (
-                          <div className="w-[40px] h-[40px] rounded-full max-w-[40px] max-h-[40px] min-w-[40px] min-h-[40px] bg-gray-700"></div>
-                        )}
-                        <div className="flex flex-col md:flex-row gap-2 items-start w-full">
-                          <p className="break-words w-full text-base">{bet.description}</p>
-                          <div className="flex flex-row md:flex-row gap-2 items-start sm:items-start">
-                            <span className="icon-coin icon-text">
-                              {bet.amount}
-                            </span>
-                            <Chip
-                              color="primary"
-                              variant="flat"
-                              size="sm"
-                            >
-                              Yes: {bet.yes_bets.reduce((acc, bet) => acc + bet.amount, 0)} (
-                              {(() => {
-                                const yesTotal = bet.yes_bets.reduce((acc, bet) => acc + bet.amount, 0);
-                                const noTotal = bet.no_bets?.reduce((acc, bet) => acc + bet.amount, 0) || 0;
-                                const total = yesTotal + noTotal;
-                                const percentage = total > 0 ? (yesTotal / total) * 100 : 0;
-                                const decimalOdds = percentage > 0 ? (100 / percentage).toFixed(2) : "∞";
-                                return `${decimalOdds}x`;
-                              })()})
-                            </Chip>
-                            <Chip
-                              color="secondary"
-                              variant="flat"
-                              size="sm"
-                            >
-                              No: {bet.no_bets.reduce((acc, bet) => acc + bet.amount, 0)} (
-                              {(() => {
-                                const yesTotal = bet.yes_bets?.reduce((acc, bet) => acc + bet.amount, 0) || 0;
-                                const noTotal = bet.no_bets.reduce((acc, bet) => acc + bet.amount, 0);
-                                const total = yesTotal + noTotal;
-                                const percentage = total > 0 ? (noTotal / total) * 100 : 0;
-                                const decimalOdds = percentage > 0 ? (100 / percentage).toFixed(2) : "∞";
-                                return `${decimalOdds}x`;
-                              })()})
-                            </Chip>
-                            <Chip
-                              color={
-                                bet.status !== "open"
-                                  ? bet.outcome === bet.choice
-                                    ? "success"
-                                    : "danger"
-                                  : "primary"
-                              }
-                              variant="flat"
-                              size="sm"
-                            >
-                              {bet.status === "resolved"
-                                ? bet.outcome === bet.choice
-                                  ? "Won"
-                                  : "Lost"
-                                : bet.status == "awaiting_confirmation"
-                                  ? "Awaiting"
-                                  : bet.status}
-                            </Chip>
-                          </div>
-                        </div>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-
-          {/* Show More */}
-          {hasMoreBets && !isLoadingBets && bets.length > 0 && (
-            <div className="flex justify-center mt-4">
+            {/* The rest of your existing code remains the same */}
+            {/* Tabs, bet list, predictions list, etc. */}
+            <div className="flex gap-4 mb-4 mt-4 font-kodemono">
               <Button
-                color="primary"
+                color={activeTab === "bets" ? "primary" : "default"}
                 variant="flat"
-                onPress={loadMoreBets}
-                isLoading={isLoadingBets}
-                className="min-w-[200px]"
+                onPress={() => setActiveTab("bets")}
               >
-                {isLoadingBets ? "Loading..." : "Show More"}
+                Bets
+              </Button>
+              <Button
+                color={activeTab === "predictions" ? "primary" : "default"}
+                variant="flat"
+                onPress={() => setActiveTab("predictions")}
+              >
+                Predictions
               </Button>
             </div>
-          )}
-          {isLoadingBets && bets.length > 0 && (
-            <div className="flex justify-center items-center py-4">
-              <Spinner size="sm" />
-            </div>
-          )}
-          {!hasMoreBets && bets.length > 0 && (
-            <div className="text-center text-gray-500 py-4">
-              No more bets to load
-            </div>
-          )}
-        </section>
-      )}
 
-      {/* Predictions */}
-      {activeTab === "predictions" && (
-        <section className="rounded-lg overflow-x-auto mb-8">
-          <div className="flex items-center relative mb-4">
-            <span className="absolute inset-y-0 left-0 flex items-center pl-2 pointer-events-none">
-              {/* Search Icon */}
-              <svg
-                aria-hidden="true"
-                className="w-5 h-5 text-gray-700"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                viewBox="0 0 24 24"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <circle cx="10" cy="10" r="7"></circle>
-                <path d="M21 21l-4.35-4.35"></path>
-              </svg>
-            </span>
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={handlePredictionSearch}
-              placeholder="Search predictions..."
-              className="w-full p-2 pl-9 rounded-md text-gray-700 focus:outline-none text-small input-search bg-gray-800 placeholder-gray-700"
-            />
-          </div>
-
-          {isLoadingPredictions && predictions.length === 0 && (
-            <div className="flex justify-center items-center py-8">
-              <Spinner size="lg" />
-            </div>
-          )}
-          {displayedPredictions.length === 0 && !isLoadingPredictions && (
-            <div className="text-center text-gray-500 py-8">
-              No predictions found
-            </div>
-          )}
-
-          {displayedPredictions.length > 0 && (
-            <section className="rounded-lg overflow-x-auto mb-8">
-              <table className="w-full text-sm text-left">
-                <tbody>
-                  {displayedPredictions.map((prediction, index) => (
-                    <tr
-                      key={index}
-                      className="cursor-pointer backbutton"
-                      onClick={() => router.push(`/predictions/${prediction.id}`)}
+            {/* BETS TAB */}
+            {activeTab === "bets" && (
+              <section className="rounded-lg overflow-x-auto">
+                <div className="flex items-center relative mb-4">
+                  <span className="absolute inset-y-0 left-0 flex items-center pl-2 pointer-events-none">
+                    {/* Search Icon */}
+                    <svg
+                      aria-hidden="true"
+                      className="w-5 h-5 text-gray-700"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      viewBox="0 0 24 24"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
                     >
-                      <td colSpan={5} className="p-2 backbutton cursor-pointer mb-4">
-                        <div className="flex flex-row gap-4 items-start">
-                          {prediction.str_thumb ? (
-                            <Image
-                              src={prediction.str_thumb}
-                              alt={prediction.description}
-                              width={40}
-                              height={40}
-                              className="w-[40px] h-[40px] min-w-[40px] min-h-[40px] rounded-full"
-                            />
-                          ) : (
-                            <div className="w-[40px] h-[40px] min-w-[40px] min-h-[40px] rounded-full bg-gray-700"></div>
-                          )}
-                          <div className="flex flex-col w-full md:flex-row gap-2 items-start">
-                            <p className="break-words text-base w-full">
-                              {prediction.description}
-                            </p>
-                            <div className="flex flex-row gap-2 items-start sm:items-start">
-                              {/* <span className="text-default-400">
+                      <circle cx="10" cy="10" r="7"></circle>
+                      <path d="M21 21l-4.35-4.35"></path>
+                    </svg>
+                  </span>
+                  <input
+                    type="text"
+                    value={searchTerm}
+                    onChange={handleBetSearch}
+                    placeholder="Search bets..."
+                    className="w-full p-2 pl-9 rounded-md text-gray-500 focus:outline-none text-small input-search bg-gray-800 placeholder-gray-700"
+                  />
+                </div>
+
+                {isLoadingBets && bets.length === 0 && (
+                  <div className="flex justify-center items-center py-8">
+                    <Spinner size="lg" />
+                  </div>
+                )}
+                {!isLoadingBets && bets.length === 0 && (
+                  <div className="text-center text-gray-500 py-8">
+                    No bets found
+                  </div>
+                )}
+
+                {bets.length > 0 && (
+                  <table className="w-full text-sm text-left">
+                    <tbody>
+                      {filterBets(bets, searchTerm).map((bet, index) => (
+                        <tr
+                          key={index}
+                          className="transition-colors0"
+                          onClick={() => router.push(`/bets/${bet.bet_id}`)}
+                        >
+                          <td colSpan={5} className="p-2 backbutton cursor-pointer">
+                            <div className="flex flex-row gap-4 items-start">
+                              {bet.str_thumb ? (
+                                <Image
+                                  src={bet.str_thumb}
+                                  alt={bet.description}
+                                  width={40}
+                                  height={40}
+                                  className="w-[40px] h-[40px] rounded-full max-w-[40px] max-h-[40px] min-w-[40px] min-h-[40px]"
+                                />
+                              ) : (
+                                <div className="w-[40px] h-[40px] rounded-full max-w-[40px] max-h-[40px] min-w-[40px] min-h-[40px] bg-gray-700"></div>
+                              )}
+                              <div className="flex flex-col md:flex-row gap-2 items-start w-full">
+                                <p className="break-words w-full text-base">{bet.description}</p>
+                                <div className="flex flex-row md:flex-row gap-2 items-start sm:items-start">
+                                  <span className="icon-coin icon-text">
+                                    {bet.amount}
+                                  </span>
+                                  <Chip
+                                    color="primary"
+                                    variant="flat"
+                                    size="sm"
+                                  >
+                                    Yes: {bet.yes_bets.reduce((acc, bet) => acc + bet.amount, 0)} (
+                                    {(() => {
+                                      const yesTotal = bet.yes_bets.reduce((acc, bet) => acc + bet.amount, 0);
+                                      const noTotal = bet.no_bets?.reduce((acc, bet) => acc + bet.amount, 0) || 0;
+                                      const total = yesTotal + noTotal;
+                                      const percentage = total > 0 ? (yesTotal / total) * 100 : 0;
+                                      const decimalOdds = percentage > 0 ? (100 / percentage).toFixed(2) : "∞";
+                                      return `${decimalOdds}x`;
+                                    })()})
+                                  </Chip>
+                                  <Chip
+                                    color="secondary"
+                                    variant="flat"
+                                    size="sm"
+                                  >
+                                    No: {bet.no_bets.reduce((acc, bet) => acc + bet.amount, 0)} (
+                                    {(() => {
+                                      const yesTotal = bet.yes_bets?.reduce((acc, bet) => acc + bet.amount, 0) || 0;
+                                      const noTotal = bet.no_bets.reduce((acc, bet) => acc + bet.amount, 0);
+                                      const total = yesTotal + noTotal;
+                                      const percentage = total > 0 ? (noTotal / total) * 100 : 0;
+                                      const decimalOdds = percentage > 0 ? (100 / percentage).toFixed(2) : "∞";
+                                      return `${decimalOdds}x`;
+                                    })()})
+                                  </Chip>
+                                  <Chip
+                                    color={
+                                      bet.status !== "open"
+                                        ? bet.outcome === bet.choice
+                                          ? "success"
+                                          : "danger"
+                                        : "primary"
+                                    }
+                                    variant="flat"
+                                    size="sm"
+                                  >
+                                    {bet.status === "resolved"
+                                      ? bet.outcome === bet.choice
+                                        ? "Won"
+                                        : "Lost"
+                                      : bet.status == "awaiting_confirmation"
+                                        ? "Awaiting"
+                                        : bet.status}
+                                  </Chip>
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+
+                {/* Show More */}
+                {hasMoreBets && !isLoadingBets && bets.length > 0 && (
+                  <div className="flex justify-center mt-4">
+                    <Button
+                      color="primary"
+                      variant="flat"
+                      onPress={loadMoreBets}
+                      isLoading={isLoadingBets}
+                      className="min-w-[200px]"
+                    >
+                      {isLoadingBets ? "Loading..." : "Show More"}
+                    </Button>
+                  </div>
+                )}
+                {isLoadingBets && bets.length > 0 && (
+                  <div className="flex justify-center items-center py-4">
+                    <Spinner size="sm" />
+                  </div>
+                )}
+                {!hasMoreBets && bets.length > 0 && (
+                  <div className="text-center text-gray-500 py-4">
+                    No more bets to load
+                  </div>
+                )}
+              </section>
+            )}
+
+            {/* Predictions */}
+            {activeTab === "predictions" && (
+              <section className="rounded-lg overflow-x-auto mb-8">
+                <div className="flex items-center relative mb-4">
+                  <span className="absolute inset-y-0 left-0 flex items-center pl-2 pointer-events-none">
+                    {/* Search Icon */}
+                    <svg
+                      aria-hidden="true"
+                      className="w-5 h-5 text-gray-700"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      viewBox="0 0 24 24"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <circle cx="10" cy="10" r="7"></circle>
+                      <path d="M21 21l-4.35-4.35"></path>
+                    </svg>
+                  </span>
+                  <input
+                    type="text"
+                    value={searchTerm}
+                    onChange={handlePredictionSearch}
+                    placeholder="Search predictions..."
+                    className="w-full p-2 pl-9 rounded-md text-gray-700 focus:outline-none text-small input-search bg-gray-800 placeholder-gray-700"
+                  />
+                </div>
+
+                {isLoadingPredictions && predictions.length === 0 && (
+                  <div className="flex justify-center items-center py-8">
+                    <Spinner size="lg" />
+                  </div>
+                )}
+                {displayedPredictions.length === 0 && !isLoadingPredictions && (
+                  <div className="text-center text-gray-500 py-8">
+                    No predictions found
+                  </div>
+                )}
+
+                {displayedPredictions.length > 0 && (
+                  <section className="rounded-lg overflow-x-auto mb-8">
+                    <table className="w-full text-sm text-left">
+                      <tbody>
+                        {displayedPredictions.map((prediction, index) => (
+                          <tr
+                            key={index}
+                            className="cursor-pointer backbutton"
+                            onClick={() => router.push(`/predictions/${prediction.id}`)}
+                          >
+                            <td colSpan={5} className="p-2 backbutton cursor-pointer mb-4">
+                              <div className="flex flex-row gap-4 items-start">
+                                {prediction.str_thumb ? (
+                                  <Image
+                                    src={prediction.str_thumb}
+                                    alt={prediction.description}
+                                    width={40}
+                                    height={40}
+                                    className="w-[40px] h-[40px] min-w-[40px] min-h-[40px] rounded-full"
+                                  />
+                                ) : (
+                                  <div className="w-[40px] h-[40px] min-w-[40px] min-h-[40px] rounded-full bg-gray-700"></div>
+                                )}
+                                <div className="flex flex-col w-full md:flex-row gap-2 items-start">
+                                  <p className="break-words text-base w-full">
+                                    {prediction.description}
+                                  </p>
+                                  <div className="flex flex-row gap-2 items-start sm:items-start">
+                                    {/* <span className="text-default-400">
                                   {prediction.resolution_date
                                     ? format(new Date(prediction.resolution_date), "MM/dd/yy")
                                     : ""}
                                 </span> */}
-                              <span className="icon-user text-primary">
-                                {prediction.bets_count}
-                              </span>
-                              <Chip
-                                color="primary"
-                                variant="flat"
-                                size="sm"
-                              >
-                                Yes: {prediction.yes_total_amount} ({(() => {
-                                  const total = Number(prediction.yes_total_amount) + Number(prediction.no_total_amount);
-                                  const percentage = total > 0 ? (Number(prediction.yes_total_amount) / total) * 100 : 0;
-                                  const decimalOdds = percentage > 0 ? (100 / percentage).toFixed(2) : "∞";
-                                  return `${decimalOdds}x`;
-                                })()})
-                              </Chip>
-                              <Chip
-                                color="secondary"
-                                variant="flat"
-                                size="sm"
-                              >
-                                No: {prediction.no_total_amount} ({(() => {
-                                  const total = Number(prediction.yes_total_amount) + Number(prediction.no_total_amount);
-                                  const percentage = total > 0 ? (Number(prediction.no_total_amount) / total) * 100 : 0;
-                                  const decimalOdds = percentage > 0 ? (100 / percentage).toFixed(2) : "∞";
-                                  return `${decimalOdds}x`;
-                                })()})
-                              </Chip>
-                              <Chip
-                                color={
-                                  prediction.status === "open"
-                                    ? "primary"
-                                    : "secondary"
-                                }
-                                variant="flat"
-                                size="sm"
-                              >
-                                {prediction.status === "resolved"
-                                  ? prediction.outcome === prediction.creator_choice
-                                    ? "Win"
-                                    : "Loss"
-                                  : prediction.status === "open"
-                                    ? "Open"
-                                    : "Awaiting"}
-                              </Chip>
-                            </div>
-                          </div>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </section>
-          )}
+                                    <span className="icon-user text-primary">
+                                      {prediction.bets_count}
+                                    </span>
+                                    <Chip
+                                      color="primary"
+                                      variant="flat"
+                                      size="sm"
+                                    >
+                                      Yes: {prediction.yes_total_amount} ({(() => {
+                                        const total = Number(prediction.yes_total_amount) + Number(prediction.no_total_amount);
+                                        const percentage = total > 0 ? (Number(prediction.yes_total_amount) / total) * 100 : 0;
+                                        const decimalOdds = percentage > 0 ? (100 / percentage).toFixed(2) : "∞";
+                                        return `${decimalOdds}x`;
+                                      })()})
+                                    </Chip>
+                                    <Chip
+                                      color="secondary"
+                                      variant="flat"
+                                      size="sm"
+                                    >
+                                      No: {prediction.no_total_amount} ({(() => {
+                                        const total = Number(prediction.yes_total_amount) + Number(prediction.no_total_amount);
+                                        const percentage = total > 0 ? (Number(prediction.no_total_amount) / total) * 100 : 0;
+                                        const decimalOdds = percentage > 0 ? (100 / percentage).toFixed(2) : "∞";
+                                        return `${decimalOdds}x`;
+                                      })()})
+                                    </Chip>
+                                    <Chip
+                                      color={
+                                        prediction.status === "open"
+                                          ? "primary"
+                                          : "secondary"
+                                      }
+                                      variant="flat"
+                                      size="sm"
+                                    >
+                                      {prediction.status === "resolved"
+                                        ? prediction.outcome === prediction.creator_choice
+                                          ? "Win"
+                                          : "Loss"
+                                        : prediction.status === "open"
+                                          ? "Open"
+                                          : "Awaiting"}
+                                    </Chip>
+                                  </div>
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </section>
+                )}
 
-          <div id="sentinel" className="flex justify-center p-4">
-            {hasMorePredictions && displayedPredictions.length > 0 && (
-              <Spinner size="sm" />
+                <div id="sentinel" className="flex justify-center p-4">
+                  {hasMorePredictions && displayedPredictions.length > 0 && (
+                    <Spinner size="sm" />
+                  )}
+                  {!hasMorePredictions && predictions.length > 0 && (
+                    <p className="text-gray-500">No more predictions to load</p>
+                  )}
+                </div>
+              </section>
             )}
-            {!hasMorePredictions && predictions.length > 0 && (
-              <p className="text-gray-500">No more predictions to load</p>
-            )}
-          </div>
-        </section>
-      )}
+          </>
+      }
     </>
   );
 } 
