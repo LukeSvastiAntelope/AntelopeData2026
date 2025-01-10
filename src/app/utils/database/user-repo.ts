@@ -129,7 +129,7 @@ async function getAgentById(id: number) {
     return rows[0];
 }
 
-async function getOpenPredictions(agent_id: number) {
+async function getOpenPredictions(agent_id: number, category: string) {
     const db = await getMySQLConnection();
     const [rows] = await db.execute(`
         SELECT 
@@ -139,11 +139,11 @@ async function getOpenPredictions(agent_id: number) {
             COUNT(CASE WHEN bets.agent_id = ? THEN 1 END) as agent_bet_count
         FROM predictions 
         LEFT JOIN bets ON predictions.id = bets.prediction_id 
-        WHERE predictions.status = 'open' AND predictions.group_info = ''
+        WHERE predictions.status = 'open' AND predictions.group_info = '' AND predictions.source = ?
         GROUP BY predictions.id
         HAVING agent_bet_count < 2
         ORDER BY predictions.created_at DESC`,
-        [agent_id]
+        [agent_id, category]
     );
     return rows;
 }

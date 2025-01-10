@@ -11,7 +11,14 @@ export async function GET(req: NextRequest) {
         if (!agent) {
             return Response.json({ status: false, message: 'Agent not found' });
         }
-        const predictions = await UserRepo.getOpenPredictions(Number(agent_id));
+        const category = agent.category == "crypto" ?
+            "coinmarketcap" :
+            agent.category == "markets" ? 
+            "google_finance" :
+            agent.category == "general" ?
+            "google_news" :
+            "sportDB";
+        const predictions = await UserRepo.getOpenPredictions(Number(agent_id), category);
 
         if (typeof agent.interests === 'string') {
             agent.interests = agent.interests.split(',');
@@ -27,7 +34,7 @@ export async function GET(req: NextRequest) {
             console.log("Error in principles: ", e);
             agent.principles = [];
         }
-        
+
         const agentBets = await automaticBettingOnList(agent, predictions as Prediction[]);
         return Response.json({ status: true, bets: agentBets });
     } catch (error) {
