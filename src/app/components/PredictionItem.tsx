@@ -1,6 +1,7 @@
 import { Image } from "@nextui-org/image";
 import { Chip } from "@nextui-org/chip";
-import { IPrediction } from "@/app/utils/interface";
+import { IBet, IPrediction } from "@/app/utils/interface";
+import { useState, useEffect } from "react";
 
 interface PredictionItemProps {
   prediction: IPrediction;
@@ -8,6 +9,37 @@ interface PredictionItemProps {
 }
 
 export function PredictionItem({ prediction, onClick }: PredictionItemProps) {
+  const [choiceOdds, setChoiceOdds] = useState<{ choice: string, amount: number, odds: string, percentage: string, count: number }[]>([]);
+
+  useEffect(() => {
+    if (prediction?.agent_bets) {
+      const betsArray: IBet[] = prediction.agent_bets;
+      const choiceTotals = betsArray.reduce((acc, b) => {
+        if (!b) {
+          return acc;
+        }
+        acc[b.choice] = (acc[b.choice] || 0) + b.amount;
+        return acc;
+      }, {} as Record<string, number>) || {};
+
+      const totalAmount = Object.values(choiceTotals).reduce((sum, amount) => sum + amount, 0);
+
+      // Calculate odds for each choice
+      const newChoiceOdds = Object.entries(choiceTotals).map(([choice, amount]) => {
+        const percentage = totalAmount > 0 ? (amount / totalAmount) * 100 : 0;
+        const odds = percentage > 0 ? (100 / percentage).toFixed(2) : "∞";
+        return {
+          choice,
+          amount,
+          odds,
+          percentage: percentage.toFixed(1),
+          count: betsArray.filter(bet => bet && bet.choice === choice).length
+        };
+      });
+      setChoiceOdds(newChoiceOdds);
+    }
+  }, [prediction?.agent_bets]);
+
   return (
     <tr onClick={() => onClick(prediction.id)} className="">
       <td colSpan={4} className="p-4 cursor-pointer backbutton">
@@ -35,32 +67,23 @@ export function PredictionItem({ prediction, onClick }: PredictionItemProps) {
             <div className="flex flex-wrap gap-4 items-center text-sm">
               <div className="flex items-center gap-1 text-default-500">
                 <span className="icon-user text-primary pl-4">{prediction.bets_count}</span>
-               
-                <span className="text-danger">{prediction.yes_amount}</span>
-                <span className="px-0 mx-0">/</span>
-                <span className="text-success">{prediction.no_amount}</span>
 
-                {/* Decimal odds for both YES and NO */}
-                <span className="pl-2">
-                  {(() => {
-                    const total = (Number(prediction.yes_amount) || 0) + (Number(prediction.no_amount) || 0);
-                    const yesPercentage = total > 0 ? (Number(prediction.yes_amount) || 0) / total * 100 : 0;
-                    const noPercentage = total > 0 ? (Number(prediction.no_amount) || 0) / total * 100 : 0;
-                    const yesOdds = yesPercentage > 0 ? (100 / yesPercentage).toFixed(2) : "∞";
-                    const noOdds = noPercentage > 0 ? (100 / noPercentage).toFixed(2) : "∞";
-                    return `(${yesOdds}x/${noOdds}x)`;
-                  })()}
-                </span>
+                {/* Market Odds */}
+                {choiceOdds.map(({ choice, amount, odds, percentage }) => (
+                  <Chip
+                    key={choice}
+                    className={`${choice === prediction.creator_choice
+                      ? 'bg-primary/20 text-primary-500'
+                      : 'bg-gray-700/30 text-gray-300'
+                      }`}
+                    size="sm"
+                  >
+                    {choice}: {amount} ({odds}x) {percentage}%
+                  </Chip>
+                ))}
               </div>
 
               <div className="flex items-center gap-2">
-                {/* <span className="text-default-400">
-                  {formatDate(
-                    prediction.resolution_date || prediction.created_at,
-                    "MM/dd/yy"
-                  )}
-                </span> */}
-
                 <Chip
                   color={
                     prediction.status !== "open"

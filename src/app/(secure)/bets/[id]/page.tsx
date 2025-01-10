@@ -64,6 +64,79 @@ const parseLogEntries = (logString: string) => {
     }).filter(Boolean);
 };
 
+const MarketOddsBar = ({ 
+    percentage, 
+    question, 
+    showOptions = false,
+    count,
+    odds,
+    amount
+}: { 
+    percentage: number, 
+    question: string, 
+    showOptions?: boolean,
+    count: number,
+    odds: string,
+    amount: number
+}) => {
+    const bgColor = percentage >= 90 ? "bg-orange-400/90" : 
+                    percentage >= 80 ? "bg-emerald-400/90" : 
+                    percentage >= 70 ? "bg-blue-400/90" : "bg-red-400/90";
+
+    return (
+        <div className="w-full mb-4">
+            <div className="relative w-full bg-white/5 rounded-lg overflow-hidden p-4">
+                {/* Progress bar */}
+                <div className="h-2 w-full bg-white/10 rounded-full mb-3">
+                    <div 
+                        className={`h-full ${bgColor} rounded-full transition-all duration-500`}
+                        style={{ width: `${percentage}%` }}
+                    />
+                </div>
+                
+                {/* Content */}
+                <div className="flex items-center justify-between">
+                    {/* Left side - Question */}
+                    <div className="flex-1">
+                        <span className="text-sm font-medium text-white">{question}</span>
+                    </div>
+
+                    {/* Right side - Stats */}
+                    <div className="flex items-center gap-6">
+                        <div className="flex flex-col items-end">
+                            <span className="text-xs text-white/60">Probability</span>
+                            <span className="text-sm font-bold text-white">{percentage}%</span>
+                        </div>
+                        <div className="flex flex-col items-end">
+                            <span className="text-xs text-white/60">Odds</span>
+                            <span className="text-sm font-bold text-white">{odds}x</span>
+                        </div>
+                        <div className="flex flex-col items-end">
+                            <span className="text-xs text-white/60">Bets</span>
+                            <span className="text-sm font-bold text-white">{count}</span>
+                        </div>
+                        <div className="flex flex-col items-end">
+                            <span className="text-xs text-white/60">Total</span>
+                            <span className="text-sm font-bold text-white">{amount}</span>
+                        </div>
+                        
+                        {showOptions && (
+                            <div className="flex gap-2 ml-4">
+                                <button className="px-3 py-1.5 bg-white/90 text-black rounded-md text-sm font-medium hover:bg-white transition-colors">
+                                    Yes
+                                </button>
+                                <button className="px-3 py-1.5 bg-white/90 text-black rounded-md text-sm font-medium hover:bg-white transition-colors">
+                                    No
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 export default function BetDetailPage() {
     const params = useParams();
     const router = useRouter();
@@ -74,9 +147,7 @@ export default function BetDetailPage() {
     const [showCommentModal, setShowCommentModal] = useState(false);
     const [newComment, setNewComment] = useState("");
     const fetch = useFetch();
-
-    const [totalYes, setTotalYes] = useState(0);
-    const [totalNo, setTotalNo] = useState(0);
+    const [choiceOdds, setChoiceOdds] = useState<{ choice: string, amount: number, odds: string, percentage: string, count: number }[]>([]);
 
     const handleSaveComment = async () => {
         try {
@@ -110,13 +181,26 @@ export default function BetDetailPage() {
                 // Parse the bets string and calculate totals
                 if (response.prediction?.bets) {
                     const betsArray: BetData[] = response.prediction.bets;
-                    const yesTotal = betsArray.reduce((sum, bet) =>
-                        bet.choice.toLowerCase() === 'yes' ? sum + bet.amount : sum, 0);
-                    const noTotal = betsArray.reduce((sum, bet) =>
-                        bet.choice.toLowerCase() === 'no' ? sum + bet.amount : sum, 0);
+                    const choiceTotals = betsArray.reduce((acc, b) => {
+                        acc[b.choice] = (acc[b.choice] || 0) + b.amount;
+                        return acc;
+                    }, {} as Record<string, number>) || {};
 
-                    setTotalYes(yesTotal);
-                    setTotalNo(noTotal);
+                    const totalAmount = Object.values(choiceTotals).reduce((sum, amount) => sum + amount, 0);
+
+                    // Calculate odds for each choice
+                    const choiceOdds = Object.entries(choiceTotals).map(([choice, amount]) => {
+                        const percentage = totalAmount > 0 ? (amount / totalAmount) * 100 : 0;
+                        const odds = percentage > 0 ? (100 / percentage).toFixed(2) : "∞";
+                        return {
+                            choice,
+                            amount,
+                            odds,
+                            percentage: percentage.toFixed(1),
+                            count: betsArray.filter(bet => bet.choice === choice).length
+                        };
+                    });
+                    setChoiceOdds(choiceOdds);
                 }
             } else {
                 toast.error(response.message);
@@ -213,22 +297,6 @@ export default function BetDetailPage() {
                                                 <Chip color="secondary" className="bg-primary/20">{bet.predicted_outcome || bet.creator_choice}</Chip>
                                             </div>
                                             <div>
-                                                <h3 className="text-sm font-medium text-default-400 mb-1">Yes Votes</h3>
-                                                <p className="text-sm font-semibold">{prediction?.yes_count} ({totalYes})</p>
-                                            </div>
-                                            <div>
-                                                <h3 className="text-sm font-medium text-default-400 mb-1">No Votes</h3>
-                                                <p className="text-sm font-semibold">{prediction?.no_count} ({totalNo})</p>
-                                            </div>
-                                            <div>
-                                                <h3 className="text-sm font-medium text-default-400 mb-1">Odds</h3>
-                                                <p className="text-sm font-semibold">
-                                                    Yes: {totalYes > 0 ? (1 / (totalYes / (totalYes + totalNo || 1))).toFixed(2) : "∞"}x
-                                                    <br />
-                                                    No: {totalNo > 0 ? (1 / (totalNo / (totalYes + totalNo || 1))).toFixed(2) : "∞"}x
-                                                </p>
-                                            </div>
-                                            <div>
                                                 <h3 className="text-sm font-medium text-default-400 mb-1">Validation Source</h3>
                                                 <p className="text-sm font-semibold">{bet.source}</p>
                                             </div>
@@ -250,6 +318,21 @@ export default function BetDetailPage() {
                                     </div>
                                 </div>
                             </div>
+                            {choiceOdds.length > 0 && (
+                                <div className="w-full mt-8 space-y-2">
+                                    <h2 className="text-lg font-semibold mb-4">Market Odds</h2>
+                                    {choiceOdds.map((choice) => (
+                                        <MarketOddsBar
+                                            key={choice.choice}
+                                            percentage={parseFloat(choice.percentage)}
+                                            question={choice.choice}
+                                            count={choice.count}
+                                            odds={choice.odds}
+                                            amount={choice.amount}
+                                        />
+                                    ))}
+                                </div>
+                            )}
                             {prediction?.log && (
                                 <div className="mt-8">
                                     <div className="bg-content0 rounded-lg p-8">

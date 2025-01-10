@@ -188,11 +188,30 @@ async function getBetHistoryByAgentId(id: number, limit: number, offset: number)
                 )
                 FROM bets 
                 WHERE prediction_id = p.id 
-                    AND agent_id != 0 
-                    AND agent_id != ? 
-                    AND choice = 'yes' 
+                    AND agent_id != 0
                     AND is_secret = 0
-            ) as yes_bets,
+            ) as agent_bets
+        FROM bets b 
+        JOIN predictions p ON b.prediction_id = p.id 
+        WHERE b.agent_id = ? AND b.is_secret = 0
+        ORDER BY b.created_at DESC 
+        LIMIT ${limit} OFFSET ${offset}`,
+        [id]
+    );
+
+    // Parse the JSON strings into arrays
+    return rows.map(row => ({
+        ...row,
+        agent_bets: row.agent_bets ? JSON.parse(`[${row.agent_bets}]`) : []
+    }));
+}
+
+
+async function getPredictionsByUserId(id: string) {
+    const db = await getMySQLConnection();
+    const [rows] = await db.execute<(RowDataPacket)[]>(`
+        SELECT 
+            predictions.*,
             (
                 SELECT GROUP_CONCAT(
                     JSON_OBJECT(
@@ -204,25 +223,20 @@ async function getBetHistoryByAgentId(id: number, limit: number, offset: number)
                     )
                 )
                 FROM bets 
-                WHERE prediction_id = p.id 
-                    AND agent_id != 0 
-                    AND agent_id != ? 
-                    AND choice = 'no' 
+                WHERE prediction_id = predictions.id 
+                    AND agent_id != 0
                     AND is_secret = 0
-            ) as no_bets
-        FROM bets b 
-        JOIN predictions p ON b.prediction_id = p.id 
-        WHERE b.agent_id = ? AND b.is_secret = 0
-        ORDER BY b.created_at DESC 
-        LIMIT ${limit} OFFSET ${offset}`,
-        [id, id, id]
+            ) as agent_bets
+        FROM predictions
+        WHERE predictions.creator_id = ? AND predictions.agent_id = 0
+        GROUP BY predictions.id
+        ORDER BY predictions.created_at DESC`,
+        [id]
     );
 
-    // Parse the JSON strings into arrays
     return rows.map(row => ({
         ...row,
-        yes_bets: row.yes_bets ? JSON.parse(`[${row.yes_bets}]`) : [],
-        no_bets: row.no_bets ? JSON.parse(`[${row.no_bets}]`) : []
+        agent_bets: row.agent_bets ? JSON.parse(`[${row.agent_bets}]`) : []
     }));
 }
 
@@ -258,12 +272,9 @@ async function getPredictionById(id: string) {
         const [rows] = await db.execute<(PredictionDB & RowDataPacket)[]>(`
             SELECT 
                 p.*,
-                (SELECT COUNT(*) FROM bets WHERE prediction_id = p.id AND agent_id != 0 AND choice = 'yes' AND is_secret = 1) as yes_count,
-                (SELECT COUNT(*) FROM bets WHERE prediction_id = p.id AND agent_id != 0 AND choice = 'no' AND is_secret = 1) as no_count,
                 JSON_ARRAYAGG(
                     JSON_OBJECT(
                         'id', b.id,
-                        'agent_id', b.agent_id,
                         'amount', b.amount,
                         'choice', b.choice,
                         'reason', IFNULL(b.reason, ''),
@@ -275,7 +286,7 @@ async function getPredictionById(id: string) {
             LEFT JOIN bets b ON p.id = b.prediction_id AND b.is_secret = ?
             WHERE p.id = ?
             GROUP BY p.id`,
-            [1, id]
+            [0, id]
         );
 
         // Handle null bets array
@@ -286,7 +297,7 @@ async function getPredictionById(id: string) {
                 rows[0].bets = rows[0].bets.filter(bet => bet.id !== null);
             }
         }
-        
+
         return rows[0];
     } catch (error) {
         console.error("Error in getPredictionById: ", error);
@@ -307,12 +318,22 @@ async function getBetById(id: string, userId: string) {
 
 async function getPredictionsWithoutAgentId(id: number) {
     const db = await getMySQLConnection();
-    const [rows] = await db.execute(`
+    const [rows] = await db.execute<(RowDataPacket)[]>(`
         SELECT 
             predictions.*, 
             COUNT(DISTINCT CASE WHEN bets.is_secret = 0 THEN bets.id END) as bets_count,
-            SUM(CASE WHEN bets.is_secret = 0 AND bets.choice = 'yes' THEN bets.amount ELSE 0 END) as yes_amount,
-            SUM(CASE WHEN bets.is_secret = 0 AND bets.choice = 'no' THEN bets.amount ELSE 0 END) as no_amount
+            JSON_ARRAYAGG(
+                CASE WHEN bets.is_secret = 0 THEN
+                    JSON_OBJECT(
+                        'id', bets.id,
+                        'amount', bets.amount,
+                        'choice', bets.choice,
+                        'reason', IFNULL(bets.reason, ''),
+                        'pinecone_id', IFNULL(bets.pinecone_id, ''),
+                        'created_at', bets.created_at
+                    )
+                END
+            ) as agent_bets
         FROM predictions 
         LEFT JOIN bets ON predictions.id = bets.prediction_id
         WHERE predictions.agent_id <> ? 
@@ -320,6 +341,8 @@ async function getPredictionsWithoutAgentId(id: number) {
         ORDER BY predictions.created_at DESC`,
         [id]
     );
+
+    // Handle the results safely
     return rows;
 }
 
@@ -350,7 +373,6 @@ async function getSportsData(id: number) {
     const [rows] = await db.execute(`
         SELECT 
             predictions.*, 
-            predictions.*, 
             COUNT(DISTINCT CASE WHEN bets.is_secret = 1 THEN bets.id END) as secret_bets_count,
             COUNT(DISTINCT CASE WHEN bets.is_secret = 0 THEN bets.id END) as public_bets_count,
             GROUP_CONCAT(
@@ -379,24 +401,6 @@ async function getLeaderboard() {
         WHERE bets.is_secret = 0
         GROUP BY agents.id, agents.total_winnings
         ORDER BY agents.total_winnings DESC`
-    );
-    return rows;
-}
-
-async function getPredictionsByUserId(id: string) {
-    const db = await getMySQLConnection();
-    const [rows] = await db.execute(`
-        SELECT 
-            predictions.*, 
-            COUNT(bets.id) as bets_count,
-            SUM(CASE WHEN bets.choice = 'yes' THEN bets.amount ELSE 0 END) as yes_total_amount,
-            SUM(CASE WHEN bets.choice = 'no' THEN bets.amount ELSE 0 END) as no_total_amount
-        FROM predictions 
-        LEFT JOIN bets ON predictions.id = bets.prediction_id
-        WHERE predictions.creator_id = ? AND predictions.agent_id = 0 AND bets.is_secret = 0
-        GROUP BY predictions.id
-        ORDER BY predictions.created_at DESC`,
-        [id]
     );
     return rows;
 }

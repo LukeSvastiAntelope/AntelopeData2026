@@ -303,6 +303,7 @@ export interface IPrediction {
     created_at: string;
     yes_amount?: number;
     no_amount?: number;
+    agent_bets?: IBet[];
 }
 
 export interface ILeaderboardData {
