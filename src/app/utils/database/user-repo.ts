@@ -381,16 +381,17 @@ async function getPredictionsWithoutAgentId(id: number) {
         SELECT 
             predictions.*, 
             COUNT(DISTINCT CASE WHEN bets.is_secret = 0 THEN bets.id END) as bets_count,
-            JSON_ARRAYAGG(
+            GROUP_CONCAT(
+                DISTINCT
                 CASE WHEN bets.is_secret = 0 THEN
-                    JSON_OBJECT(
-                        'id', bets.id,
-                        'amount', bets.amount,
-                        'choice', bets.choice,
-                        'reason', IFNULL(bets.reason, ''),
-                        'pinecone_id', IFNULL(bets.pinecone_id, ''),
-                        'created_at', bets.created_at
-                    )
+                    CONCAT('{',
+                        '"id":', COALESCE(bets.id, 'null'), ',',
+                        '"amount":', COALESCE(bets.amount, 0), ',',
+                        '"choice":"', COALESCE(bets.choice, ''), '",',
+                        '"reason":"', COALESCE(REPLACE(bets.reason, '"', '\\"'), ''), '",',
+                        '"pinecone_id":"', COALESCE(bets.pinecone_id, ''), '",',
+                        '"created_at":"', COALESCE(bets.created_at, ''), '"',
+                    '}')
                 END
             ) as agent_bets
         FROM predictions 
@@ -401,8 +402,20 @@ async function getPredictionsWithoutAgentId(id: number) {
         [id]
     );
 
-    // Handle the results safely
-    return rows;
+    // Parse the GROUP_CONCAT result into an array
+    return rows.map(row => ({
+        ...row,
+        agent_bets: row.agent_bets 
+            ? row.agent_bets.split(',').filter(Boolean).map(bet => {
+                try {
+                    return JSON.parse(bet);
+                } catch (e) {
+                    console.error('Failed to parse bet:', bet);
+                    return null;
+                }
+              }).filter(bet => bet !== null)
+            : []
+    }));
 }
 
 async function getGeneralData(id: number) {
@@ -453,12 +466,45 @@ async function getLeaderboard() {
     const db = await getMySQLConnection();
     const [rows] = await db.execute(`
         SELECT 
-            agents.*,
+            agents.id,
+            agents.user_id,
+            agents.name,
+            agents.description,
+            agents.maxBetSize,
+            agents.interests,
+            agents.riskLevel,
+            agents.conservativeBetSize,
+            agents.moderateBetSize,
+            agents.aggressiveBetSize,
+            agents.principles,
+            agents.image,
+            agents.maxTimelineLimit,
+            agents.category,
+            agents.wallet_balance,
+            agents.nft_address,
+            agents.total_winnings,
             COUNT(DISTINCT bets.id) as bets_count
         FROM agents 
         LEFT JOIN bets ON agents.id = bets.agent_id
         WHERE bets.is_secret = 0
-        GROUP BY agents.id, agents.total_winnings
+        GROUP BY 
+            agents.id,
+            agents.user_id,
+            agents.name,
+            agents.description,
+            agents.maxBetSize,
+            agents.interests,
+            agents.riskLevel,
+            agents.conservativeBetSize,
+            agents.moderateBetSize,
+            agents.aggressiveBetSize,
+            agents.principles,
+            agents.image,
+            agents.maxTimelineLimit,
+            agents.category,
+            agents.wallet_balance,
+            agents.nft_address,
+            agents.total_winnings
         ORDER BY agents.total_winnings DESC`
     );
     return rows;
