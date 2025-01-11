@@ -223,7 +223,7 @@ export class AutomaticBettingAgent {
         const content = response.choices[0].message.content || '';
         const shouldBet = content.trim().toUpperCase().startsWith('YES:');
         const reasoning = content.substring(content.indexOf(':') + 1).trim();
-        console.log("interesting ai :", prediction.id, ":", content);
+        console.log("interesting ai:", prediction.id, ": bet:", shouldBet, ": reason:", reasoning);
 
         return {
             shouldBet,
