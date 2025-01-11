@@ -381,19 +381,21 @@ async function getPredictionsWithoutAgentId(id: number) {
         SELECT 
             predictions.*, 
             COUNT(DISTINCT CASE WHEN bets.is_secret = 0 THEN bets.id END) as bets_count,
-            GROUP_CONCAT(
-                DISTINCT
-                CASE WHEN bets.is_secret = 0 THEN
-                    CONCAT('{',
-                        '"id":', COALESCE(bets.id, 'null'), ',',
-                        '"amount":', COALESCE(bets.amount, 0), ',',
-                        '"choice":"', COALESCE(bets.choice, ''), '",',
-                        '"reason":"', COALESCE(REPLACE(bets.reason, '"', '\\"'), ''), '",',
-                        '"pinecone_id":"', COALESCE(bets.pinecone_id, ''), '",',
-                        '"created_at":"', COALESCE(bets.created_at, ''), '"',
-                    '}')
-                END
-            ) as agent_bets
+            CONCAT('[',
+                GROUP_CONCAT(
+                    DISTINCT
+                    CASE WHEN bets.is_secret = 0 THEN
+                        CONCAT('{',
+                            '"id":', COALESCE(bets.id, 'null'), ',',
+                            '"amount":', COALESCE(bets.amount, 0), ',',
+                            '"choice":"', COALESCE(REPLACE(bets.choice, '"', '\\"'), ''), '",',
+                            '"reason":"', COALESCE(REPLACE(REPLACE(bets.reason, '"', '\\"'), '\n', '\\n'), ''), '",',
+                            '"pinecone_id":"', COALESCE(bets.pinecone_id, ''), '",',
+                            '"created_at":"', DATE_FORMAT(bets.created_at, '%Y-%m-%dT%H:%i:%s.000Z'), '"',
+                        '}')
+                    END
+                ),
+            ']') as agent_bets
         FROM predictions 
         LEFT JOIN bets ON predictions.id = bets.prediction_id
         WHERE predictions.agent_id <> ? 
@@ -402,21 +404,11 @@ async function getPredictionsWithoutAgentId(id: number) {
         [id]
     );
 
-    // Parse the GROUP_CONCAT result into an array
+    // Parse the complete JSON array instead of individual items
     return rows.map(row => ({
         ...row,
-        agent_bets: row.agent_bets 
-            ? row.agent_bets.split(',').filter(Boolean).map((bet: string) => {
-                if (bet.includes('null') || !bet) {
-                    return null;
-                }
-                try {
-                    return JSON.parse(bet);
-                } catch (e) {
-                    console.error('Failed to parse bet:', e);
-                    return null;
-                }
-              })
+        agent_bets: row.agent_bets && row.agent_bets !== '[null]' 
+            ? JSON.parse(row.agent_bets)
             : []
     }));
 }

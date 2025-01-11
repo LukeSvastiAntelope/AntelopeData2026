@@ -7,6 +7,8 @@ import { toast } from "react-hot-toast";
 import { useFetch } from "../utils/lib";
 import Link from "next/link";
 import Image from "next/image";
+import { Button } from "@nextui-org/button";
+import PredictionDialog from "../components/PredictionDialog";
 
 const AsideSkeleton = () => {
     return (
@@ -66,9 +68,14 @@ const SecureLayout = ({ children }: { children: React.ReactNode }) => {
     const pathname = usePathname();
     const [agent, setAgent] = useState<IAgentProfile | null>(null);
     const [isLoading, setIsLoading] = useState(true);
+    const [isOpen, setIsOpen] = useState(false);
     const fetch = useFetch();
     if (typeof window !== 'undefined' && !localStorage.getItem("token")) {
         route.push("/login");
+    }
+
+    const openPredictionDialog = () => {
+        setIsOpen(true);
     }
 
     useEffect(() => {
@@ -152,6 +159,9 @@ const SecureLayout = ({ children }: { children: React.ReactNode }) => {
                                         <span className={`icon-strategy group-hover:hidden ${pathname === '/strategy' ? 'hidden' : 'block'}`} />
                                         <span className="hidden font-kodemono md:inline-block">Strategy</span>
                                     </Link>
+                                    <Button color="primary" variant="flat" onPress={openPredictionDialog}>
+                                        Create Prediction
+                                    </Button>
                                 </div>
 
                                 <div className="md:hidden min-w-40px min-h-40px max-w-40px max-h-40px center-logo"></div>
@@ -187,6 +197,7 @@ const SecureLayout = ({ children }: { children: React.ReactNode }) => {
                     {children}
                 </main>
             </div>
+            <PredictionDialog isOpen={isOpen} onClose={() => setIsOpen(false)}/>
         </div>
     )
 }

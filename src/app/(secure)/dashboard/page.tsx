@@ -11,7 +11,6 @@ import { Image } from "@nextui-org/image";
 import { FaRocket, FaDatabase, FaChartLine, FaShieldAlt } from "react-icons/fa";
 import { useFetch } from "@/app/utils/lib";
 import { IAgentProfile } from "@/app/utils/interface";
-import PredictionDialog from "@/app/components/PredictionDialog";
 
 // ------------- ADDED: Chart.js imports -------------
 import {
@@ -287,10 +286,6 @@ export default function Dashboard() {
     setSearchPredictions(e.target.value);
   };
 
-  const openPredictionDialog = () => {
-    setIsOpen(true);
-  };
-
   // --------------------------- CREATE SCATTER DATA --------------------------
   // For each bet, create a single dot with x= resolution date, y= index
   // We'll show the bet description in a custom tooltip.
@@ -421,9 +416,6 @@ export default function Dashboard() {
                   Predictions
                 </Button>
               </div>
-              <Button color="primary" variant="flat" onPress={openPredictionDialog}>
-                Create Prediction
-              </Button>
             </div>
 
             <div className="relative mb-6">
@@ -695,7 +687,6 @@ export default function Dashboard() {
                 </div>
               </section>
             )}
-            <PredictionDialog isOpen={isOpen} onClose={() => setIsOpen(false)} fetchPredictions={fetchPredictions}/>
           </>
       }
     </>

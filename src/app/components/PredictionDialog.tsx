@@ -45,7 +45,7 @@ interface ILeague {
     strSport: string;
 }
 
-const PredictionDialog = ({ isOpen, onClose, fetchPredictions }: { isOpen: boolean, onClose: () => void, fetchPredictions: () => void }) => {
+const PredictionDialog = ({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) => {
 
     const [predictionType, setPredictionType] = useState<string>("custom");
     const [description, setDescription] = useState<string>("");
@@ -106,7 +106,6 @@ const PredictionDialog = ({ isOpen, onClose, fetchPredictions }: { isOpen: boole
             if (response.status) {
                 toast.success("Prediction created successfully");
                 onClose();
-                fetchPredictions();
             } else {
                 toast.error(response.message);
             }
