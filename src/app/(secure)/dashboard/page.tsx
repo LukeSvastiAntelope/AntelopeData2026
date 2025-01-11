@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { toast } from "react-hot-toast";
 import { Spinner } from "@nextui-org/spinner";
 import { Chip } from "@nextui-org/chip";
@@ -142,7 +141,6 @@ export default function Dashboard() {
   const [displayedPredictions, setDisplayedPredictions] = useState<IPrediction[]>([]);
   const [pagePredictions, setPagePredictions] = useState<number>(1);
   const [hasMorePredictions, setHasMorePredictions] = useState<boolean>(true);
-  const [isOpen, setIsOpen] = useState<boolean>(false);
 
   const totalBets = bets.length;
   const totalPredictions = predictions.length;
@@ -533,7 +531,7 @@ export default function Dashboard() {
                                     
 
                                     {/* Market Odds */}
-                                    {choiceOdds.map(({ choice, amount, odds, percentage }) => (
+                                    {choiceOdds.map(({ choice, percentage }) => (
                                       <Chip
                                         key={choice}
                                         className={
@@ -658,7 +656,7 @@ export default function Dashboard() {
 
                             <div className="flex flex-wrap gap-2 items-center">
                              
-                              {choiceOdds.map(({ choice, amount, odds, percentage }) => (
+                              {choiceOdds.map(({ choice, percentage }) => (
                                 <Chip
                                   key={choice}
                                   className={`${choice === prediction.creator_choice
