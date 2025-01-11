@@ -11,6 +11,7 @@ import { Image } from "@nextui-org/image";
 import { FaRocket, FaDatabase, FaChartLine, FaShieldAlt } from "react-icons/fa";
 import { useFetch } from "@/app/utils/lib";
 import { IAgentProfile } from "@/app/utils/interface";
+import PredictionDialog from "@/app/components/PredictionDialog";
 
 // ------------- ADDED: Chart.js imports -------------
 import {
@@ -138,6 +139,7 @@ export default function Dashboard() {
   const [displayedPredictions, setDisplayedPredictions] = useState<IPrediction[]>([]);
   const [pagePredictions, setPagePredictions] = useState<number>(1);
   const [hasMorePredictions, setHasMorePredictions] = useState<boolean>(true);
+  const [isOpen, setIsOpen] = useState<boolean>(false);
 
   const totalBets = bets.length;
   const totalPredictions = predictions.length;
@@ -285,6 +287,10 @@ export default function Dashboard() {
     setSearchPredictions(e.target.value);
   };
 
+  const openPredictionDialog = () => {
+    setIsOpen(true);
+  };
+
   // --------------------------- CREATE SCATTER DATA --------------------------
   // For each bet, create a single dot with x= resolution date, y= index
   // We'll show the bet description in a custom tooltip.
@@ -394,24 +400,29 @@ export default function Dashboard() {
               </div>
             </div>
 
-            <div className="flex gap-4 mb-6">
-              <Button
-                className={`px-6 py-2 rounded-lg ${activeTab === "bets"
-                  ? "bg-primary text-white"
-                  : "bg-gray-800 text-gray-400 hover:bg-gray-700"
-                  }`}
-                onPress={() => setActiveTab("bets")}
-              >
-                Bets History
-              </Button>
-              <Button
-                className={`px-6 py-2 rounded-lg ${activeTab === "predictions"
-                  ? "bg-primary text-white"
-                  : "bg-gray-800 text-gray-400 hover:bg-gray-700"
-                  }`}
-                onPress={() => setActiveTab("predictions")}
-              >
-                Predictions
+            <div className="flex gap-4 mb-6 w-full justify-between">
+              <div className="flex gap-4">
+                <Button
+                  className={`px-6 py-2 rounded-lg ${activeTab === "bets"
+                    ? "bg-primary text-white"
+                    : "bg-gray-800 text-gray-400 hover:bg-gray-700"
+                    }`}
+                  onPress={() => setActiveTab("bets")}
+                >
+                  Bets History
+                </Button>
+                <Button
+                  className={`px-6 py-2 rounded-lg ${activeTab === "predictions"
+                    ? "bg-primary text-white"
+                    : "bg-gray-800 text-gray-400 hover:bg-gray-700"
+                    }`}
+                  onPress={() => setActiveTab("predictions")}
+                >
+                  Predictions
+                </Button>
+              </div>
+              <Button color="primary" variant="flat" onPress={openPredictionDialog}>
+                Create Prediction
               </Button>
             </div>
 
@@ -684,6 +695,7 @@ export default function Dashboard() {
                 </div>
               </section>
             )}
+            <PredictionDialog isOpen={isOpen} onClose={() => setIsOpen(false)} fetchPredictions={fetchPredictions}/>
           </>
       }
     </>

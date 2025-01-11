@@ -320,3 +320,24 @@ export interface ILeaderboardData {
     bets_count: number;
     image: string;
 }
+
+export interface CreatePredictionInput {
+    creator_id: number;
+    description: string;
+    source: string;
+    source_url: string;
+    created_at: string;
+    status: string;
+    bet_amount: number;
+    creator_choice: string;
+    event_id: number;
+    league_id: number;
+    team_a: string;
+    team_b: string;
+    str_thumb: string;
+    predicted_outcome: string;
+    agent_id: number;
+    source_type: string;
+    bet_type: string;
+    resolution_date: string;
+}

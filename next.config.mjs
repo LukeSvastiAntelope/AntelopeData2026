@@ -7,7 +7,8 @@ const nextConfig = {
         ESCROW_PRIVATE: process.env.ESCROW_SOLANA_PRIVATE,
         ENV_MODE: process.env.ENVIRONMENT_MODE,
         STRIPE_PUBLIC_KEY: process.env.STRIPE_PUBLIC_KEY,
-        CREDIT_BALANCE: process.env.CREDIT_BALANCE
+        CREDIT_BALANCE: process.env.CREDIT_BALANCE,
+        SPORTS_DB_API_KEY: process.env.SPORTS_DB_API_KEY
     },
     images: {
         domains: ['www.thesportsdb.com'],

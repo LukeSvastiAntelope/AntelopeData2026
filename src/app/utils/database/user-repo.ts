@@ -2,8 +2,8 @@ import bcrypt from "bcryptjs";
 import { openSql as getMySQLConnection } from "./db";
 import { generateConfirmationToken } from "../api/token";
 import { AGENT_RISK_LEVEL } from "../const";
-import { IFormDataAgentProfile } from "../interface";
-import { UserDB, AgentDB, PaymentIntentDB, PredictionDB, IBet } from "../interface";
+import { IFormDataAgentProfile, PredictionDB } from "../interface";
+import { UserDB, AgentDB, PaymentIntentDB, CreatePredictionInput, IBet } from "../interface";
 import { RowDataPacket } from 'mysql2/promise';
 
 export const UserRepo = {
@@ -34,7 +34,35 @@ export const UserRepo = {
     getLeaderboard,
     getPredictionsByUserId,
     changePassword,
-    updatePassword
+    updatePassword,
+    createPrediction
+}
+
+async function createPrediction(data: CreatePredictionInput) {
+    const db = await getMySQLConnection();
+    await db.execute(
+        'INSERT INTO predictions (creator_id, description, source, source_url, created_at, status, bet_amount, creator_choice, event_id, league_id, team_a, team_b, str_thumb, predicted_outcome, agent_id, source_type, bet_type, resolution_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [
+            data.creator_id ?? 0,
+            data.description ?? '',
+            data.source ?? '',
+            data.source_url ?? '',
+            data.created_at ?? new Date().toISOString(),
+            data.status ?? 'open',
+            data.bet_amount ?? 0,
+            data.creator_choice ?? '',
+            data.event_id ?? 0,
+            data.league_id ?? 0,
+            data.team_a ?? '',
+            data.team_b ?? '',
+            data.str_thumb ?? '',
+            data.predicted_outcome ?? '',
+            data.agent_id ?? 0,
+            data.source_type ?? '',
+            data.bet_type ?? '',
+            data.resolution_date ?? new Date().toISOString()
+        ]
+    );
 }
 
 async function changePassword(id: string, currentPassword: string, newPassword: string) {
@@ -301,7 +329,7 @@ async function getPredictionById(id: string) {
         const [rows] = await db.execute<(PredictionDB & RowDataPacket)[]>(`
             SELECT 
                 p.*,
-                JSON_ARRAYAGG(
+                GROUP_CONCAT(
                     JSON_OBJECT(
                         'id', b.id,
                         'amount', b.amount,
@@ -309,7 +337,7 @@ async function getPredictionById(id: string) {
                         'reason', IFNULL(b.reason, ''),
                         'pinecone_id', IFNULL(b.pinecone_id, ''),
                         'created_at', b.created_at
-                    )
+                    ) SEPARATOR '|||'
                 ) as bets
             FROM predictions p
             LEFT JOIN bets b ON p.id = b.prediction_id AND b.is_secret = ?
@@ -318,18 +346,20 @@ async function getPredictionById(id: string) {
             [0, id]
         );
 
-        // Handle null bets array
-        if (rows[0]) {
-            rows[0].bets = rows[0].bets || [];
-            // Filter out null entries that might come from the LEFT JOIN
-            if (Array.isArray(rows[0].bets)) {
-                rows[0].bets = rows[0].bets.filter(bet => bet.id !== null);
-            }
+        if (!rows[0]) {
+            return null;
         }
+
+        // Parse the GROUP_CONCAT result into an array
+        rows[0].bets = typeof rows[0].bets === 'string'
+            ? (rows[0].bets as string).split('|||').map(bet => JSON.parse(bet))
+            : [];
 
         return rows[0];
     } catch (error) {
-        console.error("Error in getPredictionById: ", error);
+        if (error instanceof Error) {
+            console.error(`Error in getPredictionById for id ${id}:`, error.message);
+        }
         throw error;
     }
 }
