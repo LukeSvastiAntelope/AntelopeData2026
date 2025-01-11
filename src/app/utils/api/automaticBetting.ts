@@ -968,6 +968,77 @@ ${p.metadata?.comment ? `- Agent Controller Comment: ${p.metadata.comment}` : ''
         }
         return null;
     }
+
+    public async handleUserQuestion(question: string): Promise<string> {
+        try {
+            // 1) Create embeddings for the question
+            const embeddingResponse = await this.openai.embeddings.create({
+                model: "text-embedding-ada-002",
+                input: question
+            });
+            const questionEmbedding = embeddingResponse.data[0].embedding;
+
+            // 2) Perform a real Pinecone query to find relevant prior predictions/bets
+            //    The actual filter or topK can be adjusted to suit your domain logic
+            const index = this.pinecone.Index('prediction-results');
+            const pineconeResponse = await index.query({
+                vector: questionEmbedding,
+                topK: 5,
+                includeMetadata: true,
+                filter: {
+                    agent_id: { $eq: this.agent.id }
+                }
+            });
+
+            // 3) Summarize the relevant results
+            let relevantSummaries = "";
+            if (pineconeResponse.matches && pineconeResponse.matches.length > 0) {
+                relevantSummaries = pineconeResponse.matches
+                    .map((match) => {
+                        const meta = match.metadata || {};
+                        // Feel free to refine these strings to be more descriptive
+                        return `- Description: ${meta.description || "N/A"} | Choice: ${meta.choice} | Result: ${meta.result}`;
+                    })
+                    .join("\n");
+            } else {
+                relevantSummaries = "No similar prior predictions or bets found.";
+            }
+
+            // 4) Build your system prompt with the agent’s context,
+            //    explicitly telling the model how to respond about its name.
+            const systemPrompt = `
+                You are a specialized betting agent with the following details:
+                Name: ${this.agent.name}
+
+                Category: ${this.agent.category}
+                Risk Level: ${this.agent.riskLevel}
+                Principles: ${this.agent.principles.map((p) => p.title).join(", ")}
+                
+                If the user asks who you are or your name, respond: "I am ${this.agent.name}."
+                If referencing prior bets, highlight how risk strategy or prior results inform your answer.
+
+                Here are some of your relevant prior results from Pinecone:
+                ${relevantSummaries}
+            `;
+
+            const messages = [
+                { role: "system", content: systemPrompt },
+                { role: "user", content: `User question: ${question}` }
+            ];
+
+            const response = await this.openai.chat.completions.create({
+                model: "gpt-4o",
+                messages,
+                temperature: 0.4
+            });
+
+            return response.choices[0].message.content?.trim() 
+                || "No detailed answer available.";
+        } catch (error) {
+            console.error("Error in handleUserQuestion:", error);
+            return "An error occurred while processing your question. Please try again.";
+        }
+    }
 }
 
 export async function automaticBettingOnList(agent: unknown, predictions: Prediction[]): Promise<BetDecision[]> {
