@@ -433,6 +433,8 @@ export default function Dashboard() {
               <Button color="primary" variant="flat" onPress={openPredictionDialog}>
                 Create Prediction
               </Button>
+
+    
             </div>
 
             <div className="relative mb-6 group">
