@@ -37,7 +37,7 @@ background-clip: text;
 }
 
 .input-search::placeholder {
-  color: rgb(55 65 81 / var(--tw-text-opacity, 1)); /* for example, Tailwind's gray-400 tone */
+  color: rgb(61 72 90/ var(--tw-text-opacity, 1)); /* for example, Tailwind's gray-400 tone */
   transition: color 0.2s ease-in-out;
 }
 
@@ -219,9 +219,9 @@ max-width: 80px;
 
 .icon-coin {
   background-image: url('/assets/images/coin.svg');
-  background-size: 10px 10px;
+  background-size: 12px 12px;
   background-repeat: no-repeat;
-  background-position: center;
+  background-position: left center;
   padding-left: 16px;
   margin-right: 16px;
   width: 10px;
@@ -393,9 +393,9 @@ max-width: 80px;
   background-image: url('/assets/images/thumb-down.svg');
   background-size: 16px 16px;
   background-repeat: no-repeat;
-  background-position: center;
-  padding-left: 16px;
-  margin-right: 16px;
+  background-position: 6px 3px;
+  padding-left: 22px;
+  /* margin-right: 16px; */
   width: 10px;
   height: 20px;
 }   
@@ -404,9 +404,9 @@ max-width: 80px;
   background-image: url('/assets/images/thumb-up.svg');
   background-size: 16px 16px;
   background-repeat: no-repeat;
-  background-position: center;
-  padding-left: 16px;
-  margin-right: 16px;
+  background-position: 6px 1px;
+  padding-left: 22px;
+  /* margin-right: 16px; */
   width: 10px;
   height: 20px;
 }
@@ -478,7 +478,7 @@ max-width: 80px;
 }
 
 .input-search {
-  background-color: #1e212a;
+  background-color: #232a3e;
 }
 
 @media (prefers-color-scheme: dark) {

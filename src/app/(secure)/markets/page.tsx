@@ -289,19 +289,19 @@ export default function MarketsPage() {
 
       {/* Search Field for Predictions */}
       {activeTab === "predictions" && (
-        <div className="my-4 relative">
-          <span className="absolute inset-y-0 left-0 flex items-center pl-2 pointer-events-none">
-            {/* Search Icon */}
-            <svg
-              aria-hidden="true"
-              className="w-5 h-5 text-gray-700"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              viewBox="0 0 24 24"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
+        <div className="relative mb-6 group">
+        <span className="absolute inset-y-0 left-0 flex items-center pl-2 pointer-events-none">
+          {/* Search Icon */}
+          <svg
+            aria-hidden="true"
+            className="w-5 h-5 text-gray-700 group-focus-within:text-white transition-colors duration-200"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            viewBox="0 0 24 24"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
               <circle cx="10" cy="10" r="7"></circle>
               <path d="M21 21l-4.35-4.35"></path>
             </svg>
@@ -318,7 +318,7 @@ export default function MarketsPage() {
 
       {/* Search Field for Sports */}
       {activeTab === "sports" && (
-        <div className="my-4 relative">
+        <div className="relative mb-6 group">
           <span className="absolute inset-y-0 left-0 flex items-center pl-2 pointer-events-none">
             {/* Search Icon */}
             <svg
@@ -347,7 +347,7 @@ export default function MarketsPage() {
 
       {/* Search Field for General */}
       {activeTab === "general" && (
-        <div className="my-4 relative">
+        <div className="relative mb-6 group">
           <span className="absolute inset-y-0 left-0 flex items-center pl-2 pointer-events-none">
             {/* Search Icon */}
             <svg
@@ -376,7 +376,7 @@ export default function MarketsPage() {
 
       {/* Search Field for General */}
       {activeTab === "crypto" && (
-        <div className="my-4 relative">
+        <div className="relative mb-6 group">
           <span className="absolute inset-y-0 left-0 flex items-center pl-2 pointer-events-none">
             {/* Search Icon */}
             <svg
@@ -404,7 +404,7 @@ export default function MarketsPage() {
       )}
 
       {activeTab === "markets" && (
-        <div className="my-4 relative">
+        <div className="relative mb-6 group">
           <span className="absolute inset-y-0 left-0 flex items-center pl-2 pointer-events-none">
             {/* Search Icon */}
             <svg
