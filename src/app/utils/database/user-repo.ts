@@ -11,6 +11,7 @@ export const UserRepo = {
     registerPassword,
     verifyAccount,
     getUserById,
+    getUserByUsername,
     getAgentByUserId,
     getAgentById,
     createAgent,
@@ -31,7 +32,29 @@ export const UserRepo = {
     getGeneralData,
     getSportsData,
     getLeaderboard,
-    getPredictionsByUserId
+    getPredictionsByUserId,
+    changePassword,
+    updatePassword
+}
+
+async function changePassword(id: string, currentPassword: string, newPassword: string) {
+    const db = await getMySQLConnection();
+    const [rows] = await db.execute<(UserDB & RowDataPacket)[]>('SELECT * FROM users WHERE id = ?', [id]);
+    const user = rows[0];
+    if (!user) {
+        throw new Error('User not found');
+    }
+    if (!bcrypt.compareSync(currentPassword, user.password)) {
+        throw new Error('Current password is incorrect');
+    }   
+    const hashedPassword = bcrypt.hashSync(newPassword, 10);
+    await db.execute('UPDATE users SET password = ? WHERE id = ?', [hashedPassword, id]);
+}
+
+async function updatePassword(id: number, newPassword: string) {
+    const db = await getMySQLConnection();
+    const hashedPassword = bcrypt.hashSync(newPassword, 10);
+    await db.execute('UPDATE users SET password = ? WHERE id = ?', [hashedPassword, id]);
 }
 
 async function authenticate({ username, password }: { username: string, password: string }) {
@@ -91,6 +114,12 @@ async function verifyAccount(username: string) {
 async function getUserById(id: string) {
     const db = await getMySQLConnection();
     const [rows] = await db.execute<(UserDB & RowDataPacket)[]>('SELECT * FROM users WHERE id = ?', [id]);
+    return rows[0];
+}
+
+async function getUserByUsername(username: string) {
+    const db = await getMySQLConnection();
+    const [rows] = await db.execute<(UserDB & RowDataPacket)[]>('SELECT * FROM users WHERE username = ?', [username]);
     return rows[0];
 }
 

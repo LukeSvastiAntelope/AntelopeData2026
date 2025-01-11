@@ -203,7 +203,9 @@ export class AutomaticBettingAgent {
         - ANY reasonable connection warrants a positive response
 
         Required format:
-        [YES/NO]: [1-2 sentence explanation]
+        YES: [1-2 sentence explanation]
+        or
+        NO: [1-2 sentence explanation]
         `;
         
         const response = await this.openai.chat.completions.create({
@@ -221,7 +223,7 @@ export class AutomaticBettingAgent {
         const content = response.choices[0].message.content || '';
         const shouldBet = content.trim().toUpperCase().startsWith('YES:');
         const reasoning = content.substring(content.indexOf(':') + 1).trim();
-        console.log("interesting ai", content);
+        console.log("interesting ai :", prediction.id, ":", content);
 
         return {
             shouldBet,

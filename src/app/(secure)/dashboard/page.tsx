@@ -341,21 +341,18 @@ export default function Dashboard() {
 
   return (
     <>
-              
-
-
       {
         !agent || !agent.interests || agent.interests.length === 0 || !agent.principles || agent.principles.length === 0 ?
-        <div className="flex flex-col gap-2 mb-8 border border-white/10 rounded-xl p-6 text-center">
-        <div className="map-center"></div>
-        <h1 className="font-bold mb-2 font-kodemono">Create your strategy</h1>
-        <p className="text-gray-400">
-        You haven’t created your AI agents strategy yet. Before it can bet create the strategy and choose your area of interest.
-        </p>
-        <Button color="primary" variant="flat" onPress={() => router.push("/strategy")}>
+          <div className="flex flex-col gap-2 mb-8 border border-white/10 rounded-xl p-6 text-center">
+            <div className="map-center"></div>
+            <h1 className="font-bold mb-2 font-kodemono">Create your strategy</h1>
+            <p className="text-gray-400">
+              You haven’t created your AI agents strategy yet. Before it can bet create the strategy and choose your area of interest.
+            </p>
+            <Button color="primary" variant="flat" onPress={() => router.push("/strategy")}>
               Create Strategy
             </Button>
-      </div> :
+          </div> :
           <>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
               <Link href="/bets">
@@ -556,13 +553,7 @@ export default function Dashboard() {
                       })}
                     </tbody>
                   </table>
-                
-
-                
-                
                 )}
-
-     
                 {hasMoreBets && !isLoadingBets && bets.length > 0 && (
                   <div className="flex justify-center mt-4">
                     <Button

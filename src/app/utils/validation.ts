@@ -1,7 +1,8 @@
 export function validateUserName(username: string) {
-    const isAlphanumeric = /^[a-zA-Z0-9]+$/.test(username);
-    if (!isAlphanumeric) return "Username must be alphanumeric.";
-    if (username.length <= 3) return "Username must be longer than 3 characters.";
+    console.log(username);
+    // const isAlphanumeric = /^[a-zA-Z0-9]+$/.test(username);
+    // if (!isAlphanumeric) return "Username must be alphanumeric.";
+    // if (username.length <= 3) return "Username must be longer than 3 characters.";
     return null;
 }
 
