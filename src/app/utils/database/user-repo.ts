@@ -406,14 +406,17 @@ async function getPredictionsWithoutAgentId(id: number) {
     return rows.map(row => ({
         ...row,
         agent_bets: row.agent_bets 
-            ? row.agent_bets.split(',').filter(Boolean).map(bet => {
+            ? row.agent_bets.split(',').filter(Boolean).map((bet: string) => {
+                if (bet.includes('null') || !bet) {
+                    return null;
+                }
                 try {
                     return JSON.parse(bet);
                 } catch (e) {
-                    console.error('Failed to parse bet:', bet);
+                    console.error('Failed to parse bet:', e);
                     return null;
                 }
-              }).filter(bet => bet !== null)
+              })
             : []
     }));
 }
