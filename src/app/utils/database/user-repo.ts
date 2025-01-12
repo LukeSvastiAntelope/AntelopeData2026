@@ -4,7 +4,7 @@ import { generateConfirmationToken } from "../api/token";
 import { AGENT_RISK_LEVEL } from "../const";
 import { IFormDataAgentProfile, PredictionDB } from "../interface";
 import { UserDB, AgentDB, PaymentIntentDB, CreatePredictionInput, IBet } from "../interface";
-import { RowDataPacket } from 'mysql2/promise';
+import { RowDataPacket, ResultSetHeader } from 'mysql2/promise';
 
 export const UserRepo = {
     authenticate,
@@ -40,7 +40,7 @@ export const UserRepo = {
 
 async function createPrediction(data: CreatePredictionInput) {
     const db = await getMySQLConnection();
-    const [result] = await db.execute<(RowDataPacket)[]>(
+    const [result] = await db.execute<ResultSetHeader>(
         'INSERT INTO predictions (creator_id, description, source, source_url, created_at, status, bet_amount, creator_choice, event_id, league_id, team_a, team_b, str_thumb, predicted_outcome, agent_id, source_type, bet_type, resolution_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
         [
             data.creator_id ?? 0,
@@ -63,7 +63,7 @@ async function createPrediction(data: CreatePredictionInput) {
             data.resolution_date ?? new Date().toISOString()
         ]
     );
-    return result[0].insertId;
+    return result.insertId;
 }
 
 async function changePassword(id: string, currentPassword: string, newPassword: string) {
