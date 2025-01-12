@@ -357,7 +357,7 @@ async function getPredictionById(id: string) {
                 try {
                     return JSON.parse(bet);
                 } catch (e) {
-                    console.error('Failed to parse bet:', bet);
+                    console.error('Failed to parse bet:', e);
                     return null;
                 }
               }).filter(bet => bet !== null)
