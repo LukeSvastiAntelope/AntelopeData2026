@@ -389,23 +389,19 @@ async function getPredictionsWithoutAgentId(id: number) {
         SELECT 
             predictions.*, 
             COUNT(DISTINCT CASE WHEN bets.is_secret = 0 THEN bets.id END) as bets_count,
-            CONCAT('[',
-                GROUP_CONCAT(
-                    DISTINCT
-                    CASE 
-                        WHEN bets.is_secret = 0 THEN
-                            JSON_OBJECT(
-                                'id', COALESCE(bets.id, 'null'),
-                                'amount', COALESCE(bets.amount, 0),
-                                'choice', COALESCE(bets.choice, ''),
-                                'reason', COALESCE(REPLACE(REPLACE(bets.reason, '"', '\\"'), '\n', '\\n'), ''),
-                                'pinecone_id', COALESCE(bets.pinecone_id, ''),
-                                'created_at', DATE_FORMAT(bets.created_at, '%Y-%m-%dT%H:%i:%s.000Z')
-                            )
-                        ELSE NULL 
-                    END
-                ),
-            ']') as agent_bets
+            JSON_ARRAYAGG(
+                IF(bets.is_secret = 0,
+                    JSON_OBJECT(
+                        'id', bets.id,
+                        'amount', COALESCE(bets.amount, 0),
+                        'choice', COALESCE(bets.choice, ''),
+                        'reason', COALESCE(bets.reason, ''),
+                        'pinecone_id', COALESCE(bets.pinecone_id, ''),
+                        'created_at', DATE_FORMAT(bets.created_at, '%Y-%m-%dT%H:%i:%s.000Z')
+                    ),
+                    NULL
+                )
+            ) as agent_bets
         FROM predictions 
         LEFT JOIN bets ON predictions.id = bets.prediction_id
         WHERE predictions.agent_id <> ? 
@@ -414,11 +410,11 @@ async function getPredictionsWithoutAgentId(id: number) {
         [id]
     );
 
-    // Parse the JSON strings into arrays
+    // Clean up the results
     return rows.map(row => ({
         ...row,
-        agent_bets: row.agent_bets && row.agent_bets !== '[null]' 
-            ? JSON.parse(row.agent_bets)
+        agent_bets: Array.isArray(row.agent_bets) 
+            ? row.agent_bets.filter(bet => bet !== null)
             : []
     }));
 }
