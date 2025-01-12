@@ -392,15 +392,17 @@ async function getPredictionsWithoutAgentId(id: number) {
             CONCAT('[',
                 GROUP_CONCAT(
                     DISTINCT
-                    CASE WHEN bets.is_secret = 0 THEN
-                        CONCAT('{',
-                            '"id":', COALESCE(bets.id, 'null'), ',',
-                            '"amount":', COALESCE(bets.amount, 0), ',',
-                            '"choice":"', COALESCE(REPLACE(bets.choice, '"', '\\"'), '"),',
-                            '"reason":"', COALESCE(REPLACE(REPLACE(bets.reason, '"', '\\"'), '\n', '\\n'), '"),',
-                            '"pinecone_id":"', COALESCE(bets.pinecone_id, ''), '",',
-                            '"created_at":"', DATE_FORMAT(bets.created_at, '%Y-%m-%dT%H:%i:%s.000Z'), '"',
-                        '}')
+                    CASE 
+                        WHEN bets.is_secret = 0 THEN
+                            JSON_OBJECT(
+                                'id', COALESCE(bets.id, 'null'),
+                                'amount', COALESCE(bets.amount, 0),
+                                'choice', COALESCE(bets.choice, ''),
+                                'reason', COALESCE(REPLACE(REPLACE(bets.reason, '"', '\\"'), '\n', '\\n'), ''),
+                                'pinecone_id', COALESCE(bets.pinecone_id, ''),
+                                'created_at', DATE_FORMAT(bets.created_at, '%Y-%m-%dT%H:%i:%s.000Z')
+                            )
+                        ELSE NULL 
                     END
                 ),
             ']') as agent_bets
@@ -412,7 +414,7 @@ async function getPredictionsWithoutAgentId(id: number) {
         [id]
     );
 
-    // Parse the complete JSON array instead of individual items
+    // Parse the JSON strings into arrays
     return rows.map(row => ({
         ...row,
         agent_bets: row.agent_bets && row.agent_bets !== '[null]' 
