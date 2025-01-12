@@ -5,12 +5,12 @@ import { verifyConfirmationToken } from "@/app/utils/api/token";
 import { getJson } from "serpapi";
 import { CreatePredictionInput } from "@/app/utils/interface";
 
-function escapeMarkdown(text: string) {
-    if (typeof text !== 'string') {
-        text = String(text);
-    }
-    return text.replace(/([_*[\]()~`>#+=|{}.!-])/g, '\\$1');
-}
+// function escapeMarkdown(text: string) {
+//     if (typeof text !== 'string') {
+//         text = String(text);
+//     }
+//     return text.replace(/[<>&]/g, '\\$&');
+// }
 
 function generateDeepLink(botUsername: string, predictionId: number) {
     return `https://t.me/${botUsername}?start=bet_${predictionId}`;
@@ -82,66 +82,85 @@ export async function POST(req: NextRequest) {
         const telegramChannelId = process.env.TELEGRAM_CHANNEL_ID;
         let telegramMessage = "";
         if (data.source === "sportDB") {
-            telegramMessage = encodeURIComponent(
-                `🔮 *New Game Prediction Created\\!*\n\n` +
-                `🏟️ *${escapeMarkdown(data.description)}*\n` +
-                `*Predicted Outcome*: \`${escapeMarkdown(data.creator_choice)}\`\n` +
-                `*Created by*: \`${escapeMarkdown(user.username)}\`\n` +
-                `*Resolution Date*: \`${escapeMarkdown(data.resolution_date)}\`\n`
-            );
+            telegramMessage = 
+                `🔮 ✨ New Game Prediction\n\n` +
+                `🏟️ ${data.description}\n` +
+                `Predicted Outcome: ${data.creator_choice}\n` +
+                `Created by: ${user.username}\n` +
+                `Resolution Date: ${format(new Date(data.resolution_date), 'MMM dd, yyyy HH:mm')}`;
         } else {
-            telegramMessage = encodeURIComponent(
-                `🔮 *New Prediction Created\\!*\n\n` +
-                `*${escapeMarkdown(data.description)}*\n` +
-                `*By*: \`${escapeMarkdown(user.username)}\`\n` +
-                `*Source*: ${escapeMarkdown(data.source)}\n` +
-                `*Bet Amount*: \`${escapeMarkdown(data.bet_amount)}\` credits\n` +
-                `*Creator's Choice*: *${escapeMarkdown(data.creator_choice.toUpperCase())}*\n` +
-                `*Resolution Date*: \`${escapeMarkdown(data.resolution_date)}\``
-            );
+            telegramMessage = 
+                `🔮 ✨ New Prediction\n\n` +
+                `${data.description}\n` +
+                `By: ${user.username}\n` +
+                `Source: ${data.source}\n` +
+                `Bet Amount: ${data.bet_amount} credits\n` +
+                `Creator's Choice: ${data.creator_choice.toUpperCase()}\n` +
+                `Resolution Date: ${format(new Date(data.resolution_date), 'MMM dd, yyyy HH:mm')}`;
         }
 
         const betLink = generateDeepLink(process.env.TELEGRAM_BOT_USERNAME as string, insertId);
 
         // Define the inline keyboard with the "Bet" button
         const inlineKeyboard = {
-            reply_markup: {
-                inline_keyboard: [
-                    [
-                        {
-                            text: '🎲 Bet',
-                            url: betLink, // Opens the bot with /start=bet_predictionId
-                        },
-                    ],
-                ],
-            },
+            inline_keyboard: [
+                [
+                    {
+                        text: '🎲 Bet',
+                        url: betLink
+                    }
+                ]
+            ]
         };
+        
+        if (!telegramChannelId) throw new Error('Telegram channel ID not configured');
         if (data.str_thumb) {
-            const encodedThumb = encodeURIComponent(data.str_thumb);
-            if (!telegramChannelId) throw new Error('Telegram channel ID not configured');
-            const params = new URLSearchParams({
-                chat_id: telegramChannelId,
-                photo: encodedThumb,
-                caption: telegramMessage,
-                parse_mode: 'MarkdownV2',
-                reply_markup: JSON.stringify(inlineKeyboard)
-            });
+            try {
+                // Clean and validate the image URL
+                let imageUrl = data.str_thumb;
+                if (imageUrl.startsWith('//')) {
+                    imageUrl = 'https:' + imageUrl;
+                }
+                
+                const params = new URLSearchParams({
+                    chat_id: telegramChannelId,
+                    photo: imageUrl,  // Use raw URL
+                    caption: telegramMessage,
+                    reply_markup: JSON.stringify(inlineKeyboard)
+                });
 
-            const response = await fetch(
-                `https://api.telegram.org/bot${telegramBotToken}/sendPhoto?${params.toString()}`
-            );
-            
-            if (!response.ok) {
-                const errorData = await response.json();
-                console.error("Telegram API Error:", errorData);
-                throw new Error(`Failed to send message: ${errorData.description}`);
+                const response = await fetch(
+                    `https://api.telegram.org/bot${telegramBotToken}/sendPhoto?${params.toString()}`
+                );
+                
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    console.error("Photo send error:", errorData);
+                    throw new Error('Photo send failed: ' + errorData.description);
+                }
+            } catch (error) {
+                console.warn("Failed to send with photo:", error);
+                // Fallback to text-only message
+                const params = new URLSearchParams({
+                    chat_id: telegramChannelId,
+                    text: telegramMessage,
+                    reply_markup: JSON.stringify(inlineKeyboard)
+                });
+
+                const response = await fetch(
+                    `https://api.telegram.org/bot${telegramBotToken}/sendMessage?${params.toString()}`
+                );
+                
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    console.error("Telegram API Error:", errorData);
+                    throw new Error(`Failed to send message: ${errorData.description}`);
+                }
             }
         } else {
-            if (!telegramChannelId) throw new Error('Telegram channel ID not configured');
             const params = new URLSearchParams({
                 chat_id: telegramChannelId,
                 text: telegramMessage,
-                parse_mode: 'MarkdownV2',
                 reply_markup: JSON.stringify(inlineKeyboard)
             });
 
