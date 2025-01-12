@@ -334,10 +334,10 @@ async function getPredictionById(id: string) {
                     JSON_OBJECT(
                         'id', b.id,
                         'amount', b.amount,
-                        'choice', JSON_QUOTE(COALESCE(b.choice, '')),
-                        'reason', JSON_QUOTE(COALESCE(b.reason, '')),
-                        'pinecone_id', JSON_QUOTE(COALESCE(b.pinecone_id, '')),
-                        'created_at', JSON_QUOTE(b.created_at)
+                        'choice', COALESCE(b.choice, ''),
+                        'reason', COALESCE(b.reason, ''),
+                        'pinecone_id', COALESCE(b.pinecone_id, ''),
+                        'created_at', DATE_FORMAT(b.created_at, '%Y-%m-%dT%H:%i:%s.000Z')
                     ) SEPARATOR '|||'
                 ) as bets
             FROM predictions p
