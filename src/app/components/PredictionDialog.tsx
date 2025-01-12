@@ -47,11 +47,11 @@ interface ILeague {
 
 const PredictionDialog = ({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) => {
 
-    const [predictionType, setPredictionType] = useState<string>("custom");
+    const [predictionType, setPredictionType] = useState<string>("");
     const [description, setDescription] = useState<string>("");
     const [source, setSource] = useState<string>("google_news");
     const [sourceUrl, setSourceUrl] = useState<string>("");
-    const [dateGranularity, setDateGranularity] = useState<string>("date");
+    const [dateGranularity, setDateGranularity] = useState<string>("");
     const [resolutionDate, setResolutionDate] = useState<string>("");
     const [betAmount, setBetAmount] = useState<string>("");
     const [choice, setChoice] = useState<string>("");
@@ -164,7 +164,6 @@ const PredictionDialog = ({ isOpen, onClose }: { isOpen: boolean, onClose: () =>
                                 setPredictionType(e.target.value);
                                 setSelectedLeague(predictionTypes.find(type => type.id === e.target.value)?.leagueId || "");
                             }}
-                            defaultSelectedKeys={["custom"]}
                         >
                             {predictionTypes.map((type) => (
                                 <SelectItem key={type.id} value={type.id}>
@@ -205,7 +204,6 @@ const PredictionDialog = ({ isOpen, onClose }: { isOpen: boolean, onClose: () =>
                                     label="Date Granularity"
                                     value={dateGranularity}
                                     onChange={(e) => setDateGranularity(e.target.value)}
-                                    defaultSelectedKeys={[dateGranularity]}
                                 >
                                     <SelectItem key="date" value="date">Date Only</SelectItem>
                                     <SelectItem key="datetime" value="datetime">Date + Time</SelectItem>

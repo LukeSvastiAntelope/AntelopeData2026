@@ -4,6 +4,7 @@ import { getJson } from 'serpapi';
 import { IAgentProfile, BetDecision, NewsItem, GroupedPredictions, Prediction, MarketData } from '../interface';
 import { PineconeRecord } from '@pinecone-database/pinecone';
 import axios from 'axios';
+import { ChatCompletionMessageParam } from 'openai/resources/chat/completions.mjs';
 
 interface SimilarPredictionMetadata {
     description: string;
@@ -1028,7 +1029,7 @@ ${p.metadata?.comment ? `- Agent Controller Comment: ${p.metadata.comment}` : ''
 
             const response = await this.openai.chat.completions.create({
                 model: "gpt-4o",
-                messages,
+                messages: messages as ChatCompletionMessageParam[],
                 temperature: 0.4
             });
 

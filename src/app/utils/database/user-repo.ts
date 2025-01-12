@@ -40,7 +40,7 @@ export const UserRepo = {
 
 async function createPrediction(data: CreatePredictionInput) {
     const db = await getMySQLConnection();
-    await db.execute(
+    const [result] = await db.execute<(RowDataPacket)[]>(
         'INSERT INTO predictions (creator_id, description, source, source_url, created_at, status, bet_amount, creator_choice, event_id, league_id, team_a, team_b, str_thumb, predicted_outcome, agent_id, source_type, bet_type, resolution_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
         [
             data.creator_id ?? 0,
@@ -63,6 +63,7 @@ async function createPrediction(data: CreatePredictionInput) {
             data.resolution_date ?? new Date().toISOString()
         ]
     );
+    return result[0].insertId;
 }
 
 async function changePassword(id: string, currentPassword: string, newPassword: string) {
@@ -333,10 +334,10 @@ async function getPredictionById(id: string) {
                     JSON_OBJECT(
                         'id', b.id,
                         'amount', b.amount,
-                        'choice', b.choice,
-                        'reason', IFNULL(b.reason, ''),
-                        'pinecone_id', IFNULL(b.pinecone_id, ''),
-                        'created_at', b.created_at
+                        'choice', JSON_QUOTE(COALESCE(b.choice, '')),
+                        'reason', JSON_QUOTE(COALESCE(b.reason, '')),
+                        'pinecone_id', JSON_QUOTE(COALESCE(b.pinecone_id, '')),
+                        'created_at', JSON_QUOTE(b.created_at)
                     ) SEPARATOR '|||'
                 ) as bets
             FROM predictions p
@@ -351,8 +352,15 @@ async function getPredictionById(id: string) {
         }
 
         // Parse the GROUP_CONCAT result into an array
-        rows[0].bets = typeof rows[0].bets === 'string'
-            ? (rows[0].bets as string).split('|||').map(bet => JSON.parse(bet))
+        rows[0].bets = (typeof rows[0].bets === 'string' && rows[0].bets as string)
+            ? (rows[0].bets as string).split('|||').map(bet => {
+                try {
+                    return JSON.parse(bet);
+                } catch (e) {
+                    console.error('Failed to parse bet:', bet);
+                    return null;
+                }
+              }).filter(bet => bet !== null)
             : [];
 
         return rows[0];
@@ -388,8 +396,8 @@ async function getPredictionsWithoutAgentId(id: number) {
                         CONCAT('{',
                             '"id":', COALESCE(bets.id, 'null'), ',',
                             '"amount":', COALESCE(bets.amount, 0), ',',
-                            '"choice":"', COALESCE(REPLACE(bets.choice, '"', '\\"'), ''), '",',
-                            '"reason":"', COALESCE(REPLACE(REPLACE(bets.reason, '"', '\\"'), '\n', '\\n'), ''), '",',
+                            '"choice":"', COALESCE(REPLACE(bets.choice, '"', '\\"'), '"),',
+                            '"reason":"', COALESCE(REPLACE(REPLACE(bets.reason, '"', '\\"'), '\n', '\\n'), '"),',
                             '"pinecone_id":"', COALESCE(bets.pinecone_id, ''), '",',
                             '"created_at":"', DATE_FORMAT(bets.created_at, '%Y-%m-%dT%H:%i:%s.000Z'), '"',
                         '}')
