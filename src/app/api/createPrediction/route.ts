@@ -6,35 +6,10 @@ import { getJson } from "serpapi";
 import { CreatePredictionInput } from "@/app/utils/interface";
 
 function escapeMarkdown(text: string) {
-    // First, escape backslashes
-    text = text.replace(/\\/g, '\\\\');
-    
-    const escapeChars = [
-        '_',
-        '*',
-        '[',
-        ']',
-        '(',
-        ')',
-        '~',
-        '`',
-        '>',
-        '#',
-        '+',
-        '-',
-        '=',
-        '|',
-        '{',
-        '}',
-        '.',
-        '!',  // Added back
-    ];
-    
-    escapeChars.forEach((char) => {
-        const regExp = new RegExp(`\\${char}`, 'g');
-        text = text.replace(regExp, `\\${char}`);
-    });
-    return text;
+    if (typeof text !== 'string') {
+        text = String(text);
+    }
+    return text.replace(/([_*[\]()~`>#+=|{}.!-])/g, '\\$1');
 }
 
 function generateDeepLink(botUsername: string, predictionId: number) {
@@ -107,20 +82,22 @@ export async function POST(req: NextRequest) {
         const telegramChannelId = process.env.TELEGRAM_CHANNEL_ID;
         let telegramMessage = "";
         if (data.source === "sportDB") {
-            telegramMessage = encodeURIComponent(`🔮 *New Game Prediction Created\\!*\n\n` +
+            telegramMessage = encodeURIComponent(
+                `🔮 *New Game Prediction Created\\!*\n\n` +
                 `🏟️ *${escapeMarkdown(data.description)}*\n` +
                 `*Predicted Outcome*: \`${escapeMarkdown(data.creator_choice)}\`\n` +
                 `*Created by*: \`${escapeMarkdown(user.username)}\`\n` +
-                `*Resolution Date*: \`${data.resolution_date}\`\n`);
+                `*Resolution Date*: \`${escapeMarkdown(data.resolution_date)}\`\n`
+            );
         } else {
             telegramMessage = encodeURIComponent(
                 `🔮 *New Prediction Created\\!*\n\n` +
                 `*${escapeMarkdown(data.description)}*\n` +
                 `*By*: \`${escapeMarkdown(user.username)}\`\n` +
                 `*Source*: ${escapeMarkdown(data.source)}\n` +
-                `*Bet Amount*: \`${data.bet_amount}\` credits\n` +
+                `*Bet Amount*: \`${escapeMarkdown(data.bet_amount)}\` credits\n` +
                 `*Creator's Choice*: *${escapeMarkdown(data.creator_choice.toUpperCase())}*\n` +
-                `*Resolution Date*: ${data.resolution_date}`
+                `*Resolution Date*: \`${escapeMarkdown(data.resolution_date)}\``
             );
         }
 
