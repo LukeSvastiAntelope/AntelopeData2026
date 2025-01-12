@@ -6,6 +6,7 @@ import { Textarea } from "@nextui-org/input";
 import { useFetch } from "@/app/utils/lib";
 import toast from "react-hot-toast";
 import { IAgentProfile } from "@/app/utils/interface";
+import Image from "next/image";
 
 interface ChatMessage {
   role: "user" | "agent";
@@ -21,7 +22,7 @@ export default function AskAgent() {
   const fetch = useFetch();
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Fetch Agent Profile on mount, so we have the agent's name, category, etc.
+  // Fetch Agent Profile on mount, so we have the agent's name, category, image, etc.
   useEffect(() => {
     const loadAgentProfile = async () => {
       try {
@@ -39,7 +40,7 @@ export default function AskAgent() {
     loadAgentProfile();
   }, [fetch]);
 
-  // Scroll to the bottom whenever messages change
+  // Auto-scroll to the bottom whenever messages change
   useEffect(() => {
     if (containerRef.current) {
       containerRef.current.scrollTop = containerRef.current.scrollHeight;
@@ -56,25 +57,19 @@ export default function AskAgent() {
     setInput("");
 
     // 1) Add the user’s message to the chat
-    setMessages((prev) => [
-      ...prev,
-      { role: "user", content: userQuestion },
-    ]);
+    setMessages((prev) => [...prev, { role: "user", content: userQuestion }]);
 
     setIsLoading(true);
     try {
       // 2) Send userQuestion + agentProfile to the backend
       const body = {
         userQuestion,
-        agentProfile,  // This includes agent name, category, etc.
+        agentProfile, // Includes name, image, category, risk, etc.
       };
       const response = await fetch.post("/api/askAgent", body);
       if (response.status) {
         // 3) Add agent’s message to the chat
-        setMessages((prev) => [
-          ...prev,
-          { role: "agent", content: response.answer },
-        ]);
+        setMessages((prev) => [...prev, { role: "agent", content: response.answer }]);
       } else {
         toast.error(response.message || "Failed to get answer");
       }
@@ -86,26 +81,43 @@ export default function AskAgent() {
     }
   };
 
+  // Capture Enter key to trigger handleSend (except when shift + enter is pressed)
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
+  };
+
   return (
     <div className="h-screen flex flex-col">
       {/* Header */}
-      <div className="p-4 bg-default-100 shadow-sm">
-        <h1 className="text-2xl font-bold">
-          {agentProfile?.name
-            ? `Ask ${agentProfile.name}`
-            : "Ask Your Agent"}
-        </h1>
-        {agentProfile && (
-          <p className="text-default-500 text-small mt-1">
-            Category: {agentProfile.category}, Risk: {agentProfile.riskLevel}
-          </p>
+      <div className="p-4 shadow-sm flex items-center gap-4">
+        {agentProfile?.image && (
+          <Image
+            src={agentProfile.image}
+            alt={agentProfile?.name || "Agent"}
+            width={48}
+            height={48}
+            className="rounded-full"
+          />
         )}
+        <div>
+          <h1 className="text-2xl font-bold">
+            {agentProfile?.name ? `Ask ${agentProfile.name}` : "Ask Your Agent"}
+          </h1>
+          {agentProfile && (
+            <p className="text-default-500 text-sm mt-1">
+              Category: {agentProfile.category}, Risk: {agentProfile.riskLevel}
+            </p>
+          )}
+        </div>
       </div>
 
-      {/* Chat Container */}
+      {/* Chat Container (no extra background color) */}
       <div
         ref={containerRef}
-        className="flex-1 overflow-y-auto p-4 space-y-4 bg-content0"
+        className="flex-1 overflow-y-auto p-4 space-y-4"
       >
         {messages.map((msg, index) => (
           <div
@@ -118,20 +130,26 @@ export default function AskAgent() {
             style={{ whiteSpace: "pre-wrap" }}
           >
             <p className="text-default-600">
-              <strong>{msg.role === "user" ? "You" : "Agent"}: </strong>
+              <strong>
+                {msg.role === "user"
+                  ? "You"
+                  : agentProfile?.name || "Agent"}
+                :
+              </strong>{" "}
               {msg.content}
             </p>
           </div>
         ))}
       </div>
 
-      {/* Bottom Input Area */}
-      <div className="border-t p-4 flex items-end gap-2 bg-default-50">
+      {/* Fixed Bottom Input Area */}
+      <div className="border-t p-4 flex items-end gap-2 bg-default-50 sticky bottom-0">
         <Textarea
           label=""
           placeholder="Type your question..."
           value={input}
           onChange={(e) => setInput(e.target.value)}
+          onKeyDown={handleKeyDown}
           className="w-full"
           minRows={1}
           maxRows={4}

@@ -402,21 +402,21 @@ export default function Dashboard() {
               </div>
             </div>
 
-            <div className="flex gap-4 mb-6 w-full justify-between">
-              <div className="flex gap-4">
+            <div className="flex gap-4 mb-2 w-full justify-between">
+              <div className="flex gap-4 font-kodemono">
                 <Button
-                  className={`px-6 py-2 rounded-lg ${activeTab === "bets"
-                    ? "bg-primary text-white"
-                    : "bg-gray-800 text-gray-400 hover:bg-gray-700"
+                  className={`py-2 px-0 rounded-lg ${activeTab === "bets"
+                    ? "bg-transparent text-white"
+                    : "bg-transparent text-default-400 hover:text-white"
                     }`}
                   onPress={() => setActiveTab("bets")}
                 >
                   Bets History
                 </Button>
                 <Button
-                  className={`px-6 py-2 rounded-lg ${activeTab === "predictions"
-                    ? "bg-primary text-white"
-                    : "bg-gray-800 text-gray-400 hover:bg-gray-700"
+                  className={`py-2 px-0 rounded-lg ${activeTab === "predictions"
+                    ? "bg-transparent text-white"
+                    : "bg-transparent text-default-400 hover:text-white"
                     }`}
                   onPress={() => setActiveTab("predictions")}
                 >
@@ -494,7 +494,7 @@ export default function Dashboard() {
                             className="transition-all hover:bg-gray-800/50 "
                             onClick={() => router.push(`/bets/${bet.bet_id}`)}
                           >
-                            <td className="p-4 cursor-pointer">
+                            <td className="p-4 rounded-lg cursor-pointer">
                               <div className="flex items-start gap-4">
                                 {/* Thumbnail */}
                                 {bet.str_thumb ? (

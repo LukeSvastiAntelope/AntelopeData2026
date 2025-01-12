@@ -239,7 +239,7 @@ export default function MarketsPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-2 font-kodemono text-small">
+      <div className="flex gap-2 font-kodemono mb-2 text-small">
         
         
         

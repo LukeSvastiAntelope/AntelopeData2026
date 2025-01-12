@@ -1023,8 +1023,8 @@ ${p.metadata?.comment ? `- Agent Controller Comment: ${p.metadata.comment}` : ''
             `;
 
             const messages = [
-                { role: "system", content: systemPrompt },
-                { role: "user", content: `User question: ${question}` }
+                { role: "system" as const, content: systemPrompt },
+                { role: "user" as const, content: `User question: ${question}` }
             ];
 
             const response = await this.openai.chat.completions.create({

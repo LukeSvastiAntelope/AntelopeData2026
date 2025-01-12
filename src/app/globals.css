@@ -481,6 +481,10 @@ max-width: 80px;
   background-color: #232a3e;
 }
 
+.gray-background {
+  background-color: #232a3e;
+}
+
 @media (prefers-color-scheme: dark) {
   :root {
     --background: #0a0a0a;
