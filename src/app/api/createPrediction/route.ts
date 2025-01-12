@@ -135,16 +135,42 @@ export async function POST(req: NextRequest) {
             },
         };
         if (data.str_thumb) {
+            const encodedThumb = encodeURIComponent(data.str_thumb);
+            if (!telegramChannelId) throw new Error('Telegram channel ID not configured');
+            const params = new URLSearchParams({
+                chat_id: telegramChannelId,
+                photo: encodedThumb,
+                caption: telegramMessage,
+                parse_mode: 'MarkdownV2',
+                reply_markup: JSON.stringify(inlineKeyboard)
+            });
+
             const response = await fetch(
-                `https://api.telegram.org/bot${telegramBotToken}/sendPhoto?chat_id=${telegramChannelId}&photo=${data.str_thumb}&caption=${telegramMessage}&reply_markup=${JSON.stringify(inlineKeyboard)}`
+                `https://api.telegram.org/bot${telegramBotToken}/sendPhoto?${params.toString()}`
             );
+            
             if (!response.ok) {
-                throw new Error('Failed to send message');
+                const errorData = await response.json();
+                console.error("Telegram API Error:", errorData);
+                throw new Error(`Failed to send message: ${errorData.description}`);
             }
         } else {
-            const response = await fetch(`https://api.telegram.org/bot${telegramBotToken}/sendMessage?chat_id=${telegramChannelId}&text=${telegramMessage}&reply_markup=${JSON.stringify(inlineKeyboard)}`);
+            if (!telegramChannelId) throw new Error('Telegram channel ID not configured');
+            const params = new URLSearchParams({
+                chat_id: telegramChannelId,
+                text: telegramMessage,
+                parse_mode: 'MarkdownV2',
+                reply_markup: JSON.stringify(inlineKeyboard)
+            });
+
+            const response = await fetch(
+                `https://api.telegram.org/bot${telegramBotToken}/sendMessage?${params.toString()}`
+            );
+            
             if (!response.ok) {
-                throw new Error('Failed to send message');
+                const errorData = await response.json();
+                console.error("Telegram API Error:", errorData);
+                throw new Error(`Failed to send message: ${errorData.description}`);
             }
         }
         return Response.json({ status: true, message: 'Prediction created successfully' });
