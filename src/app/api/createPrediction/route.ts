@@ -102,14 +102,14 @@ export async function POST(req: NextRequest) {
         const telegramChannelId = process.env.TELEGRAM_CHANNEL_ID;
         let telegramMessage = "";
         if (data.source === "sportDB") {
-            telegramMessage = encodeURIComponent(`🔮 *New Game Prediction Created!*\n\n` +
+            telegramMessage = encodeURIComponent(`🔮 *New Game Prediction Created\\!*\n\n` +
                 `🏟️ *${escapeMarkdown(data.description)}*\n` +
                 `*Predicted Outcome*: \`${escapeMarkdown(data.creator_choice)}\`\n` +
                 `*Created by*: \`${escapeMarkdown(user.username)}\`\n` +
                 `*Resolution Date*: \`${data.resolution_date}\`\n`);
         } else {
             telegramMessage = encodeURIComponent(
-                `🔮 *New Prediction Created!*\n\n` +
+                `🔮 *New Prediction Created\\!*\n\n` +
                 `*${escapeMarkdown(data.description)}*\n` +
                 `*By*: \`${escapeMarkdown(user.username)}\`\n` +
                 `*Source*: ${data.source}\n` +
