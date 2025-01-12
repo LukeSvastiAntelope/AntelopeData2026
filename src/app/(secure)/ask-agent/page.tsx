@@ -90,7 +90,7 @@ export default function AskAgent() {
   };
 
   return (
-    <div className="h-screen flex flex-col">
+    <div className="h-[calc(100vh-65px)] flex flex-col">
       {/* Header */}
       <div className="p-4 shadow-sm flex items-center gap-4">
         {agentProfile?.image && (
@@ -143,7 +143,7 @@ export default function AskAgent() {
       </div>
 
       {/* Fixed Bottom Input Area */}
-      <div className="border-t p-4 flex items-end gap-2 bg-default-50 sticky bottom-0">
+      <div className=" p-0 flex items-end gap-2 bg-default-50 sticky bottom-0">
         <Textarea
           label=""
           placeholder="Type your question..."

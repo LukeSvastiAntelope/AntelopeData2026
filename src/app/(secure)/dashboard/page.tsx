@@ -494,7 +494,7 @@ export default function Dashboard() {
                             className="transition-all hover:bg-gray-800/50 "
                             onClick={() => router.push(`/bets/${bet.bet_id}`)}
                           >
-                            <td className="p-4 rounded-lg cursor-pointer">
+                            <td className="p-2 rounded-lg cursor-pointer">
                               <div className="flex items-start gap-4">
                                 {/* Thumbnail */}
                                 {bet.str_thumb ? (
@@ -516,7 +516,7 @@ export default function Dashboard() {
                                 {/* Content */}
                                 <div className="flex-1 space-y-1">
                                   {/* Description */}
-                                  <p className="text-base text-gray-200 font-medium leading-snug">
+                                  <p className="text-base text-gray-200 font-regular leading-snug">
                                     {bet.description}
                                   </p>
 
@@ -637,7 +637,7 @@ export default function Dashboard() {
                         <div
                           key={index}
                           onClick={() => router.push(`/predictions/${prediction.id}`)}
-                          className="flex items-center gap-4 p-4 bg-gray-900/30 rounded-xl hover:bg-gray-900/50 transition-colors cursor-pointer"
+                          className="flex items-center gap-4 p-2 bg-gray-900/30 rounded-xl transition-all hover:bg-gray-800/50 transition-colors cursor-pointer"
                         >
                           {prediction.str_thumb ? (
                             <Image
@@ -652,7 +652,7 @@ export default function Dashboard() {
                           )}
 
                           <div className="flex flex-col flex-grow gap-2">
-                            <div className="text-sm text-gray-100">{prediction.description}</div>
+                            <div className="text-base text-gray-100">{prediction.description}</div>
 
                             <div className="flex flex-wrap gap-2 items-center">
                              
