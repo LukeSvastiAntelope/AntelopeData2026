@@ -6,6 +6,9 @@ import { getJson } from "serpapi";
 import { CreatePredictionInput } from "@/app/utils/interface";
 
 function escapeMarkdown(text: string) {
+    // First, escape backslashes
+    text = text.replace(/\\/g, '\\\\');
+    
     const escapeChars = [
         '_',
         '*',
@@ -23,8 +26,10 @@ function escapeMarkdown(text: string) {
         '|',
         '{',
         '}',
-        '!',
-    ]; // Removed '.'
+        '.',
+        '!',  // Added back
+    ];
+    
     escapeChars.forEach((char) => {
         const regExp = new RegExp(`\\${char}`, 'g');
         text = text.replace(regExp, `\\${char}`);
@@ -112,9 +117,9 @@ export async function POST(req: NextRequest) {
                 `🔮 *New Prediction Created\\!*\n\n` +
                 `*${escapeMarkdown(data.description)}*\n` +
                 `*By*: \`${escapeMarkdown(user.username)}\`\n` +
-                `*Source*: ${data.source}\n` +
+                `*Source*: ${escapeMarkdown(data.source)}\n` +
                 `*Bet Amount*: \`${data.bet_amount}\` credits\n` +
-                `*Creator's Choice*: *${data.creator_choice.toUpperCase()}*\n` +
+                `*Creator's Choice*: *${escapeMarkdown(data.creator_choice.toUpperCase())}*\n` +
                 `*Resolution Date*: ${data.resolution_date}`
             );
         }
