@@ -161,7 +161,7 @@ const SecureLayout = ({ children }: { children: React.ReactNode }) => {
                                         <span className={`icon-strategy group-hover:hidden ${pathname === '/strategy' ? 'hidden' : 'block'}`} />
                                         <span className="hidden font-kodemono md:inline-block">Strategy</span>
                                     </Link>
-                                    <Button color="primary" variant="flat" onPress={openPredictionDialog}>
+                                    <Button className="hidden md:block" color="primary" variant="flat" onPress={openPredictionDialog}>
                                         Create Prediction
                                     </Button>
                                 </div>
