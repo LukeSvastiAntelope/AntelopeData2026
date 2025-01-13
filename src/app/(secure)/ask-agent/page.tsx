@@ -92,7 +92,7 @@ export default function AskAgent() {
   return (
     <div className="h-[calc(100vh-65px)] flex flex-col">
       {/* Header */}
-      <div className="p-4 shadow-sm flex items-center gap-4">
+      <div className="p-2 shadow-sm flex items-center gap-4">
         {agentProfile?.image && (
           <Image
             src={agentProfile.image}
@@ -103,11 +103,11 @@ export default function AskAgent() {
           />
         )}
         <div>
-          <h1 className="text-2xl font-bold">
+          <h1 className="text-xl font-kodemono">
             {agentProfile?.name ? `Ask ${agentProfile.name}` : "Ask Your Agent"}
           </h1>
           {agentProfile && (
-            <p className="text-default-500 text-sm mt-1">
+            <p className="text-default-500 text-sm mt-0">
               Category: {agentProfile.category}, Risk: {agentProfile.riskLevel}
             </p>
           )}
@@ -117,7 +117,7 @@ export default function AskAgent() {
       {/* Chat Container (no extra background color) */}
       <div
         ref={containerRef}
-        className="flex-1 overflow-y-auto p-4 space-y-4"
+        className="flex-1 overflow-y-auto p-4 space-y-4 text-small"
       >
         {messages.map((msg, index) => (
           <div

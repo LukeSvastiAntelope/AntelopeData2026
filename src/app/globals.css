@@ -287,6 +287,25 @@ max-width: 80px;
   min-height: 160px;
 }
 
+.plus-circle {
+  background-image: url('/assets/images/plus-circle.svg');
+  background-size: 20px 20px;
+  background-repeat: no-repeat;
+  background-position: center;
+  width: 20px;
+  height: 20px;
+}
+
+.message-circle {
+  background-image: url('/assets/images/message-circle.svg');
+  background-size: 20px 20px;
+  background-repeat: no-repeat;
+  background-position: left center;
+ 
+  height: 20px;
+  padding-left: 32px;
+}
+
 .icon-markets-active {
   background-image: url('/assets/images/markets_on.svg');
   background-size: 20px 20px;

@@ -184,8 +184,19 @@ export default function StrategyPage() {
       </div>
 
       {/* Betting Settings */}
+
+
+      <Card className="my-8 bg-content0 ">
+        <CardHeader className="text-small font-regular flex justify-between">
+          <span className="message-circle ml-1">Talk with your betting agent to analyze your strategy</span>
+          <Button color="primary" variant="flat" className="text-small" href="/ask-agent" as="a">
+            Talk
+          </Button>
+        </CardHeader>
+      </Card>
+
       <Card className="my-8 bg-content0">
-        <CardHeader className="text-medium font-regular flex justify-between">
+        <CardHeader className="text-small font-regular flex justify-between">
           Betting Basic
           <Button
             color="default"
@@ -198,10 +209,13 @@ export default function StrategyPage() {
           </Button>
         </CardHeader>
         <Divider />
+
+   
+
         <CardBody>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-            <h3 className="text-default-500 mb-2">Main Category</h3>
+            <h3 className="text-default-500 mb-2 text-small">Main Category</h3>
               <Chip color="primary" variant="flat">
                 {agent?.category
                   ? CATEGORIES.find(
@@ -213,21 +227,21 @@ export default function StrategyPage() {
             </div>
             
             <div>
-              <h3 className="text-default-500 mb-2">Resolution Preference</h3>
-              <p className="text-base font-semibold">{resolutionDate}</p>
+              <h3 className="text-default-500 mb-2 text-small">Resolution Preference</h3>
+              <p className="text-base font-semibold text-small">{resolutionDate}</p>
             </div>
             
           </div>
         </CardBody>
 
-        <Divider />
+      
 
         {/* Core Interests */}
 
        
        
         <CardBody>
-        <CardHeader className="text-medium font-regular px-0 pt-0 text-default-500">Sub-category Interests</CardHeader>
+        <CardHeader className="text-medium font-regular px-0 pt-0 text-default-500 text-small">Sub-category Interests</CardHeader>
           <div className="flex flex-wrap gap-2">
             {agent?.interests && agent?.interests.length > 0 ? (
               agent?.interests.map((interest) => (
@@ -246,7 +260,7 @@ export default function StrategyPage() {
 
       {/* Betting Principles */}
       <Card className="mb-8 bg-content0">
-        <CardHeader className="text-medium font-regular flex justify-between">
+        <CardHeader className="text-small font-regular flex justify-between">
           Betting Principles
           <Button
             color="default"
@@ -260,20 +274,20 @@ export default function StrategyPage() {
         </CardHeader>
         <Divider />
         <CardBody>
-          <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
+          
+          <div className="grid grid-cols-1 md:grid-cols-1 gap-1 text-small">
             {agent?.principles && agent?.principles.length > 0 ? (
-              agent?.principles.map((principle) => (
-                
+              agent?.principles.map((principle, index) => (
                 <PrincipleCard
                   key={principle.title}
                   title={principle.title}
                   description={principle.description}
-                  
+                  index={index}
                 />
-         
+                
               ))
               
-            ) : (
+            )  : (
               <p className="text-default-500">No principles added.</p>
             )}
           </div>
@@ -284,7 +298,7 @@ export default function StrategyPage() {
 
       {/* Risk Profile */}
       <Card className="bg-content0">
-        <CardHeader className="text-medium font-regular flex justify-between">
+        <CardHeader className="text-small font-regular flex justify-between">
           Risk Profile ({agent?.riskLevel})
           <Button
             color="default"
@@ -327,10 +341,11 @@ export default function StrategyPage() {
 interface PrincipleCardProps {
   title: string;
   description: string;
+  index: number;
 }
 
 const PrincipleCard = ({ title, description }: PrincipleCardProps) => (
-  <Card shadow="sm">
+  <Card shadow="none" className="bg-transparent">
     <CardBody>
       <h3 className="font-regular mb-2">{title}</h3>
       <p className="text-default-500">{description}</p>
@@ -351,6 +366,7 @@ const RiskItem = ({ level, description, value, color }: RiskItemProps) => (
       <span className="font-regular">{level}</span>
       <span className="text-default-500">{description}</span>
     </div>
+    <Divider />
     <Progress color={color} value={value} className="max-w-full" />
   </div>
 ); 

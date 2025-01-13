@@ -32,8 +32,8 @@ interface IMatch {
 
 // Add prediction types
 const predictionTypes: IPredictionType[] = [
-    { id: "custom", name: "Create Prediction", leagueId: "" },
-    { id: "soccer", name: "Predict Soccer", leagueId: "" },
+    { id: "custom", name: "General (News, Crypto, Markets)", leagueId: "" },
+    { id: "soccer", name: "Soccer", leagueId: "" },
     { id: "premier", name: "Predict Premier League", leagueId: "4328" },
     { id: "nfl", name: "Predict NFL", leagueId: "4391" },
     { id: "nba", name: "Predict NBA", leagueId: "4387" },
@@ -158,7 +158,7 @@ const PredictionDialog = ({ isOpen, onClose }: { isOpen: boolean, onClose: () =>
                 <ModalBody>
                     <div className="space-y-4">
                         <Select
-                            label="Prediction Type"
+                            label="Select Prediction Type"
                             value={predictionType}
                             onChange={(e) => {
                                 setPredictionType(e.target.value);
