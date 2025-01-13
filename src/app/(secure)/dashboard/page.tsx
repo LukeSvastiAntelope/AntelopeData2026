@@ -74,8 +74,26 @@ interface IBet {
   bet_id: number;
 }
 
+interface IActivity {
+  id: number;
+  description?: string;
+  created_at: string;
+  source?: string;
+  user_id?: number;
+  agent_id?: number;
+  prediction_id?: number;
+  bet_amount?: number;
+  creator_choice?: string;
+  str_thumb?: string;
+  username?: string;
+  amount: number;
+  choice?: string;
+  type?: string;
+}
+
 const ITEMS_PER_PAGE_BETS = 50;
 const ITEMS_PER_PAGE_PREDICTIONS = 50;
+const ITEMS_PER_PAGE_ACTIVITY = 50;
 
 const filterBets = (bets: IBet[], searchTerm: string): IBet[] => {
   const term = searchTerm.toLowerCase();
@@ -96,6 +114,15 @@ const filterPredictions = (predictions: IPrediction[], searchTerm: string): IPre
   );
 };
 
+const filterActivity = (activity: IActivity[], searchTerm: string): IActivity[] => {
+  const term = searchTerm.toLowerCase();
+  return activity.filter(item =>
+    item.description?.toLowerCase().includes(term) ||
+    item.source?.toLowerCase().includes(term) ||
+    item.type?.toLowerCase().includes(term)
+  );
+};
+
 function StatCard({
   icon,
   title,
@@ -111,20 +138,20 @@ function StatCard({
     <div
       className={`rounded-lg border border-white/10  shadow-lg px-4 py-2 flex justify-between items-center ${className}`}
     >
-      
+
       <div className="flex flex-row gap-1">
         <p className="text-default-400 text-sm">{title}</p>
         <p className="font-semibold text-sm">{value}</p>
       </div>
 
       <div className="text-primary text-1xl">{icon}</div>
-     
+
     </div>
   );
 }
 
 export default function Dashboard() {
-  const [activeTab, setActiveTab] = useState<"bets" | "predictions">("bets");
+  const [activeTab, setActiveTab] = useState<"bets" | "predictions" | "activity">("bets");
   const [searchTerm, setSearchTerm] = useState('');
   const [searchPredictions, setSearchPredictions] = useState('');
   // Agent
@@ -132,8 +159,11 @@ export default function Dashboard() {
   // Bets state
   const [bets, setBets] = useState<IBet[]>([]);
   const [isLoadingBets, setIsLoadingBets] = useState<boolean>(true);
+  const [isLoadingActivity, setIsLoadingActivity] = useState<boolean>(true);
+  const [activity, setActivity] = useState<IActivity[]>([]);
   const [pageBets, setPageBets] = useState<number>(1);
   const [hasMoreBets, setHasMoreBets] = useState<boolean>(true);
+
 
   // Predictions state
   const [predictions, setPredictions] = useState<IPrediction[]>([]);
@@ -141,6 +171,10 @@ export default function Dashboard() {
   const [displayedPredictions, setDisplayedPredictions] = useState<IPrediction[]>([]);
   const [pagePredictions, setPagePredictions] = useState<number>(1);
   const [hasMorePredictions, setHasMorePredictions] = useState<boolean>(true);
+
+  // Activity state
+  const [pageActivity, setPageActivity] = useState<number>(1);
+  const [hasMoreActivity, setHasMoreActivity] = useState<boolean>(true);
 
   const totalBets = bets.length;
   const totalPredictions = predictions.length;
@@ -210,6 +244,37 @@ export default function Dashboard() {
     }
   };
 
+  const fetchActivity = async (pageNumber: number) => {
+    setIsLoadingActivity(true);
+
+    try {
+      const response = await fetch.get(`/api/getRecentActivity?page=${pageNumber}&limit=${ITEMS_PER_PAGE_ACTIVITY}`);
+      if (response.status) {
+        if (pageNumber === 1) {
+          setActivity(response.activity);
+        } else {
+          setActivity((prev) => [...prev, ...response.activity]);
+        }
+        setHasMoreActivity(response.activity.length === ITEMS_PER_PAGE_ACTIVITY);
+      } else {
+        toast.error(response.message);
+      }
+    } catch (error) {
+      toast.error("Failed to fetch activity: " + error);
+      setHasMoreActivity(false);
+    } finally {
+      setIsLoadingActivity(false);
+    }
+  }
+
+  const loadMoreActivity = () => {
+    if (!isLoadingActivity && hasMoreActivity) {
+      const nextPage = pageActivity + 1;
+      setPageActivity(nextPage);
+      fetchActivity(nextPage);
+    }
+  }
+
   // Infinite scroll for predictions
   useEffect(() => {
     if (activeTab !== "predictions") return;
@@ -256,7 +321,6 @@ export default function Dashboard() {
   useEffect(() => {
     if (activeTab === "predictions" && predictions.length === 0) {
       fetchPredictions();
-      console.log("fetching predictions");
     }
   }, [activeTab, predictions]);
 
@@ -276,6 +340,7 @@ export default function Dashboard() {
       }
       fetchBets(1);
       fetchPredictions();
+      fetchActivity(1);
     };
     fetchAgentProfile();
   }, []);
@@ -353,30 +418,26 @@ export default function Dashboard() {
 
       {
         !agent || !agent.interests || agent.interests.length === 0 || !agent.principles || agent.principles.length === 0 ?
-        <div className="flex flex-col gap-2 mb-8 border border-white/10 rounded-xl p-6 text-center">
-        <div className="map-center"></div>
-        <h1 className="font-bold mb-2 font-kodemono">Create your strategy</h1>
-        <p className="text-gray-400">
-        You haven’t created your AI agents strategy yet. Before it can bet create the strategy and choose your area of interest.
-        </p>
-      </div>
-:
+          <div className="flex flex-col gap-2 mb-8 border border-white/10 rounded-xl p-6 text-center">
+            <div className="map-center"></div>
+            <h1 className="font-bold mb-2 font-kodemono">Create your strategy</h1>
+            <p className="text-gray-400">
+              You haven’t created your AI agents strategy yet. Before it can bet create the strategy and choose your area of interest.
+            </p>
+          </div>
+          :
           <>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-              
-                <StatCard
-                  icon={<FaRocket />}
-                  title="Bets"
-                  value={totalBets.toString()}
-                />
-       
-             
-                <StatCard
-                  icon={<FaDatabase />}
-                  title="Predictions"
-                  value={totalPredictions.toString()}
-                />
-  
+              <StatCard
+                icon={<FaRocket />}
+                title="Bets"
+                value={totalBets.toString()}
+              />
+              <StatCard
+                icon={<FaDatabase />}
+                title="Predictions"
+                value={totalPredictions.toString()}
+              />
               <StatCard
                 icon={<FaChartLine />}
                 title="Success"
@@ -388,9 +449,7 @@ export default function Dashboard() {
                 value={`${agent?.maxBetSize || 0}`}
               />
             </div>
-
             <div className="py-0 mb-4">
-             
               <div className="h-[160px]">
                 {bets && bets.length > 0 ? (
                   <Scatter data={scatterData} options={scatterOptions} />
@@ -401,9 +460,8 @@ export default function Dashboard() {
                 )}
               </div>
             </div>
-
             <div className="flex gap-4 mb-2 w-full justify-between">
-              <div className="flex gap-4 font-kodemono">
+              <div className="flex gap-4 font-kodemono items-center">
                 <Button
                   className={`py-2 px-0 rounded-lg ${activeTab === "bets"
                     ? "bg-transparent text-white"
@@ -422,9 +480,17 @@ export default function Dashboard() {
                 >
                   Predictions
                 </Button>
+                <Button
+                  className={`py-2 px-0 rounded-lg ${activeTab === "activity"
+                    ? "bg-transparent text-white"
+                    : "bg-transparent text-default-400 hover:text-white"
+                    }`}
+                  onPress={() => setActiveTab("activity")}
+                >
+                  Activity
+                </Button>
               </div>
             </div>
-
             <div className="relative mb-6 group">
               <span className="absolute inset-y-0 left-0 flex items-center pl-2 pointer-events-none">
                 {/* Search Icon */}
@@ -524,11 +590,11 @@ export default function Dashboard() {
                                   <div className="flex flex-wrap items-center gap-1">
                                     {/* Bet Amount */}
                                     <div className="flex items-center gap-1 py-1">
-                                    
+
                                       <span className="text-sm icon-coin text-gray-300">{bet.amount}</span>
                                     </div>
 
-                                    
+
 
                                     {/* Market Odds */}
                                     {choiceOdds.map(({ choice, percentage }) => (
@@ -541,7 +607,7 @@ export default function Dashboard() {
                                         }
                                         size="sm"
                                       >
-                                         {percentage}%
+                                        {percentage}%
                                       </Chip>
                                     ))}
 
@@ -637,7 +703,7 @@ export default function Dashboard() {
                         <div
                           key={index}
                           onClick={() => router.push(`/predictions/${prediction.id}`)}
-                          className="flex items-center gap-4 p-2 bg-gray-900/30 rounded-xl transition-all hover:bg-gray-800/50 transition-colors cursor-pointer"
+                          className="flex items-center gap-4 p-2 bg-gray-900/30 rounded-xl hover:bg-gray-800/50 transition-colors cursor-pointer"
                         >
                           {prediction.str_thumb ? (
                             <Image
@@ -655,7 +721,7 @@ export default function Dashboard() {
                             <div className="text-base text-gray-100">{prediction.description}</div>
 
                             <div className="flex flex-wrap gap-2 items-center">
-                             
+
                               {choiceOdds.map(({ choice, percentage }) => (
                                 <Chip
                                   key={choice}
@@ -670,7 +736,7 @@ export default function Dashboard() {
                                 </Chip>
                               ))}
 
-                              
+
 
                               {/* Status */}
                               <Chip
@@ -700,6 +766,97 @@ export default function Dashboard() {
                 </div>
               </section>
             )}
+
+            {
+              activeTab === "activity" && (
+                <section className="rounded-lg overflow-x-auto mb-8">
+                  {isLoadingActivity && activity.length === 0 ? (
+                    <div className="flex justify-center items-center py-8">
+                      <Spinner size="lg" />
+                    </div>
+                  ) : activity.length === 0 && !isLoadingActivity ? (
+                    <div className="text-center text-gray-500 py-8">
+                      No activity found
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-2">
+                      {filterActivity(activity, searchTerm).map((item: IActivity, index: number) => (
+                        <div
+                          key={index}
+                          className="flex items-start gap-4 p-4 bg-gray-900/30 rounded-xl hover:bg-gray-800/50 transition-colors"
+                        >
+                          {/* Thumbnail if available */}
+                          {item.str_thumb ? (
+                            <Image
+                              src={item.str_thumb}
+                              alt=""
+                              width={40}
+                              height={40}
+                              className="w-10 h-10 rounded-full"
+                            />
+                          ) : (
+                            <div className="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center">
+                              <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                              </svg>
+                            </div>
+                          )}
+
+                          {/* Content */}
+                          <div className="flex-1 space-y-2">
+                            <div className="font-medium text-primary">
+                              {item.type === 'bet' ? '🔮 New Agent Bet!' : `🔮 New ${item.source == "sportDB" ? "Game " : ""}Prediction Created!`}
+                            </div>
+                            
+                            <div className="space-y-1 text-sm text-gray-300">
+                              {item.description && (
+                                <div>{item.description}</div>
+                              )}
+                              {item.username && (
+                                <div>By: {item.username}</div>
+                              )}
+                              {item.amount > 0 && (
+                                <div>Bet Amount: {item.amount} credits</div>
+                              )}
+                              {item.choice && (
+                                <div>User&apos;s Choice: {item.choice}</div>
+                              )}
+                              {/* If it's not a bet, show the description */}
+                              {item.prediction_id && item.type == "bet" && (
+                                <div>Prediction ID: {item.prediction_id}</div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {hasMoreActivity && !isLoadingActivity && activity.length > 0 && (
+                    <div className="flex justify-center mt-4">
+                      <Button
+                        color="primary"
+                        variant="flat"
+                        onPress={loadMoreActivity}
+                        isLoading={isLoadingActivity}
+                        className="min-w-[200px]"
+                      >
+                        {isLoadingActivity ? "Loading..." : "Show More"}
+                      </Button>
+                    </div>
+                  )}
+                  {isLoadingActivity && activity.length > 0 && (
+                    <div className="flex justify-center items-center py-4">
+                      <Spinner size="sm" />
+                    </div>
+                  )}
+                  {!hasMoreActivity && activity.length > 0 && (
+                    <div className="text-center text-gray-500 py-4">
+                      No more activity to load
+                    </div>
+                  )}
+                </section>
+              )
+            }
           </>
       }
     </>
