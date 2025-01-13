@@ -506,7 +506,7 @@ ${p.metadata?.comment ? `- Agent Controller Comment: ${p.metadata.comment}` : ''
                         return false;
                     }
 
-                    console.log("prediction", prediction);
+                    console.log("filter prediction", p);
 
                     const existingBet = prediction?.agent_bets ?
                         this.parseAgentBets(prediction.agent_bets)[this.agent.id] :
@@ -533,6 +533,8 @@ ${p.metadata?.comment ? `- Agent Controller Comment: ${p.metadata.comment}` : ''
                             reasoning: p.reasoning || 'No specific reasoning provided'
                         });
                     }
+                    console.log("parse prediction", p);
+
                     return {
                         predictionId: p.id,
                         agentId: this.agent.id,
