@@ -45,44 +45,45 @@ export const UserRepo = {
 async function getRecentActivity(limit: number, offset: number) {
     const db = await getMySQLConnection();
     const query = `
-      (SELECT 
-        'bet' as type,
-        bets.id as bet_id,
-        bets.user_id as user_id,
-        bets.prediction_id as prediction_id,
-        bets.created_at as created_at,
-        bets.amount as amount,
-        '' as str_thumb,
-        bets.choice as choice,
-        '' as description,
-        '' as source,
-        users.username as username
-      FROM bets
-      JOIN users ON bets.user_id = users.id
-      WHERE bets.is_secret = 0)
-      
-      UNION ALL
-      
-      (SELECT 
-        'prediction' as type,
-        '0' as bet_id,
-        predictions.creator_id as user_id,
-        predictions.id as prediction_id,
-        predictions.created_at as created_at,
-        predictions.bet_amount as amount,
-        predictions.str_thumb as str_thumb,
-        predictions.creator_choice as choice,
-        predictions.description as description,
-        predictions.source as source,
-        users.username as username
-      FROM predictions
-      JOIN users ON predictions.creator_id = users.id)
-      
+      SELECT * FROM (
+        (SELECT 
+          'bet' as type,
+          bets.id as bet_id,
+          bets.user_id as user_id,
+          bets.prediction_id as prediction_id,
+          bets.created_at as created_at,
+          bets.amount as amount,
+          '' as str_thumb,
+          bets.choice as choice,
+          '' as description,
+          '' as source,
+          users.username as username
+        FROM bets
+        JOIN users ON bets.user_id = users.id
+        WHERE bets.is_secret = 0)
+        
+        UNION ALL
+        
+        (SELECT 
+          'prediction' as type,
+          '0' as bet_id,
+          predictions.creator_id as user_id,
+          predictions.id as prediction_id,
+          predictions.created_at as created_at,
+          predictions.bet_amount as amount,
+          predictions.str_thumb as str_thumb,
+          predictions.creator_choice as choice,
+          predictions.description as description,
+          predictions.source as source,
+          users.username as username
+        FROM predictions
+        JOIN users ON predictions.creator_id = users.id)
+      ) AS combined_results
       ORDER BY created_at DESC
-      LIMIT ? OFFSET ?
+      LIMIT ?, ?
     `;
     
-    const [rows] = await db.execute<(RowDataPacket)[]>(query, [limit, offset]);
+    const [rows] = await db.execute<RowDataPacket[]>(query, [offset, limit]);
     return rows;
 }
 
