@@ -7,7 +7,6 @@ import { toast } from "react-hot-toast";
 import { useFetch } from "../utils/lib";
 import Link from "next/link";
 import Image from "next/image";
-import { Button } from "@nextui-org/button";
 import PredictionDialog from "../components/PredictionDialog";
 
 const AsideSkeleton = () => {
