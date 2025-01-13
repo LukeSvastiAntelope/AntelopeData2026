@@ -196,12 +196,12 @@ export default function StrategyPage() {
       </Card>
 
       <Card className="my-8 bg-content0">
-        <CardHeader className="text-small font-regular flex justify-between">
+        <CardHeader className="text-small font-regular flex justify-between ml-2">
           Betting Basic
           <Button
             color="default"
             variant="flat"
-            className=""
+            className="mr-2"
             href="/editBasicStrategy"
             as="a"
           >
@@ -213,7 +213,7 @@ export default function StrategyPage() {
    
 
         <CardBody>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 ml-2">
             <div>
             <h3 className="text-default-500 mb-2 text-small">Main Category</h3>
               <Chip color="primary" variant="flat">
@@ -241,8 +241,8 @@ export default function StrategyPage() {
        
        
         <CardBody>
-        <CardHeader className="text-medium font-regular px-0 pt-0 text-default-500 text-small">Sub-category Interests</CardHeader>
-          <div className="flex flex-wrap gap-2">
+        <CardHeader className="text-medium font-regular px-0 pt-0 text-default-500 text-small ml-2">Sub-category Interests</CardHeader>
+          <div className="flex flex-wrap gap-2 ml-2">
             {agent?.interests && agent?.interests.length > 0 ? (
               agent?.interests.map((interest) => (
                 <Chip key={interest} color="primary" variant="flat">
@@ -260,12 +260,12 @@ export default function StrategyPage() {
 
       {/* Betting Principles */}
       <Card className="mb-8 bg-content0">
-        <CardHeader className="text-small font-regular flex justify-between">
+        <CardHeader className="text-small font-regular flex justify-between mx-2">
           Betting Principles
           <Button
             color="default"
             variant="flat"
-            className=""
+            className="mr-2"
             href="/editPrinciples"
             as="a"
           >
@@ -298,12 +298,12 @@ export default function StrategyPage() {
 
       {/* Risk Profile */}
       <Card className="bg-content0">
-        <CardHeader className="text-small font-regular flex justify-between">
+        <CardHeader className="text-small font-regular flex justify-between mx-2">
           Risk Profile ({agent?.riskLevel})
           <Button
             color="default"
             variant="flat"
-            className=""
+            className="mr-2"
             href="/editRiskStrategy"
             as="a"
           >
@@ -312,7 +312,7 @@ export default function StrategyPage() {
         </CardHeader>
         <Divider />
         <CardBody>
-          <div className="space-y-6 text-small">
+          <div className="space-y-6 text-small mx-2">
             <RiskItem
               level="Conservative"
               description={agent?.conservativeBetSize?.toString() || "0"}
@@ -366,7 +366,7 @@ const RiskItem = ({ level, description, value, color }: RiskItemProps) => (
       <span className="font-regular">{level}</span>
       <span className="text-default-500">{description}</span>
     </div>
-    <Divider />
+   
     <Progress color={color} value={value} className="max-w-full" />
   </div>
 ); 
