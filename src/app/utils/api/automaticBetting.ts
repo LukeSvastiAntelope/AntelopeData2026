@@ -146,7 +146,9 @@ export class AutomaticBettingAgent {
             return [];
         }
 
+        console.log("interestingPredictions", interestingPredictions);
         const groupedPredictions = this.groupPredictionsByTopic(interestingPredictions);
+        console.log("groupedPredictions", groupedPredictions);
         const decisions = await Promise.all(
             Object.entries(groupedPredictions).map(async ([, topicPredictions]) => {
                 const news = await this.gatherRelevantNews(topicPredictions);
