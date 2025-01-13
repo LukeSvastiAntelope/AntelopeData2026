@@ -58,7 +58,7 @@ export default function MarketsPage() {
   const fetch = useFetch();
 
   // Fetch Predictions
-  const fetchPredictions = async () => {
+  const fetchPredictions = async (category: string) => {
     if (isLoadingPredictions) return;
     setIsLoadingPredictions(true);
     setIsLoadingSports(true);
@@ -70,22 +70,22 @@ export default function MarketsPage() {
       const response = await fetch.get("/api/getPredictions");
       if (response.status) {
         let source = "";
-        if (agent?.category == "general") {
+        if (category == "general") {
           source = "google_news";
-        } else if (agent?.category == "markets") {
+        } else if (category == "markets") {
           source = "google_finance";
-        } else if (agent?.category == "crypto") {
+        } else if (category == "crypto") {
           source = "coinmarketcap";
         } else {
           source = "sportDB";
         }
         let interest = response.predictions.filter((prediction: IPrediction) => prediction.source == source);
         if (source == "sportDB") {
-          if (agent?.category == "nba") {
+          if (category == "nba") {
             interest = interest.filter((prediction: IPrediction) => prediction.league_id == 4387);
-          } else if (agent?.category == "nfl") {
+          } else if (category == "nfl") {
             interest = interest.filter((prediction: IPrediction) => prediction.league_id == 4391);
-          } else if (agent?.category == "english premier league") {
+          } else if (category == "english premier league") {
             interest = interest.filter((prediction: IPrediction) => prediction.league_id == 4328);
           } else {
             interest = interest.filter((prediction: IPrediction) => prediction.league_id != 4387 && prediction.league_id != 4391);
@@ -143,7 +143,7 @@ export default function MarketsPage() {
       } else {
         toast.error(response.message);
       }
-      fetchPredictions();
+      fetchPredictions(response.agent.category);
     } catch (error) {
       console.log(error);
       toast.error('Failed to fetch agent profile');

@@ -112,7 +112,7 @@ export default function PredictionDetail() {
             } else {
                 toast.error(response.message);
             }
-            fetchPredictionDetails(params.id as string);
+            fetchPredictionDetails(params.id as string, response.agent.category);
         } catch (error) {
             console.log(error);
             toast.error('Failed to fetch agent profile');
@@ -120,7 +120,7 @@ export default function PredictionDetail() {
     };
 
     // Call both fetches
-    const fetchPredictionDetails = async (id: string) => {
+    const fetchPredictionDetails = async (id: string, category: string) => {
         try {
             const response = await fetchData.get(`/api/getPrediction/${id}`);
             if (response.status) {
@@ -150,24 +150,24 @@ export default function PredictionDetail() {
                 }
 
                 let source = "";
-                if (agent?.category == "general") {
+                if (category == "general") {
                     source = "google_news";
-                } else if (agent?.category == "markets") {
+                } else if (category == "markets") {
                     source = "google_finance";
-                } else if (agent?.category == "crypto") {
+                } else if (category == "crypto") {
                     source = "coinmarketcap";
                 } else {
                     source = "sportDB";
                 }
                 let interest = response.prediction.source == source;
                 if (source == "sportDB") {
-                    if (agent?.category == "nba") {
+                    if (category == "nba") {
                         interest = response.prediction.league_id == 4387;
-                    } else if (agent?.category == "nfl") {
+                    } else if (category == "nfl") {
                         interest = response.prediction.league_id == 4391;
-                    } else if (agent?.category == "english premier league") {
+                    } else if (category == "english premier league") {
                         interest = response.prediction.league_id == 4328;
-                    } else if (agent?.category == "soccer") {
+                    } else if (category == "soccer") {
                         interest = response.prediction.league_id != 4387 && response.prediction.league_id != 4391;
                     }
                 }
@@ -233,7 +233,7 @@ export default function PredictionDetail() {
                 toast.success("Bet placed successfully!");
                 setIsModalOpen(false);
                 // Refresh prediction details
-                fetchPredictionDetails(params.id as string);
+                fetchPredictionDetails(params.id as string, agent?.category as string);
             } else {
                 toast.error(response.message);
             }
