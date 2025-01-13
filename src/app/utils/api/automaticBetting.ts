@@ -391,6 +391,8 @@ ${p.metadata?.comment ? `- Agent Controller Comment: ${p.metadata.comment}` : ''
                     ],
                     temperature: 0.3
                 });
+                console.log("prompt", prompt);
+                console.log("completion", completion);
 
                 const batchDecisions = this.parseAnalysisResponse(
                     completion.choices[0].message.content!,
