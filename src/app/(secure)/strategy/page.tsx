@@ -12,6 +12,7 @@ import { useFetch } from "@/app/utils/lib";
 import { IAgentProfile } from "@/app/utils/interface";
 import { convertDaysToYMD } from "@/app/utils/lib";
 import { CATEGORIES } from "@/app/utils/const";
+import {Switch} from "@nextui-org/switch";
 
 /**
  * StrategySkeleton: Skeleton loader that matches the layout for “Strategy Page”
@@ -140,16 +141,19 @@ export default function StrategyPage() {
   const [agent, setAgent] = useState<IAgentProfile | null>(null);
   const [resolutionDate, setResolutionDate] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isBettingEnabled, setIsBettingEnabled] = useState(false);
   const fetch = useFetch();
 
   useEffect(() => {
     const fetchAgentProfile = async () => {
+      setIsLoading(true);
       try {
         // For demonstration, reusing the same endpoint as the profile.
         // If your backend provides a separate endpoint, replace accordingly.
         const response = await fetch.get("/api/getAgentProfile");
         if (response.status) {
           setAgent(response.agent);
+          setIsBettingEnabled(response.agent.is_bet || false);
           const { years, months, days } = convertDaysToYMD(response.agent.maxTimelineLimit);
           setResolutionDate(
             `${years ? `${years} years ` : ""}${months ? `${months} months ` : ""
@@ -168,6 +172,23 @@ export default function StrategyPage() {
     fetchAgentProfile();
   }, []);
 
+  const handleBettingToggle = async (isSelected: boolean) => {
+    try {
+      const response = await fetch.post("/api/updateBettingStatus", {
+        is_bet: isSelected
+      });
+      if (response.status) {
+        setIsBettingEnabled(isSelected);
+        toast.success(isSelected ? "Betting enabled" : "Betting disabled");
+      } else {
+        toast.error(response.message);
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to update betting status");
+    }
+  };
+
   if (isLoading) return <StrategySkeleton />;
 
   return (
@@ -182,6 +203,23 @@ export default function StrategyPage() {
           </p>
         </div>
       </div>
+
+      <Card className="my-8 bg-content0">
+        <CardBody className="flex flex-row justify-between items-center">
+          <div>
+            <h3 className="text-small font-regular">Betting Status</h3>
+            <p className="text-default-500 text-small">
+              {isBettingEnabled ? "Betting is currently enabled" : "Betting is currently disabled"}
+            </p>
+          </div>
+          <Switch
+            isSelected={isBettingEnabled}
+            onValueChange={handleBettingToggle}
+            color="success"
+            size="lg"
+          />
+        </CardBody>
+      </Card>
 
       {/* Betting Settings */}
 
@@ -228,7 +266,7 @@ export default function StrategyPage() {
             
             <div>
               <h3 className="text-default-500 mb-2 text-small">Resolution Preference</h3>
-              <p className="text-base font-semibold text-small">{resolutionDate}</p>
+              <p className="font-semibold text-small">{resolutionDate}</p>
             </div>
             
           </div>
@@ -241,7 +279,7 @@ export default function StrategyPage() {
        
        
         <CardBody>
-        <CardHeader className="text-medium font-regular px-0 pt-0 text-default-500 text-small ml-2">Sub-category Interests</CardHeader>
+        <CardHeader className="font-regular px-0 pt-0 text-default-500 text-small ml-2">Sub-category Interests</CardHeader>
           <div className="flex flex-wrap gap-2 ml-2">
             {agent?.interests && agent?.interests.length > 0 ? (
               agent?.interests.map((interest) => (
@@ -284,9 +322,7 @@ export default function StrategyPage() {
                   description={principle.description}
                   index={index}
                 />
-                
               ))
-              
             )  : (
               <p className="text-default-500">No principles added.</p>
             )}

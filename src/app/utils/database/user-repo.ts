@@ -37,7 +37,13 @@ export const UserRepo = {
     updatePassword,
     createPrediction,
     updateUserBalance,
-    createBet
+    createBet,
+    updateBettingStatus
+}
+
+async function updateBettingStatus(userId: number, is_bet: boolean) {
+    const db = await getMySQLConnection();
+    await db.execute('UPDATE agents SET is_bet = ? WHERE user_id = ?', [is_bet, userId]);
 }
 
 async function createBet(predictionId: number, agentId: number, choice: string, amount: number, reason: string, userId: number, pineconeId: string) {
