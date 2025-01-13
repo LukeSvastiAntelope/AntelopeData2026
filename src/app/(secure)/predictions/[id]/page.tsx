@@ -160,7 +160,7 @@ export default function PredictionDetail() {
                     source = "sportDB";
                 }
                 let interest = response.prediction.source == source;
-                if (source == "sportDB") {
+                if (source == "sportDB" && interest) {
                     if (category == "nba") {
                         interest = response.prediction.league_id == 4387;
                     } else if (category == "nfl") {
