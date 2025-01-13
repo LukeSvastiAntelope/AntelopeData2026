@@ -139,14 +139,11 @@ function StatCard({
     <div
       className={`rounded-lg border border-white/10  shadow-lg px-4 py-2 flex justify-between items-center ${className}`}
     >
-
       <div className="flex flex-row gap-1">
         <p className="text-default-400 text-sm">{title}</p>
         <p className="font-semibold text-sm">{value}</p>
       </div>
-
       <div className="text-primary text-1xl">{icon}</div>
-
     </div>
   );
 }
@@ -247,7 +244,6 @@ export default function Dashboard() {
 
   const fetchActivity = async (pageNumber: number) => {
     setIsLoadingActivity(true);
-
     try {
       const response = await fetch.get(`/api/getRecentActivity?page=${pageNumber}&limit=${ITEMS_PER_PAGE_ACTIVITY}`);
       if (response.status) {
@@ -822,10 +818,6 @@ export default function Dashboard() {
                               )}
                               {item.choice && (
                                 <div>User&apos;s Choice: {item.choice}</div>
-                              )}
-                              {/* If it's not a bet, show the description */}
-                              {item.prediction_id && item.type == "bet" && (
-                                <div>Prediction ID: {item.prediction_id}</div>
                               )}
                             </div>
                           </div>

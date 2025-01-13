@@ -55,11 +55,12 @@ async function getRecentActivity(limit: number, offset: number) {
           bets.amount as amount,
           '' as str_thumb,
           bets.choice as choice,
-          '' as description,
-          '' as source,
+          predictions.description as description,
+          predictions.source as source,
           users.username as username
         FROM bets
         JOIN users ON bets.user_id = users.id
+        JOIN predictions ON bets.prediction_id = predictions.id
         WHERE bets.is_secret = 0)
         
         UNION ALL
