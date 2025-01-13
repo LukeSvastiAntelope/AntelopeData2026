@@ -38,7 +38,7 @@ export default function AskAgent() {
       }
     };
     loadAgentProfile();
-  }, []);
+  }, [fetch]);
 
   // Auto-scroll to the bottom whenever messages change
   useEffect(() => {
@@ -59,16 +59,18 @@ export default function AskAgent() {
     // 1) Add the user’s message to the chat
     setMessages((prev) => [...prev, { role: "user", content: userQuestion }]);
 
+    // 2) Show the "thinking" state
     setIsLoading(true);
+
     try {
-      // 2) Send userQuestion + agentProfile to the backend
+      // 3) Send userQuestion + agentProfile to the backend
       const body = {
         userQuestion,
         agentProfile, // Includes name, image, category, risk, etc.
       };
       const response = await fetch.post("/api/askAgent", body);
       if (response.status) {
-        // 3) Add agent’s message to the chat
+        // 4) Add agent’s message to the chat
         setMessages((prev) => [...prev, { role: "agent", content: response.answer }]);
       } else {
         toast.error(response.message || "Failed to get answer");
@@ -82,7 +84,7 @@ export default function AskAgent() {
   };
 
   // Capture Enter key to trigger handleSend (except when shift + enter is pressed)
-  const handleKeyDown = (e: React.KeyboardEvent) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSend();
@@ -117,33 +119,50 @@ export default function AskAgent() {
       {/* Chat Container (no extra background color) */}
       <div
         ref={containerRef}
-        className="flex-1 overflow-y-auto p-4 space-y-4 text-small"
+        className="flex-1 overflow-y-auto p-2 space-y-4 text-small"
       >
-        {messages.map((msg, index) => (
-          <div
-            key={index}
-            className={`max-w-xl px-4 py-2 rounded-md ${
-              msg.role === "user"
-                ? "bg-primary/10 self-end"
-                : "bg-default-200 self-start"
-            }`}
-            style={{ whiteSpace: "pre-wrap" }}
-          >
+        {messages.length === 0 ? (
+          <div className="flex items-center justify-center h-full">
+            <p className="text-default-400">Ask the agent any question about, previous bets, strategy, etc.</p>
+          </div>
+        ) : (
+          messages.map((msg, index) => {
+            const isUser = msg.role === "user";
+            return (
+              <div
+                key={index}
+                className={`max-w-xl px-2 py-2 rounded-md ${
+                  isUser ? "bg-primary/20 self-end" : "bg-gray-800 self-start"
+                }`}
+                style={{ whiteSpace: "pre-wrap" }}
+              >
+                <p
+                  className={
+                    isUser ? "text-primary-600 px-2" : "text-white p-2"
+                  }
+                >
+                  <strong>
+                    {isUser ? "You" : agentProfile?.name || "Agent"}:
+                  </strong>{" "}
+                  {msg.content}
+                </p>
+              </div>
+            );
+          })
+        )}
+        {/* If the agent is "thinking," show a loader bubble */}
+        {isLoading && (
+          <div className="max-w-xl px-4 py-2 rounded-md bg-default-200 self-start">
             <p className="text-default-600">
-              <strong>
-                {msg.role === "user"
-                  ? "You"
-                  : agentProfile?.name || "Agent"}
-                :
-              </strong>{" "}
-              {msg.content}
+              <strong>{agentProfile?.name || "Agent"}:</strong> 
+              <span className="ml-2 animate-pulse">Thinking...</span>
             </p>
           </div>
-        ))}
+        )}
       </div>
 
       {/* Fixed Bottom Input Area */}
-      <div className=" p-0 flex items-end gap-2 bg-default-50 sticky bottom-0">
+      <div className="p-2 flex items-end gap-2 bg-default-50 sticky bottom-0">
         <Textarea
           label=""
           placeholder="Type your question..."
@@ -154,7 +173,11 @@ export default function AskAgent() {
           minRows={1}
           maxRows={4}
         />
-        <Button color="primary" onPress={handleSend} isLoading={isLoading}>
+        <Button
+          color="primary"
+          onPress={handleSend}
+          isDisabled={isLoading}
+        >
           Send
         </Button>
       </div>

@@ -312,7 +312,7 @@ export default function StrategyPage() {
         </CardHeader>
         <Divider />
         <CardBody>
-          <div className="space-y-6">
+          <div className="space-y-6 text-small">
             <RiskItem
               level="Conservative"
               description={agent?.conservativeBetSize?.toString() || "0"}
