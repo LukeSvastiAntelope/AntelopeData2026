@@ -403,6 +403,8 @@ ${p.metadata?.comment ? `- Agent Controller Comment: ${p.metadata.comment}` : ''
                 if (i + BATCH_SIZE < predictions.length) {
                     await new Promise(resolve => setTimeout(resolve, 1000));
                 }
+                console.log("predictions", predictions);
+                console.log("allDecisions", allDecisions);
             } catch (error) {
                 console.error(`Error analyzing batch ${i / BATCH_SIZE + 1}:`, error);
             }
