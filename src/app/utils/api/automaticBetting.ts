@@ -93,21 +93,21 @@ export class AutomaticBettingAgent {
             // Process predictions in smaller chunks
             const CHUNK_SIZE = 5;
             const allDecisions: BetDecision[] = [];
-            
+
             // Process predictions in chunks
             for (let i = 0; i < predictions.length; i += CHUNK_SIZE) {
                 const chunk = predictions.slice(i, i + CHUNK_SIZE);
-                
+
                 // Process this chunk
                 const chunkResults = await this.processChunk(chunk);
                 allDecisions.push(...chunkResults);
-                
+
                 // Add a small delay between chunks to prevent overload
                 if (i + CHUNK_SIZE < predictions.length) {
                     await new Promise(resolve => setTimeout(resolve, 500));
                 }
             }
-            
+
             return allDecisions;
         } catch (error) {
             console.error('Error in batch prediction analysis:', error);
@@ -119,7 +119,7 @@ export class AutomaticBettingAgent {
         const openPredictions = predictions.filter(p => p.creator_id !== this.agent.user_id);
         const predictionSource = this.getPredictionSource();
         const categoryPredictions = openPredictions.filter(p => p.source === predictionSource);
-        
+
         // Add market data enrichment if needed
         if (predictionSource === 'google_finance' || predictionSource === 'coinmarketcap') {
             await this.enrichPredictionsWithMarketData(categoryPredictions);
@@ -140,7 +140,7 @@ export class AutomaticBettingAgent {
                 })
             )
         ).filter(result => result.shouldBet)
-         .map(result => result.prediction);
+            .map(result => result.prediction);
 
         if (interestingPredictions.length === 0) {
             return [];
@@ -158,7 +158,7 @@ export class AutomaticBettingAgent {
                     news,
                     similarPredictions
                 );
-                
+
                 // Store each bet decision in Pinecone and update with pineconeId
                 const updatedDecisions = await Promise.all(decision.map(async bet => {
                     const prediction = topicPredictions.find(p => p.id === bet.predictionId);
@@ -210,7 +210,7 @@ export class AutomaticBettingAgent {
         or
         NO: [1-2 sentence explanation]
         `;
-        
+
         const response = await this.openai.chat.completions.create({
             model: "gpt-4o",
             messages: [
@@ -260,7 +260,7 @@ export class AutomaticBettingAgent {
 
         for (let i = 0; i < predictions.length; i += BATCH_SIZE) {
             const batchPredictions = predictions.slice(i, i + BATCH_SIZE);
-            
+
             // Get relevant news for this batch
             const relevantNews = this.filterRelevantNews(news, batchPredictions, 3);
             const relevantSimilar = this.filterSimilarPredictions(similarPredictions, batchPredictions, 2);
@@ -271,9 +271,8 @@ export class AutomaticBettingAgent {
                     prediction.betReason = prediction.betReason || [];
                     prediction.betReason.push({
                         step: "newsAnalysis",
-                        reasoning: `Analyzed ${relevantNews.length} relevant news articles: ${
-                            relevantNews.map(n => n.title.substring(0, 50)).join('; ')
-                        }`
+                        reasoning: `Analyzed ${relevantNews.length} relevant news articles: ${relevantNews.map(n => n.title.substring(0, 50)).join('; ')
+                            }`
                     });
                 });
             }
@@ -284,9 +283,8 @@ export class AutomaticBettingAgent {
                     prediction.betReason = prediction.betReason || [];
                     prediction.betReason.push({
                         step: "similarPredictions",
-                        reasoning: `Found ${relevantSimilar.length} similar predictions with ${
-                            relevantSimilar.filter(p => p.metadata?.result === 'win').length
-                        } successful outcomes`
+                        reasoning: `Found ${relevantSimilar.length} similar predictions with ${relevantSimilar.filter(p => p.metadata?.result === 'win').length
+                            } successful outcomes`
                     });
                 });
             }
@@ -310,46 +308,46 @@ export class AutomaticBettingAgent {
 
 Predictions to analyze:
 ${batchPredictions.map(p => {
-    // Parse all bets to calculate odds
-    const bets = p.agent_bets ? p.agent_bets.split(',').map(bet => {
-        const [, , amount, choice] = bet.split(':');
-        return { amount: Number(amount), choice };
-    }) : [];
+                // Parse all bets to calculate odds
+                const bets = p.agent_bets ? p.agent_bets.split(',').map(bet => {
+                    const [, , amount, choice] = bet.split(':');
+                    return { amount: Number(amount), choice };
+                }) : [];
 
-    // Group and sum bets by choice
-    const betsByChoice = bets.reduce((acc, bet) => {
-        acc[bet.choice] = (acc[bet.choice] || 0) + bet.amount;
-        return acc;
-    }, {} as Record<string, number>);
+                // Group and sum bets by choice
+                const betsByChoice = bets.reduce((acc, bet) => {
+                    acc[bet.choice] = (acc[bet.choice] || 0) + bet.amount;
+                    return acc;
+                }, {} as Record<string, number>);
 
-    const totalAmount = Object.values(betsByChoice).reduce((sum, amount) => sum + amount, 0);
+                const totalAmount = Object.values(betsByChoice).reduce((sum, amount) => sum + amount, 0);
 
-    // Calculate odds for each unique choice made by betters
-    const oddsDisplay = totalAmount > 0 
-        ? Object.entries(betsByChoice)
-            .map(([choice, amount]) => {
-                const percentage = (amount / totalAmount * 100).toFixed(1);
-                return `${choice}: ${percentage}%`;
-            })
-            .join(' vs ')
-        : p.source === "sportDB"
-            ? `${p.team_a}: 33.3% vs ${p.team_b}: 33.3% vs draw: 33.3%` // Default for sports
-            : `${p.creator_choice}: 50.0% vs No: 50.0%`; // Default for binary
+                // Calculate odds for each unique choice made by betters
+                const oddsDisplay = totalAmount > 0
+                    ? Object.entries(betsByChoice)
+                        .map(([choice, amount]) => {
+                            const percentage = (amount / totalAmount * 100).toFixed(1);
+                            return `${choice}: ${percentage}%`;
+                        })
+                        .join(' vs ')
+                    : p.source === "sportDB"
+                        ? `${p.team_a}: 33.3% vs ${p.team_b}: 33.3% vs draw: 33.3%` // Default for sports
+                        : `${p.creator_choice}: 50.0% vs No: 50.0%`; // Default for binary
 
-    return `ID: ${p.id}
+                return `ID: ${p.id}
      Description: ${p.description}
-     ${p.source === "sportDB" ? 
-        `Team A: ${p.team_a}
+     ${p.source === "sportDB" ?
+                        `Team A: ${p.team_a}
      Team B: ${p.team_b}
      Predicted Winner: ${p.predicted_outcome}` :
-        `Creator Choice: ${p.creator_choice}`}
+                        `Creator Choice: ${p.creator_choice}`}
      Creator Betting Amount: ${p.bet_amount}
      Market Odds: ${oddsDisplay}
      Total Bet Amount: ${totalAmount}
-     You Are Already Bet: ${p.agent_bets ? this.parseAgentBets(p.agent_bets)[this.agent.id] ? 
-        `${this.parseAgentBets(p.agent_bets)[this.agent.id].amount} to ${this.parseAgentBets(p.agent_bets)[this.agent.id].choice}` : 
-        'No bets made yet' : 'No bets made yet'}`
-}).join('\n')}
+     You Are Already Bet: ${p.agent_bets ? this.parseAgentBets(p.agent_bets)[this.agent.id] ?
+                        `${this.parseAgentBets(p.agent_bets)[this.agent.id].amount} to ${this.parseAgentBets(p.agent_bets)[this.agent.id].choice}` :
+                        'No bets made yet' : 'No bets made yet'}`
+            }).join('\n')}
 
     Key News:
     ${relevantNews.map(n => `- ${n.title}`).join('\n')}
@@ -393,9 +391,16 @@ ${p.metadata?.comment ? `- Agent Controller Comment: ${p.metadata.comment}` : ''
                 });
                 console.log("prompt", prompt);
                 console.log("completion", completion.choices[0].message.content);
+                const content = completion.choices[0].message.content;
+                const cleanContent = content
+                    ? content
+                        .replace(/```json\n?/g, '')  // Remove opening code block
+                        .replace(/\n?```/g, '')      // Remove closing code block
+                    .trim()
+                    : '';
 
                 const batchDecisions = this.parseAnalysisResponse(
-                    completion.choices[0].message.content!,
+                    cleanContent,
                     batchPredictions
                 );
 
@@ -472,10 +477,12 @@ ${p.metadata?.comment ? `- Agent Controller Comment: ${p.metadata.comment}` : ''
 
     private parseAnalysisResponse(content: string, predictions: Prediction[]): BetDecision[] {
         try {
+            console.log("content", content);
             const jsonStr = content.substring(
                 content.indexOf('{'),
                 content.lastIndexOf('}') + 1
             );
+            console.log("jsonStr", jsonStr);
             const analysis = JSON.parse(jsonStr);
 
             if (!analysis?.predictions || !Array.isArray(analysis.predictions)) {
@@ -492,20 +499,28 @@ ${p.metadata?.comment ? `- Agent Controller Comment: ${p.metadata.comment}` : ''
                         typeof p.confidence === 'number' &&
                         p.confidence >= 0 && p.confidence <= 1;
 
+                    console.log("isValid", isValid);
+
                     if (!isValid) {
                         console.error('Invalid prediction format:', p);
                         return false;
                     }
 
+                    console.log("prediction", prediction);
+
                     const existingBet = prediction?.agent_bets ?
                         this.parseAgentBets(prediction.agent_bets)[this.agent.id] :
                         null;
+
+                    console.log("existingBet", existingBet);
 
                     // Check if agent has already bet twice
                     if (existingBet && existingBet.betCount && existingBet.betCount >= 2) {
                         console.log(`Agent ${this.agent.id} has already bet twice on prediction ${p.id}`);
                         return false;
                     }
+
+                    console.log("isValid", isValid);
 
                     return isValid && p.shouldBet && p.confidence > 0;
                 })
@@ -655,7 +670,7 @@ ${p.metadata?.comment ? `- Agent Controller Comment: ${p.metadata.comment}` : ''
             // Extract JSON array if response contains any non-JSON text
             const jsonMatch = content.match(/\[.*\]/);
             const jsonStr = jsonMatch ? jsonMatch[0] : content;
-            
+
             const terms = JSON.parse(jsonStr);
             return Array.isArray(terms) ? terms : [text];
         } catch (error) {
@@ -729,9 +744,9 @@ ${p.metadata?.comment ? `- Agent Controller Comment: ${p.metadata.comment}` : ''
         agentBetsStr.split(',').forEach(bet => {
             const [id, agentId, amount, choice] = bet.split(':');
             betsPerAgent[agentId] = (betsPerAgent[agentId] || 0) + 1;
-            result[agentId] = { 
-                id: Number(id), 
-                amount: Number(amount), 
+            result[agentId] = {
+                id: Number(id),
+                amount: Number(amount),
                 choice,
                 betCount: betsPerAgent[agentId]
             };
@@ -739,7 +754,7 @@ ${p.metadata?.comment ? `- Agent Controller Comment: ${p.metadata.comment}` : ''
         return result;
     }
 
-    
+
 
     private async findSimilarPredictions(predictions: Prediction[]): Promise<PineconePredictionMatch[]> {
         try {
@@ -766,11 +781,11 @@ ${p.metadata?.comment ? `- Agent Controller Comment: ${p.metadata.comment}` : ''
                 const description = match.metadata?.description?.toLowerCase() || '';
                 // For crypto predictions, ensure they contain relevant terms
                 if (category === 'coinmarketcap') {
-                    return description.includes('bitcoin') || 
-                           description.includes('crypto') || 
-                           description.includes('btc') ||
-                           description.includes('eth') ||
-                           description.includes('cryptocurrency');
+                    return description.includes('bitcoin') ||
+                        description.includes('crypto') ||
+                        description.includes('btc') ||
+                        description.includes('eth') ||
+                        description.includes('cryptocurrency');
                 }
                 return true;
             });
@@ -840,9 +855,8 @@ ${p.metadata?.comment ? `- Agent Controller Comment: ${p.metadata.comment}` : ''
                     prediction.betReason = prediction.betReason || [];
                     prediction.betReason.push({
                         step: "marketData",
-                        reasoning: `Current price: $${marketData.price.toFixed(2)}${
-                            marketData.change24h ? `, 24h change: ${marketData.change24h.toFixed(2)}%` : ''
-                        }`
+                        reasoning: `Current price: $${marketData.price.toFixed(2)}${marketData.change24h ? `, 24h change: ${marketData.change24h.toFixed(2)}%` : ''
+                            }`
                     });
                 }
             } catch (error) {
@@ -869,7 +883,7 @@ ${p.metadata?.comment ? `- Agent Controller Comment: ${p.metadata.comment}` : ''
                     convert: 'USD'
                 }
             });
-            
+
             // Safely access nested properties
             const cryptoData = response.data?.data?.[symbol]?.[0] || response.data?.data?.[symbol];
             if (!cryptoData?.quote?.USD) {
@@ -1039,7 +1053,7 @@ ${p.metadata?.comment ? `- Agent Controller Comment: ${p.metadata.comment}` : ''
                 temperature: 0.4
             });
 
-            return response.choices[0].message.content?.trim() 
+            return response.choices[0].message.content?.trim()
                 || "No detailed answer available.";
         } catch (error) {
             console.error("Error in handleUserQuestion:", error);
