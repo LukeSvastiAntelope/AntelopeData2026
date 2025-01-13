@@ -80,10 +80,10 @@ async function getRecentActivity(limit: number, offset: number) {
         JOIN users ON predictions.creator_id = users.id)
       ) AS combined_results
       ORDER BY created_at DESC
-      LIMIT ?, ?
+      LIMIT ${offset}, ${limit}
     `;
     
-    const [rows] = await db.execute<RowDataPacket[]>(query, [offset, limit]);
+    const [rows] = await db.execute<RowDataPacket[]>(query);
     return rows;
 }
 
