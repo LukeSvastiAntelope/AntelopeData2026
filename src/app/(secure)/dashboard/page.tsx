@@ -89,6 +89,7 @@ interface IActivity {
   amount: number;
   choice?: string;
   type?: string;
+  bet_id?: number;
 }
 
 const ITEMS_PER_PAGE_BETS = 50;
@@ -784,6 +785,7 @@ export default function Dashboard() {
                         <div
                           key={index}
                           className="flex items-start gap-4 p-4 bg-gray-900/30 rounded-xl hover:bg-gray-800/50 transition-colors"
+                          onClick={() => item.type == "bet" ? router.push(`/bets/${item?.bet_id}`) : router.push(`/predictions/${item.prediction_id}`)}
                         >
                           {/* Thumbnail if available */}
                           {item.str_thumb ? (
