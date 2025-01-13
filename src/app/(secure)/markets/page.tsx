@@ -19,7 +19,7 @@ export default function MarketsPage() {
   const [searchMarkets, setSearchMarkets] = useState("");
 
   // Predictions
-  const [agent, setAgent] = useState<IAgentProfile | null>(null);
+  const [, setAgent] = useState<IAgentProfile | null>(null);
   const [predictions, setPredictions] = useState<IPrediction[]>([]);
   const [displayedPredictions, setDisplayedPredictions] = useState<IPrediction[]>([]);
   const [isLoadingPredictions, setIsLoadingPredictions] = useState<boolean>(false);
