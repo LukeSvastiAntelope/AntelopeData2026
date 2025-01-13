@@ -310,6 +310,7 @@ export interface IPrediction {
     yes_amount?: number;
     no_amount?: number;
     agent_bets?: IBet[];
+    league_id: number;
 }
 
 export interface ILeaderboardData {

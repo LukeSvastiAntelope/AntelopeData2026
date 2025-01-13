@@ -8,8 +8,12 @@ import { useEffect, useState } from "react";
 import { useFetch } from "@/app/utils/lib";
 import { toast } from "react-hot-toast";
 import { useParams, useRouter } from "next/navigation";
-import { IBet, PredictionDB } from "@/app/utils/interface";
+import { IBet, PredictionDB, IAgentProfile } from "@/app/utils/interface";
 import { format as formatDateFn } from "date-fns";
+import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter } from "@nextui-org/modal";
+import { Button } from "@nextui-org/button";
+import { Input, Textarea } from "@nextui-org/input";
+import { Select, SelectItem } from "@nextui-org/select";
 
 const MarketOddsBar = ({
     percentage,
@@ -93,6 +97,27 @@ export default function PredictionDetail() {
     const [prediction, setPrediction] = useState<PredictionDB | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [choiceOdds, setChoiceOdds] = useState<{ choice: string, amount: number, odds: string, percentage: string, count: number }[]>([]);
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [selectedChoice, setSelectedChoice] = useState("");
+    const [betAmount, setBetAmount] = useState("");
+    const [betReason, setBetReason] = useState("");
+    const [choiceList, setChoiceList] = useState<string[]>([]);
+    const [agent, setAgent] = useState<IAgentProfile | null>(null);
+
+    const fetchAgentProfile = async () => {
+        try {
+            const response = await fetchData.get('/api/getAgentProfile');
+            if (response.status) {
+                setAgent(response.agent);
+            } else {
+                toast.error(response.message);
+            }
+            fetchPredictionDetails(params.id as string);
+        } catch (error) {
+            console.log(error);
+            toast.error('Failed to fetch agent profile');
+        }
+    };
 
     // Call both fetches
     const fetchPredictionDetails = async (id: string) => {
@@ -123,6 +148,40 @@ export default function PredictionDetail() {
                     });
                     setChoiceOdds(choiceOdds);
                 }
+
+                let source = "";
+                if (agent?.category == "general") {
+                    source = "google_news";
+                } else if (agent?.category == "markets") {
+                    source = "google_finance";
+                } else if (agent?.category == "crypto") {
+                    source = "coinmarketcap";
+                } else {
+                    source = "sportDB";
+                }
+                let interest = response.prediction.source == source;
+                if (source == "sportDB") {
+                    if (agent?.category == "nba") {
+                        interest = response.prediction.league_id == 4387;
+                    } else if (agent?.category == "nfl") {
+                        interest = response.prediction.league_id == 4391;
+                    } else if (agent?.category == "english premier league") {
+                        interest = response.prediction.league_id == 4328;
+                    } else if (agent?.category == "soccer") {
+                        interest = response.prediction.league_id != 4387 && response.prediction.league_id != 4391;
+                    }
+                }
+                if (interest) {
+                    if (response.prediction.source !== "sportDB") {
+                        setChoiceList(["yes", "no"]);
+                    } else {
+                        if (response.prediction.league_id == "4391" || response.prediction.league_id == "4387") {
+                            setChoiceList([response.prediction.team_a, response.prediction.team_b]);
+                        } else {
+                            setChoiceList([response.prediction.team_a, response.prediction.team_b, "Draw"]);
+                        }
+                    }
+                }
             } else {
                 toast.error(response.message);
             }
@@ -135,12 +194,53 @@ export default function PredictionDetail() {
 
     // Call both fetches
     useEffect(() => {
-        const id = Array.isArray(params.id) ? params.id[0] : params.id;
         if (params.id) {
-            fetchPredictionDetails(id);
+            fetchAgentProfile();
         }
     }, [params.id]);
 
+    // Add this function to handle betting
+    const handleBet = async () => {
+        try {
+            if (!agent?.wallet_balance || agent?.wallet_balance < Number(betAmount)) {
+                toast.error("Insufficient balance");
+                return;
+            }
+
+            if (selectedChoice == "") {
+                toast.error("Please select a choice");
+                return;
+            }
+
+            if (Number(betAmount) <= 0) {
+                toast.error("Bet amount must be greater than 0");
+                return;
+            }
+
+            if (betReason == "") {
+                toast.error("Please enter a reason for your bet");
+                return;
+            }
+
+            const response = await fetchData.post(`/api/placeBet`, {
+                predictionId: params.id,
+                choice: selectedChoice,
+                amount: Number(betAmount),
+                reason: betReason
+            });
+
+            if (response.status) {
+                toast.success("Bet placed successfully!");
+                setIsModalOpen(false);
+                // Refresh prediction details
+                fetchPredictionDetails(params.id as string);
+            } else {
+                toast.error(response.message);
+            }
+        } catch (error) {
+            toast.error("Failed to place bet: " + error);
+        }
+    };
 
     if (isLoading) {
         return (
@@ -201,6 +301,17 @@ export default function PredictionDetail() {
                                         <p className="text-sm text-gray-500">Creator Choice</p>
                                         <p className="font-semibold">{prediction.creator_choice}</p>
                                     </div>
+                                    {
+                                        choiceList.length > 0 && (
+                                            <Button
+                                                className="ml-auto block"
+                                                color="primary"
+                                                onPress={() => setIsModalOpen(true)}
+                                            >
+                                                Place Bet
+                                            </Button>
+                                        )
+                                    }
                                 </div>
                             </div>
                         </div>
@@ -211,14 +322,15 @@ export default function PredictionDetail() {
                     <div className="w-full mt-8 space-y-2">
                         <h2 className="text-lg font-semibold mb-4">Market Odds</h2>
                         {choiceOdds.map((choice) => (
-                            <MarketOddsBar
-                                key={choice.choice}
-                                percentage={parseFloat(choice.percentage)}
-                                question={choice.choice}
-                                count={choice.count}
-                                odds={choice.odds}
-                                amount={choice.amount}
-                            />
+                            <div key={choice.choice}>
+                                <MarketOddsBar
+                                    percentage={parseFloat(choice.percentage)}
+                                    question={choice.choice}
+                                    count={choice.count}
+                                    odds={choice.odds}
+                                    amount={choice.amount}
+                                />
+                            </div>
                         ))}
                     </div>
                 )}
@@ -256,6 +368,48 @@ export default function PredictionDetail() {
                     )}
                 </div>
             </div>
+
+            {/* Add Modal */}
+            {choiceList.length > 0 && (
+                <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
+                    <ModalContent>
+                        <ModalHeader>Place Bet on {selectedChoice}</ModalHeader>
+                        <ModalBody>
+                            <Select
+                                label="Choice"
+                                value={selectedChoice}
+                                onChange={(e) => setSelectedChoice(e.target.value)}
+                                placeholder="Select a choice"
+                            >
+                                {choiceList.map((choice) => (
+                                    <SelectItem key={choice} value={choice}>{choice}</SelectItem>
+                                ))}
+                            </Select>
+                            <Input
+                                label="Amount"
+                                type="number"
+                                value={betAmount}
+                                onChange={(e) => setBetAmount(e.target.value)}
+                                placeholder="Enter bet amount"
+                            />
+                            <Textarea
+                                label="Reason"
+                                value={betReason}
+                                onChange={(e) => setBetReason(e.target.value)}
+                                placeholder="Why are you making this bet?"
+                            />
+                        </ModalBody>
+                        <ModalFooter>
+                            <Button color="danger" variant="light" onPress={() => setIsModalOpen(false)}>
+                                Cancel
+                            </Button>
+                            <Button color="primary" onPress={handleBet}>
+                                Place Bet
+                            </Button>
+                        </ModalFooter>
+                    </ModalContent>
+                </Modal>
+            )}
         </>
     );
 } 

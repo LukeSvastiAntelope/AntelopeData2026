@@ -35,7 +35,14 @@ export const UserRepo = {
     getPredictionsByUserId,
     changePassword,
     updatePassword,
-    createPrediction
+    createPrediction,
+    updateUserBalance,
+    createBet
+}
+
+async function createBet(predictionId: number, agentId: number, choice: string, amount: number, reason: string, userId: number, pineconeId: string) {
+    const db = await getMySQLConnection();
+    await db.execute('INSERT INTO bets (prediction_id, agent_id, choice, amount, reason, user_id, pinecone_id) VALUES (?, ?, ?, ?, ?, ?, ?)', [predictionId, agentId, choice, amount, reason, userId, pineconeId]);
 }
 
 async function createPrediction(data: CreatePredictionInput) {
@@ -319,6 +326,11 @@ async function updateAgentBalance(agentId: number, creditAmount: number) {
     await db.execute('UPDATE agents SET wallet_balance = wallet_balance + ? WHERE id = ?', [creditAmount, agentId]);
 }
 
+async function updateUserBalance(userId: number, creditAmount: number) {
+    const db = await getMySQLConnection();
+    await db.execute('UPDATE users set wallet_balance = wallet_balance - ? WHERE id = ?', [creditAmount, userId]);
+}
+
 async function updateAgentNftAddress(agentId: number, nftAddress: string) {
     const db = await getMySQLConnection();
     await db.execute('UPDATE agents SET nft_address = ? WHERE id = ?', [nftAddress, agentId]);
@@ -389,19 +401,21 @@ async function getPredictionsWithoutAgentId(id: number) {
         SELECT 
             predictions.*, 
             COUNT(DISTINCT CASE WHEN bets.is_secret = 0 THEN bets.id END) as bets_count,
-            JSON_ARRAYAGG(
-                IF(bets.is_secret = 0,
-                    JSON_OBJECT(
-                        'id', bets.id,
-                        'amount', COALESCE(bets.amount, 0),
-                        'choice', COALESCE(bets.choice, ''),
-                        'reason', COALESCE(bets.reason, ''),
-                        'pinecone_id', COALESCE(bets.pinecone_id, ''),
-                        'created_at', DATE_FORMAT(bets.created_at, '%Y-%m-%dT%H:%i:%s.000Z')
-                    ),
-                    NULL
-                )
-            ) as agent_bets
+            CONCAT('[', 
+                GROUP_CONCAT(
+                    IF(bets.is_secret = 0,
+                        JSON_OBJECT(
+                            'id', bets.id,
+                            'amount', COALESCE(bets.amount, 0),
+                            'choice', COALESCE(bets.choice, ''),
+                            'reason', COALESCE(bets.reason, ''),
+                            'pinecone_id', COALESCE(bets.pinecone_id, ''),
+                            'created_at', DATE_FORMAT(bets.created_at, '%Y-%m-%dT%H:%i:%s.000Z')
+                        ),
+                        NULL
+                    )
+                ),
+            ']') as agent_bets
         FROM predictions 
         LEFT JOIN bets ON predictions.id = bets.prediction_id
         WHERE predictions.agent_id <> ? 
@@ -410,11 +424,11 @@ async function getPredictionsWithoutAgentId(id: number) {
         [id]
     );
 
-    // Clean up the results
+    // Simplified parsing since we're now getting a proper JSON array string
     return rows.map(row => ({
         ...row,
-        agent_bets: Array.isArray(row.agent_bets) 
-            ? row.agent_bets.filter(bet => bet !== null)
+        agent_bets: row.agent_bets && row.agent_bets !== '[null]' 
+            ? JSON.parse(row.agent_bets).filter(Boolean)
             : []
     }));
 }

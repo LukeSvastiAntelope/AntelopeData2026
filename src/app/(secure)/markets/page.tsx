@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { Image } from "@nextui-org/image";
 import { Button } from "@nextui-org/button";
 import { Spinner } from "@nextui-org/spinner";
-import { IPrediction, ILeaderboardData } from "@/app/utils/interface";
+import { IPrediction, ILeaderboardData, IAgentProfile } from "@/app/utils/interface";
 import { useFetch } from "@/app/utils/lib";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
@@ -19,6 +19,7 @@ export default function MarketsPage() {
   const [searchMarkets, setSearchMarkets] = useState("");
 
   // Predictions
+  const [agent, setAgent] = useState<IAgentProfile | null>(null);
   const [predictions, setPredictions] = useState<IPrediction[]>([]);
   const [displayedPredictions, setDisplayedPredictions] = useState<IPrediction[]>([]);
   const [isLoadingPredictions, setIsLoadingPredictions] = useState<boolean>(false);
@@ -68,9 +69,31 @@ export default function MarketsPage() {
     try {
       const response = await fetch.get("/api/getPredictions");
       if (response.status) {
-        setPredictions(response.predictions);
-        setDisplayedPredictions(response.predictions.slice(0, ITEMS_PER_PAGE_PREDICTIONS));
-        setHasMorePredictions(response.predictions.length > ITEMS_PER_PAGE_PREDICTIONS);
+        let source = "";
+        if (agent?.category == "general") {
+          source = "google_news";
+        } else if (agent?.category == "markets") {
+          source = "google_finance";
+        } else if (agent?.category == "crypto") {
+          source = "coinmarketcap";
+        } else {
+          source = "sportDB";
+        }
+        let interest = response.predictions.filter((prediction: IPrediction) => prediction.source == source);
+        if (source == "sportDB") {
+          if (agent?.category == "nba") {
+            interest = interest.filter((prediction: IPrediction) => prediction.league_id == 4387);
+          } else if (agent?.category == "nfl") {
+            interest = interest.filter((prediction: IPrediction) => prediction.league_id == 4391);
+          } else if (agent?.category == "english premier league") {
+            interest = interest.filter((prediction: IPrediction) => prediction.league_id == 4328);
+          } else {
+            interest = interest.filter((prediction: IPrediction) => prediction.league_id != 4387 && prediction.league_id != 4391);
+          }
+        }
+        setPredictions(interest);
+        setDisplayedPredictions(interest.slice(0, ITEMS_PER_PAGE_PREDICTIONS));
+        setHasMorePredictions(interest.length > ITEMS_PER_PAGE_PREDICTIONS);
         const sports = response.predictions.filter((prediction: IPrediction) => prediction.source === "sportDB");
         setSportsData(sports || []);
         setDisplayedSports(sports.slice(0, ITEMS_PER_PAGE_PREDICTIONS));
@@ -112,6 +135,21 @@ export default function MarketsPage() {
     }
   };
 
+  const fetchAgentProfile = async () => {
+    try {
+      const response = await fetch.get('/api/getAgentProfile');
+      if (response.status) {
+        setAgent(response.agent);
+      } else {
+        toast.error(response.message);
+      }
+      fetchPredictions();
+    } catch (error) {
+      console.log(error);
+      toast.error('Failed to fetch agent profile');
+    }
+  };
+
 
   // Lazy-load data based on current tab
   useEffect(() => {
@@ -120,9 +158,8 @@ export default function MarketsPage() {
     }
   }, [activeTab]);
 
-  // On first mount
   useEffect(() => {
-    fetchPredictions();
+    fetchAgentProfile();
   }, []);
 
   // Handle search
@@ -234,15 +271,9 @@ export default function MarketsPage() {
             Explore other categories, find interesting predictions, refine your approach, and see how top bettors fare.
           </p>
         </div>
-
-
       </div>
-
       {/* Tabs */}
       <div className="flex gap-2 font-kodemono mb-2 text-small">
-        
-        
-        
         <button
           onClick={() => setActiveTab("predictions")}
           className={`px-1 py-2 hover:text-white ${activeTab === "predictions" ? "text-white" : "text-gray-700"
@@ -290,18 +321,18 @@ export default function MarketsPage() {
       {/* Search Field for Predictions */}
       {activeTab === "predictions" && (
         <div className="relative mb-6 group">
-        <span className="absolute inset-y-0 left-0 flex items-center pl-2 pointer-events-none">
-          {/* Search Icon */}
-          <svg
-            aria-hidden="true"
-            className="w-5 h-5 text-gray-700 group-focus-within:text-white transition-colors duration-200"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            viewBox="0 0 24 24"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
+          <span className="absolute inset-y-0 left-0 flex items-center pl-2 pointer-events-none">
+            {/* Search Icon */}
+            <svg
+              aria-hidden="true"
+              className="w-5 h-5 text-gray-700 group-focus-within:text-white transition-colors duration-200"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              viewBox="0 0 24 24"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
               <circle cx="10" cy="10" r="7"></circle>
               <path d="M21 21l-4.35-4.35"></path>
             </svg>

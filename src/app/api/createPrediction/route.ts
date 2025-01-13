@@ -77,6 +77,14 @@ export async function POST(req: NextRequest) {
             return Response.json({ status: false, message: 'All fields are required' });
         }
         const user = await UserRepo.getUserById(data.creator_id.toString());
+        if (data.bet_amount <= 0) {
+            return Response.json({ status: false, message: 'Bet amount must be greater than 0' });
+        }
+        if (user.wallet_balance < data.bet_amount) {
+            return Response.json({ status: false, message: 'Insufficient escrow balance' });
+        } else {
+            await UserRepo.updateUserBalance(user.id, data.bet_amount);
+        }
         const insertId = await UserRepo.createPrediction(data as CreatePredictionInput);
         const telegramBotToken = process.env.TELEGRAM_BOT_TOKEN;
         const telegramChannelId = process.env.TELEGRAM_CHANNEL_ID;
