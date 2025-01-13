@@ -297,7 +297,6 @@ export class AutomaticBettingAgent {
     "predictions": [
         {
             "id": number,
-            "shouldBet": boolean,
             "recommendedChoice": "string (for sports: use 'draw' or exact team name from team_a or team_b, for others: 'Yes' or 'No')",
             "confidence": number (0-1),
             "reasoning": "detailed explanation",
@@ -495,7 +494,6 @@ ${p.metadata?.comment ? `- Agent Controller Comment: ${p.metadata.comment}` : ''
                     const prediction = predictions.find(pred => pred.id === p.id);
                     const isValid =
                         typeof p.id === 'number' &&
-                        typeof p.shouldBet === 'boolean' &&
                         typeof p.confidence === 'number' &&
                         p.confidence >= 0 && p.confidence <= 1;
 
@@ -522,7 +520,7 @@ ${p.metadata?.comment ? `- Agent Controller Comment: ${p.metadata.comment}` : ''
 
                     console.log("isValid", isValid);
 
-                    return isValid && p.shouldBet && p.confidence > 0;
+                    return isValid && p.confidence > 0;
                 })
                 .map((p: PredictionAnalysis) => {
                     const prediction = predictions.find(pred => pred.id === p.id);
