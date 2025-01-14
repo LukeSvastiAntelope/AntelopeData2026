@@ -207,7 +207,7 @@ export default function StrategyPage() {
       <Card className="my-8 bg-content0">
         <CardBody className="flex flex-row justify-between items-center">
           <div>
-            <h3 className="text-small font-regular">Betting Status</h3>
+            {/* <h3 className="text-small font-regular">Betting Status</h3> */}
             <p className="text-default-500 text-small">
               {isBettingEnabled ? "Betting is currently enabled" : "Betting is currently disabled"}
             </p>
@@ -216,7 +216,7 @@ export default function StrategyPage() {
             isSelected={isBettingEnabled}
             onValueChange={handleBettingToggle}
             color="success"
-            size="lg"
+            size="sm"
           />
         </CardBody>
       </Card>
@@ -227,7 +227,7 @@ export default function StrategyPage() {
       <Card className="my-8 bg-content0 ">
         <CardHeader className="text-small font-regular flex justify-between">
           <span className="message-circle ml-1">Talk with your betting agent to analyze your strategy</span>
-          <Button color="primary" variant="flat" className="text-small" href="/ask-agent" as="a">
+          <Button color="primary" variant="flat" className="text-small" href="/ask-agent" size="sm" as="a">
             Talk
           </Button>
         </CardHeader>
@@ -242,6 +242,7 @@ export default function StrategyPage() {
             className="mr-2"
             href="/editBasicStrategy"
             as="a"
+            size="sm"
           >
             Edit
           </Button>
@@ -254,7 +255,7 @@ export default function StrategyPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 ml-2">
             <div>
             <h3 className="text-default-500 mb-2 text-small">Main Category</h3>
-              <Chip color="primary" variant="flat">
+              <Chip color="primary" variant="flat" size="sm">
                 {agent?.category
                   ? CATEGORIES.find(
                     (category) =>
@@ -283,7 +284,7 @@ export default function StrategyPage() {
           <div className="flex flex-wrap gap-2 ml-2">
             {agent?.interests && agent?.interests.length > 0 ? (
               agent?.interests.map((interest) => (
-                <Chip key={interest} color="primary" variant="flat">
+                <Chip key={interest} color="primary" variant="flat" size="sm">
                   {interest}
                 </Chip>
               ))
@@ -306,6 +307,7 @@ export default function StrategyPage() {
             className="mr-2"
             href="/editPrinciples"
             as="a"
+            size="sm"
           >
             Edit
           </Button>
@@ -342,6 +344,7 @@ export default function StrategyPage() {
             className="mr-2"
             href="/editRiskStrategy"
             as="a"
+            size="sm"
           >
             Edit
           </Button>
