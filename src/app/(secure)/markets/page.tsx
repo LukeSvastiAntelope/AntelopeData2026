@@ -276,42 +276,42 @@ export default function MarketsPage() {
       <div className="flex gap-2 font-kodemono mb-2 text-small">
         <button
           onClick={() => setActiveTab("predictions")}
-          className={`px-1 py-2 hover:text-white ${activeTab === "predictions" ? "text-white" : "text-gray-700"
+          className={`px-1 py-2 hover:text-white ${activeTab === "predictions" ? "text-white" : "text-default-400"
             }`}
         >
           Predictions
         </button>
         <button
           onClick={() => setActiveTab("sports")}
-          className={`px-1 py-2 hover:text-white ${activeTab === "sports" ? "text-white" : "text-gray-700"
+          className={`px-1 py-2 hover:text-white ${activeTab === "sports" ? "text-white" : "text-default-400"
             }`}
         >
           Sports
         </button>
         <button
           onClick={() => setActiveTab("general")}
-          className={`px-1 py-2 hover:text-white ${activeTab === "general" ? "text-white" : "text-gray-700"
+          className={`px-1 py-2 hover:text-white ${activeTab === "general" ? "text-white" : "text-default-400"
             }`}
         >
           General
         </button>
         <button
           onClick={() => setActiveTab("crypto")}
-          className={`px-1 py-2 hover:text-white ${activeTab === "crypto" ? "text-white" : "text-gray-700"
+          className={`px-1 py-2 hover:text-white ${activeTab === "crypto" ? "text-white" : "text-default-400"
             }`}
         >
           Crypto
         </button>
         <button
           onClick={() => setActiveTab("markets")}
-          className={`px-1 py-2 hover:text-white ${activeTab === "markets" ? "text-white" : "text-gray-700"
+          className={`px-1 py-2 hover:text-white ${activeTab === "markets" ? "text-white" : "text-default-400"
             }`}
         >
           Markets
         </button>
         <button
           onClick={() => setActiveTab("leaderboard")}
-          className={`px-1 py-2 hover:text-white ${activeTab === "leaderboard" ? "text-white" : "text-gray-700"
+          className={`px-1 py-2 hover:text-white ${activeTab === "leaderboard" ? "text-white" : "text-default-400"
             }`}
         >
           Leaderboard
@@ -485,6 +485,7 @@ export default function MarketsPage() {
                       key={index}
                       prediction={prediction}
                       onClick={(id) => router.push(`/predictions/${id}`)}
+                
                     />
                   ))}
                 </tbody>

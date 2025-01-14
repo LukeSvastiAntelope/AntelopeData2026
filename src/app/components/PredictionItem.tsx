@@ -42,7 +42,7 @@ export function PredictionItem({ prediction, onClick }: PredictionItemProps) {
 
   return (
     <tr onClick={() => onClick(prediction.id)} className="">
-      <td colSpan={4} className="py-4 cursor-pointer backbutton">
+      <td colSpan={4} className="p-2 cursor-pointer select-item">
         <div className="flex flex-row gap-4 items-start">
           {/* Thumbnail */}
           {prediction.str_thumb ? (
@@ -64,7 +64,7 @@ export function PredictionItem({ prediction, onClick }: PredictionItemProps) {
               {prediction.description}
             </p>
 
-            <div className="flex flex-wrap gap-4 items-center text-sm">
+            <div className="flex flex-wrap gap-1 items-center text-sm">
               <div className="flex items-center gap-1 text-default-500">
                 <span className="icon-user text-primary pl-4">{prediction.bets_count}</span>
 
@@ -73,17 +73,17 @@ export function PredictionItem({ prediction, onClick }: PredictionItemProps) {
                   <Chip
                     key={choice}
                     className={`${choice === prediction.creator_choice
-                      ? 'bg-primary/20 text-primary-500'
-                      : 'bg-gray-700/30 text-gray-300'
+                      ? 'bg-success/20 text-success-500 icon-thumbs-up'
+                      : 'bg-danger/20 text-danger-600 icon-thumbs-down'
                       }`}
                     size="sm"
                   >
-                    {choice}: {amount} ({odds}x) {percentage}%
+                     ({odds}x) {percentage}%
                   </Chip>
                 ))}
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1">
                 <Chip
                   color={
                     prediction.status !== "open"

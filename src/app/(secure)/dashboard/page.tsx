@@ -415,13 +415,98 @@ export default function Dashboard() {
 
       {
         !agent || !agent.interests || agent.interests.length === 0 || !agent.principles || agent.principles.length === 0 ?
-          <div className="flex flex-col gap-2 mb-8 border border-white/10 rounded-xl p-6 text-center">
+        <div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <StatCard
+          icon={<FaRocket />}
+          title="Bets"
+          value={totalBets.toString()}
+        />
+        <StatCard
+          icon={<FaDatabase />}
+          title="Predictions"
+          value={totalPredictions.toString()}
+        />
+        <StatCard
+          icon={<FaChartLine />}
+          title="Success"
+          value={`${Number(successRate || 0).toFixed(2)}%`}
+        />
+        <StatCard
+          icon={<FaShieldAlt />}
+          title="Avg. Bet Size"
+          value={`${agent?.maxBetSize || 0}`}
+        />
+      </div>
+
+      <div className="flex gap-4 mb-2 w-full justify-between">
+              <div className="flex gap-4 font-kodemono items-center">
+                <Button
+                  className={`py-2 px-0 rounded-lg ${activeTab === "bets"
+                    ? "bg-transparent text-white"
+                    : "bg-transparent text-default-400 hover:text-white"
+                    }`}
+                  onPress={() => setActiveTab("bets")}
+                >
+                  Bets History
+                </Button>
+                <Button
+                  className={`py-2 px-0 rounded-lg ${activeTab === "predictions"
+                    ? "bg-transparent text-white"
+                    : "bg-transparent text-default-400 hover:text-white"
+                    }`}
+                  onPress={() => setActiveTab("predictions")}
+                >
+                  Predictions
+                </Button>
+                <Button
+                  className={`py-2 px-0 rounded-lg ${activeTab === "activity"
+                    ? "bg-transparent text-white"
+                    : "bg-transparent text-default-400 hover:text-white"
+                    }`}
+                  onPress={() => setActiveTab("activity")}
+                >
+                  Activity
+                </Button>
+              </div>
+            </div>
+            <div className="relative mb-6 group">
+              <span className="absolute inset-y-0 left-0 flex items-center pl-2 pointer-events-none">
+                {/* Search Icon */}
+                <svg
+                  aria-hidden="true"
+                  className="w-5 h-5 text-gray-700 group-focus-within:text-white transition-colors duration-200"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  viewBox="0 0 24 24"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <circle cx="10" cy="10" r="7"></circle>
+                  <path d="M21 21l-4.35-4.35"></path>
+                </svg>
+              </span>
+              <input
+                type="text"
+                value={activeTab === "bets" ? searchTerm : searchPredictions}
+                onChange={activeTab === "bets" ? handleBetSearch : handlePredictionSearch}
+                placeholder={`Search ${activeTab}...`}
+                className="w-full p-2 pl-9 rounded-md focus:outline-none text-small input-search bg-gray-800"
+              />
+            </div>
+      
+          <div className="flex flex-col gap-2 mb-8 border border-white/10 rounded-xl p-6 text-center empty-state place-content-center">
             <div className="map-center"></div>
-            <h1 className="font-bold mb-2 font-kodemono">Create your strategy</h1>
-            <p className="text-gray-400">
+            <h1 className="font-bold mb-1 font-kodemono">Create your strategy</h1>
+            <p className="text-gray-400 pb-2 ">
               You haven’t created your AI agents strategy yet. Before it can bet create the strategy and choose your area of interest.
             </p>
+            <Button onClick={() => router.push('/strategy')} className="w-fit mx-auto" color="primary" variant="flat">Create Strategy</Button>
           </div>
+
+          </div>
+
           :
           <>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
@@ -554,7 +639,7 @@ export default function Dashboard() {
                         return (
                           <tr
                             key={index}
-                            className="transition-all hover:bg-gray-800/50 "
+                            className="transition-all select-item"
                             onClick={() => router.push(`/bets/${bet.bet_id}`)}
                           >
                             <td className="p-2 rounded-lg cursor-pointer">
@@ -700,7 +785,7 @@ export default function Dashboard() {
                         <div
                           key={index}
                           onClick={() => router.push(`/predictions/${prediction.id}`)}
-                          className="flex items-center gap-4 p-2 bg-gray-900/30 rounded-xl hover:bg-gray-800/50 transition-colors cursor-pointer"
+                          className="flex items-center gap-4 p-2 bg-gray-900/30 rounded-xl select-item transition-colors cursor-pointer"
                         >
                           {prediction.str_thumb ? (
                             <Image
@@ -780,7 +865,7 @@ export default function Dashboard() {
                       {filterActivity(activity, searchTerm).map((item: IActivity, index: number) => (
                         <div
                           key={index}
-                          className="flex items-start gap-4 p-4 bg-gray-900/30 rounded-xl hover:bg-gray-800/50 transition-colors"
+                          className="flex items-start gap-4 p-4 bg-gray-900/30 rounded-xl select-item transition-colors"
                           onClick={() => item.type == "bet" ? router.push(`/bets/${item?.bet_id}`) : router.push(`/predictions/${item.prediction_id}`)}
                         >
                           {/* Thumbnail if available */}
@@ -802,19 +887,22 @@ export default function Dashboard() {
 
                           {/* Content */}
                           <div className="flex-1 space-y-2">
-                            <div className="font-medium text-primary">
-                              {item.type === 'bet' ? '🔮 New Agent Bet!' : `🔮 New ${item.source == "sportDB" ? "Game " : ""}Prediction Created!`}
+                            <div className="font-medium text-small">
+                              {item.type === 'bet' ? 'New Agent Bet!' : `New ${item.source == "sportDB" ? "Game " : ""}Prediction Created!`}
                             </div>
                             
                             <div className="space-y-1 text-sm text-gray-300">
                               {item.description && (
-                                <div>{item.description}</div>
+                                <div className="text-gray-300 text-base font-medium">{item.description}</div>
+                              )}
+                              {item.created_at && (
+                                <div className="text-gray-300">On: {new Date(item.created_at).toLocaleString()}</div>
                               )}
                               {item.username && (
-                                <div>By: {item.username}</div>
+                                <div className="text-gray-300">By: {item.username}</div>
                               )}
                               {item.amount > 0 && (
-                                <div>Bet Amount: {item.amount} credits</div>
+                                <div>Bet: {item.amount} credits</div>
                               )}
                               {item.choice && (
                                 <div>User&apos;s Choice: {item.choice}</div>
