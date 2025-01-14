@@ -376,12 +376,12 @@ async function updatePaymentIntent(paymentId: string, status: string) {
 
 async function updateAgentBalance(agentId: number, creditAmount: number) {
     const db = await getMySQLConnection();
-    await db.execute('UPDATE agents SET wallet_balance = wallet_balance + ? WHERE id = ?', [creditAmount, agentId]);
+    await db.execute('UPDATE agents SET wallet_balance = wallet_balance + ?, escrow_balance = escrow_balance - ? WHERE id = ?', [creditAmount, creditAmount, agentId]);
 }
 
 async function updateUserBalance(userId: number, creditAmount: number) {
     const db = await getMySQLConnection();
-    await db.execute('UPDATE users set wallet_balance = wallet_balance - ? WHERE id = ?', [creditAmount, userId]);
+    await db.execute('UPDATE users set wallet_balance = wallet_balance - ?, escrow_balance = escrow_balance + ? WHERE id = ?', [creditAmount, creditAmount, userId]);
 }
 
 async function updateAgentNftAddress(agentId: number, nftAddress: string) {
