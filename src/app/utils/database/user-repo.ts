@@ -399,8 +399,8 @@ async function getPredictionById(id: string) {
                     JSON_OBJECT(
                         'id', b.id,
                         'amount', b.amount,
-                        'choice', COALESCE(REPLACE(REPLACE(b.choice, '"', '\\"'), "'", "\\'"), ''),
-                        'reason', COALESCE(REPLACE(REPLACE(b.reason, '"', '\\"'), "'", "\\'"), ''),
+                        'choice', COALESCE(b.choice, ''),
+                        'reason', COALESCE(b.reason, ''),
                         'pinecone_id', COALESCE(b.pinecone_id, ''),
                         'created_at', DATE_FORMAT(b.created_at, '%Y-%m-%dT%H:%i:%s.000Z')
                     ) SEPARATOR '|||'
