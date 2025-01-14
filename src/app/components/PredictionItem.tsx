@@ -69,7 +69,7 @@ export function PredictionItem({ prediction, onClick }: PredictionItemProps) {
                 <span className="icon-user text-primary pl-4">{prediction.bets_count}</span>
 
                 {/* Market Odds */}
-                {choiceOdds.map(({ choice, amount, odds, percentage }) => (
+                {choiceOdds.map(({ choice, odds, percentage }) => (
                   <Chip
                     key={choice}
                     className={`${choice === prediction.creator_choice
