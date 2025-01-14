@@ -222,7 +222,7 @@ async function createAgent(id: string) {
     const db = await getMySQLConnection();
     await db.execute(
         'INSERT INTO agents (user_id, riskLevel, conservativeBetSize, moderateBetSize, aggressiveBetSize, wallet_balance) VALUES (?, ?, ?, ?, ?, ?)',
-        [Number(id), AGENT_RISK_LEVEL[0], 0, 0, 0, 10000]
+        [Number(id), AGENT_RISK_LEVEL[0], 0, 0, 0, process.env.CREDIT_BALANCE || 1000]
     );
     return await getAgentByUserId(id);
 }
@@ -399,8 +399,8 @@ async function getPredictionById(id: string) {
                     JSON_OBJECT(
                         'id', b.id,
                         'amount', b.amount,
-                        'choice', COALESCE(b.choice, ''),
-                        'reason', COALESCE(b.reason, ''),
+                        'choice', COALESCE(REPLACE(REPLACE(b.choice, '"', '\\"'), "'", "\\'"), ''),
+                        'reason', COALESCE(REPLACE(REPLACE(b.reason, '"', '\\"'), "'", "\\'"), ''),
                         'pinecone_id', COALESCE(b.pinecone_id, ''),
                         'created_at', DATE_FORMAT(b.created_at, '%Y-%m-%dT%H:%i:%s.000Z')
                     ) SEPARATOR '|||'

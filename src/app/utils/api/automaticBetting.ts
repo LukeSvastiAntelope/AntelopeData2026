@@ -263,7 +263,7 @@ export class AutomaticBettingAgent {
 
             // Get relevant news for this batch
             const relevantNews = this.filterRelevantNews(news, batchPredictions, 3);
-            const relevantSimilar = this.filterSimilarPredictions(similarPredictions, batchPredictions, 2);
+            const relevantSimilar = this.filterSimilarPredictions(similarPredictions, batchPredictions, 5);
 
             // Add news analysis reason
             if (relevantNews.length > 0) {
