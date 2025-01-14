@@ -38,7 +38,7 @@ export default function AskAgent() {
       }
     };
     loadAgentProfile();
-  }, [fetch]);
+  }, []);
 
   // Auto-scroll to the bottom whenever messages change
   useEffect(() => {
