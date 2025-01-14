@@ -70,9 +70,9 @@ export async function POST(req: NextRequest) {
             data.str_thumb = result.images_results[0].original || "";
         }
 
-        if (prediction.type === "custom" && (!data.description || !data.source || !data.resolution_date || !data.bet_amount || !data.creator_choice)) {
+        if (data.source != "sportDB" && (!data.description || !data.source || !data.resolution_date || !data.bet_amount || !data.creator_choice)) {
             return Response.json({ status: false, message: 'All fields are required' });
-        } else if (!data.event_id || !data.team_a || !data.team_b || !data.resolution_date || !data.bet_amount || !data.creator_choice || !data.league_id || !data.description) {
+        } else if (data.source == "sportDB" && (!data.event_id || !data.team_a || !data.team_b || !data.resolution_date || !data.bet_amount || !data.creator_choice || !data.league_id || !data.description)) {
             return Response.json({ status: false, message: 'All fields are required' });
         }
         const user = await UserRepo.getUserById(data.creator_id.toString());
