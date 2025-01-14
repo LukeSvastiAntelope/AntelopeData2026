@@ -93,7 +93,7 @@ const PredictionDialog = ({ isOpen, onClose }: { isOpen: boolean, onClose: () =>
                     description: matches.find(match => match.idEvent === selectedMatch)?.strEvent || "",
                 };
 
-            if (payload.type === "custom" && (!payload.description || !payload.source || !payload.source_url || !payload.resolutionDate || !payload.bet_amount || !payload.choice)) {
+            if (payload.type === "custom" && (!payload.description || !payload.source || !payload.resolutionDate || !payload.bet_amount || !payload.choice)) {
                 toast.error("All fields are required");
                 return;
 
