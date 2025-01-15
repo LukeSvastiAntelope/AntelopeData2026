@@ -16,6 +16,6 @@ export async function POST(req: NextRequest) {
         return Response.json({ status: true, message: 'Registration successful. Please check your telegram to verify your account.' });
     } catch (err) {
         console.log("Error in signup: ", err);
-        return Response.json({ status: false, message: err })
+        return Response.json({ status: false, message: `Error: ${err}` })
     }
 }

@@ -240,36 +240,6 @@ export default function AgentProfile() {
                             onChange={(e) => setDescription(e.target.value)}
                             className="max-w-md"
                         />
-
-                        {/* <div className="flex flex-wrap gap-3 mt-4">
-                            <Chip
-                                variant="shadow"
-                                classNames={{
-                                    base: "bg-gradient-to-br from-primary to-secondary hover:scale-105 transition-transform",
-                                    content: "drop-shadow-md text-white font-semibold px-4",
-                                }}
-                            >
-                                Pro Agent
-                            </Chip>
-                            <Chip
-                                variant="bordered"
-                                classNames={{
-                                    base: "border-primary/30 hover:bg-primary/10 hover:scale-105 transition-all",
-                                    content: "text-primary font-medium px-4",
-                                }}
-                            >
-                                {totalBets} Bets
-                            </Chip>
-                            <Chip
-                                variant="bordered"
-                                classNames={{
-                                    base: "border-secondary/30 hover:bg-secondary/10 hover:scale-105 transition-all",
-                                    content: "text-secondary font-medium px-4",
-                                }}
-                            >
-                                {successRate?.toFixed(2) || "0.00"}% Success Rate
-                            </Chip>
-                        </div> */}
                     </div>
                 </div>
 

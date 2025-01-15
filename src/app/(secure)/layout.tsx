@@ -8,6 +8,7 @@ import { useFetch } from "../utils/lib";
 import Link from "next/link";
 import Image from "next/image";
 import PredictionDialog from "../components/PredictionDialog";
+import AgentProfileDialog from "../components/AgentProfileDialog";
 
 const AsideSkeleton = () => {
     return (
@@ -68,7 +69,10 @@ const SecureLayout = ({ children }: { children: React.ReactNode }) => {
     const [agent, setAgent] = useState<IAgentProfile | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [isOpen, setIsOpen] = useState(false);
-    const fetch = useFetch();
+    const [isAgentProfileOpen, setIsAgentProfileOpen] = useState(false);
+    const [isSubmittingProfile, setIsSubmittingProfile] = useState(false);
+    const fetchData = useFetch();
+
     if (typeof window !== 'undefined' && !localStorage.getItem("token")) {
         route.push("/login");
     }
@@ -77,21 +81,66 @@ const SecureLayout = ({ children }: { children: React.ReactNode }) => {
         setIsOpen(true);
     }
 
-    useEffect(() => {
-        const fetchAgentProfile = async () => {
-            try {
-                const response = await fetch.get('/api/getAgentProfile');
-                if (response.status) {
-                    setAgent(response.agent);
-                } else {
-                    toast.error(response.message);
-                }
-            } catch (error) {
-                console.log(error);
-                toast.error('Failed to fetch agent profile');
+    const handleSaveProfile = async (name: string, description: string, fileRef: React.RefObject<HTMLInputElement>) => {
+        setIsSubmittingProfile(true);
+
+        try {
+            // Create multipart form data
+            const formData = new FormData();
+            formData.append("name", name);
+            formData.append("description", description);
+
+            // Attach avatar file (if the user selected one)
+            const avatarFile = fileRef?.current?.files?.[0];
+            if (avatarFile) {
+                formData.append("avatar", avatarFile);
             }
-            setIsLoading(false);
-        };
+
+            const token = typeof window !== 'undefined' ? localStorage.getItem("token") ?? "" : "";
+            const res = await fetch('/api/saveAgentProfile', {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                }
+            });
+            const response = await res.json();
+            if (response.status) {
+                await fetchAgentProfile();
+                toast.success("Profile info updated successfully!");
+            } else {
+                toast.error(response.message || "Failed to update profile info.");
+            }
+        } catch (error) {
+            console.error(error);
+            toast.error("Profile update failed.");
+        } finally {
+            setIsSubmittingProfile(false);
+        }
+    };
+
+    const fetchAgentProfile = async () => {
+        try {
+            const response = await fetchData.get('/api/getAgentProfile');
+            if (response.status) {
+                setAgent(response.agent);
+                if (!response.agent.name || !response.agent.description) {
+                    setIsAgentProfileOpen(true);
+                } else {
+                    setIsAgentProfileOpen(false);
+                }
+            } else {
+                toast.error(response.message);
+                setIsAgentProfileOpen(false);
+            }
+        } catch (error) {
+            console.log(error);
+            toast.error('Failed to fetch agent profile');
+        }
+        setIsLoading(false);
+    };
+
+    useEffect(() => {
         fetchAgentProfile();
     }, []);
 
@@ -141,8 +190,6 @@ const SecureLayout = ({ children }: { children: React.ReactNode }) => {
                                         </div>
                                     </div>
 
-                                    
-
                                     <Link href="/" className={`flex items-center group md:gap-2 ${pathname === '/dashboard' ? 'text-white' : 'text-default-400 hover:text-white'}`}>
                                         <span className={`icon-dashboard-active group-hover:block ${pathname === '/dashboard' ? 'block' : 'hidden'}`} />
                                         <span className={`icon-dashboard group-hover:hidden ${pathname === '/dashboard' ? 'hidden' : 'block'}`} />
@@ -160,9 +207,9 @@ const SecureLayout = ({ children }: { children: React.ReactNode }) => {
                                         <span className={`icon-strategy group-hover:hidden ${pathname === '/strategy' ? 'hidden' : 'block'}`} />
                                         <span className="hidden font-kodemono md:inline-block">Strategy</span>
                                     </Link>
-                                    <Link 
-                                        href="#" 
-                                        onClick={openPredictionDialog} 
+                                    <Link
+                                        href="#"
+                                        onClick={openPredictionDialog}
                                         className="flex items-center group md:gap-2 text-default-400 hover:text-white"
                                     >
                                         <span className={`plus-circle group-hover:block text-white ${pathname === '/strategy' ? 'block' : 'hidden'}`} />
@@ -204,7 +251,16 @@ const SecureLayout = ({ children }: { children: React.ReactNode }) => {
                     {children}
                 </main>
             </div>
-            <PredictionDialog isOpen={isOpen} onClose={() => setIsOpen(false)}/>
+            <PredictionDialog isOpen={isOpen} onClose={() => setIsOpen(false)} />
+            <AgentProfileDialog
+                isOpen={isAgentProfileOpen}
+                onClose={() => setIsAgentProfileOpen(false)}
+                name={agent?.name || ""}
+                description={agent?.description || ""}
+                image={agent?.image || ""}
+                isSubmittingProfile={isSubmittingProfile}
+                handleSaveProfile={handleSaveProfile}
+            />
         </div>
     )
 }
