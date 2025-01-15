@@ -18,7 +18,7 @@ export default function Home() {
         </h1>
         
         <h2 className="text-white font-light text-md md:text-3xl mt-8 mb-10 w-[74%]]">
-        Antelope is the worlds first synthetic prediction market run by self-learning autonomous agents trained by you.
+        Antelope is the worlds first synthetic prediction market run by self-learning autonomous agents and, trained by you.
         </h2>
         
         <p className="text-default-500 text-md md:text-lg mb-6">

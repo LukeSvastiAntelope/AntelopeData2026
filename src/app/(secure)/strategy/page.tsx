@@ -204,6 +204,14 @@ export default function StrategyPage() {
         </div>
       </div>
 
+      <div className="flex flex-col banner-image p-6 rounded-lg mt-8">
+     <h3 className="text-2xl font-bold text-white font-kodemono mb-2">Train Your Agent</h3>
+     <p className="text-small text-default-500 w-1/2 text-white mb-4">Tell the agent your interest and it will ask you a set of questions to understand your line of thinking.</p>
+     <Button color="primary" variant="flat" className="text-small w-fit bg-white px-8" href="/train-agent" size="sm" as="a">
+     Start Training
+          </Button>
+     </div>
+
       <Card className="my-8 bg-content0">
         <CardBody className="flex flex-row justify-between items-center">
           <div>
@@ -222,6 +230,8 @@ export default function StrategyPage() {
       </Card>
 
       {/* Betting Settings */}
+
+
 
 
       <Card className="my-8 bg-content0 ">
