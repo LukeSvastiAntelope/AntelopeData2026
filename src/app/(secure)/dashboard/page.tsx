@@ -10,6 +10,7 @@ import { Image } from "@nextui-org/image";
 import { FaRocket, FaDatabase, FaChartLine, FaShieldAlt } from "react-icons/fa";
 import { useFetch } from "@/app/utils/lib";
 import { IAgentProfile } from "@/app/utils/interface";
+import { Tooltip } from "@nextui-org/tooltip";
 
 // ------------- ADDED: Chart.js imports -------------
 import {
@@ -18,7 +19,7 @@ import {
   CategoryScale,
   LinearScale,
   Title,
-  Tooltip,
+  Tooltip as ChartTooltip,
   Legend,
   PointElement,
   LineElement,
@@ -33,7 +34,7 @@ ChartJS.register(
   CategoryScale,
   LinearScale,
   Title,
-  Tooltip,
+  ChartTooltip,
   Legend,
   PointElement,
   LineElement,
@@ -399,8 +400,8 @@ export default function Dashboard() {
   return (
     <>
       <div className="flex flex-col mt-2 gap-0 mb-6">
-        <h1 className="font-bold mb-0 font-kodemono">Dashboard Overview</h1>
-        <p className="text-gray-400">
+        <h1 className="font-bold mb-2 font-kodemono">Dashboard Overview</h1>
+        <p className="h1paragraph text-gray-500">
           Track your betting performance and prediction accuracy
         </p>
       </div>
@@ -440,33 +441,45 @@ export default function Dashboard() {
       </div>
       <div className="flex gap-4 mb-2 w-full justify-between">
         <div className="flex gap-4 font-kodemono items-center">
-          <Button
-            className={`py-2 px-0 rounded-lg ${activeTab === "activity"
-              ? "bg-transparent text-white"
-              : "bg-transparent text-default-400 hover:text-white"
+          <Tooltip content="View your recent activity" showArrow>
+            <Button
+              className={`py-2 px-0 rounded-lg ${
+                activeTab === "activity"
+                  ? "bg-transparent text-white"
+                  : "bg-transparent text-default-400 hover:text-white"
               }`}
-            onPress={() => setActiveTab("activity")}
-          >
-            Activity
-          </Button>
-          <Button
-            className={`py-2 px-0 rounded-lg ${activeTab === "bets"
-              ? "bg-transparent text-white"
-              : "bg-transparent text-default-400 hover:text-white"
+              onPress={() => setActiveTab("activity")}
+            >
+              Activity
+            </Button>
+          </Tooltip>
+
+          <Tooltip content="Review your bets history" showArrow>
+            <Button
+              className={`py-2 px-0 rounded-lg ${
+                activeTab === "bets"
+                  ? "bg-transparent text-white"
+                  : "bg-transparent text-default-400 hover:text-white"
               }`}
-            onPress={() => setActiveTab("bets")}
-          >
-            Bets History
-          </Button>
-          <Button
-            className={`py-2 px-0 rounded-lg ${activeTab === "predictions"
-              ? "bg-transparent text-white"
-              : "bg-transparent text-default-400 hover:text-white"
+              onPress={() => setActiveTab("bets")}
+            >
+              Bets History
+            </Button>
+          </Tooltip>
+
+          <Tooltip content="Check out predictions" showArrow>
+            <Button
+              className={`py-2 px-0 rounded-lg ${
+                activeTab === "predictions"
+                  ? "bg-transparent text-white"
+                  : "bg-transparent text-default-400 hover:text-white"
               }`}
-            onPress={() => setActiveTab("predictions")}
-          >
-            Predictions
-          </Button>
+              onPress={() => setActiveTab("predictions")}
+            >
+              Predictions
+            </Button>
+          </Tooltip>
+
         </div>
       </div>
 
@@ -579,13 +592,22 @@ export default function Dashboard() {
                               {/* Stats & Chips */}
                               <div className="flex flex-wrap items-center gap-1">
                                 {/* Bet Amount */}
+                                <Tooltip content="Bet amount" showArrow>
                                 <div className="flex items-center gap-1 py-1">
 
                                   <span className="text-sm icon-coin text-gray-300">{bet.amount}</span>
-                                </div>
+                                </div></Tooltip>
 
                                 {/* Market Odds */}
                                 {choiceOdds.map(({ choice, percentage }) => (
+                                  <Tooltip
+                                  content={
+                                    choice === "yes"
+                                      ? "Agents betting Yes"
+                                      : "Agents betting No"
+                                  }
+                                  showArrow
+                                >
                                   <Chip
                                     key={choice}
                                     className={
@@ -597,9 +619,22 @@ export default function Dashboard() {
                                   >
                                     {percentage}%
                                   </Chip>
+                                </Tooltip>
                                 ))}
 
                                 {/* Status */}
+                                <Tooltip
+                                  content={
+                                    bet.status === "resolved"
+                                      ? bet.outcome === bet.choice
+                                        ? "Won"
+                                        : "Lost"
+                                      : bet.status === "Pending"
+                                        ? "Awaiting"
+                                        : bet.status
+                                  }
+                                  showArrow
+                                >
                                 <Chip
                                   className={`${bet.status === "resolved"
                                     ? bet.outcome === bet.choice
@@ -617,8 +652,10 @@ export default function Dashboard() {
                                       : "Lost"
                                     : bet.status === "Pending"
                                       ? "Awaiting"
-                                      : bet.status}
+                                      : bet.status
+                                      }
                                 </Chip>
+                                </Tooltip>
                               </div>
                             </div>
                           </div>
@@ -747,22 +784,39 @@ export default function Dashboard() {
                         <div className="flex flex-wrap gap-2 items-center">
 
                           {choiceOdds.map(({ choice, percentage }) => (
+                            <Tooltip
+                            content={
+                              choice === prediction.creator_choice
+                                ? "Agents betting Yes"
+                                : "Agents betting No"
+                            }
+                            showArrow
+                          >     
                             <Chip
                               key={choice}
                               className={`${choice === prediction.creator_choice
                                 ? 'bg-success/20 text-success-500 icon-thumbs-up px-2'
-                                : 'bg-danger/20 text-danger-500 icon-thumbs-up px-2'
+                                : 'bg-danger/20 text-danger-500 icon-thumbs-down px-2'
                                 }`}
                               size="sm"
                             >
                               {/* {choice}: {amount} ({odds}x)  */}
                               {percentage}%
                             </Chip>
+                          </Tooltip>
                           ))}
 
 
 
                           {/* Status */}
+                          <Tooltip
+                            content={
+                              prediction.status === "open"
+                                ? "Open"
+                                : "Closed"
+                            }
+                            showArrow
+                          >
                           <Chip
                             className={`${prediction.status === "open"
                               ? "bg-blue-500/20 text-blue-400"
@@ -770,8 +824,10 @@ export default function Dashboard() {
                               }`}
                             size="sm"
                           >
-                            {prediction.status}
+                            {/* make sure first letter is upper case */}
+                            {prediction.status.charAt(0).toUpperCase() + prediction.status.slice(1)}
                           </Chip>
+                          </Tooltip>
                         </div>
                       </div>
                     </div>
@@ -828,32 +884,56 @@ export default function Dashboard() {
                     )}
 
                     {/* Content */}
-                    <div className="flex-1 space-y-2">
+                    <div className="flex-1 space-y-1">
                       {
                         item.type !== "agent_join" && (
-                          <div className="font-medium text-small">
-                            {item.type === 'bet' ? 'New Agent Bet!' : `New ${item.source == "sportDB" ? "Game " : ""}Prediction Created!`}
+                          <div className="font-medium text-small text-default-500">
+                            {/* add the username of the agent that is make a bet */}
+                            {item.type === 'bet' ? `${item.username} wagered on:` : `${item.source == "sportDB" ? "Game " : ""}Predicted!`}
                           </div>
                         )
                       }
-
-                      <div className="space-y-1 text-sm text-gray-300">
+                     
+                      <div className="space-y-1 text-sm ">
                         {item.description && (
-                          <div className="text-gray-300 text-base font-medium">{item.description}</div>
+                         
+                          <div className="text-white text-base font-medium">{item.description}</div>
+                  
                         )}
-                        {item.created_at && (
-                          <div className="text-gray-300">On: {new Date(item.created_at).toLocaleString()}</div>
-                        )}
-                        {item.username && (
-                          <div className="text-gray-300">By: {item.username}</div>
-                        )}
+                        <span className="flex flex-wrap gap-2">
+                        {/* {item.created_at && (
+                          <Tooltip content="Created at" showArrow>
+                          <div className="text-default-500">On: {new Date(item.created_at).toLocaleString()}</div>
+                          </Tooltip>
+                        )} */}
+                       
                         {item.amount > 0 && (
-                          <div>Bet: {item.amount} credits</div>
+                          <Tooltip content="Bet amount" showArrow>
+                          <div className="icon-coin text-default-500">{item.amount}</div>
+                          </Tooltip>
                         )}
                         {item.choice && item.type !== "agent_join" && (
-                          <div>User&apos;s Choice: {item.choice}</div>
-                        )}
-                      </div>
+  <Tooltip content="User's Choice" showArrow>
+    <div
+      className={(() => {
+        // Decide styling based on the choice
+        if (item.choice.toLowerCase() === "yes") {
+          return "bg-success/20 text-success-500 icon-thumbs-up px-8 rounded-md";
+        } else if (item.choice.toLowerCase() === "no") {
+          return "bg-danger/20 text-danger-500 icon-thumbs-down px-8 rounded-md";
+        } else if (item.choice.toLowerCase() === "draw") {
+          return "bg-warning/20 text-warning-500 icon-exclamation-circle px-2 rounded-md";
+        }
+        // Default styling for other custom choices:
+        return "bg-secondary/20 text-secondary-500 px-2 py-1 rounded-md";
+      })()}
+    >
+      {item.choice}
+    </div>
+  </Tooltip>
+)}
+                        </span>
+                      </div>  
                     </div>
                   </div>
                 ))}

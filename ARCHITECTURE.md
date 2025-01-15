@@ -2,18 +2,20 @@
 
 ## Overview
 This document details how the Market Maker Agent application is organized and how different parts of the system collaborate. The application is built on Next.js (using the latest App Router) and leverages multiple frameworks and libraries for an end-to-end solution:
-• React for rendering UI.
-• Tailwind CSS and NextUI for styling and component frameworks.
-• MySQL (and occasionally SQLite) for data persistence.
+
+• React for rendering UI.  
+• Tailwind CSS and NextUI for styling and component frameworks.  
+• MySQL (and occasionally SQLite) for data persistence.  
 • JSON Web Token (JWT) based authentication.
 
 ## Main Components
 
 - **Frontend (Next.js + React)**  
   • The code resides in the "app" folder, using Next.js’ new file-based routing conventions.  
-  • We have grouped folders "(auth)" and "(secure)" within "app" to structure public (unauthenticated) versus protected (authenticated) routes:
+  • We have grouped folders "(auth)" and "(secure)" within "app" to structure public (unauthenticated) versus protected (authenticated) routes:  
     - (auth): Contains pages like login, register, and account verification.  
-    - (secure): Houses pages for profiles, bets, predictions, and payments, enforcing authentication through a SecureLayout.  
+    - (secure): Houses pages for profiles, bets, predictions, payments, markets, dashboards, strategies, and more; it enforces authentication through a SecureLayout.  
+  • New pages in (secure) include: dashboard, predictions, payment, bets, markets, about, strategy, logout.  
   • Global styles are implemented through Tailwind CSS (see globals.css). NextUI is used to provide common styled components like Cards, Buttons, and Modals.
 
 - **Backend (API Routes)**  
@@ -23,20 +25,23 @@ This document details how the Market Maker Agent application is organized and ho
     - saveNftAddress: Persists minted NFT addresses to the database.  
     - verify: Verifies user registration tokens.  
     - stripeWebhookCheckout: Manages Stripe webhook events for credits purchase.  
-  • Each API route can read data from request or form data, authenticate token usage, query or update the database, and return JSON responses.
+    - createAgentBet: Creates a new bet for the agent.  
+    - createAgentPrediction: Creates a new prediction.  
+    - updateBettingStatus: Updates an agent’s active betting status.  
+  • Each API route can parse request input (JSON, form data, etc.), authenticate token usage, query or update the database, and return JSON responses.
 
 - **Database**  
   • The code references a UserRepo that is used to read and write user- or agent-related data against MySQL.  
   • The connection and user-repo logic are found under "utils/database".  
-  • Additional data structures, such as “predictions” and “bets,” are stored in a similar manner (not fully shown here).
+  • Additional data structures, such as “predictions” and “bets,” are stored similarly.
 
 - **Authentication**  
   • Implements JWT-based authentication.  
   • On the frontend, tokens are stored in localStorage. If no token is found, secure routes redirect to the login page.  
-  • On the backend, tokens are validated in serverless functions (using “verifyConfirmationToken”).
+  • On the backend, tokens are validated in serverless functions.
 
 ## Component Interaction
-• The UI (in the “(auth)” subfolders for public pages, “(secure)” subfolders for protected pages, plus shared layouts) communicates with serverless API routes for data retrieval and updates.  
+• The UI (in both “(auth)” subfolders for public pages and “(secure)” subfolders for protected pages) communicates with serverless API routes for data retrieval and updates.  
 • Providers (see “mainProvider.tsx”) wrap the application and handle theming, while “solProvider.tsx” helps with Solana wallet functionality for NFT minting.  
 • The application is effectively separated into these distinct sets of concerns: storing data (DB + repo), serving data (API routes), and presenting data (frontend pages).
 
@@ -59,19 +64,16 @@ This document details how the Market Maker Agent application is organized and ho
 ## Future Updates
 - Continue updating sub-sections with any new pages and routes (e.g., if a new “(admin)” folder is introduced).  
 - Expand on system diagrams for a more visual understanding, especially around payment flows, NFT minting, and external APIs.  
-- Keep this document in sync with backend changes (both database schema and new endpoints).  
-
-This architecture overview should serve as a reference for how the pieces of the application fit together and how best to navigate the code to extend or modify features. 
+- Keep this document in sync with backend changes (both database schema and new endpoints).
 
 ## New Components and Routes
-
-- **Frontend**: Added new pages in the `(secure)` folder such as `dashboard`, `predictions`, `payment`, `bets`, `markets`, `about`, `strategy`, and `logout`.
-- **Backend**: Introduced new API routes like `createAgentBet`, `createAgentPrediction`, `stripeWebhookCheckout`, and `stripeCheckout`.
+- **Frontend**: Added new pages in the (secure) folder such as dashboard, predictions, payment, bets, markets, about, strategy, and logout.  
+- **Backend**: Introduced new API routes like createAgentBet, createAgentPrediction, stripeWebhookCheckout, and stripeCheckout.
 
 ## Updated Technology Stack
-
-- Added new dependencies in `package.json` for enhanced functionality and integration.
+- Added new dependencies in package.json for enhanced functionality and integration (e.g., upgraded React, NextUI, etc.).
 
 ## Utilities
+- Updated utility functions in api/predictionGenerator.ts and api/automaticBetting.ts for improved prediction and betting capabilities.
 
-- Updated utility functions in `api/predictionGenerator.ts` and `api/automaticBetting.ts` for improved prediction and betting capabilities. 
+This architecture overview should serve as a reference for how the pieces of the application fit together and how best to navigate the code to extend or modify features. 
