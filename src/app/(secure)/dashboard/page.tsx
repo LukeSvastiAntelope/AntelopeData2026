@@ -863,7 +863,7 @@ export default function Dashboard() {
                 {filterActivity(activity, searchTerm).map((item: IActivity, index: number) => (
                   <div
                     key={index}
-                    className="flex items-start gap-4 p-4 bg-gray-900/30 rounded-xl select-item transition-colors"
+                    className="flex items-start gap-4 p-4  rounded-xl select-item transition-colors cursor-pointer"
                     onClick={() => item.type == "bet" ? router.push(`/bets/${item?.bet_id}`) : router.push(`/predictions/${item.prediction_id}`)}
                   >
                     {/* Thumbnail if available */}
@@ -922,13 +922,16 @@ export default function Dashboard() {
         } else if (item.choice.toLowerCase() === "no") {
           return "relative max-w-fit min-w-min inline-flex items-center justify-between box-border whitespace-nowrap h-6 text-tiny rounded-full bg-danger/20 text-danger-500 icon-thumbs-down px-2";
         } else if (item.choice.toLowerCase() === "draw") {
-          return "bg-warning/20 text-warning-500 icon-exclamation-circle px-2 rounded-md";
+          return "bg-warning/20 text-warning-500 relative max-w-fit min-w-min inline-flex items-center justify-between box-border whitespace-nowrap h-6 text-tiny rounded-full px-2" ;
         }
         // Default styling for other custom choices:
-        return "bg-secondary/20 text-secondary-500 px-2 py-1 rounded-md relative max-w-fit min-w-min inline-flex items-center justify-between box-border whitespace-nowrap h-6 text-tiny rounded-full px-2";
-      })()}
+             return "bg-secondary/20 text-secondary-500 px-2 py-1 rounded-md relative max-w-fit min-w-min inline-flex items-center justify-between box-border whitespace-nowrap h-6 text-tiny rounded-full px-2";
+
+             
+            })()}
     >
-      <span className="flex-1 text-inherit font-normal px-1">{item.choice}</span>
+      {/* Item choices should be camel case for example: Predicted: Paris */}
+      <span className="flex-1 text-inherit font-normal px-1">{item.choice.charAt(0).toLocaleUpperCase() + item.choice.slice(1)}</span>
     </div>
   </Tooltip>
 )}
