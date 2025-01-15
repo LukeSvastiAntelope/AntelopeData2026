@@ -5,7 +5,6 @@ import toast from "react-hot-toast";
 import Image from "next/image";
 import { Button } from "@nextui-org/button";
 import { Input, Textarea } from "@nextui-org/input";
-import { Chip } from "@nextui-org/chip";
 import { validatePassword } from "@/app/utils/validation";
 import { Skeleton } from "@nextui-org/skeleton";
 import { useFetch } from "@/app/utils/lib";
@@ -49,10 +48,6 @@ export default function AgentProfile() {
     const fileRef = useRef<HTMLInputElement | null>(null);
     const [imagePreview, setImagePreview] = useState<string>("");
 
-    // Additional stats from server
-    const [totalBets, setTotalBets] = useState(0);
-    const [successRate, setSuccessRate] = useState(0);
-
     // For "Credentials" section
     const [currentPassword, setCurrentPassword] = useState("");
     const [newPassword, setNewPassword] = useState("");
@@ -61,7 +56,7 @@ export default function AgentProfile() {
     const [isSubmittingProfile, setIsSubmittingProfile] = useState(false);
     const [isSubmittingPassword, setIsSubmittingPassword] = useState(false);
 
-    const fetch = useFetch();
+    const fetchData = useFetch();
 
     // Handle the user uploading / previewing a local avatar image
     const handleImageUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -81,12 +76,10 @@ export default function AgentProfile() {
     useEffect(() => {
         const fetchAgentProfile = async () => {
             try {
-                const response = await fetch.get("/api/getAgentProfile");
+                const response = await fetchData.get("/api/getAgentProfile");
                 if (response.status) {
                     const a = response.agent as IAgentProfile;
                     setAgent(a);
-                    setTotalBets(response.totalBets);
-                    setSuccessRate(response.successRate);
 
                     // Prefill editable fields
                     setName(a.name || "");
@@ -126,7 +119,15 @@ export default function AgentProfile() {
                 formData.append("image", imageUrl);
             }
 
-            const response = await fetch.post("/api/saveAgentProfile", formData);
+            const token = typeof window !== 'undefined' ? localStorage.getItem("token") ?? "" : "";
+            const res = await fetch('/api/saveAgentProfile', {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                }
+            });
+            const response = await res.json();
             if (response.status) {
                 toast.success("Profile info updated successfully!");
             } else {
@@ -161,7 +162,7 @@ export default function AgentProfile() {
 
         setIsSubmittingPassword(true);
         try {
-            const response = await fetch.post("/api/changePassword", {
+            const response = await fetchData.post("/api/changePassword", {
                 currentPassword,
                 newPassword,
             });
