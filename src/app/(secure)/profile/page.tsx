@@ -1,17 +1,17 @@
 'use client'
 
-import { Chip } from "@nextui-org/chip";
-import { Skeleton } from "@nextui-org/skeleton";
-import { Button } from "@nextui-org/button";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import toast from "react-hot-toast";
-import { useFetch } from "@/app/utils/lib";
 import Image from "next/image";
-import { IAgentProfile } from "@/app/utils/interface";
-import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter } from "@nextui-org/modal";
-import { Input } from "@nextui-org/input";
+import { Button } from "@nextui-org/button";
+import { Input, Textarea } from "@nextui-org/input";
+import { Chip } from "@nextui-org/chip";
 import { validatePassword } from "@/app/utils/validation";
+import { Skeleton } from "@nextui-org/skeleton";
+import { useFetch } from "@/app/utils/lib";
+import type { IAgentProfile } from "@/app/utils/interface";
 
+// Skeleton for loading state
 const ProfileSkeleton = () => {
     return (
         <div className="bg-content1/50 backdrop-blur-md rounded-2xl p-8 shadow-lg border border-white/10">
@@ -36,123 +36,211 @@ const ProfileSkeleton = () => {
     );
 };
 
-const AgentProfile = () => {
-
+export default function AgentProfile() {
     const [agent, setAgent] = useState<IAgentProfile | null>(null);
     const [isLoading, setIsLoading] = useState(true);
+
+    // For "Profile Info" section
+    const [name, setName] = useState("");
+    const [description, setDescription] = useState("");
+    const [imageUrl, setImageUrl] = useState("");
+
+    // For controlling image file input
+    const fileRef = useRef<HTMLInputElement | null>(null);
+    const [imagePreview, setImagePreview] = useState<string>("");
+
+    // Additional stats from server
     const [totalBets, setTotalBets] = useState(0);
     const [successRate, setSuccessRate] = useState(0);
+
+    // For "Credentials" section
+    const [currentPassword, setCurrentPassword] = useState("");
+    const [newPassword, setNewPassword] = useState("");
+    const [confirmPassword, setConfirmPassword] = useState("");
+
+    const [isSubmittingProfile, setIsSubmittingProfile] = useState(false);
+    const [isSubmittingPassword, setIsSubmittingPassword] = useState(false);
+
     const fetch = useFetch();
-    const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
-    const [passwords, setPasswords] = useState({
-        currentPassword: '',
-        newPassword: '',
-        confirmPassword: ''
-    });
-    const [isSubmitting, setIsSubmitting] = useState(false);
+
+    // Handle the user uploading / previewing a local avatar image
+    const handleImageUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            // This is the base64 preview for local display
+            if (reader.result) {
+                setImagePreview(reader.result as string);
+            }
+        };
+        reader.readAsDataURL(file);
+    }, []);
 
     useEffect(() => {
         const fetchAgentProfile = async () => {
             try {
-                const response = await fetch.get('/api/getAgentProfile');
+                const response = await fetch.get("/api/getAgentProfile");
                 if (response.status) {
-                    setAgent(response.agent);
+                    const a = response.agent as IAgentProfile;
+                    setAgent(a);
                     setTotalBets(response.totalBets);
                     setSuccessRate(response.successRate);
+
+                    // Prefill editable fields
+                    setName(a.name || "");
+                    setDescription(a.description || "");
+                    setImageUrl(a.image || "/assets/images/default-agent.png");
+                    setImagePreview(a.image || "/assets/images/default-agent.png");
                 } else {
                     toast.error(response.message);
                 }
             } catch (error) {
                 console.log(error);
-                toast.error('Failed to fetch agent profile');
+                toast.error("Failed to fetch agent profile");
             }
             setIsLoading(false);
         };
         fetchAgentProfile();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    const handleChangePassword = async () => {
-        if (passwords.newPassword !== passwords.confirmPassword) {
-            toast.error('New passwords do not match');
-            return;
-        }
-        const validationError = validatePassword(passwords.newPassword);
-        if (validationError) {
-            toast(validationError,
-                {
-                    icon: '🤬',
-                    style: {
-                        borderRadius: '10px',
-                        background: '#333',
-                        color: '#fff',
-                    },
-                }
-            );
-            return;
-        }
+    // Save "Profile Info"
+    const handleSaveProfile = async () => {
+        if (!agent) return;
+        setIsSubmittingProfile(true);
 
-        setIsSubmitting(true);
         try {
-            const response = await fetch.post('/api/changePassword', {
-                currentPassword: passwords.currentPassword,
-                newPassword: passwords.newPassword
-            });
+            // Create multipart form data
+            const formData = new FormData();
+            formData.append("name", name);
+            formData.append("description", description);
 
-            if (response.status) {
-                toast.success('Password changed successfully');
-                setIsChangePasswordOpen(false);
-                setPasswords({ currentPassword: '', newPassword: '', confirmPassword: '' });
+            // Attach avatar file (if the user selected one)
+            const avatarFile = fileRef?.current?.files?.[0];
+            if (avatarFile) {
+                formData.append("avatar", avatarFile);
             } else {
-                toast.error(response.message);
+                // In case no new file: store the existing image path
+                formData.append("image", imageUrl);
+            }
+
+            const response = await fetch.post("/api/saveAgentProfile", formData);
+            if (response.status) {
+                toast.success("Profile info updated successfully!");
+            } else {
+                toast.error(response.message || "Failed to update profile info.");
             }
         } catch (error) {
             console.error(error);
-            toast.error('Failed to change password');
+            toast.error("Profile update failed.");
         }
-        setIsSubmitting(false);
+
+        setIsSubmittingProfile(false);
+    };
+
+    // Change password
+    const handleChangePassword = async () => {
+        if (newPassword !== confirmPassword) {
+            toast.error("New passwords do not match");
+            return;
+        }
+        const validationError = validatePassword(newPassword);
+        if (validationError) {
+            toast(validationError, {
+                icon: "🤬",
+                style: {
+                    borderRadius: "10px",
+                    background: "#333",
+                    color: "#fff",
+                },
+            });
+            return;
+        }
+
+        setIsSubmittingPassword(true);
+        try {
+            const response = await fetch.post("/api/changePassword", {
+                currentPassword,
+                newPassword,
+            });
+            if (response.status) {
+                toast.success("Password changed successfully!");
+                // Clear fields
+                setCurrentPassword("");
+                setNewPassword("");
+                setConfirmPassword("");
+            } else {
+                toast.error(response.message || "Failed to change password.");
+            }
+        } catch (error) {
+            console.error(error);
+            toast.error("Failed to change password.");
+        }
+        setIsSubmittingPassword(false);
     };
 
     if (isLoading) return <ProfileSkeleton />;
 
     return (
-        <>
+        <div className="space-y-8">
+            {/* Profile Info Section */}
             <div className="bg-content1/50 backdrop-blur-md rounded-2xl p-8 shadow-lg hover:shadow-xl transition-all duration-300 border border-white/10">
-                <div className="flex flex-col md:flex-row items-center gap-8">
-                    <div className="relative group">
-                        <div className="absolute -inset-1 bg-gradient-to-r from-primary/40 to-secondary/40 rounded-full blur-xl opacity-0 group-hover:opacity-100 transition duration-500"></div>
-                        <Image
-                            src={agent?.image || '/assets/images/default-agent.png'}
-                            alt="Agent Image"
-                            className="relative w-[140px] h-[140px] rounded-full border-4 border-white/20 group-hover:border-white/30 group-hover:scale-105 transition-all duration-300"
-                            width={140}
-                            height={140}
-                        />
-                        <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transform group-hover:-translate-y-1 transition-all duration-300">
-                            <Button
-                                size="sm"
-                                color="primary"
-                                variant="shadow"
-                                className="px-4 py-2 font-medium backdrop-blur-md"
-                                href="/editProfile"
-                                as="a"
-                            >
-                                <span className="icon-edit mr-2" />
-                                Edit Profile
-                            </Button>
-                        </div>
-                    </div>
+                <h2 className="text-2xl font-bold mb-4">Profile Information</h2>
 
-                    <div className="flex-1 text-center md:text-left space-y-4">
-                        <div className="relative group">
-                            <h1 className="text-4xl font-bold bg-gradient-to-r from-primary via-secondary to-primary bg-clip-text text-transparent bg-[length:200%] animate-gradient">
-                                {agent?.name || 'Agent Name'}
-                            </h1>
-                            <div className="absolute -inset-1 bg-gradient-to-r from-primary/20 to-secondary/20 blur-2xl opacity-0 group-hover:opacity-100 transition duration-500"></div>
-                        </div>
-                        <p className="text-default-500 text-lg leading-relaxed max-w-2xl">
-                            {agent?.description || 'Agent Description'}
-                        </p>
-                        <div className="flex flex-wrap gap-3 mt-6 justify-center md:justify-start">
+                {/* Avatar Upload */}
+                <div className="flex flex-col md:flex-row items-center gap-8 mb-6">
+                    <div
+                        className="relative group w-[140px] h-[140px] rounded-full overflow-hidden object-cover border-2 border-white/20 cursor-pointer"
+                        onClick={() => fileRef.current?.click()}
+                    >
+                        {imagePreview ? (
+                            <Image
+                                src={imagePreview}
+                                alt="Agent Avatar"
+                                fill
+                                className="object-cover hover:scale-105 duration-200 transition-transform"
+                            />
+                        ) : (
+                            <div className="w-full h-full flex items-center justify-center text-default-400 text-6xl">
+                                +
+                            </div>
+                        )}
+                    </div>
+                    <Button
+                        color="primary"
+                        onPress={() => fileRef.current?.click()}
+                        className="hover:scale-105 transition-transform"
+                    >
+                        Change Avatar
+                    </Button>
+                    <input
+                        type="file"
+                        accept="image/*"
+                        ref={fileRef}
+                        className="hidden"
+                        onChange={handleImageUpload}
+                    />
+                </div>
+
+                <div className="flex flex-col md:flex-row items-start gap-8">
+                    {/* Editable Fields for Name & Description */}
+                    <div className="flex-1 space-y-4">
+                        <Input
+                            label="Name"
+                            value={name}
+                            onChange={(e) => setName(e.target.value)}
+                            className="max-w-md"
+                        />
+                        <Textarea
+                            label="Description"
+                            value={description}
+                            onChange={(e) => setDescription(e.target.value)}
+                            className="max-w-md"
+                        />
+
+                        {/* <div className="flex flex-wrap gap-3 mt-4">
                             <Chip
                                 variant="shadow"
                                 classNames={{
@@ -178,72 +266,61 @@ const AgentProfile = () => {
                                     content: "text-secondary font-medium px-4",
                                 }}
                             >
-                                {successRate?.toFixed(2) || '0.00'}% Success Rate
+                                {successRate?.toFixed(2) || "0.00"}% Success Rate
                             </Chip>
-                        </div>
+                        </div> */}
                     </div>
+                </div>
+
+                {/* Save Profile Info Button */}
+                <div className="mt-6">
+                    <Button
+                        color="primary"
+                        variant="shadow"
+                        onPress={handleSaveProfile}
+                        isLoading={isSubmittingProfile}
+                        className="hover:scale-105 transition-transform"
+                    >
+                        Update Profile
+                    </Button>
                 </div>
             </div>
 
-            <div className="mt-8 flex justify-center md:justify-start">
-                <Button 
-                    color="primary" 
-                    variant="shadow"
-                    className="hover:scale-105 transition-transform"
-                    onPress={() => setIsChangePasswordOpen(true)}
-                >
-                    <span className="icon-lock mr-2" />
-                    Change Password
-                </Button>
+            {/* Credentials Section */}
+            <div className="bg-content1/50 backdrop-blur-md rounded-2xl p-8 shadow-lg hover:shadow-xl transition-all duration-300 border border-white/10">
+                <h2 className="text-2xl font-bold mb-4">Credentials</h2>
+                <div className="flex flex-col gap-4 max-w-md">
+                    <Input
+                        label="Current Password"
+                        type="password"
+                        value={currentPassword}
+                        onChange={(e) => setCurrentPassword(e.target.value)}
+                    />
+                    <Input
+                        label="New Password"
+                        type="password"
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                    />
+                    <Input
+                        label="Confirm New Password"
+                        type="password"
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                    />
+                </div>
+
+                <div className="mt-6">
+                    <Button
+                        color="primary"
+                        onPress={handleChangePassword}
+                        isLoading={isSubmittingPassword}
+                        className="hover:scale-105 transition-transform"
+                    >
+                        Update Password
+                    </Button>
+                </div>
             </div>
-
-            <Modal 
-                isOpen={isChangePasswordOpen} 
-                onClose={() => setIsChangePasswordOpen(false)}
-                placement="center"
-            >
-                <ModalContent>
-                    <ModalHeader>Change Password</ModalHeader>
-                    <ModalBody>
-                        <Input
-                            type="password"
-                            label="Current Password"
-                            value={passwords.currentPassword}
-                            onChange={(e) => setPasswords(prev => ({...prev, currentPassword: e.target.value}))}
-                        />
-                        <Input
-                            type="password"
-                            label="New Password"
-                            value={passwords.newPassword}
-                            onChange={(e) => setPasswords(prev => ({...prev, newPassword: e.target.value}))}
-                        />
-                        <Input
-                            type="password"
-                            label="Confirm New Password"
-                            value={passwords.confirmPassword}
-                            onChange={(e) => setPasswords(prev => ({...prev, confirmPassword: e.target.value}))}
-                        />
-                    </ModalBody>
-                    <ModalFooter>
-                        <Button
-                            color="danger"
-                            variant="flat"
-                            onPress={() => setIsChangePasswordOpen(false)}
-                        >
-                            Cancel
-                        </Button>
-                        <Button
-                            color="primary"
-                            onPress={handleChangePassword}
-                            isLoading={isSubmitting}
-                        >
-                            Change Password
-                        </Button>
-                    </ModalFooter>
-                </ModalContent>
-            </Modal>
-        </>
+        </div>
     );
-};
-
-export default AgentProfile;
+}

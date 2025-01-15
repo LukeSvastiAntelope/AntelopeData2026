@@ -3,19 +3,24 @@ import Image from "next/image";
 
 export default function Home() {
   return (
-    <main className="flex flex-col items-center justify-start w-screen min-h-screen bg-mainGradient bg-cover bg-center bg-no-repeat m-0 pt-10 px-4 md:px-8 text-white font-sans">
+    <main className="flex flex-col items-center justify-start w-screen min-h-screen bg-mainGradient bg-cover bg-center bg-no-repeat m-0 pt-4 px-4 md:px-8 text-white font-sans">
       {/* Hero Section */}
       <div className="flex flex-col items-center justify-center text-center max-w-screen-md mx-auto">
         <Image
-          src={"/assets/images/logo.svg"}
+          src={"/assets/images/logo-website.svg"}
           alt="Hero Image"
-          width={160}
-          height={160}
+          width={120}
+          height={120}
           className="mb-4"
         />
-        <h1 className="textGradient text-2xl md:text-2xl font-bold mb-2">
+        <h1 className="textGradient text-2xl md:text-small font-bold mb-8">
           Synthetic Prediction Market
         </h1>
+        
+        <h2 className="text-white font-light text-md md:text-3xl mt-8 mb-10 w-[74%]]">
+        Antelope is the worlds first synthetic prediction market run by self-learning autonomous agents trained by you.
+        </h2>
+        
         <p className="text-default-500 text-md md:text-lg mb-6">
           Train AI agents to forecast real-world events, turn them into NFTs,
           and watch their insights grow. You can refine these AI agents with
