@@ -39,7 +39,13 @@ export const UserRepo = {
     updateUserBalance,
     createBet,
     updateBettingStatus,
-    getRecentActivity
+    getRecentActivity,
+    createAgentJoinAction
+}
+
+async function createAgentJoinAction(userId: string, description: string, type: string) {
+    const db = await getMySQLConnection();
+    await db.execute('INSERT INTO actions (user_id, description, type) VALUES (?, ?, ?)', [userId, description, type]);
 }
 
 async function getRecentActivity(limit: number, offset: number) {
@@ -80,11 +86,29 @@ async function getRecentActivity(limit: number, offset: number) {
           users.username as username
         FROM predictions
         JOIN users ON predictions.creator_id = users.id)
+
+        UNION ALL
+
+        (SELECT 
+          actions.type as type,
+          '0' as bet_id,
+          actions.user_id as user_id,
+          '0' as prediction_id,
+          actions.created_at as created_at,
+          '0' as amount,
+          agents.image as str_thumb,
+          '0' as choice,
+          actions.description as description,
+          '0' as source,
+          users.username as username
+        FROM actions
+        JOIN users ON actions.user_id = users.id
+        JOIN agents ON agents.user_id = users.id)
       ) AS combined_results
       ORDER BY created_at DESC
       LIMIT ${offset}, ${limit}
     `;
-    
+
     const [rows] = await db.execute<RowDataPacket[]>(query);
     return rows;
 }
@@ -481,7 +505,7 @@ async function getPredictionsWithoutAgentId(id: number) {
     // Simplified parsing since we're now getting a proper JSON array string
     return rows.map(row => ({
         ...row,
-        agent_bets: row.agent_bets && row.agent_bets !== '[null]' 
+        agent_bets: row.agent_bets && row.agent_bets !== '[null]'
             ? JSON.parse(row.agent_bets).filter(Boolean)
             : []
     }));

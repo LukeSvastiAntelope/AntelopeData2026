@@ -300,7 +300,6 @@ export default function Dashboard() {
 
     // Load more predictions when page changes
     loadMorePredictions();
-
     return () => observer.disconnect();
   }, [activeTab, predictions, pagePredictions, searchPredictions, hasMorePredictions]);
 
@@ -313,13 +312,6 @@ export default function Dashboard() {
       setHasMorePredictions(filteredPredictions.length > ITEMS_PER_PAGE_PREDICTIONS);
     }
   }, [searchPredictions, activeTab, predictions]);
-
-  // Lazy-fetch predictions
-  useEffect(() => {
-    if (activeTab === "predictions" && predictions.length === 0) {
-      fetchPredictions();
-    }
-  }, [activeTab, predictions]);
 
   // Fetch Agent + Bets + Predictions
   useEffect(() => {
@@ -449,6 +441,15 @@ export default function Dashboard() {
       <div className="flex gap-4 mb-2 w-full justify-between">
         <div className="flex gap-4 font-kodemono items-center">
           <Button
+            className={`py-2 px-0 rounded-lg ${activeTab === "activity"
+              ? "bg-transparent text-white"
+              : "bg-transparent text-default-400 hover:text-white"
+              }`}
+            onPress={() => setActiveTab("activity")}
+          >
+            Activity
+          </Button>
+          <Button
             className={`py-2 px-0 rounded-lg ${activeTab === "bets"
               ? "bg-transparent text-white"
               : "bg-transparent text-default-400 hover:text-white"
@@ -465,15 +466,6 @@ export default function Dashboard() {
             onPress={() => setActiveTab("predictions")}
           >
             Predictions
-          </Button>
-          <Button
-            className={`py-2 px-0 rounded-lg ${activeTab === "activity"
-              ? "bg-transparent text-white"
-              : "bg-transparent text-default-400 hover:text-white"
-              }`}
-            onPress={() => setActiveTab("activity")}
-          >
-            Activity
           </Button>
         </div>
       </div>
@@ -665,138 +657,138 @@ export default function Dashboard() {
 
       {activeTab === "predictions" && (
         !agent || !agent.interests || agent.interests.length === 0 || !agent.principles || agent.principles.length === 0 ?
-        <div>
-          <div className="relative mb-6 group">
-            <span className="absolute inset-y-0 left-0 flex items-center pl-2 pointer-events-none">
-              {/* Search Icon */}
-              <svg
-                aria-hidden="true"
-                className="w-5 h-5 text-gray-700 group-focus-within:text-white transition-colors duration-200"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                viewBox="0 0 24 24"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <circle cx="10" cy="10" r="7"></circle>
-                <path d="M21 21l-4.35-4.35"></path>
-              </svg>
-            </span>
-            <input
-              type="text"
-              value={activeTab === "predictions" ? searchTerm : searchPredictions}
-              onChange={activeTab === "predictions" ? handleBetSearch : handlePredictionSearch}
-              placeholder={`Search ${activeTab}...`}
-              className="w-full p-2 pl-9 rounded-md focus:outline-none text-small input-search bg-gray-800"
-            />
-          </div>
-          <div className="flex flex-col gap-2 mb-8 border border-white/10 rounded-xl p-6 text-center empty-state place-content-center">
-            <div className="map-center"></div>
-            <h1 className="font-bold mb-1 font-kodemono">Create your strategy</h1>
-            <p className="text-gray-400 pb-2 ">
-              You haven’t created your AI agents strategy yet. Before it can bet create the strategy and choose your area of interest.
-            </p>
-            <Button onPress={() => router.push('/strategy')} className="w-fit mx-auto" color="primary" variant="flat">Create Strategy</Button>
-          </div>
-        </div> :
-        <section className="rounded-lg overflow-x-auto mb-8">
-          {isLoadingPredictions && predictions.length === 0 ? (
-            <div className="flex justify-center items-center py-8">
-              <Spinner size="lg" />
+          <div>
+            <div className="relative mb-6 group">
+              <span className="absolute inset-y-0 left-0 flex items-center pl-2 pointer-events-none">
+                {/* Search Icon */}
+                <svg
+                  aria-hidden="true"
+                  className="w-5 h-5 text-gray-700 group-focus-within:text-white transition-colors duration-200"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  viewBox="0 0 24 24"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <circle cx="10" cy="10" r="7"></circle>
+                  <path d="M21 21l-4.35-4.35"></path>
+                </svg>
+              </span>
+              <input
+                type="text"
+                value={activeTab === "predictions" ? searchTerm : searchPredictions}
+                onChange={activeTab === "predictions" ? handleBetSearch : handlePredictionSearch}
+                placeholder={`Search ${activeTab}...`}
+                className="w-full p-2 pl-9 rounded-md focus:outline-none text-small input-search bg-gray-800"
+              />
             </div>
-          ) : displayedPredictions.length === 0 && !isLoadingPredictions ? (
-            <div className="text-center text-gray-500 py-8">
-              No predictions found
+            <div className="flex flex-col gap-2 mb-8 border border-white/10 rounded-xl p-6 text-center empty-state place-content-center">
+              <div className="map-center"></div>
+              <h1 className="font-bold mb-1 font-kodemono">Create your strategy</h1>
+              <p className="text-gray-400 pb-2 ">
+                You haven’t created your AI agents strategy yet. Before it can bet create the strategy and choose your area of interest.
+              </p>
+              <Button onPress={() => router.push('/strategy')} className="w-fit mx-auto" color="primary" variant="flat">Create Strategy</Button>
             </div>
-          ) : (
-            <div className="flex flex-col gap-2">
-              {displayedPredictions.map((prediction, index) => {
-                const choiceTotals = prediction.agent_bets?.reduce((acc, b) => {
-                  acc[b.choice] = (acc[b.choice] || 0) + b.amount;
-                  return acc;
-                }, {} as Record<string, number>) || {};
+          </div> :
+          <section className="rounded-lg overflow-x-auto mb-8">
+            {isLoadingPredictions && predictions.length === 0 ? (
+              <div className="flex justify-center items-center py-8">
+                <Spinner size="lg" />
+              </div>
+            ) : displayedPredictions.length === 0 && !isLoadingPredictions ? (
+              <div className="text-center text-gray-500 py-8">
+                No predictions found
+              </div>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {displayedPredictions.map((prediction, index) => {
+                  const choiceTotals = prediction.agent_bets?.reduce((acc, b) => {
+                    acc[b.choice] = (acc[b.choice] || 0) + b.amount;
+                    return acc;
+                  }, {} as Record<string, number>) || {};
 
-                const totalAmount = Object.values(choiceTotals).reduce((sum, amount) => sum + amount, 0);
+                  const totalAmount = Object.values(choiceTotals).reduce((sum, amount) => sum + amount, 0);
 
-                // Calculate odds for each choice
-                const choiceOdds = Object.entries(choiceTotals).map(([choice, amount]) => {
-                  const percentage = totalAmount > 0 ? (amount / totalAmount) * 100 : 0;
-                  const odds = percentage > 0 ? (100 / percentage).toFixed(2) : "∞";
-                  return {
-                    choice,
-                    amount,
-                    odds,
-                    percentage: percentage.toFixed(1)
-                  };
-                });
+                  // Calculate odds for each choice
+                  const choiceOdds = Object.entries(choiceTotals).map(([choice, amount]) => {
+                    const percentage = totalAmount > 0 ? (amount / totalAmount) * 100 : 0;
+                    const odds = percentage > 0 ? (100 / percentage).toFixed(2) : "∞";
+                    return {
+                      choice,
+                      amount,
+                      odds,
+                      percentage: percentage.toFixed(1)
+                    };
+                  });
 
-                return (
-                  <div
-                    key={index}
-                    onClick={() => router.push(`/predictions/${prediction.id}`)}
-                    className="flex items-center gap-4 p-2 bg-gray-900/30 rounded-xl select-item transition-colors cursor-pointer"
-                  >
-                    {prediction.str_thumb ? (
-                      <Image
-                        src={prediction.str_thumb}
-                        alt=""
-                        width={40}
-                        height={40}
-                        className="w-10 h-10 rounded-full"
-                      />
-                    ) : (
-                      <div className="w-10 h-10 rounded-full bg-gray-800" />
-                    )}
+                  return (
+                    <div
+                      key={index}
+                      onClick={() => router.push(`/predictions/${prediction.id}`)}
+                      className="flex items-center gap-4 p-2 bg-gray-900/30 rounded-xl select-item transition-colors cursor-pointer"
+                    >
+                      {prediction.str_thumb ? (
+                        <Image
+                          src={prediction.str_thumb}
+                          alt=""
+                          width={40}
+                          height={40}
+                          className="w-10 h-10 rounded-full"
+                        />
+                      ) : (
+                        <div className="w-10 h-10 rounded-full bg-gray-800" />
+                      )}
 
-                    <div className="flex flex-col flex-grow gap-2">
-                      <div className="text-base text-gray-100">{prediction.description}</div>
+                      <div className="flex flex-col flex-grow gap-2">
+                        <div className="text-base text-gray-100">{prediction.description}</div>
 
-                      <div className="flex flex-wrap gap-2 items-center">
+                        <div className="flex flex-wrap gap-2 items-center">
 
-                        {choiceOdds.map(({ choice, percentage }) => (
+                          {choiceOdds.map(({ choice, percentage }) => (
+                            <Chip
+                              key={choice}
+                              className={`${choice === prediction.creator_choice
+                                ? 'bg-success/20 text-success-500 icon-thumbs-up px-2'
+                                : 'bg-danger/20 text-danger-500 icon-thumbs-up px-2'
+                                }`}
+                              size="sm"
+                            >
+                              {/* {choice}: {amount} ({odds}x)  */}
+                              {percentage}%
+                            </Chip>
+                          ))}
+
+
+
+                          {/* Status */}
                           <Chip
-                            key={choice}
-                            className={`${choice === prediction.creator_choice
-                              ? 'bg-success/20 text-success-500 icon-thumbs-up px-2'
-                              : 'bg-danger/20 text-danger-500 icon-thumbs-up px-2'
+                            className={`${prediction.status === "open"
+                              ? "bg-blue-500/20 text-blue-400"
+                              : "bg-yellow-500/20 text-yellow-400"
                               }`}
                             size="sm"
                           >
-                            {/* {choice}: {amount} ({odds}x)  */}
-                            {percentage}%
+                            {prediction.status}
                           </Chip>
-                        ))}
-
-
-
-                        {/* Status */}
-                        <Chip
-                          className={`${prediction.status === "open"
-                            ? "bg-blue-500/20 text-blue-400"
-                            : "bg-yellow-500/20 text-yellow-400"
-                            }`}
-                          size="sm"
-                        >
-                          {prediction.status}
-                        </Chip>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+                  );
+                })}
+              </div>
+            )}
 
-          <div id="sentinel" className="flex justify-center p-4">
-            {hasMorePredictions && displayedPredictions.length > 0 && (
-              <Spinner size="sm" />
-            )}
-            {!hasMorePredictions && predictions.length > 0 && (
-              <p className="text-gray-500">No more predictions to load</p>
-            )}
-          </div>
-        </section>
+            <div id="sentinel" className="flex justify-center p-4">
+              {hasMorePredictions && displayedPredictions.length > 0 && (
+                <Spinner size="sm" />
+              )}
+              {!hasMorePredictions && predictions.length > 0 && (
+                <p className="text-gray-500">No more predictions to load</p>
+              )}
+            </div>
+          </section>
       )}
 
       {
@@ -837,9 +829,13 @@ export default function Dashboard() {
 
                     {/* Content */}
                     <div className="flex-1 space-y-2">
-                      <div className="font-medium text-small">
-                        {item.type === 'bet' ? 'New Agent Bet!' : `New ${item.source == "sportDB" ? "Game " : ""}Prediction Created!`}
-                      </div>
+                      {
+                        item.type !== "agent_join" && (
+                          <div className="font-medium text-small">
+                            {item.type === 'bet' ? 'New Agent Bet!' : `New ${item.source == "sportDB" ? "Game " : ""}Prediction Created!`}
+                          </div>
+                        )
+                      }
 
                       <div className="space-y-1 text-sm text-gray-300">
                         {item.description && (
@@ -854,7 +850,7 @@ export default function Dashboard() {
                         {item.amount > 0 && (
                           <div>Bet: {item.amount} credits</div>
                         )}
-                        {item.choice && (
+                        {item.choice && item.type !== "agent_join" && (
                           <div>User&apos;s Choice: {item.choice}</div>
                         )}
                       </div>

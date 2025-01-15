@@ -44,7 +44,6 @@ const AgentProfileDialog = (
             isDismissable={false}
             classNames={{
                 base: "bg-[#1c1c1c] dark",
-                closeButton: "text-white/60 hover:text-white",
             }}
         >
             <ModalContent>
@@ -114,13 +113,6 @@ const AgentProfileDialog = (
                         isLoading={isSubmittingProfile}
                     >
                         {isSubmittingProfile ? "Saving..." : "Save"}
-                    </Button>
-                    <Button 
-                        color="danger" 
-                        onPress={onClose}
-                        className="bg-pink-500"
-                    >
-                        Cancel
                     </Button>
                 </ModalFooter>
             </ModalContent>
