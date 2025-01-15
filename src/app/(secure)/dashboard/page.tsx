@@ -887,7 +887,7 @@ export default function Dashboard() {
                     <div className="flex-1 space-y-1">
                       {
                         item.type !== "agent_join" && (
-                          <div className="font-medium text-small text-default-500">
+                          <div className="font-normal text-small text-default-500">
                             {/* add the username of the agent that is make a bet */}
                             {item.type === 'bet' ? `${item.username} wagered on:` : `${item.source == "sportDB" ? "Game " : ""}Predicted!`}
                           </div>
@@ -897,7 +897,7 @@ export default function Dashboard() {
                       <div className="space-y-1 text-sm ">
                         {item.description && (
                          
-                          <div className="text-white text-base font-medium">{item.description}</div>
+                          <div className="text-white text-base font-normal">{item.description}</div>
                   
                         )}
                         <span className="flex flex-wrap gap-2">
@@ -918,17 +918,17 @@ export default function Dashboard() {
       className={(() => {
         // Decide styling based on the choice
         if (item.choice.toLowerCase() === "yes") {
-          return "bg-success/20 text-success-500 icon-thumbs-up px-8 rounded-md";
+          return "relative max-w-fit min-w-min inline-flex items-center justify-between box-border whitespace-nowrap h-6 text-tiny rounded-full bg-success/20 text-success-500 icon-thumbs-up px-2";
         } else if (item.choice.toLowerCase() === "no") {
-          return "bg-danger/20 text-danger-500 icon-thumbs-down px-8 rounded-md";
+          return "relative max-w-fit min-w-min inline-flex items-center justify-between box-border whitespace-nowrap h-6 text-tiny rounded-full bg-danger/20 text-danger-500 icon-thumbs-down px-2";
         } else if (item.choice.toLowerCase() === "draw") {
           return "bg-warning/20 text-warning-500 icon-exclamation-circle px-2 rounded-md";
         }
         // Default styling for other custom choices:
-        return "bg-secondary/20 text-secondary-500 px-2 py-1 rounded-md";
+        return "bg-secondary/20 text-secondary-500 px-2 py-1 rounded-md relative max-w-fit min-w-min inline-flex items-center justify-between box-border whitespace-nowrap h-6 text-tiny rounded-full px-2";
       })()}
     >
-      {item.choice}
+      <span className="flex-1 text-inherit font-normal px-1">{item.choice}</span>
     </div>
   </Tooltip>
 )}
