@@ -430,7 +430,10 @@ ${p.metadata?.comment ? `- Agent Controller Comment: ${p.metadata.comment}` : ''
 
     private async filterTrainingPredictions(): Promise<Prediction[]> {
         const index = this.pinecone.index("prediction-training");
-        const indexList = this.agent.train_index.split(',');
+        const indexList = this.agent.train_index ? this.agent.train_index.split(',') : [];
+        if (indexList.length == 0) {
+            return [];
+        }
         
         try {
             // Use fetch operation instead of query
