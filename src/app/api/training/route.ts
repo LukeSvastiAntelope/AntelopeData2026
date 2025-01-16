@@ -57,7 +57,7 @@ export async function POST(req: NextRequest) {
             }
         }]);
 
-        const train_index = agent.train_index + "," + predictionId;
+        const train_index = agent.train_index ? agent.train_index + "," + predictionId : predictionId;
         await UserRepo.updateAgentTraining(agent.id, train_index);
 
         return Response.json({
