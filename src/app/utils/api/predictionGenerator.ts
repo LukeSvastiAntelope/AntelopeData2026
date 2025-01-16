@@ -1071,7 +1071,7 @@ export class AIEnhancedPredictionGenerator {
             const predictionEvent = prediction.event;
             if (!predictionEvent) return false;
 
-            const index = this.pinecone.Index('prediction-training');
+            const index = this.pinecone.Index('prediction-results');
             const thirtyDaysAgo = new Date();
             thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
@@ -1132,7 +1132,7 @@ export class AIEnhancedPredictionGenerator {
             const predictionText = `${prediction.question} ${prediction.description}`.toLowerCase();
             const embedding = await this.getEmbedding(predictionText);
 
-            const index = this.pinecone.Index('prediction-training');
+            const index = this.pinecone.Index('prediction-results');
             const queryResponse = await index.query({
                 vector: embedding,
                 topK: 5,
@@ -1232,7 +1232,7 @@ export class AIEnhancedPredictionGenerator {
             const embedding = await this.getEmbedding(normalizedText);
             const id = `prediction-${Date.now()}`;
 
-            const newIndex = this.pinecone.Index('prediction-training');
+            const newIndex = this.pinecone.Index('prediction-results');
             await newIndex.upsert([{
                 id: id,
                 values: embedding,

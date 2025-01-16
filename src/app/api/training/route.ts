@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
         });
 
         const normalizedText = `${question} ${description}`.toLowerCase();
-        const index = pinecone.index("prediction-training");
+        const index = pinecone.index("prediction-results");
         const embedding = await getEmbedding(normalizedText);
 
         await index.upsert([{

@@ -429,7 +429,7 @@ ${p.metadata?.comment ? `- Agent Controller Comment: ${p.metadata.comment}` : ''
     }
 
     private async filterTrainingPredictions(): Promise<Prediction[]> {
-        const index = this.pinecone.index("prediction-training");
+        const index = this.pinecone.index("prediction-results");
         const indexList = this.agent.train_index ? this.agent.train_index.split(',') : [];
         if (indexList.length == 0) {
             return [];
