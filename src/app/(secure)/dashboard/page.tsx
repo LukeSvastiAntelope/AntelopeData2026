@@ -12,6 +12,7 @@ import { useFetch } from "@/app/utils/lib";
 import { IAgentProfile } from "@/app/utils/interface";
 import { Tooltip } from "@nextui-org/tooltip";
 
+
 // ------------- ADDED: Chart.js imports -------------
 import {
   Chart as ChartJS,
@@ -91,6 +92,8 @@ interface IActivity {
   choice?: string;
   type?: string;
   bet_id?: number;
+  user_avatar?: string;
+  agent_name?: string;
 }
 
 const ITEMS_PER_PAGE_BETS = 50;
@@ -863,10 +866,14 @@ export default function Dashboard() {
                 {filterActivity(activity, searchTerm).map((item: IActivity, index: number) => (
                   <div
                     key={index}
-                    className="flex items-start gap-4 p-4  rounded-xl select-item transition-colors cursor-pointer"
-                    onClick={() => item.type == "bet" ? router.push(`/bets/${item?.bet_id}`) : router.push(`/predictions/${item.prediction_id}`)}
+                    className="flex items-start gap-4 p-4 rounded-xl select-item transition-colors cursor-pointer"
+                    onClick={() =>
+                      item.type === "bet"
+                        ? router.push(`/bets/${item.bet_id}`)
+                        : router.push(`/predictions/${item.prediction_id}`)
+                    }
                   >
-                    {/* Thumbnail if available */}
+                    {/* Thumbnail if available (e.g., prediction/bet image) */}
                     {item.str_thumb ? (
                       <Image
                         src={item.str_thumb}
@@ -877,66 +884,83 @@ export default function Dashboard() {
                       />
                     ) : (
                       <div className="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center">
-                        <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                        <svg
+                          className="w-6 h-6 text-gray-400"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
+                          />
                         </svg>
                       </div>
                     )}
 
-                    {/* Content */}
+                    {/* Right column: details */}
                     <div className="flex-1 space-y-1">
-                      {
-                        item.type !== "agent_join" && (
-                          <div className="font-normal text-small text-default-500">
-                            {/* add the username of the agent that is make a bet */}
-                            {item.type === 'bet' ? `${item.username} wagered on:` : `${item.source == "sportDB" ? "Game " : ""}Predicted!`}
-                          </div>
-                        )
-                      }
-                     
-                      <div className="space-y-1 text-sm ">
-                        {item.description && (
-                         
-                          <div className="text-white text-base font-normal">{item.description}</div>
-                  
-                        )}
-                        <span className="flex flex-wrap gap-2">
-                        {/* {item.created_at && (
-                          <Tooltip content="Created at" showArrow>
-                          <div className="text-default-500">On: {new Date(item.created_at).toLocaleString()}</div>
-                          </Tooltip>
-                        )} */}
-                       
-                        {item.amount > 0 && (
-                          <Tooltip content="Bet amount" showArrow>
-                          <div className="icon-coin text-default-500">{item.amount}</div>
-                          </Tooltip>
-                        )}
-                        {item.choice && item.type !== "agent_join" && (
-  <Tooltip content="User's Choice" showArrow>
-    <div
-      className={(() => {
-        // Decide styling based on the choice
-        if (item.choice.toLowerCase() === "yes") {
-          return "relative max-w-fit min-w-min inline-flex items-center justify-between box-border whitespace-nowrap h-6 text-tiny rounded-full bg-success/20 text-success-500 icon-thumbs-up px-2";
-        } else if (item.choice.toLowerCase() === "no") {
-          return "relative max-w-fit min-w-min inline-flex items-center justify-between box-border whitespace-nowrap h-6 text-tiny rounded-full bg-danger/20 text-danger-500 icon-thumbs-down px-2";
-        } else if (item.choice.toLowerCase() === "draw") {
-          return "bg-warning/20 text-warning-500 relative max-w-fit min-w-min inline-flex items-center justify-between box-border whitespace-nowrap h-6 text-tiny rounded-full px-2" ;
-        }
-        // Default styling for other custom choices:
-             return "bg-secondary/20 text-secondary-500 px-2 py-1 rounded-md relative max-w-fit min-w-min inline-flex items-center justify-between box-border whitespace-nowrap h-6 text-tiny rounded-full px-2";
+                      {item.type !== "agent_join" && (
+                        <div className="flex items-center gap-2">
+                          {/* Agent avatar or fallback */}
+                          {item.user_avatar ? (
+                            <Image
+                              src={item.user_avatar}
+                              alt={item.agent_name || "Agent avatar"}
+                              width={24}
+                              height={24}
+                              className="rounded-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-6 h-6 rounded-full bg-gray-600" />
+                          )}
 
-             
-            })()}
-    >
-      {/* Item choices should be camel case for example: Predicted: Paris */}
-      <span className="flex-1 text-inherit font-normal px-1">{item.choice.charAt(0).toLocaleUpperCase() + item.choice.slice(1)}</span>
-    </div>
-  </Tooltip>
-)}
+                          <span className="font-normal text-small text-default-500">
+                            {item.type === "bet"
+                              ? `${item.agent_name ?? "Agent Name"} wagered on:`
+                              : `${item.source === "sportDB" ? "Game " : ""}Predicted!`}
+                          </span>
+                        </div>
+                      )}
+
+                      <div className="space-y-1 text-sm">
+                        {item.description && (
+                          <div className="text-white text-base font-normal">
+                            {item.description}
+                          </div>
+                        )}
+
+                        <span className="flex flex-wrap gap-2">
+                          {item.amount > 0 && (
+                            <Tooltip content="Bet amount" showArrow>
+                              <div className="icon-coin text-default-500">{item.amount}</div>
+                            </Tooltip>
+                          )}
+
+                          {item.choice && item.type !== "agent_join" && (
+                            <Tooltip content="User's Choice" showArrow>
+                              <div
+                                className={(() => {
+                                  if (item.choice.toLowerCase() === "yes") {
+                                    return "relative max-w-fit min-w-min inline-flex items-center justify-between box-border whitespace-nowrap h-6 text-tiny rounded-full bg-success/20 text-success-500 icon-thumbs-up px-2";
+                                  } else if (item.choice.toLowerCase() === "no") {
+                                    return "relative max-w-fit min-w-min inline-flex items-center justify-between box-border whitespace-nowrap h-6 text-tiny rounded-full bg-danger/20 text-danger-500 icon-thumbs-down px-2";
+                                  } else if (item.choice.toLowerCase() === "draw") {
+                                    return "bg-warning/20 text-warning-500 relative max-w-fit min-w-min inline-flex items-center justify-between box-border whitespace-nowrap h-6 text-tiny rounded-full px-2";
+                                  }
+                                  return "bg-secondary/20 text-secondary-500 px-2 py-1 rounded-md relative max-w-fit min-w-min inline-flex items-center justify-between box-border whitespace-nowrap h-6 text-tiny rounded-full px-2";
+                                })()}
+                              >
+                                <span className="flex-1 text-inherit font-normal px-1">
+                                  {item.choice.charAt(0).toUpperCase() + item.choice.slice(1)}
+                                </span>
+                              </div>
+                            </Tooltip>
+                          )}
                         </span>
-                      </div>  
+                      </div>
                     </div>
                   </div>
                 ))}

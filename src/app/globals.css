@@ -268,8 +268,7 @@ max-width: 80px;
   background-position: left center;
   padding-left: 16px;
  
-  width: 12px;
-  height: 20px;
+
 }
 
 .icon-coin-bigger {
@@ -434,22 +433,20 @@ max-width: 80px;
   background-image: url('/assets/images/thumb-down.svg');
   background-size: 16px 16px;
   background-repeat: no-repeat;
-  background-position: 6px 3px;
+  background-position: 6px center;
   padding-left: 22px;
   /* margin-right: 16px; */
-  width: 10px;
-  height: 20px;
+
 }   
 
 .icon-thumbs-up {
   background-image: url('/assets/images/thumb-up.svg');
   background-size: 16px 16px;
   background-repeat: no-repeat;
-  background-position: 6px 1px;
+  background-position: 6px center;
   padding-left: 22px;
   /* margin-right: 16px; */
-  width: 10px;
-  height: 20px;
+
 }
 
 .icon-bet:hover {
