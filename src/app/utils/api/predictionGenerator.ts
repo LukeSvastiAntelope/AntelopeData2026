@@ -272,11 +272,6 @@ export class AIEnhancedPredictionGenerator {
             // Get data from multiple sources
             const data = await this.getCombinedCryptoData(this.agent.interests);
 
-            if (!data || !data.marketData || data.marketData.length === 0) {
-                console.error('No valid crypto market data found');
-                return undefined;
-            }
-
             const prompt = this.createEnhancedCryptoPrompt(data);
             const prediction = await this.generateWithAI(prompt);
 
