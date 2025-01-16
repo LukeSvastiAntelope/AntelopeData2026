@@ -59,11 +59,13 @@ async function getRecentActivity(limit: number, offset: number) {
           bets.prediction_id as prediction_id,
           bets.created_at as created_at,
           bets.amount as amount,
-          agents.image as str_thumb,
+          predictions.str_thumb as str_thumb,
           bets.choice as choice,
           predictions.description as description,
           predictions.source as source,
-          users.username as username
+          users.username as username,
+          agents.name as agent_name,
+          agents.image as agent_image
         FROM bets
         JOIN users ON bets.user_id = users.id
         JOIN predictions ON bets.prediction_id = predictions.id
@@ -83,7 +85,9 @@ async function getRecentActivity(limit: number, offset: number) {
           predictions.creator_choice as choice,
           predictions.description as description,
           predictions.source as source,
-          users.username as username
+          users.username as username,
+          '' as agent_name,
+          '' as agent_image
         FROM predictions
         JOIN users ON predictions.creator_id = users.id)
 
@@ -100,7 +104,9 @@ async function getRecentActivity(limit: number, offset: number) {
           '0' as choice,
           actions.description as description,
           '0' as source,
-          users.username as username
+          users.username as username,
+          agents.name as agent_name,
+          '' as agent_image
         FROM actions
         JOIN users ON actions.user_id = users.id
         JOIN agents ON agents.user_id = users.id)

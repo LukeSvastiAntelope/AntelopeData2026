@@ -25,52 +25,6 @@ export class AIEnhancedPredictionGenerator {
     }
 
     async init() {
-        // Check if index exists, if not create it
-        // const indexName = 'predictions';
-        // await this.pinecone.deleteIndex(indexName);
-        // const indexesList = await this.pinecone.listIndexes();
-        // console.log(indexesList);
-        // const indexExists = indexesList.indexes?.some(
-        //     index => index.name === 'predictions'
-        // );
-
-        // if (!indexExists) {
-        //     await this.pinecone.createIndex({
-        //         name: indexName,
-        //         dimension: this.VECTOR_DIMENSION,
-        //         metric: 'cosine',
-        //         spec: { serverless: { cloud: 'aws', region: 'us-east-1' } }
-        //     });
-        // }
-    }
-
-    private async validatePrediction(prediction: AutomatedPrediction): Promise<boolean> {
-        const currentDate = new Date();
-        const maxEndDate = new Date(currentDate);
-        maxEndDate.setDate(maxEndDate.getDate() + this.agent.maxTimelineLimit);
-        const predictionDate = new Date(prediction.endDate);
-
-        // Check date validity
-        if (predictionDate <= currentDate || predictionDate > maxEndDate) {
-            return false;
-        }
-
-        // Check for unrealistic keywords
-        const unrealisticKeywords = [
-            'mars', 'moon', 'space colony', 'flying car', 'cure all', 'stadium complete',
-            'infrastructure', 'eradicate', 'solve world', 'eliminate all', 'revolutionary'
-        ];
-
-        const predictionText = `${prediction.question} ${prediction.description}`.toLowerCase();
-        const hasUnrealisticTerms = unrealisticKeywords.some(keyword =>
-            predictionText.includes(keyword.toLowerCase())
-        );
-
-        if (hasUnrealisticTerms) {
-            return false;
-        }
-
-        return true;
     }
 
     private async getImagesForPrediction(topic: string): Promise<PredictionImage[]> {
@@ -226,11 +180,7 @@ export class AIEnhancedPredictionGenerator {
     // Update the main generation method
     async generatePrediction(): Promise<AutomatedPrediction | undefined> {
         let prediction: AutomatedPrediction | undefined;
-        // const isValid = false;
-        // const attempts = 0;
-        // const MAX_ATTEMPTS = 5;
 
-        // do {
         if (this.hasSportsInterest()) {
             prediction = await this.generateSportsPrediction();
             if (!prediction) {
@@ -243,19 +193,6 @@ export class AIEnhancedPredictionGenerator {
             }
         }
 
-        // isValid = await this.validatePrediction(prediction);
-        // attempts++;
-
-        // if (!isValid && attempts < MAX_ATTEMPTS) {
-        //     console.log('Generated prediction was invalid, retrying...');
-        // }
-        // } while (!isValid && attempts < MAX_ATTEMPTS);
-
-        // if (!isValid) {
-        //     throw new Error('Failed to generate valid prediction after maximum attempts');
-        // }
-
-        // Continue with principle evaluation and image enrichment
         const principleScore = await this.evaluatePredictionAgainstPrinciples(prediction);
         prediction.confidence *= principleScore;
         prediction.initialStake = this.calculateStakeBasedOnConfidence(prediction.confidence);
@@ -687,43 +624,6 @@ export class AIEnhancedPredictionGenerator {
             console.error('Failed to generate prediction with OpenAI:', error);
             throw error;
         }
-    }
-
-    private calculateValidEndDate(question: string): Date {
-        const currentDate = new Date();
-        const maxEndDate = new Date(currentDate);
-        maxEndDate.setMonth(currentDate.getMonth() + 3);
-
-        // Try to extract date from question
-        const dateMatch = question.match(/by\s+([\w\s,]+\d{4})/i);
-        if (dateMatch) {
-            const extractedDate = new Date(dateMatch[1]);
-            if (this.isValidPredictionDate(extractedDate)) {
-                return extractedDate;
-            }
-        }
-
-        // If no valid date found or date is invalid, generate a date within 3 months
-        const randomDays = Math.floor(Math.random() * 90) + 1; // 1 to 90 days
-        const randomDate = new Date(currentDate);
-        randomDate.setDate(currentDate.getDate() + randomDays);
-
-        // Ensure date doesn't exceed maxEndDate
-        return randomDate > maxEndDate ? maxEndDate : randomDate;
-    }
-
-    private isValidPredictionDate(date: Date): boolean {
-        const currentDate = new Date();
-        const maxEndDate = new Date(currentDate);
-        maxEndDate.setMonth(currentDate.getMonth() + 3);
-
-        // Add time buffer to ensure date is within range
-        currentDate.setHours(0, 0, 0, 0);
-        maxEndDate.setHours(23, 59, 59, 999);
-
-        return date >= currentDate &&
-            date <= maxEndDate &&
-            !isNaN(date.getTime());
     }
 
     private async checkSimilarity(prediction: AutomatedPrediction): Promise<boolean> {

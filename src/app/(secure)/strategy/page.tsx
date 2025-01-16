@@ -12,7 +12,7 @@ import { useFetch } from "@/app/utils/lib";
 import { IAgentProfile } from "@/app/utils/interface";
 import { convertDaysToYMD } from "@/app/utils/lib";
 import { CATEGORIES } from "@/app/utils/const";
-import {Switch} from "@nextui-org/switch";
+import { Switch } from "@nextui-org/switch";
 
 /**
  * StrategySkeleton: Skeleton loader that matches the layout for “Strategy Page”
@@ -99,13 +99,13 @@ const StrategySkeleton = () => {
                   <Skeleton className="h-5 w-32 rounded-lg mb-2" />
                   <Skeleton className="h-4 w-full rounded-lg" />
                 </CardBody>
-                
+
               </Card>
-              
+
             ))}
           </div>
         </CardBody>
-      
+
       </Card>
 
       {/* Risk Profile Skeleton */}
@@ -205,12 +205,12 @@ export default function StrategyPage() {
       </div>
 
       <div className="flex flex-col banner-image p-6 rounded-lg mt-8">
-     <h3 className="text-2xl font-bold text-white font-kodemono mb-2">Train Your Agent</h3>
-     <p className="text-small text-default-500 w-1/2 text-white mb-4">Tell the agent your interest and it will ask you a set of questions to understand your line of thinking.</p>
-     <Button color="primary" variant="flat" className="text-small w-fit bg-white px-8" href="/train-agent" size="sm" as="a">
-     Start Training
-          </Button>
-     </div>
+        <h3 className="text-2xl font-bold text-white font-kodemono mb-2">Train Your Agent</h3>
+        <p className="text-small w-1/2 text-white mb-4">Tell the agent your interest and it will ask you a set of questions to understand your line of thinking.</p>
+        <Button color="primary" variant="flat" className="text-small w-fit bg-white px-8" href="/trainAgent" size="sm" as="a">
+          Start Training
+        </Button>
+      </div>
 
       <Card className="my-8 bg-content0">
         <CardBody className="flex flex-row justify-between items-center">
@@ -259,12 +259,12 @@ export default function StrategyPage() {
         </CardHeader>
         <Divider />
 
-   
+
 
         <CardBody>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 ml-2">
             <div>
-            <h3 className="text-default-500 mb-2 text-small">Main Category</h3>
+              <h3 className="text-default-500 mb-2 text-small">Main Category</h3>
               <Chip color="primary" variant="flat" size="sm">
                 {agent?.category
                   ? CATEGORIES.find(
@@ -274,23 +274,23 @@ export default function StrategyPage() {
                   : "General"}
               </Chip>
             </div>
-            
+
             <div>
               <h3 className="text-default-500 mb-2 text-small">Resolution Preference</h3>
               <p className="font-semibold text-small">{resolutionDate}</p>
             </div>
-            
+
           </div>
         </CardBody>
 
-      
+
 
         {/* Core Interests */}
 
-       
-       
+
+
         <CardBody>
-        <CardHeader className="font-regular px-0 pt-0 text-default-500 text-small ml-2">Sub-category Interests</CardHeader>
+          <CardHeader className="font-regular px-0 pt-0 text-default-500 text-small ml-2">Sub-category Interests</CardHeader>
           <div className="flex flex-wrap gap-2 ml-2">
             {agent?.interests && agent?.interests.length > 0 ? (
               agent?.interests.map((interest) => (
@@ -305,7 +305,7 @@ export default function StrategyPage() {
         </CardBody>
       </Card>
 
-    
+
 
       {/* Betting Principles */}
       <Card className="mb-8 bg-content0">
@@ -324,7 +324,7 @@ export default function StrategyPage() {
         </CardHeader>
         <Divider />
         <CardBody>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-1 gap-1 text-small">
             {agent?.principles && agent?.principles.length > 0 ? (
               agent?.principles.map((principle, index) => (
@@ -335,13 +335,13 @@ export default function StrategyPage() {
                   index={index}
                 />
               ))
-            )  : (
+            ) : (
               <p className="text-default-500">No principles added.</p>
             )}
           </div>
-          
+
         </CardBody>
-        
+
       </Card>
 
       {/* Risk Profile */}
@@ -415,7 +415,7 @@ const RiskItem = ({ level, description, value, color }: RiskItemProps) => (
       <span className="font-regular">{level}</span>
       <span className="text-default-500">{description}</span>
     </div>
-   
+
     <Progress color={color} value={value} className="max-w-full" />
   </div>
 ); 
