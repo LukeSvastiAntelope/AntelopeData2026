@@ -40,7 +40,13 @@ export const UserRepo = {
     createBet,
     updateBettingStatus,
     getRecentActivity,
-    createAgentJoinAction
+    createAgentJoinAction,
+    updateAgentTraining
+}
+
+async function updateAgentTraining(agentId: number, train_index: string) {
+    const db = await getMySQLConnection();
+    await db.execute('UPDATE agents SET trainCount = trainCount - 1, train_index = ? WHERE id = ?', [train_index, agentId]);
 }
 
 async function createAgentJoinAction(userId: string, description: string, type: string) {

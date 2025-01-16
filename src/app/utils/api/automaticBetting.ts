@@ -257,6 +257,7 @@ export class AutomaticBettingAgent {
         const allDecisions: BetDecision[] = [];
         const allNews: NewsItem[] = [];
         const allSimilar: PineconePredictionMatch[] = [];
+        const relevantTraining = await this.filterTrainingPredictions();
 
         for (let i = 0; i < predictions.length; i += BATCH_SIZE) {
             const batchPredictions = predictions.slice(i, i + BATCH_SIZE);
@@ -359,6 +360,14 @@ ${batchPredictions.map(p => {
 - Result: ${p.metadata?.result || 'N/A'}
 ${p.metadata?.comment ? `- Agent Controller Comment: ${p.metadata.comment}` : ''}`
             ).join('\n')}
+
+    Agent Training Predictions:
+    ${relevantTraining.map(p => `
+- Question: ${p.description}
+- Choice: ${p.creator_choice}
+- Amount: ${p.bet_amount}
+- Reasoning: ${p.betReason}
+`).join('\n')}
     
     Agent Principles:
     - Betting Strategy:
@@ -417,6 +426,35 @@ ${p.metadata?.comment ? `- Agent Controller Comment: ${p.metadata.comment}` : ''
         }
 
         return { decision: allDecisions, relevantNews: allNews, relevantSimilar: allSimilar };
+    }
+
+    private async filterTrainingPredictions(): Promise<Prediction[]> {
+        const index = this.pinecone.index("prediction-training");
+        const indexList = this.agent.train_index.split(',');
+        
+        try {
+            // Use fetch operation instead of query
+            const response = await index.fetch(indexList);
+            
+            // Transform the records into Predictions with metadata
+            return Object.values(response.records).map(record => ({
+                id: parseInt(record.id),
+                creator_id: this.agent.id,
+                description: record.metadata?.question as string || '',
+                source: '',
+                status: 'resolved',
+                bet_amount: record.metadata?.amount as number || 0,
+                creator_choice: record.metadata?.choice as string || '',
+                predicted_outcome: '',
+                created_at: record.metadata?.created_at as string || new Date().toISOString(),
+                resolution_date: '',
+                outcome: ''
+            } as Prediction));
+
+        } catch (error) {
+            console.error('Error fetching from Pinecone:', error);
+            return [];
+        }
     }
 
     private filterSimilarPredictions(
@@ -754,8 +792,6 @@ ${p.metadata?.comment ? `- Agent Controller Comment: ${p.metadata.comment}` : ''
         return result;
     }
 
-
-
     private async findSimilarPredictions(predictions: Prediction[]): Promise<PineconePredictionMatch[]> {
         try {
             const descriptions = predictions.map(p => p.description).join(' ');
@@ -770,7 +806,7 @@ ${p.metadata?.comment ? `- Agent Controller Comment: ${p.metadata.comment}` : ''
                 includeMetadata: true,
                 filter: {
                     status: { $eq: 'resolved' },
-                    agent_id: { $eq: this.agent.id },
+                    agentId: { $eq: this.agent.id },
                     category: { $eq: category }  // Add category filter
                 }
             });
@@ -812,11 +848,11 @@ ${p.metadata?.comment ? `- Agent Controller Comment: ${p.metadata.comment}` : ''
                     amount: bet.betAmount,
                     status: 'pending',  // Will need to be updated when prediction resolves
                     created_at: new Date().toISOString(),
-                    agent_id: bet.agentId,
-                    prediction_id: bet.predictionId,
+                    agentId: bet.agentId,
+                    predictionId: bet.predictionId,
                     confidence: bet.confidence,
                     reasoning: bet.reasoning,
-                    risk_assessment: bet.riskAssessment,
+                    riskAssessment: bet.riskAssessment,
                     result: 'pending',
                     log: prediction.betReason ? JSON.stringify(prediction.betReason) : ""
                 }
@@ -1007,7 +1043,7 @@ ${p.metadata?.comment ? `- Agent Controller Comment: ${p.metadata.comment}` : ''
                 topK: 5,
                 includeMetadata: true,
                 filter: {
-                    agent_id: { $eq: this.agent.id }
+                    agentId: { $eq: this.agent.id }
                 }
             });
 

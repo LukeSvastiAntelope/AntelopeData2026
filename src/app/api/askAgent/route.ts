@@ -2,20 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { AutomaticBettingAgent } from "@/app/utils/api/automaticBetting";
 import { IAgentProfile } from "@/app/utils/interface";
 
-/**
- * POST /api/askAgent
- * Expects JSON body:
- *   {
- *     "userQuestion": string,
- *     "agentProfile": IAgentProfile
- *   }
- * Returns JSON:
- *   {
- *     "status": boolean,
- *     "answer"?: string,
- *     "message"?: string
- *   }
- */
 export async function POST(request: NextRequest) {
   try {
     const { userQuestion, agentProfile } = (await request.json()) as {
@@ -44,7 +30,9 @@ export async function POST(request: NextRequest) {
       conservativeBetSize: agentProfile.conservativeBetSize,
       moderateBetSize: agentProfile.moderateBetSize,
       aggressiveBetSize: agentProfile.aggressiveBetSize,
-      nft_address: agentProfile.nft_address
+      nft_address: agentProfile.nft_address,
+      trainCount: agentProfile.trainCount,
+      train_index: agentProfile.train_index
     });
 
     // Pass the question to our agent

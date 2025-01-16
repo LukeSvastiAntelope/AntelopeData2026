@@ -4,6 +4,55 @@ import { IAgentProfile, ILeague } from '../interface';
 import { getJson } from 'serpapi';
 import { AutomatedPrediction, SportsEvent, PredictionImage, NewsItem, SerpApiNewsResult } from '../interface';
 import { AIResponse } from '../types/sports';
+import axios from 'axios';
+
+interface CryptoMarketData {
+    name: string;
+    symbol: string;
+    price: number;
+    market_cap: number;
+    percent_change_24h: number;
+}
+
+interface CryptoTrendData {
+    term: string;
+    trends: string; // Update this type based on actual Google Trends response
+}
+
+interface CombinedCryptoData {
+    marketData: CryptoMarketData[];
+    news: NewsItem[];
+    trends: CryptoTrendData[];
+}
+
+interface FinancialMarketData {
+    title: string;
+    ticker: string;
+    price: string;
+    price_movement: string;
+    percentage_change: string;
+    market_cap: string;
+    exchange: string;
+}
+
+interface GoogleImageResult {
+    original: string;
+    source: string;
+    title: string;
+}
+
+// Add this interface to define the CoinMarketCap API response structure
+interface CoinMarketCapInfo {
+    name: string;
+    symbol: string;
+    quote: {
+        USD: {
+            price: number;
+            market_cap: number;
+            percent_change_24h: number;
+        };
+    };
+}
 
 export class AIEnhancedPredictionGenerator {
     private agent: IAgentProfile;
@@ -13,6 +62,8 @@ export class AIEnhancedPredictionGenerator {
     private SERPAPI_API_KEY = process.env.SERPAPI_API_KEY!;
     private VECTOR_DIMENSION = 1536;
     private CURRENT_DATE = new Date();
+    private MAX_SIMILAR_ATTEMPTS = 5;
+    private COINMARKETCAP_API_KEY = process.env.COINMARKETCAP_API_KEY!;
 
     constructor(agent: IAgentProfile) {
         this.agent = agent;
@@ -39,12 +90,6 @@ export class AIEnhancedPredictionGenerator {
 
     private async getGoogleImages(topic: string): Promise<PredictionImage[]> {
         try {
-            interface GoogleImageResult {
-                original: string;
-                source: string;
-                title: string;
-            }
-
             const result = await getJson({
                 engine: "google_images",
                 q: topic,
@@ -186,8 +231,18 @@ export class AIEnhancedPredictionGenerator {
             if (!prediction) {
                 return undefined;
             }
-        } else {
+        } else if (this.agent.category == "general") {
             prediction = await this.generateGeneralPrediction();
+            if (!prediction) {
+                return undefined;
+            }
+        } else if (this.agent.category == "crypto") {
+            prediction = await this.generateCryptoPrediction();
+            if (!prediction) {
+                return undefined;
+            }
+        } else {
+            prediction = await this.generateFinancePrediction();
             if (!prediction) {
                 return undefined;
             }
@@ -200,25 +255,390 @@ export class AIEnhancedPredictionGenerator {
         prediction.principleScore = principleScore;
 
         const enrichedPrediction = await this.enrichPredictionWithImages(prediction);
-        const pineconeId = await this.storePrediction(enrichedPrediction);
-        enrichedPrediction.pineconeId = pineconeId;
+        // const pineconeId = await this.storePrediction(enrichedPrediction);
+        // enrichedPrediction.pineconeId = pineconeId;
 
         return enrichedPrediction;
     }
 
-    private async generateGeneralPrediction(): Promise<AutomatedPrediction> {
+    private async generateCryptoPrediction(attempt = 0): Promise<AutomatedPrediction | undefined> {
+        try {
+            // Add attempt count check
+            if (attempt >= this.MAX_SIMILAR_ATTEMPTS) {
+                console.log("Max attempts reached for crypto prediction");
+                return undefined;
+            }
+
+            // Get data from multiple sources
+            const data = await this.getCombinedCryptoData(this.agent.interests);
+
+            if (!data || !data.marketData || data.marketData.length === 0) {
+                console.error('No valid crypto market data found');
+                return undefined;
+            }
+
+            const prompt = this.createEnhancedCryptoPrompt(data);
+            const prediction = await this.generateWithAI(prompt);
+
+            // Format the prediction
+            const formattedPrediction = {
+                question: prediction.question,
+                description: prediction.description,
+                category: 'coinmarketcap',
+                endDate: new Date(prediction.endDate),
+                choice: prediction.choice || 'Yes',
+                confidence: prediction.confidence,
+                reasoning: prediction.reasoning,
+                sources: prediction.sources || [],
+                initialStake: 0
+            };
+            console.log("formattedPrediction", formattedPrediction);
+
+            // Check for similar predictions
+            const isSimilar = await this.checkSimilarity(formattedPrediction);
+            if (isSimilar) {
+                return this.generateCryptoPrediction(attempt + 1);
+            }
+
+            return formattedPrediction;
+
+        } catch (error) {
+            console.error('Failed to create crypto prediction:', error);
+            return undefined;
+        }
+    }
+
+    private createEnhancedCryptoPrompt(data: CombinedCryptoData) {
+        const currentDate = new Date();
+        const maxEndDate = new Date(currentDate);
+        maxEndDate.setDate(maxEndDate.getDate() + 360);
+
+        return `Based on this comprehensive crypto market data:
+    
+    MARKET DATA:
+    ${data.marketData.map((crypto: CryptoMarketData) => `
+    ${crypto.name} (${crypto.symbol}):
+    - Price: $${crypto.price.toFixed(2)}
+    - Market Cap: $${(crypto.market_cap / 1e9).toFixed(2)}B
+    - 24h Change: ${crypto.percent_change_24h.toFixed(2)}%
+    `).join('\n')}
+    
+    RECENT NEWS:
+    ${data.news.map((item: NewsItem) => `- ${item.title}`).join('\n')}
+    
+    MARKET TRENDS:
+    ${data.trends.map((trend: CryptoTrendData) => `- ${trend.term}: ${trend.trends}`).join('\n')}
+    
+    Generate an interesting cryptocurrency prediction that falls into one of these categories:
+    
+    1. MARKET DYNAMICS:
+       - Price correlations between different cryptocurrencies
+       - Market dominance shifts
+       - Trading volume milestones
+    
+    2. ADOPTION & INTEGRATION:
+       - Institutional adoption
+       - Integration with traditional finance
+       - New partnership announcements
+    
+    3. TECHNICAL DEVELOPMENTS:
+       - Network upgrades
+       - Protocol improvements
+       - New feature launches
+    
+    4. MARKET SENTIMENT:
+       - Trading volume patterns
+       - Social media impact
+       - Community growth metrics
+    
+    Requirements:
+    - Must be verifiable by ${maxEndDate.toISOString().split('T')[0]}
+    - Must include specific, measurable metrics
+    - Must be based on current trends and data
+    - Must avoid overly speculative predictions
+    - Must include realistic price targets or adoption metrics
+    - Try to generate a prediction which can resolve within short time period : not essential part
+    
+    Format the response as:
+    {
+        "question": "Will [specific event] happen by [date]?",
+        "description": "Detailed context including current market conditions...",
+        "category": "crypto",
+        "reasoning": "Analysis based on market data, news, and trends...",
+        "endDate": "YYYY-MM-DD",
+        "sources": ["relevant links..."],
+        "confidence": 0.7
+    }`;
+    }
+
+    private async getCombinedCryptoData(interests: string[]): Promise<CombinedCryptoData> {
+        try {
+            const [cryptoMarketData, newsData, trendData] = await Promise.all([
+                this.getBasicCryptoData(interests),
+                this.getCryptoNews(interests),
+                this.getCryptoTrends(interests)
+            ]);
+
+            return {
+                marketData: cryptoMarketData,
+                news: newsData,
+                trends: trendData
+            };
+        } catch (error) {
+            console.error('Error fetching combined crypto data:', error);
+            return {
+                marketData: [],
+                news: [],
+                trends: []
+            };
+        }
+    }
+
+    private async getBasicCryptoData(interests: string[]): Promise<CryptoMarketData[]> {
+        try {
+            const cryptoSymbols = interests
+                .map(interest => this.extractCryptoSymbol(interest))
+                .filter((symbol): symbol is string => symbol !== null); // Filter out null values
+
+            if (cryptoSymbols.length === 0) {
+                throw new Error('No valid crypto symbols found');
+            }
+
+            const response = await axios.get(`https://pro-api.coinmarketcap.com/v2/cryptocurrency/quotes/latest`, {
+                headers: {
+                    'X-CMC_PRO_API_KEY': this.COINMARKETCAP_API_KEY,
+                },
+                params: {
+                    symbol: cryptoSymbols.join(','),
+                    convert: 'USD'
+                }
+            });
+
+            const data = response.data;
+            console.log("coinmarketcap data", data);
+            if (!data?.data) {
+                throw new Error('No data received from CoinMarketCap');
+            }
+
+            const cryptoData: CryptoMarketData[] = [];
+
+            // Safely process each crypto entry
+            Object.entries(data.data as Record<string, CoinMarketCapInfo>).forEach(([symbol, cryptoInfo]) => {
+                try {
+                    if (cryptoInfo && cryptoInfo.quote?.USD) {
+                        cryptoData.push({
+                            name: cryptoInfo.name || symbol,
+                            symbol: cryptoInfo.symbol || symbol,
+                            price: cryptoInfo.quote.USD.price || 0,
+                            market_cap: cryptoInfo.quote.USD.market_cap || 0,
+                            percent_change_24h: cryptoInfo.quote.USD.percent_change_24h || 0
+                        });
+                    }
+                } catch (err) {
+                    console.error(`Error processing crypto data for ${symbol}:`, err);
+                }
+            });
+
+            return cryptoData;
+
+        } catch (error) {
+            console.error('Error fetching basic crypto data:', error);
+            return [];
+        }
+    }
+
+    private extractCryptoSymbol(description: string): string | null {
+        // Improved crypto symbol extraction
+        // Look for common patterns: (BTC), BTC/USD, $BTC, etc.
+        const patterns = [
+            /\(([A-Z]{3,})\)/, // (BTC)
+            /([A-Z]{3,})\/USD/, // BTC/USD
+            /\$([A-Z]{3,})/, // $BTC
+            /#([A-Z]{3,})/, // #BTC
+            /\b(BTC|ETH|USDT|BNB|XRP|ADA|SOL|DOT|DOGE|SHIB)\b/ // Common crypto symbols
+        ];
+
+        for (const pattern of patterns) {
+            const match = description.match(pattern);
+            if (match && match[1]) {
+                return match[1];
+            }
+        }
+        return null;
+    }
+
+    private async getCryptoNews(interests: string[]): Promise<NewsItem[]> {
+        try {
+            const newsItems = [];
+            const shuffledInterests = this.shuffleArray(interests).slice(0, 2);
+
+            for (const interest of shuffledInterests) {
+                const result = await getJson({
+                    engine: "google_news",
+                    q: `${interest} cryptocurrency crypto`,
+                    api_key: process.env.SERPAPI_API_KEY,
+                    time: "1d"
+                });
+
+                if (result.news_results) {
+                    newsItems.push(...result.news_results.slice(0, 3));
+                }
+            }
+
+            return newsItems;
+        } catch (error) {
+            console.error('Error fetching crypto news:', error);
+            return [];
+        }
+    }
+
+    private async getCryptoTrends(interests: string[]): Promise<CryptoTrendData[]> {
+        try {
+            const trendData = [];
+            const shuffledInterests = this.shuffleArray(interests).slice(0, 2);
+
+            for (const interest of shuffledInterests) {
+                const result = await getJson({
+                    engine: "google_trends",
+                    q: `${interest} crypto`,
+                    api_key: process.env.SERPAPI_API_KEY
+                });
+
+                if (result.interest_over_time) {
+                    trendData.push({
+                        term: interest,
+                        trends: result.interest_over_time
+                    });
+                }
+            }
+
+            return trendData;
+        } catch (error) {
+            console.error('Error fetching crypto trends:', error);
+            return [];
+        }
+    }
+
+    private async generateFinancePrediction(attemptCount = 0): Promise<AutomatedPrediction | undefined> {
+        try {
+            // Add attempt count check
+            if (attemptCount >= this.MAX_SIMILAR_ATTEMPTS) {
+                console.log("Max attempts reached for markets prediction");
+                return undefined;
+            }
+
+            // Get financial data for random interests
+            const shuffledInterests = this.shuffleArray(this.agent.interests).slice(0, 3);
+            const marketData = [];
+
+            for (const interest of shuffledInterests) {
+                const result = await getJson({
+                    engine: "google_finance",
+                    q: interest,
+                    api_key: process.env.SERPAPI_API_KEY
+                });
+
+                if (result.financial_results) {
+                    marketData.push(...result.financial_results.map((item: FinancialMarketData) => ({
+                        title: item.title,
+                        ticker: item.ticker,
+                        price: item.price,
+                        price_movement: item.price_movement,
+                        percentage_change: item.percentage_change,
+                        market_cap: item.market_cap,
+                        exchange: item.exchange
+                    })));
+                }
+            }
+
+            if (marketData.length === 0) {
+                throw new Error("No market data found");
+            }
+
+            const prompt = this.createMarketsPrompt(marketData);
+            const prediction = await this.generateWithAI(prompt);
+
+            // Format the prediction
+            const formattedPrediction = {
+                question: prediction.question,
+                description: prediction.description,
+                category: 'google_finance',
+                endDate: new Date(prediction.endDate),
+                choice: prediction.choice || 'Yes',
+                confidence: prediction.confidence,
+                reasoning: prediction.reasoning,
+                sources: prediction.sources || [],
+                initialStake: 0
+            };
+
+            // Check for similar predictions
+            const isSimilar = await this.checkSimilarity(formattedPrediction);
+            if (isSimilar) {
+                return this.generateFinancePrediction(attemptCount + 1);
+            }
+
+            return formattedPrediction;
+
+        } catch (error) {
+            console.error('Failed to create markets prediction:', error);
+            return undefined;
+        }
+    }
+
+    private createMarketsPrompt(marketData: FinancialMarketData[]) {
+        const currentDate = new Date();
+        const maxEndDate = new Date(currentDate);
+        maxEndDate.setDate(maxEndDate.getDate() + 360);
+
+        return `Based on this market data:
+    ${marketData.map((item: FinancialMarketData) => `
+    Stock: ${item.title} (${item.ticker})
+    Current Price: ${item.price}
+    Movement: ${item.price_movement} (${item.percentage_change})
+    Market Cap: ${item.market_cap}
+    Exchange: ${item.exchange}
+    `).join('\n')}
+    
+    Generate a financial market prediction that:
+    1. Must be about specific price targets, market events, or company milestones
+    2. Must be verifiable by ${maxEndDate.toISOString().split('T')[0]}
+    3. Must be based on current market trends and company performance
+    4. Must include specific numbers or measurable outcomes
+    5. Must avoid vague or general predictions
+    
+    Good examples:
+    - "Will [Stock] reach [specific price target] by [date]?"
+    - "Will [Company] achieve [specific revenue/profit target] in Q[X] [year]?"
+    - "Will [Company] complete their announced [specific milestone] by [date]?"
+    
+    Format the response as:
+    {
+        "question": "Will [specific event] happen by [date]?",
+        "description": "Detailed market context...",
+        "category": "markets",
+        "reasoning": "Analysis based on current market data...",
+        "endDate": "YYYY-MM-DD",
+        "sources": ["relevant links..."],
+        "confidence": 0.7
+    }`;
+    }
+
+    private async generateGeneralPrediction(attemptCount = 0): Promise<AutomatedPrediction | undefined> {
         // Similar structure but without sports-specific fields
         try {
+            if (attemptCount >= this.MAX_SIMILAR_ATTEMPTS) {
+                console.log("Max attempts reached for general prediction");
+                return undefined;
+            }
             const news = await this.gatherRecentNews();
             const prompt = await this.createPromptWithNews(news);
             const prediction = await this.generateWithAI(prompt);
-
             const formattedPrediction: AutomatedPrediction = {
                 question: prediction.question,
                 description: prediction.description,
-                category: prediction.category,
+                category: 'google_news',
                 endDate: new Date(prediction.endDate),
-                initialStake: this.calculateStakeBasedOnConfidence(prediction.confidence),
+                initialStake: 0,
                 choice: prediction.choice || 'Yes',
                 confidence: prediction.confidence,
                 reasoning: prediction.reasoning,
@@ -228,7 +648,7 @@ export class AIEnhancedPredictionGenerator {
             console.log("isSimilar", isSimilar);
             if (isSimilar) {
                 console.log('Similar prediction found, retrying...');
-                return this.generateGeneralPrediction();
+                return this.generateGeneralPrediction(attemptCount + 1);
             }
 
             return formattedPrediction;
@@ -335,19 +755,16 @@ export class AIEnhancedPredictionGenerator {
         );
     }
 
-    private async generateSportsPrediction(): Promise<AutomatedPrediction | undefined> {
+    private async generateSportsPrediction(attempts = 0): Promise<AutomatedPrediction | undefined> {
         try {
-            const maxAttempts = 10;
             const usedEventIds: Set<string> = new Set();
-            let attempts = 0;
             const events = await this.getUpcomingSportsEvents();
             if (events.length === 0) {
                 throw new Error("No events found");
             }
             let predictionResult: AutomatedPrediction | undefined;
 
-            while (attempts < maxAttempts) {
-                console.log("usedEventIds", usedEventIds);
+            while (attempts < this.MAX_SIMILAR_ATTEMPTS) {
                 // Filter out already used events
                 const unusedEvents = events.filter(event => !usedEventIds.has(event.idEvent));
 
@@ -365,6 +782,12 @@ export class AIEnhancedPredictionGenerator {
                 }
 
                 const strThumb = randomEvents.find(event => event.idEvent === prediction.event?.event_id)?.strThumb || '';
+                const homeTeam = randomEvents.find(event => event.idEvent === prediction.event?.event_id)?.strHomeTeam || '';
+                const awayTeam = randomEvents.find(event => event.idEvent === prediction.event?.event_id)?.strAwayTeam || '';
+                if (prediction.event) {
+                    prediction.event.home_team = homeTeam;
+                    prediction.event.away_team = awayTeam;
+                }
 
                 // Ensure the response matches our interface
                 const formattedPrediction: AutomatedPrediction = {
@@ -373,7 +796,7 @@ export class AIEnhancedPredictionGenerator {
                     category: 'sportDB',
                     endDate: new Date(prediction.endDate),
                     initialStake: this.calculateStakeBasedOnConfidence(prediction.confidence),
-                    choice: prediction.choice || 'Yes',
+                    choice: prediction.event?.winner || 'Yes',
                     confidence: prediction.confidence,
                     reasoning: prediction.reasoning,
                     event: prediction.event,
@@ -516,6 +939,8 @@ export class AIEnhancedPredictionGenerator {
             .map(event => `
                 Event_ID: ${event.idEvent}
             Event: ${event.strEvent}
+            Home Team: ${event.strHomeTeam}
+            Away Team: ${event.strAwayTeam}
             Date: ${event.dateEvent}
             Venue: ${event.strVenue}
             League: ${event.strLeague}
@@ -536,17 +961,17 @@ export class AIEnhancedPredictionGenerator {
     
     Format:
     {
-      "question": "[Team] vs [Team] on [Date]",
-      "event": {
-        "winner": "Team",
-        "event_id": "Event_ID",
-        "league_id": "League_ID",
-        "home_team": "Home_Team",
-        "away_team": "Away_Team"
-      },
-      "endDate": "Date",
-      "confidence": 0.7,
-      "reasoning": "Why this prediction is realistic and verifiable...",
+        "question": "[Home_Team] vs [Away_Team] on [Date]",
+        "event": {
+            "winner": "Home_Team or Away_Team or 'Draw'",
+            "event_id": "Event_ID",
+            "league_id": "League_ID",
+            "home_team": "Home_Team",
+            "away_team": "Away_Team"
+        },
+        "endDate": "Date",
+        "confidence": 0.7,
+        "reasoning": "Why this prediction is realistic and verifiable...",
     }`;
     }
 
@@ -646,7 +1071,7 @@ export class AIEnhancedPredictionGenerator {
             const predictionEvent = prediction.event;
             if (!predictionEvent) return false;
 
-            const index = this.pinecone.Index('predictions');
+            const index = this.pinecone.Index('prediction-training');
             const thirtyDaysAgo = new Date();
             thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
@@ -656,6 +1081,7 @@ export class AIEnhancedPredictionGenerator {
                 includeMetadata: true,
                 filter: {
                     category: "sportDB",
+                    agent_id: this.agent.id,
                     timestamp: { $gte: Math.floor(thirtyDaysAgo.getTime() / 1000) }
                 }
             });
@@ -706,18 +1132,14 @@ export class AIEnhancedPredictionGenerator {
             const predictionText = `${prediction.question} ${prediction.description}`.toLowerCase();
             const embedding = await this.getEmbedding(predictionText);
 
-            // Calculate date range for similarity check (last 30 days)
-            const thirtyDaysAgo = new Date();
-            thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
-            const index = this.pinecone.Index('predictions');
+            const index = this.pinecone.Index('prediction-training');
             const queryResponse = await index.query({
                 vector: embedding,
                 topK: 5,
                 includeMetadata: true,
                 filter: {
-                    timestamp: { $gte: Math.floor(thirtyDaysAgo.getTime() / 1000) },
-                    category: prediction.category
+                    category: prediction.category,
+                    agent_id: this.agent.id
                 }
             });
 
@@ -810,30 +1232,7 @@ export class AIEnhancedPredictionGenerator {
             const embedding = await this.getEmbedding(normalizedText);
             const id = `prediction-${Date.now()}`;
 
-            const index = this.pinecone.Index('predictions');
-            await index.upsert([{
-                id: id,
-                values: embedding,
-                metadata: {
-                    question: prediction.question,
-                    description: prediction.description,
-                    category: prediction.category,
-                    timestamp: Math.floor(new Date().getTime() / 1000),
-                    creator_choice: prediction.choice,
-                    event: prediction.event ? JSON.stringify(prediction.event) : "",
-                    initial_stake: prediction.initialStake,
-                    confidence: prediction.confidence,
-                    reasoning: prediction.reasoning,
-                    sources: prediction.sources ? JSON.stringify(prediction.sources) : "",
-                    principles_applied: prediction.principlesApplied ? JSON.stringify(prediction.principlesApplied) : "",
-                    principle_score: prediction.principleScore ? prediction.principleScore : 0,
-                    user_id: prediction.userId ? prediction.userId : 0,
-                    agent_id: this.agent.id,
-                    end_date: prediction.endDate ? prediction.endDate.toISOString() : ""
-                }
-            }]);
-
-            const newIndex = this.pinecone.Index('prediction-results');
+            const newIndex = this.pinecone.Index('prediction-training');
             await newIndex.upsert([{
                 id: id,
                 values: embedding,
@@ -844,10 +1243,10 @@ export class AIEnhancedPredictionGenerator {
                     status: 'pending',  // Will need to be updated when prediction resolves
                     created_at: new Date().toISOString(),
                     agent_id: this.agent.id,
-                    prediction_id: 0,
+                    prediction_id: id,
                     confidence: prediction.confidence,
                     reasoning: prediction.reasoning,
-                    result: 'pending'
+                    result: 'pending',
                 }
             }]);
 

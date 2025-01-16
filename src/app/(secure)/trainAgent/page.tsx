@@ -5,17 +5,13 @@ import { Button, Card, Input, Select, SelectItem, Textarea } from '@nextui-org/r
 import { useRouter } from 'next/navigation'
 import { useFetch } from '@/app/utils/lib'
 import { toast } from 'react-hot-toast'
-
-interface Prediction {
-    id: string
-    matchDetails: string
-    options: string[]
-    aiPrediction: string
-}
+import { IAgentProfile } from '@/app/utils/interface'
+import { AutomatedPrediction } from '@/app/utils/interface'
 
 export default function TrainAgentPage() {
-    const [prediction, setPrediction] = useState<Prediction | null>(null)
+    const [prediction, setPrediction] = useState<AutomatedPrediction | null>(null)
     const [loading, setLoading] = useState(false);
+    const [agent, setAgent] = useState<IAgentProfile | null>(null);
     const [formData, setFormData] = useState({
         selectedOption: '',
         betAmount: '',
@@ -25,12 +21,23 @@ export default function TrainAgentPage() {
     const fetchData = useFetch();
 
     const generatePrediction = async () => {
+        if (!agent) return;
+        if (agent.trainCount == 0) {
+            toast.error('Agent training is finished')
+            return;
+        }
+        if (loading) {
+            return;
+        }
         setLoading(true)
         try {
             // TODO: Replace with actual API call
-            const response = await fetchData.get('/api/createAgentPrediction')
-            const data = await response.json()
-            setPrediction(data)
+            const response = await fetchData.get('/api/createAgentPrediction?agentId=' + agent.id)
+            if (response.status) {
+                setPrediction(response.prediction)
+            } else {
+                toast.error(response.message)
+            }
         } catch (error) {
             console.error('Error generating prediction:', error)
         } finally {
@@ -40,20 +47,29 @@ export default function TrainAgentPage() {
 
     const onSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
-        if (!prediction) return
+        if (!prediction || !agent) return
+        if (agent.trainCount == 0) {
+            toast.error('Agent training is finished')
+            return;
+        }
 
         try {
-            await fetchData.post('/api/training/submit', {
-                predictionId: prediction.id,
-                selectedOption: formData.selectedOption,
+            await fetchData.post('/api/training', {
+                predictionId: `prediction-${Date.now()}-${agent?.id}`,
                 betAmount: Number(formData.betAmount),
-                reason: formData.reason,
+                reasoning: formData.reason,
+                agentId: agent.id,
+                confidence: 0.8,
+                choice: formData.selectedOption,
+                question: prediction.question,
+                description: prediction.description,
+                category: prediction.category,
             })
 
             // Reset form and generate new prediction
             setFormData({ selectedOption: '', betAmount: '', reason: '' })
-            setPrediction(null)
-            generatePrediction()
+            setPrediction(null);
+            setAgent(prevAgent => prevAgent ? { ...prevAgent, trainCount: prevAgent.trainCount - 1 } : null);
         } catch (error) {
             console.error('Error submitting training data:', error)
         }
@@ -64,6 +80,7 @@ export default function TrainAgentPage() {
         try {
             const response = await fetchData.get('/api/getAgentProfile');
             if (response.status) {
+                setAgent(response.agent);
                 if (!response.agent.principles || response.agent.principles.length === 0 || !response.agent.interests || response.agent.interests.length === 0) {
                     toast.error('Agent strategy is not complete. Please complete the strategy before training.');
                     setTimeout(() => {
@@ -96,14 +113,12 @@ export default function TrainAgentPage() {
                 isDisabled={prediction !== null}
                 className="mb-6"
             >
-                Generate New Prediction
+                Generate New Prediction {agent?.trainCount}
             </Button>
 
             {prediction && (
                 <Card className="mb-6 p-4">
-                    <h2 className="text-xl mb-4">Match Details</h2>
-                    <p className="mb-4">{prediction.matchDetails}</p>
-                    <p className="font-semibold">AI Prediction: {prediction.aiPrediction}</p>
+                    <p className="font-semibold">AI Prediction: {prediction.question}</p>
                 </Card>
             )}
 
@@ -116,11 +131,21 @@ export default function TrainAgentPage() {
                         onChange={(e) => setFormData(prev => ({ ...prev, selectedOption: e.target.value }))}
                         isRequired
                     >
-                        {prediction.options.map((opt) => (
-                            <SelectItem key={opt} value={opt}>
-                                {opt}
-                            </SelectItem>
-                        ))}
+                        {
+                            prediction.category == "sportDB" ?
+                                <>
+                                    <SelectItem value={prediction.event?.home_team} key={prediction.event?.home_team}>{prediction.event?.home_team}</SelectItem>
+                                    <SelectItem value={prediction.event?.away_team} key={prediction.event?.away_team}>{prediction.event?.away_team}</SelectItem>
+                                    {
+                                        prediction.event?.league_id != "4391" && prediction.event?.league_id != "4387" &&
+                                        <SelectItem value="Draw" key="Draw">Draw</SelectItem>
+                                    }
+                                </> :
+                                <>
+                                    <SelectItem value="Yes" key="Yes">Yes</SelectItem>
+                                    <SelectItem value="No" key="No">No</SelectItem>
+                                </>
+                        }
                     </Select>
 
                     <Input

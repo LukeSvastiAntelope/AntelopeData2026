@@ -15,6 +15,8 @@ export interface IAgentProfile {
     maxTimelineLimit: number;
     wallet_balance: number;
     nft_address: string;
+    trainCount: number;
+    train_index: string;
 }
 
 export interface IFormDataAgentProfile {
