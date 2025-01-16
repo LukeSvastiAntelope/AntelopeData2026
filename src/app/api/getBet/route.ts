@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
     }
 
     try {
-        const bet = await UserRepo.getBetById(betId, jwtPayload.email as string);
+        const bet = await UserRepo.getBetById(betId);
         if (!bet) {
             return Response.json({
                 status: false,
@@ -36,7 +36,7 @@ export async function GET(req: NextRequest) {
 
         const prediction = await UserRepo.getPredictionById(bet.prediction_id);
 
-        if (bet.pinecone_id) {
+        if (bet.pinecone_id && bet.user_id === jwtPayload.id) {
             const pinecone = new Pinecone({
                 apiKey: process.env.PINECONE_API_KEY as string
             });
@@ -83,8 +83,8 @@ export async function POST(req: NextRequest) {
             });
         }
 
-        const bet = await UserRepo.getBetById(id, jwtPayload.email as string);
-        if (!bet) {
+        const bet = await UserRepo.getBetById(id);
+        if (!bet || bet.user_id !== jwtPayload.id) {
             return Response.json({
                 status: false,
                 message: 'Bet not found'

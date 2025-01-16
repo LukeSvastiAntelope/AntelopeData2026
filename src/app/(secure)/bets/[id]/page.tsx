@@ -64,36 +64,36 @@ const parseLogEntries = (logString: string) => {
     }).filter(Boolean);
 };
 
-const MarketOddsBar = ({ 
-    percentage, 
-    question, 
+const MarketOddsBar = ({
+    percentage,
+    question,
     showOptions = false,
     count,
     odds,
     amount
-}: { 
-    percentage: number, 
-    question: string, 
+}: {
+    percentage: number,
+    question: string,
     showOptions?: boolean,
     count: number,
     odds: string,
     amount: number
 }) => {
-    const bgColor = percentage >= 90 ? "bg-orange-400/90" : 
-                    percentage >= 80 ? "bg-emerald-400/90" : 
-                    percentage >= 70 ? "bg-blue-400/90" : "bg-red-400/90";
+    const bgColor = percentage >= 90 ? "bg-orange-400/90" :
+        percentage >= 80 ? "bg-emerald-400/90" :
+            percentage >= 70 ? "bg-blue-400/90" : "bg-red-400/90";
 
     return (
         <div className="w-full mb-4">
             <div className="relative w-full bg-white/5 rounded-lg overflow-hidden p-4">
                 {/* Progress bar */}
                 <div className="h-2 w-full bg-white/10 rounded-full mb-3">
-                    <div 
+                    <div
                         className={`h-full ${bgColor} rounded-full transition-all duration-500`}
                         style={{ width: `${percentage}%` }}
                     />
                 </div>
-                
+
                 {/* Content */}
                 <div className="flex items-center justify-between">
                     {/* Left side - Question */}
@@ -119,7 +119,7 @@ const MarketOddsBar = ({
                             <span className="text-xs text-white/60">Total</span>
                             <span className="text-sm font-bold text-white">{amount}</span>
                         </div>
-                        
+
                         {showOptions && (
                             <div className="flex gap-2 ml-4">
                                 <button className="px-3 py-1.5 bg-white/90 text-black rounded-md text-sm font-medium hover:bg-white transition-colors">
@@ -252,26 +252,29 @@ export default function BetDetailPage() {
 
                                 {/* Bet Details */}
                                 <div className="color-white">
-                                    <div className="p-4 border border-white/10 rounded-lg">
-                                        <h2 className="text-lg font-semibold mb-4">Reasoning</h2>
-                                        <p className="text-default-400 leading-relaxed ">{bet.reason}</p>
-                                        {
-                                            pineconeData && pineconeData.metadata?.comment && (
-                                                <>
-                                                    <h2 className="text-lg font-semibold mb-4 mt-4">Comment</h2>
-                                                    <p className="text-default-400 leading-relaxed ">{pineconeData.metadata.comment as string}</p>
-                                                </>
-                                            )
-                                        }
-                                        <Button
-                                            color="primary"
-                                            variant="light"
-                                            className="text-primary bg-primary/20 underline text-sm mt-2 hover:bg-primary/40"
-                                            onPress={() => setShowCommentModal(true)}
-                                        >
-                                            Adjust Reasoning
-                                        </Button>
-                                    </div>
+                                    {
+                                        bet.user_id === Number(localStorage.getItem("userId")) &&
+                                        <div className="p-4 border border-white/10 rounded-lg">
+                                            <h2 className="text-lg font-semibold mb-4">Reasoning</h2>
+                                            <p className="text-default-400 leading-relaxed ">{bet.reason}</p>
+                                            {
+                                                pineconeData && pineconeData.metadata?.comment && (
+                                                    <>
+                                                        <h2 className="text-lg font-semibold mb-4 mt-4">Comment</h2>
+                                                        <p className="text-default-400 leading-relaxed ">{pineconeData.metadata.comment as string}</p>
+                                                    </>
+                                                )
+                                            }
+                                            <Button
+                                                color="primary"
+                                                variant="light"
+                                                className="text-primary bg-primary/20 underline text-sm mt-2 hover:bg-primary/40"
+                                                onPress={() => setShowCommentModal(true)}
+                                            >
+                                                Adjust Reasoning
+                                            </Button>
+                                        </div>
+                                    }
                                     <div className="w-full mt-8">
                                         <h2 className="text-lg font-semibold mb-4">Bet Details</h2>
                                         <div className="grid grid-cols-2 grid-rows-4 md:grid-cols-4 md:grid-rows-2 gap-4">

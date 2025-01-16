@@ -261,7 +261,7 @@ export class AIEnhancedPredictionGenerator {
         return enrichedPrediction;
     }
 
-    private async generateCryptoPrediction(attempt = 0): Promise<AutomatedPrediction | undefined> {
+    private async generateCryptoPrediction(attempt = 0, similarPredictions: AutomatedPrediction[] = []): Promise<AutomatedPrediction | undefined> {
         try {
             // Add attempt count check
             if (attempt >= this.MAX_SIMILAR_ATTEMPTS) {
@@ -272,7 +272,7 @@ export class AIEnhancedPredictionGenerator {
             // Get data from multiple sources
             const data = await this.getCombinedCryptoData(this.agent.interests);
 
-            const prompt = this.createEnhancedCryptoPrompt(data);
+            const prompt = this.createEnhancedCryptoPrompt(data, similarPredictions);
             const prediction = await this.generateWithAI(prompt);
 
             // Format the prediction
@@ -292,7 +292,8 @@ export class AIEnhancedPredictionGenerator {
             // Check for similar predictions
             const isSimilar = await this.checkSimilarity(formattedPrediction);
             if (isSimilar) {
-                return this.generateCryptoPrediction(attempt + 1);
+                similarPredictions.push(formattedPrediction);
+                return this.generateCryptoPrediction(attempt + 1, similarPredictions);
             }
 
             return formattedPrediction;
@@ -303,7 +304,7 @@ export class AIEnhancedPredictionGenerator {
         }
     }
 
-    private createEnhancedCryptoPrompt(data: CombinedCryptoData) {
+    private createEnhancedCryptoPrompt(data: CombinedCryptoData, similarPredictions: AutomatedPrediction[]) {
         const currentDate = new Date();
         const maxEndDate = new Date(currentDate);
         maxEndDate.setDate(maxEndDate.getDate() + 360);
@@ -354,6 +355,9 @@ export class AIEnhancedPredictionGenerator {
     - Must include realistic price targets or adoption metrics
     - Try to generate a prediction which can resolve within short time period : not essential part
     
+    Please do not generate similar predictions to the following:
+    ${similarPredictions.map(prediction => `- ${prediction.question}`).join('\n')}
+    
     Format the response as:
     {
         "question": "Will [specific event] happen by [date]?",
@@ -391,9 +395,8 @@ export class AIEnhancedPredictionGenerator {
 
     private async getBasicCryptoData(interests: string[]): Promise<CryptoMarketData[]> {
         try {
-            const cryptoSymbols = interests
-                .map(interest => this.extractCryptoSymbol(interest))
-                .filter((symbol): symbol is string => symbol !== null); // Filter out null values
+            const cryptoSymbols = await this.getCryptoSymbols(interests);
+            console.log("cryptoSymbols", cryptoSymbols);
 
             if (cryptoSymbols.length === 0) {
                 throw new Error('No valid crypto symbols found');
@@ -438,6 +441,59 @@ export class AIEnhancedPredictionGenerator {
 
         } catch (error) {
             console.error('Error fetching basic crypto data:', error);
+            return [];
+        }
+    }
+
+    private async getCryptoSymbols(interests: string[]): Promise<string[]> {
+        try {
+            const prompt = `Extract the crypto symbols which can use to search in coinmarketcap from the following interests: ${interests.join(', ')}`;
+            
+            const response = await this.openai.chat.completions.create({
+                model: "gpt-4o",
+                messages: [
+                    { 
+                        role: "system", 
+                        content: "You are a crypto expert. Extract only valid cryptocurrency symbols from the given interests. Return them in a JSON object mapping symbols to their full names." 
+                    },
+                    { role: "user", content: prompt }
+                ],
+                temperature: 0.3,
+                response_format: { type: "json_object" }
+            });
+
+            const content = response.choices[0].message.content;
+            console.log("Crypto symbols response:", content);
+            
+            if (!content) {
+                console.warn('No content received from OpenAI');
+                return [];
+            }
+
+            try {
+                // Parse the JSON response
+                const parsedResponse = JSON.parse(content);
+                
+                // Extract keys (symbols) from the object
+                const symbols = Object.keys(parsedResponse);
+                
+                // Validate and clean symbols
+                return symbols
+                    .filter(symbol => 
+                        typeof symbol === 'string' && 
+                        symbol.length > 0 && 
+                        symbol.length <= 10 &&
+                        // Additional validation if needed
+                        /^[A-Za-z0-9]+$/.test(symbol) // Only allow alphanumeric symbols
+                    )
+                    .map(symbol => symbol.toUpperCase().trim());
+
+            } catch (parseError) {
+                console.error('Failed to parse OpenAI response:', parseError);
+                return [];
+            }
+        } catch (error) {
+            console.error('Error in getCryptoSymbols:', error);
             return [];
         }
     }
@@ -514,7 +570,7 @@ export class AIEnhancedPredictionGenerator {
         }
     }
 
-    private async generateFinancePrediction(attemptCount = 0): Promise<AutomatedPrediction | undefined> {
+    private async generateFinancePrediction(attemptCount = 0, similarPredictions: AutomatedPrediction[] = []): Promise<AutomatedPrediction | undefined> {
         try {
             // Add attempt count check
             if (attemptCount >= this.MAX_SIMILAR_ATTEMPTS) {
@@ -550,7 +606,7 @@ export class AIEnhancedPredictionGenerator {
                 throw new Error("No market data found");
             }
 
-            const prompt = this.createMarketsPrompt(marketData);
+            const prompt = this.createMarketsPrompt(marketData, similarPredictions);
             const prediction = await this.generateWithAI(prompt);
 
             // Format the prediction
@@ -569,7 +625,8 @@ export class AIEnhancedPredictionGenerator {
             // Check for similar predictions
             const isSimilar = await this.checkSimilarity(formattedPrediction);
             if (isSimilar) {
-                return this.generateFinancePrediction(attemptCount + 1);
+                similarPredictions.push(formattedPrediction);
+                return this.generateFinancePrediction(attemptCount + 1, similarPredictions);
             }
 
             return formattedPrediction;
@@ -580,7 +637,7 @@ export class AIEnhancedPredictionGenerator {
         }
     }
 
-    private createMarketsPrompt(marketData: FinancialMarketData[]) {
+    private createMarketsPrompt(marketData: FinancialMarketData[], similarPredictions: AutomatedPrediction[]) {
         const currentDate = new Date();
         const maxEndDate = new Date(currentDate);
         maxEndDate.setDate(maxEndDate.getDate() + 360);
@@ -606,6 +663,9 @@ export class AIEnhancedPredictionGenerator {
     - "Will [Company] achieve [specific revenue/profit target] in Q[X] [year]?"
     - "Will [Company] complete their announced [specific milestone] by [date]?"
     
+    Please do not generate similar predictions to the following:
+    ${similarPredictions.map(prediction => `- ${prediction.question}`).join('\n')}
+    
     Format the response as:
     {
         "question": "Will [specific event] happen by [date]?",
@@ -618,7 +678,7 @@ export class AIEnhancedPredictionGenerator {
     }`;
     }
 
-    private async generateGeneralPrediction(attemptCount = 0): Promise<AutomatedPrediction | undefined> {
+    private async generateGeneralPrediction(attemptCount = 0, similarPredictions: AutomatedPrediction[] = []): Promise<AutomatedPrediction | undefined> {
         // Similar structure but without sports-specific fields
         try {
             if (attemptCount >= this.MAX_SIMILAR_ATTEMPTS) {
@@ -626,7 +686,7 @@ export class AIEnhancedPredictionGenerator {
                 return undefined;
             }
             const news = await this.gatherRecentNews();
-            const prompt = await this.createPromptWithNews(news);
+            const prompt = await this.createPromptWithNews(news, similarPredictions);
             const prediction = await this.generateWithAI(prompt);
             const formattedPrediction: AutomatedPrediction = {
                 question: prediction.question,
@@ -642,8 +702,9 @@ export class AIEnhancedPredictionGenerator {
             const isSimilar = await this.checkSimilarity(formattedPrediction);
             console.log("isSimilar", isSimilar);
             if (isSimilar) {
+                similarPredictions.push(formattedPrediction);
                 console.log('Similar prediction found, retrying...');
-                return this.generateGeneralPrediction(attemptCount + 1);
+                return this.generateGeneralPrediction(attemptCount + 1, similarPredictions);
             }
 
             return formattedPrediction;
@@ -696,7 +757,7 @@ export class AIEnhancedPredictionGenerator {
         return newArray;
     }
 
-    private createPromptWithNews(news: NewsItem[]): string {
+    private createPromptWithNews(news: NewsItem[], similarPredictions: AutomatedPrediction[]): string {
         const currentDate = new Date();
         const maxEndDate = new Date(currentDate);
         maxEndDate.setDate(maxEndDate.getDate() + this.agent.maxTimelineLimit);
@@ -729,6 +790,9 @@ export class AIEnhancedPredictionGenerator {
        Bad examples:
        - "Will X reach $400 billion?" vs "Will X reach $450 billion?"
        - "Will stock price reach $100?" vs "Will stock price reach $110?"
+
+    Please do not generate similar predictions to the following:
+    ${similarPredictions.map(prediction => `- ${prediction.question}`).join('\n')}
     
     Format the response as:
     {
@@ -754,6 +818,7 @@ export class AIEnhancedPredictionGenerator {
         try {
             const usedEventIds: Set<string> = new Set();
             const events = await this.getUpcomingSportsEvents();
+            const similarPredictions: AutomatedPrediction[] = [];
             if (events.length === 0) {
                 throw new Error("No events found");
             }
@@ -769,7 +834,7 @@ export class AIEnhancedPredictionGenerator {
 
                 const randomEvents = this.shuffleArray(unusedEvents).slice(0, 10);
 
-                const prompt = this.createSportsPrompt(randomEvents);
+                const prompt = this.createSportsPrompt(randomEvents, similarPredictions);
                 const prediction = await this.generateWithAI(prompt);
 
                 if (prediction.event?.event_id) {
@@ -805,6 +870,7 @@ export class AIEnhancedPredictionGenerator {
                     break;
                 } else {
                     attempts++;
+                    similarPredictions.push(formattedPrediction);
                     console.log("similar prediction found, retrying...");
                 }
             }
@@ -929,7 +995,7 @@ export class AIEnhancedPredictionGenerator {
         }
     }
 
-    private createSportsPrompt(events: SportsEvent[]): string {
+    private createSportsPrompt(events: SportsEvent[], similarPredictions: AutomatedPrediction[]): string {
         const eventsContext = events
             .map(event => `
                 Event_ID: ${event.idEvent}
@@ -967,7 +1033,10 @@ export class AIEnhancedPredictionGenerator {
         "endDate": "Date",
         "confidence": 0.7,
         "reasoning": "Why this prediction is realistic and verifiable...",
-    }`;
+    }
+        Please do not generate similar predictions to the following:
+        ${similarPredictions.map(prediction => `- ${prediction.question}`).join('\n')}
+        `;
     }
 
     private async generateWithAI(prompt: string): Promise<AutomatedPrediction> {

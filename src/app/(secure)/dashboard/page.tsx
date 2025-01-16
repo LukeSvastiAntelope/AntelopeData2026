@@ -347,9 +347,6 @@ export default function Dashboard() {
     setSearchPredictions(e.target.value);
   };
 
-  // --------------------------- CREATE SCATTER DATA --------------------------
-  // For each bet, create a single dot with x= resolution date, y= index
-  // We'll show the bet description in a custom tooltip.
   const scatterData = {
     datasets: [
       {

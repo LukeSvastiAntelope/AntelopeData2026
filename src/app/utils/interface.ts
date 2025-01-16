@@ -209,7 +209,7 @@ export interface IBet {
     pinecone_id: string;
     agent_id: number;
     bet_id?: number;
-
+    user_id: number;
 }
 
 export interface SerpApiNewsResult {

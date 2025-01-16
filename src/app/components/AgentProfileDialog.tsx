@@ -12,16 +12,13 @@ import Image from "next/image";
 
 const AgentProfileDialog = (
     { isOpen, onClose, name, description, image, isSubmittingProfile, handleSaveProfile }:
-    {
-        isOpen: boolean, onClose: () => void, name: string, description: string, image: string,
-        isSubmittingProfile: boolean, handleSaveProfile: (name: string, description: string, fileRef: React.RefObject<HTMLInputElement>) => void
-    }
+        {
+            isOpen: boolean, onClose: () => void, name: string, description: string, image: string,
+            isSubmittingProfile: boolean, handleSaveProfile: (name: string, description: string, fileRef: React.RefObject<HTMLInputElement>) => void
+        }
 ) => {
-
     const [agentName, setAgentName] = useState(name);
     const [agentDescription, setAgentDescription] = useState(description);
-
-    // For controlling image file input
     const fileRef = useRef<HTMLInputElement | null>(null);
     const [imagePreview, setImagePreview] = useState<string>(image);
 
@@ -37,10 +34,10 @@ const AgentProfileDialog = (
     };
 
     return (
-        <Modal 
-            isOpen={isOpen} 
-            onClose={onClose} 
-            size="md" 
+        <Modal
+            isOpen={isOpen}
+            onClose={onClose}
+            size="md"
             isDismissable={false}
             classNames={{
                 base: "bg-[#1c1c1c] dark",
@@ -66,7 +63,7 @@ const AgentProfileDialog = (
                                 <div className="text-white/40 text-4xl">+</div>
                             )}
                         </div>
-                        <Button 
+                        <Button
                             color="primary"
                             onPress={() => fileRef.current?.click()}
                             size="sm"
@@ -106,8 +103,8 @@ const AgentProfileDialog = (
                     </div>
                 </ModalBody>
                 <ModalFooter>
-                    <Button 
-                        color="primary" 
+                    <Button
+                        color="primary"
                         onPress={() => handleSaveProfile(agentName, agentDescription, fileRef)}
                         className="bg-blue-500"
                         isLoading={isSubmittingProfile}

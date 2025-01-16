@@ -115,7 +115,6 @@ export default function TrainAgentPage() {
                 color="primary"
                 onPress={generatePrediction}
                 isLoading={loading}
-                isDisabled={prediction !== null}
                 className="mb-6"
             >
                 Generate New Prediction {agent?.trainCount}

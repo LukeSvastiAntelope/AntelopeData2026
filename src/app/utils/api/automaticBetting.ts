@@ -909,8 +909,8 @@ ${p.metadata?.comment ? `- Agent Controller Comment: ${p.metadata.comment}` : ''
 
     private async getCryptoMarketData(prediction: Prediction): Promise<MarketData | null> {
         try {
-            const symbol = this.extractCryptoSymbol(prediction.description);
-            if (!symbol) return null;
+            const symbols = await this.getCryptoSymbols(prediction.description);
+            if (!symbols) return null;
 
             // Using CoinMarketCap Basic plan endpoints
             const response = await axios.get(`${this.COINMARKETCAP_BASE_URL}/cryptocurrency/quotes/latest`, {
@@ -918,20 +918,20 @@ ${p.metadata?.comment ? `- Agent Controller Comment: ${p.metadata.comment}` : ''
                     'X-CMC_PRO_API_KEY': this.COINMARKETCAP_API_KEY,
                 },
                 params: {
-                    symbol: symbol,
+                    symbol: symbols,
                     convert: 'USD'
                 }
             });
 
             // Safely access nested properties
-            const cryptoData = response.data?.data?.[symbol]?.[0] || response.data?.data?.[symbol];
+            const cryptoData = response.data?.data?.[symbols[0]]?.[0] || response.data?.data?.[symbols[0]];
             if (!cryptoData?.quote?.USD) {
                 console.error('Invalid data structure from CoinMarketCap:', cryptoData);
                 return null;
             }
 
             return {
-                symbol,
+                symbol: symbols[0],
                 price: cryptoData.quote.USD.price || 0,
                 change24h: cryptoData.quote.USD.percent_change_24h || 0,
                 volume24h: cryptoData.quote.USD.volume_24h || 0,
@@ -946,6 +946,59 @@ ${p.metadata?.comment ? `- Agent Controller Comment: ${p.metadata.comment}` : ''
                 });
             }
             return null;
+        }
+    }
+
+    private async getCryptoSymbols(description: string): Promise<string[]> {
+        try {
+            const prompt = `Extract the crypto symbols which can use to search in coinmarketcap from the following prediction: ${description}`;
+            
+            const response = await this.openai.chat.completions.create({
+                model: "gpt-4o",
+                messages: [
+                    { 
+                        role: "system", 
+                        content: "You are a crypto expert. Extract only valid cryptocurrency symbols from the given prediction. Return them in a JSON object mapping symbols to their full names." 
+                    },
+                    { role: "user", content: prompt }
+                ],
+                temperature: 0.3,
+                response_format: { type: "json_object" }
+            });
+
+            const content = response.choices[0].message.content;
+            console.log("Crypto symbols response:", content);
+            
+            if (!content) {
+                console.warn('No content received from OpenAI');
+                return [];
+            }
+
+            try {
+                // Parse the JSON response
+                const parsedResponse = JSON.parse(content);
+                
+                // Extract keys (symbols) from the object
+                const symbols = Object.keys(parsedResponse);
+                
+                // Validate and clean symbols
+                return symbols
+                    .filter(symbol => 
+                        typeof symbol === 'string' && 
+                        symbol.length > 0 && 
+                        symbol.length <= 10 &&
+                        // Additional validation if needed
+                        /^[A-Za-z0-9]+$/.test(symbol) // Only allow alphanumeric symbols
+                    )
+                    .map(symbol => symbol.toUpperCase().trim());
+
+            } catch (parseError) {
+                console.error('Failed to parse OpenAI response:', parseError);
+                return [];
+            }
+        } catch (error) {
+            console.error('Error in getCryptoSymbols:', error);
+            return [];
         }
     }
 
@@ -1064,12 +1117,9 @@ ${p.metadata?.comment ? `- Agent Controller Comment: ${p.metadata.comment}` : ''
                 relevantSummaries = "No similar prior predictions or bets found.";
             }
 
-            // 4) Build your system prompt with the agent’s context,
-            //    explicitly telling the model how to respond about its name.
             const systemPrompt = `
                 You are a specialized betting agent with the following details:
                 Name: ${this.agent.name}
-
                 Category: ${this.agent.category}
                 Risk Level: ${this.agent.riskLevel}
                 Principles: ${this.agent.principles.map((p) => p.title).join(", ")}
