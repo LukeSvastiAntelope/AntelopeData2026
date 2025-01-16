@@ -54,7 +54,7 @@ export default function TrainAgentPage() {
         }
 
         try {
-            await fetchData.post('/api/training', {
+            const result = await fetchData.post('/api/training', {
                 predictionId: `prediction-${Date.now()}-${agent?.id}`,
                 betAmount: Number(formData.betAmount),
                 reasoning: formData.reason,
@@ -64,12 +64,17 @@ export default function TrainAgentPage() {
                 question: prediction.question,
                 description: prediction.description,
                 category: prediction.category,
-            })
+            });
 
-            // Reset form and generate new prediction
-            setFormData({ selectedOption: '', betAmount: '', reason: '' })
-            setPrediction(null);
-            setAgent(prevAgent => prevAgent ? { ...prevAgent, trainCount: prevAgent.trainCount - 1 } : null);
+            if (result.status) {
+                toast.success('Training data submitted successfully')
+                // Reset form and generate new prediction
+                setFormData({ selectedOption: '', betAmount: '', reason: '' })
+                setPrediction(null);
+                setAgent(prevAgent => prevAgent ? { ...prevAgent, trainCount: prevAgent.trainCount - 1 } : null);
+            } else {
+                toast.error(result.message)
+            }
         } catch (error) {
             console.error('Error submitting training data:', error)
         }
