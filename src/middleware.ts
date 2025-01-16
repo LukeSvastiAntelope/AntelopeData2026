@@ -5,7 +5,6 @@ const publicRoutes = [
     '/api/signin', 
     '/api/signup', 
     '/api/verify', 
-    '/api/createAgentPrediction', 
     '/api/createAgentBet', 
     '/api/stripeWebhookCheckout', 
     '/api/forgotPassword',
