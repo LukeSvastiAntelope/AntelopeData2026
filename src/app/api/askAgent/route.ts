@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { AutomaticBettingAgent } from "@/app/utils/api/automaticBetting";
 import { IAgentProfile } from "@/app/utils/interface";
+import { UserRepo } from "@/app/utils/database/user-repo";
 
 export async function POST(request: NextRequest) {
   try {
@@ -12,6 +13,8 @@ export async function POST(request: NextRequest) {
     if (!userQuestion || !agentProfile) {
       throw new Error("Missing userQuestion or agentProfile in request body");
     }
+    
+    await UserRepo.insertConversation(agentProfile.user_id, agentProfile.id, userQuestion, "user");
 
     // Create an Agent instance with the user-provided agentProfile
     const agent = new AutomaticBettingAgent({
@@ -37,6 +40,7 @@ export async function POST(request: NextRequest) {
 
     // Pass the question to our agent
     const answer = await agent.handleUserQuestion(userQuestion);
+    await UserRepo.insertConversation(agentProfile.user_id, agentProfile.id, answer, "agent");
 
     return NextResponse.json({ status: true, answer }, { status: 200 });
   } catch (error) {

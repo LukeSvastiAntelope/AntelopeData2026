@@ -7,6 +7,7 @@ import { UserDB, AgentDB, PaymentIntentDB, CreatePredictionInput, IBet } from ".
 import { RowDataPacket, ResultSetHeader } from 'mysql2/promise';
 
 export const UserRepo = {
+    insertConversation,
     authenticate,
     registerPassword,
     verifyAccount,
@@ -42,6 +43,11 @@ export const UserRepo = {
     getRecentActivity,
     createAgentJoinAction,
     updateAgentTraining
+}
+
+async function insertConversation(userId: number, agentId: number, message: string, type: string) {
+    const db = await getMySQLConnection();
+    await db.execute('INSERT INTO conversations (user_id, agent_id, message, type) VALUES (?, ?, ?, ?)', [userId, agentId, message, type]);
 }
 
 async function updateAgentTraining(agentId: number, train_index: string) {
