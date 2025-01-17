@@ -248,6 +248,16 @@ max-width: 80px;
   min-height: 80px;
 }
 
+.training-center {
+  background-image: url('/assets/images/training.svg');
+  background-size: 80px 80px;
+  background-repeat: no-repeat;
+  background-position: center;
+ 
+  min-width: 80px;
+  min-height: 80px;
+}
+
 .icon-coin {
   background-image: url('/assets/images/coin.svg');
   background-size: 12px 12px;

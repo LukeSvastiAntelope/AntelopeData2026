@@ -77,9 +77,6 @@ interface MultiChoiceOddsBarProps {
 }
 
 const MultiChoiceOddsBar = ({ choices }: MultiChoiceOddsBarProps) => {
-    // Sum total of all choices' numeric percentages
-    const totalPercentage = choices.reduce((sum, c) => sum + parseFloat(c.percentage), 0);
-
     // Accumulator to position each segment’s left offset
     let accumulated = 0;
 
@@ -110,7 +107,7 @@ const MultiChoiceOddsBar = ({ choices }: MultiChoiceOddsBarProps) => {
 
                         return (
                             <div
-                                key={c.choice}
+                                key={idx}
                                 className={`absolute top-0 bottom-0 ${segmentColor} transition-all duration-300`}
                                 style={style}
                             />

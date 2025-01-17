@@ -207,7 +207,7 @@ export default function StrategyPage() {
       <div className="flex flex-col banner-image p-6 rounded-lg mt-8">
         <h3 className="text-2xl font-bold text-white font-kodemono mb-2">Train Your Agent</h3>
         <p className="text-small w-1/2 text-white mb-4">Tell the agent your interest and it will ask you a set of questions to understand your line of thinking.</p>
-        <Button color="primary" variant="flat" className="text-small w-fit bg-white px-8" href="/trainAgent" size="sm" as="a">
+        <Button color="primary" variant="flat" className="text-small w-fit bg-white px-8" href="/ask-agent?mode=train" size="sm" as="a">
           Start Training
         </Button>
       </div>
@@ -228,11 +228,6 @@ export default function StrategyPage() {
           />
         </CardBody>
       </Card>
-
-      {/* Betting Settings */}
-
-
-
 
       <Card className="my-8 bg-content0 ">
         <CardHeader className="text-small font-regular flex justify-between">
@@ -259,8 +254,6 @@ export default function StrategyPage() {
         </CardHeader>
         <Divider />
 
-
-
         <CardBody>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 ml-2">
             <div>
@@ -282,12 +275,6 @@ export default function StrategyPage() {
 
           </div>
         </CardBody>
-
-
-
-        {/* Core Interests */}
-
-
 
         <CardBody>
           <CardHeader className="font-regular px-0 pt-0 text-default-500 text-small ml-2">Sub-category Interests</CardHeader>

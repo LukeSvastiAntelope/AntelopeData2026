@@ -8,6 +8,8 @@ import toast from "react-hot-toast";
 import { AutomatedPrediction, IAgentProfile } from "@/app/utils/interface";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
+import { Select, SelectItem } from "@nextui-org/select";
+import { useSearchParams } from "next/navigation";
 
 interface ChatMessage {
   role: "user" | "agent";
@@ -24,6 +26,7 @@ interface TrainingMessageProps {
 const TrainingMessageComponent = ({ agent, setIsTraining, setAgent }: TrainingMessageProps) => {
   const [isThinking, setIsThinking] = useState(false);
   const [trainingPredictions, setTrainingPredictions] = useState<AutomatedPrediction | null>(null);
+  const [trainingPredictionsList, setTrainingPredictionsList] = useState<AutomatedPrediction[]>([]);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const fetchData = useFetch();
   const [betAmount, setBetAmount] = useState('0');
@@ -77,6 +80,12 @@ const TrainingMessageComponent = ({ agent, setIsTraining, setAgent }: TrainingMe
       });
 
       if (result.status) {
+        setTrainingPredictions(prev => prev ? {
+          ...prev,
+          choice: choice,
+          reasoning: reason,
+          initialStake: Number(betAmount)
+        } : null)
         toast.success('Training data submitted successfully')
         // Reset form and generate new prediction
         setIsSubmitted(true)
@@ -92,14 +101,15 @@ const TrainingMessageComponent = ({ agent, setIsTraining, setAgent }: TrainingMe
   }
 
   const setHandleNewQuestion = () => {
-    if (agent.trainCount == 1) {
+    if (agent.trainCount == 1 || !trainingPredictions) {
       toast.error('Agent training is finished')
       return;
     }
+    setTrainingPredictionsList(prevList => [...prevList, trainingPredictions]);
     setTrainingPredictions(null);
     setIsSubmitted(false)
     setAgent(prevAgent => prevAgent ? { ...prevAgent, trainCount: prevAgent.trainCount - 1 } : null);
-    generatePrediction()
+    generatePrediction();
   }
 
   useEffect(() => {
@@ -108,8 +118,17 @@ const TrainingMessageComponent = ({ agent, setIsTraining, setAgent }: TrainingMe
 
   return (
     <div className="w-full space-y-4">
-      <div className="text-white">Certainly! Let&apos;s dive into some prediction questions related to my field:</div>
-
+      <div className="text-white">{agent.name || "Agent"}: Certainly! Let&apos;s dive into some prediction questions related to my field:</div>
+      {
+        trainingPredictionsList.length > 0 && trainingPredictionsList.map((prediction, index) => (
+          <div key={index}>
+            <div className="text-white">{6 - agent.trainCount - trainingPredictionsList.length + index} {prediction.question}</div>
+            <div className="text-white">{prediction.choice}</div>
+            <div className="text-white">{prediction.reasoning}</div>
+            <div className="text-white">{prediction.initialStake}</div>
+          </div>
+        ))
+      }
       {
         isThinking ? (
           <div className="text-white">Thinking...</div>
@@ -139,15 +158,15 @@ const TrainingMessageComponent = ({ agent, setIsTraining, setAgent }: TrainingMe
                   </div>
                   <div className="space-y-2">
                     <Input type="number" label="Bet Amount" placeholder="Enter bet amount" value={betAmount} onChange={(e) => setBetAmount(e.target.value)} classNames={{
-      input: "bg-content1/20 dark:bg-content1/20",
-      inputWrapper: "bg-content1/20 dark:bg-content1/20"
-    }} />
+                      input: "bg-content1/20 dark:bg-content1/20",
+                      inputWrapper: "bg-content1/20 dark:bg-content1/20"
+                    }} />
                   </div>
                   <div className="space-y-2">
                     <Textarea type="text" label="Reason" placeholder="Enter reason" value={reason || ''} onChange={(e) => setReason(e.target.value)} classNames={{
-      input: "bg-content1/20 dark:bg-content1/20",
-      inputWrapper: "bg-content1/20 dark:bg-content1/20"
-    }}  />
+                      input: "bg-content1/20 dark:bg-content1/20",
+                      inputWrapper: "bg-content1/20 dark:bg-content1/20"
+                    }} />
                   </div>
                 </> :
                 <div className="text-white bg-gray-800 p-2 rounded-md w-full">I&apos;ve saved your instructions for question {6 - agent.trainCount}</div>
@@ -167,6 +186,18 @@ const TrainingMessageComponent = ({ agent, setIsTraining, setAgent }: TrainingMe
   );
 }
 
+const TrainStart = ({ setTrain }: { setTrain: () => void }) => {
+  return (
+    <div className="flex flex-col gap-2 mb-8 border border-white/10 rounded-xl p-6 text-center empty-state place-content-center">
+      <div className="training-center"></div>
+      <p className="text-gray-400 pb-2 ">
+        Thank you agent to reason about your subject of interest by breaking down your own reasoning based on relevants bets.
+      </p>
+      <Button className="w-fit mx-auto" color="primary" variant="flat" onPress={setTrain}>Begin Training</Button>
+    </div>
+  )
+}
+
 export default function AskAgent() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
@@ -177,6 +208,23 @@ export default function AskAgent() {
   const fetch = useFetch();
   const router = useRouter();
   const containerRef = useRef<HTMLDivElement>(null);
+  const searchParams = useSearchParams();
+  let receiveMode = searchParams.get("mode") || "conversation";
+  const [mode, setMode] = useState(receiveMode);
+  const modeList = [
+    {
+      key: "conversation",
+      value: "Conversation"
+    },
+    {
+      key: "train",
+      value: "Train Agent"
+    },
+    {
+      key: "database",
+      value: "Search Database"
+    }
+  ]
 
   // Fetch Agent Profile on mount, so we have the agent's name, category, image, etc.
   useEffect(() => {
@@ -190,6 +238,11 @@ export default function AskAgent() {
             return;
           }
           setAgentProfile(response.agent);
+          console.log("receiveMode", receiveMode);
+          if (receiveMode == "train") {
+            setTraining(response.agent);
+            receiveMode = "";
+          }
         } else {
           toast.error(response.message || "Failed to get agent info.");
         }
@@ -214,7 +267,23 @@ export default function AskAgent() {
     }
   }, [isTraining]);
 
+  useEffect(() => {
+    if (!agentProfile) return;
+    if (mode == "train" && receiveMode != "train") {
+      setMessages(prevMessages => [...prevMessages, {
+        role: "agent",
+        content: <TrainStart setTrain={() => setTraining(agentProfile)} />,
+        type: "training"
+      }]);
+    } else {
+      setMessages(prevMessages => prevMessages.filter(msg => msg.type !== "training"));
+    }
+  }, [mode]);
+
   const handleSend = async () => {
+    if (mode == "train") {
+      return;
+    }
     if (!input.trim()) {
       toast.error("Please enter a question");
       return;
@@ -258,8 +327,9 @@ export default function AskAgent() {
     }
   };
 
-  const setTraining = async () => {
-    if (!agentProfile) return;
+  const setTraining = async (agent: IAgentProfile) => {
+    if (!agent || isTraining) return;
+    setMessages(prevMessages => prevMessages.filter(msg => msg.type !== "training"));
     setMessages(prevMessages => [...prevMessages,
     {
       role: "user",
@@ -273,7 +343,7 @@ export default function AskAgent() {
       setMessages(prevMessages => [...prevMessages, {
         role: "agent",
         content: <TrainingMessageComponent
-          agent={agentProfile}
+          agent={agent}
           setIsTraining={setIsTraining}
           setAgent={setAgentProfile}
         />,
@@ -310,13 +380,18 @@ export default function AskAgent() {
               )}
             </div>
           </div>
-          <Button
-            className="bg-[#7828C8] text-white text-sm font-normal hover:bg-[#6820A8]"
-            isDisabled={isTraining}
-            onPress={setTraining}
+          <Select
+            variant='bordered'
+            className="w-[200px]"
+            selectedKeys={new Set([mode])}
+            onChange={(e) => setMode(e.target.value)}
           >
-            Train
-          </Button>
+            {modeList.map((mode) => (
+              <SelectItem key={mode.key} value={mode.key}>
+                {mode.value}
+              </SelectItem>
+            ))}
+          </Select>
         </div>
       </div>
 
@@ -344,9 +419,13 @@ export default function AskAgent() {
                     isUser ? "text-primary-600 px-2" : "text-white p-2"
                   }
                 >
-                  <strong>
-                    {isUser ? "You" : agentProfile?.name || "Agent"}:
-                  </strong>{" "}
+                  {
+                    isUser || msg.type != "training" ?
+                      <strong>
+                        {isUser ? "You" : agentProfile?.name || "Agent"}: {" "}
+                      </strong>
+                      : null
+                  }
                   {msg.content}
                 </p>
               </div>
