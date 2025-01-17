@@ -107,7 +107,7 @@ const TrainingMessageComponent = ({ agent, setIsTraining, setAgent }: TrainingMe
   }, []);
 
   return (
-    <div className="w-full max-w-xl space-y-4">
+    <div className="w-full space-y-4">
       <div className="text-white">Certainly! Let&apos;s dive into some prediction questions related to my field:</div>
 
       {
@@ -124,7 +124,7 @@ const TrainingMessageComponent = ({ agent, setIsTraining, setAgent }: TrainingMe
                     {
                       trainingPredictions.category == "sportDB" ?
                         <>
-                          <Button className="bg-[#7828C8] text-white px-4 py-1 rounded-md flex-1 text-center" onPress={() => setChoice(trainingPredictions.event?.home_team || null)}>{trainingPredictions.event?.home_team}</Button>
+                          <Button className="bg-success/20 text-success-500 px-4 py-1 rounded-md flex-1 text-center" onPress={() => setChoice(trainingPredictions.event?.home_team || null)}>{trainingPredictions.event?.home_team}</Button>
                           <Button className="bg-[#6820A8] text-white px-4 py-1 rounded-md flex-1 text-center" onPress={() => setChoice(trainingPredictions.event?.away_team || null)}>{trainingPredictions.event?.away_team}</Button>
                           {
                             trainingPredictions.event?.league_id != "4391" && trainingPredictions.event?.league_id != "4387" &&
@@ -132,16 +132,22 @@ const TrainingMessageComponent = ({ agent, setIsTraining, setAgent }: TrainingMe
                           }
                         </> :
                         <>
-                          <Button className="bg-green-500 text-white px-4 py-1 rounded-md flex-1 text-center" onPress={() => setChoice("Yes")}>Yes</Button>
-                          <Button className="bg-purple-900 text-white px-4 py-1 rounded-md flex-1 text-center" onPress={() => setChoice("No")}>No</Button>
+                          <Button className="bg-success/20 text-success-500 px-4 py-1 rounded-md flex-1 text-center" onPress={() => setChoice("Yes")}>Yes</Button>
+                          <Button className="bg-danger/20 text-danger-500 px-4 py-1 rounded-md flex-1 text-center" onPress={() => setChoice("No")}>No</Button>
                         </>
                     }
                   </div>
                   <div className="space-y-2">
-                    <Input type="number" label="Bet Amount" placeholder="Enter bet amount" value={betAmount} onChange={(e) => setBetAmount(e.target.value)} />
+                    <Input type="number" label="Bet Amount" placeholder="Enter bet amount" value={betAmount} onChange={(e) => setBetAmount(e.target.value)} classNames={{
+      input: "bg-content1/20 dark:bg-content1/20",
+      inputWrapper: "bg-content1/20 dark:bg-content1/20"
+    }} />
                   </div>
                   <div className="space-y-2">
-                    <Textarea type="text" label="Reason" placeholder="Enter reason" value={reason || ''} onChange={(e) => setReason(e.target.value)} />
+                    <Textarea type="text" label="Reason" placeholder="Enter reason" value={reason || ''} onChange={(e) => setReason(e.target.value)} classNames={{
+      input: "bg-content1/20 dark:bg-content1/20",
+      inputWrapper: "bg-content1/20 dark:bg-content1/20"
+    }}  />
                   </div>
                 </> :
                 <div className="text-white bg-gray-800 p-2 rounded-md w-full">I&apos;ve saved your instructions for question {6 - agent.trainCount}</div>

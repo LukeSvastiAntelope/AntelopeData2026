@@ -902,8 +902,8 @@ export default function Dashboard() {
                             <Image
                               src={item.agent_image || 'https://ui-avatars.com/api/?name=' + item.agent_name + '&length=1&background=f31260&color=fff'}
                               alt={item.agent_name || "Agent avatar"}
-                              width={24}
-                              height={24}
+                              width={18}
+                              height={18}
                               className="rounded-full object-cover"
                             />
                           ) : (
@@ -926,7 +926,7 @@ export default function Dashboard() {
                           </div>
                         )}
 
-                        <span className="flex flex-wrap gap-4 items-center">
+                        <span className="flex flex-wrap gap-0 items-center">
                           {item.amount > 0 && (
                             <Tooltip content="Bet amount" showArrow>
                               <div className="icon-coin text-default-500">{item.amount}</div>

@@ -175,7 +175,7 @@ const SecureLayout = ({ children }: { children: React.ReactNode }) => {
                                                 </div>
 
                                                 {/* Profile Photo */}
-                                                <div className="md:flex items-center p-2 border border-white/10 profile-border hidden gap-2 mb-2">
+                                                <div className="md:flex items-center py-2 hidden gap-2 mb-2">
 
                                                     <Image
                                                         src={agent?.image || "/assets/images/logo-simple.svg"}

@@ -64,72 +64,75 @@ const parseLogEntries = (logString: string) => {
     }).filter(Boolean);
 };
 
-const MarketOddsBar = ({
-    percentage,
-    question,
-    showOptions = false,
-    count,
-    odds,
-    amount
-}: {
-    percentage: number,
-    question: string,
-    showOptions?: boolean,
-    count: number,
-    odds: string,
-    amount: number
-}) => {
-    const bgColor = percentage >= 90 ? "bg-orange-400/90" :
-        percentage >= 80 ? "bg-emerald-400/90" :
-            percentage >= 70 ? "bg-blue-400/90" : "bg-red-400/90";
+interface ChoiceOdds {
+    choice: string;
+    percentage: string;  // e.g., "45.0" for 45.0%
+    amount: number;
+    count: number;
+    odds: string;
+}
+
+interface MultiChoiceOddsBarProps {
+    choices: ChoiceOdds[  ]; // e.g., an array of "Yes"/"No"/"Draw"
+}
+
+const MultiChoiceOddsBar = ({ choices }: MultiChoiceOddsBarProps) => {
+    // Sum total of all choices' numeric percentages
+    const totalPercentage = choices.reduce((sum, c) => sum + parseFloat(c.percentage), 0);
+
+    // Accumulator to position each segment’s left offset
+    let accumulated = 0;
 
     return (
         <div className="w-full mb-4">
             <div className="relative w-full bg-white/5 rounded-lg overflow-hidden p-4">
-                {/* Progress bar */}
-                <div className="h-2 w-full bg-white/10 rounded-full mb-3">
-                    <div
-                        className={`h-full ${bgColor} rounded-full transition-all duration-500`}
-                        style={{ width: `${percentage}%` }}
-                    />
+                {/* Single combined bar */}
+                <div className="h-2 w-full bg-white/10 rounded-full mb-3 relative overflow-hidden">
+                    {choices.map((c, idx) => {
+                        // Decide a color style for each choice
+                        let segmentColor = "bg-orange-400/90";
+                        if (c.choice.toLowerCase() === "yes") {
+                            segmentColor = "bg-emerald-400/90";
+                        } else if (c.choice.toLowerCase() === "no") {
+                            segmentColor = "bg-red-400/90";
+                        } else if (c.choice.toLowerCase() === "draw") {
+                            segmentColor = "bg-yellow-400/90";
+                        }
+
+                        const widthFraction = parseFloat(c.percentage);
+                        const style = {
+                            left: `${accumulated}%`,
+                            width: `${widthFraction}%`,
+                        };
+
+                        // Update the accumulated offset for the next segment
+                        accumulated += widthFraction;
+
+                        return (
+                            <div
+                                key={c.choice}
+                                className={`absolute top-0 bottom-0 ${segmentColor} transition-all duration-300`}
+                                style={style}
+                            />
+                        );
+                    })}
                 </div>
 
-                {/* Content */}
+                {/* Below the progress bar, show details */}
                 <div className="flex items-center justify-between">
-                    {/* Left side - Question */}
-                    <div className="flex-1">
-                        <span className="text-sm font-medium text-white capitalize">{question}</span>
+                    <div className="text-sm text-white/60">
+                        {/* Could show “Yes / No / Draw” or any other info */}
+                        Combined Odds
                     </div>
-
-                    {/* Right side - Stats */}
-                    <div className="flex items-center gap-6">
-                        <div className="flex flex-col items-end">
-                            <span className="text-xs text-white/60">Probability</span>
-                            <span className="text-sm font-bold text-white">{percentage}%</span>
-                        </div>
-                        <div className="flex flex-col items-end">
-                            <span className="text-xs text-white/60">Odds</span>
-                            <span className="text-sm font-bold text-white">{odds}x</span>
-                        </div>
-                        <div className="flex flex-col items-end">
-                            <span className="text-xs text-white/60">Bets</span>
-                            <span className="text-sm font-bold text-white">{count}</span>
-                        </div>
-                        <div className="flex flex-col items-end">
-                            <span className="text-xs text-white/60">Total</span>
-                            <span className="text-sm font-bold text-white">{amount}</span>
-                        </div>
-
-                        {showOptions && (
-                            <div className="flex gap-2 ml-4">
-                                <button className="px-3 py-1.5 bg-white/90 text-black rounded-md text-sm font-medium hover:bg-white transition-colors">
-                                    Yes
-                                </button>
-                                <button className="px-3 py-1.5 bg-white/90 text-black rounded-md text-sm font-medium hover:bg-white transition-colors">
-                                    No
-                                </button>
+                    <div className="flex items-center gap-4">
+                        {choices.map((c) => (
+                            <div key={c.choice} className="flex flex-col items-end">
+                                <span className="text-xs text-white/60">{c.choice}</span>
+                                <span className="text-sm font-bold text-white">
+                                    {c.percentage}%
+                                </span>
                             </div>
-                        )}
+                        ))}
                     </div>
                 </div>
             </div>
@@ -227,7 +230,7 @@ export default function BetDetailPage() {
                 color="default"
                 variant="light"
                 onPress={() => router.back()}
-                className="mb-4 text-small p-0 subtlebackground backbutton"
+                className="mb-4 text-small p-0 bg-content0"
             >
                 ← Back
             </Button>
@@ -238,17 +241,23 @@ export default function BetDetailPage() {
                     <>
                         <div className="px-0 max-w-[800px]">
                             {/* Header Section */}
-                            <div className="flex gap-6 mb-8 flex-col w-full imagecut bg-content0 rounded-xl p-8">
+                            <div className="flex gap-6 mb-8 flex-col w-full bg-content0 rounded-xl p-8">
                                 <Image
                                     src={bet.str_thumb}
                                     alt="Event"
-                                    className="w-full object-cover rounded-xl imagecut"
-                                    style={{ maxWidth: "100%", minWidth: "-webkit-fill-available;" }}
+                                    className="w-full object-cover rounded-xl "
+                                    style={{ maxWidth: "100%", minWidth: "-webkit-fill-available;", height: "200px" }}
                                 />
 
                                 <div>
                                     <h3 className="text-lg font-semibold mb-2">{bet.description}</h3>
                                 </div>
+
+                                {choiceOdds.length > 0 && (
+                                    
+                                        <MultiChoiceOddsBar choices={choiceOdds} />
+                               
+                                )}
 
                                 {/* Bet Details */}
                                 <div className="color-white">
@@ -319,28 +328,33 @@ export default function BetDetailPage() {
                                             </div>
                                         </div>
                                     </div>
+                                    <div className="">
+                                        <h2 className="text-base font-semibold mt-2">Reasoning</h2>
+                                        <p className="text-default-400 leading-relaxed ">{bet.reason}</p>
+                                        {
+                                            pineconeData && pineconeData.metadata?.comment && (
+                                                <>
+                                                    <h2 className="text-lg font-semibold mb-4 mt-4">Comment</h2>
+                                                    <p className="text-default-400 leading-relaxed ">{pineconeData.metadata.comment as string}</p>
+                                                </>
+                                            )
+                                        }
+                                        <Button
+                                            color="primary"
+                                            variant="light"
+                                            className="text-primary bg-primary/20 underline text-sm mt-2 hover:bg-primary/40"
+                                            onPress={() => setShowCommentModal(true)}
+                                        >
+                                            Adjust Reasoning
+                                        </Button>
+                                    </div>
                                 </div>
                             </div>
-                            {choiceOdds.length > 0 && (
-                                <div className="w-full mt-8 space-y-2">
-                                    <h2 className="text-lg font-semibold mb-4">Market Odds</h2>
-                                    {choiceOdds.map((choice) => (
-                                        <MarketOddsBar
-                                            key={choice.choice}
-                                            percentage={parseFloat(choice.percentage)}
-                                            question={choice.choice}
-                                            count={choice.count}
-                                            odds={choice.odds}
-                                            amount={choice.amount}
-                                        />
-                                    ))}
-                                </div>
-                            )}
                             {prediction?.log && (
                                 <div className="mt-8">
                                     <div className="bg-content0 rounded-lg p-8">
                                         <h2 className="text-xl font-semibold mb-4">Resolution Log</h2>
-                                        <div className="space-y-4 font-kodemono">
+                                        <div className="space-y-4">
                                             {parseLogEntries(prediction.log).map((entry, index) => (
                                                 <div key={index} className="flex flex-col gap-1">
                                                     <span className="text-primary text-sm">
@@ -359,7 +373,7 @@ export default function BetDetailPage() {
                                 {pineconeData && (
                                     <div className="mt-0">
                                         <div className="bg-content0 rounded-lg p-8 ">
-                                            <div className="flex flex-col gap-4 font-kodemono">
+                                            <div className="flex flex-col gap-4">
                                                 <h2 className="text-xl font-semibold mb-4">Reasoning Log</h2>
                                                 {Object.entries(pineconeData.metadata || {}).map(([key, value]) => {
                                                     return (

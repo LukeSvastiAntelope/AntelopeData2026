@@ -92,11 +92,20 @@ background-clip: text;
 .center-logo {
 max-width: 80px;
     background: url(/assets/images/logo-simple.svg);
-    width: 40px;
-    height: 40px;
-    background-size: 40px;
+    width: 20px;
+    height: 20px;
+    background-size: 20px;
     background-position: top;
   }
+
+  .center-logo-web {
+    max-width: 80px;
+        background: url(/assets/images/logo-simple.svg);
+        width: 40px;
+        height: 40px;
+        background-size: 40px;
+        background-position: top;
+      }
 
 .icon-profile {
   background-image: url('/assets/images/profile_off.svg');
