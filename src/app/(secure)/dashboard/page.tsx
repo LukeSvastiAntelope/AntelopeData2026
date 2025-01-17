@@ -537,7 +537,7 @@ export default function Dashboard() {
                   {filterBets(bets, searchTerm).map((bet, index) => {
                     // Group bets by choice and calculate totals
                     const choiceTotals = bet.agent_bets?.reduce((acc, b) => {
-                      acc[b.choice] = (acc[b.choice] || 0) + b.amount;
+                      acc[b.choice.toLowerCase()] = (acc[b.choice.toLowerCase()] || 0) + b.amount;
                       return acc;
                     }, {} as Record<string, number>) || {};
 
@@ -600,7 +600,7 @@ export default function Dashboard() {
                                   <Tooltip
                                     key={index}
                                     content={
-                                      choice === "yes"
+                                      choice.toLowerCase() === bet.creator_choice?.toLowerCase()
                                         ? "Agents betting Yes"
                                         : "Agents betting No"
                                     }
@@ -608,7 +608,7 @@ export default function Dashboard() {
                                   >
                                     <Chip
                                       className={
-                                        choice === "yes"
+                                        choice.toLowerCase() === bet.creator_choice?.toLowerCase()
                                           ? "bg-success/20 text-success-500 icon-thumbs-up px-2"
                                           : "bg-danger/20 text-danger-500 icon-thumbs-down px-2"
                                       }
@@ -634,7 +634,7 @@ export default function Dashboard() {
                                 >
                                   <Chip
                                     className={`${bet.status === "resolved"
-                                      ? bet.outcome === bet.choice
+                                      ? bet.outcome?.toLowerCase() === bet.choice?.toLowerCase()
                                         ? "bg-green-500/20 text-green-400"
                                         : "bg-red-500/20 text-red-400"
                                       : bet.status === "Pending"
@@ -644,7 +644,7 @@ export default function Dashboard() {
                                     size="sm"
                                   >
                                     {bet.status === "resolved"
-                                      ? bet.outcome === bet.choice
+                                      ? bet.outcome?.toLowerCase() === bet.choice?.toLowerCase()
                                         ? "Won"
                                         : "Lost"
                                       : bet.status === "Pending"
@@ -739,7 +739,7 @@ export default function Dashboard() {
               <div className="flex flex-col gap-2">
                 {displayedPredictions.map((prediction, index) => {
                   const choiceTotals = prediction.agent_bets?.reduce((acc, b) => {
-                    acc[b.choice] = (acc[b.choice] || 0) + b.amount;
+                    acc[b.choice.toLowerCase()] = (acc[b.choice.toLowerCase()] || 0) + b.amount;
                     return acc;
                   }, {} as Record<string, number>) || {};
 
@@ -783,7 +783,7 @@ export default function Dashboard() {
                           {choiceOdds.map(({ choice, percentage }, index) => (
                             <Tooltip
                               content={
-                                choice === prediction.creator_choice
+                                choice.toLowerCase() === prediction.creator_choice.toLowerCase()
                                   ? "Agents betting Yes"
                                   : "Agents betting No"
                               }

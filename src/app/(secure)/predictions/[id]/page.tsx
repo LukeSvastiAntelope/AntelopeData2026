@@ -49,7 +49,7 @@ const MarketOddsBar = ({
                 <div className="flex items-center justify-between">
                     {/* Left side - Question */}
                     <div className="flex-1">
-                        <span className="text-sm font-medium text-white">{question}</span>
+                        <span className="text-sm font-medium text-white capitalize">{question}</span>
                     </div>
 
                     {/* Right side - Stats */}
@@ -128,7 +128,7 @@ export default function PredictionDetail() {
                 if (response.prediction?.bets) {
                     const betsArray: IBet[] = response.prediction.bets;
                     const choiceTotals = betsArray.reduce((acc, b) => {
-                        acc[b.choice] = (acc[b.choice] || 0) + b.amount;
+                        acc[b.choice.toLowerCase()] = (acc[b.choice.toLowerCase()] || 0) + b.amount;
                         return acc;
                     }, {} as Record<string, number>) || {};
 
@@ -292,17 +292,17 @@ export default function PredictionDetail() {
                                         >
                                             {prediction.status === "open"
                                                 ? "Open"
-                                                : prediction.outcome === prediction.creator_choice
+                                                : prediction.outcome.toLowerCase() === prediction.creator_choice.toLowerCase()
                                                     ? "Win"
                                                     : "Loss"}
                                         </Chip>
                                     </div>
                                     <div>
                                         <p className="text-sm text-gray-500">Creator Choice</p>
-                                        <p className="font-semibold">{prediction.creator_choice}</p>
+                                        <p className="font-semibold capitalize">{prediction.creator_choice}</p>
                                     </div>
                                     {
-                                        choiceList.length > 0 && (
+                                        choiceList.length > 0 && prediction.status == "open" && (
                                             <Button
                                                 className="ml-auto block"
                                                 color="primary"

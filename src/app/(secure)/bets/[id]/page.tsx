@@ -98,7 +98,7 @@ const MarketOddsBar = ({
                 <div className="flex items-center justify-between">
                     {/* Left side - Question */}
                     <div className="flex-1">
-                        <span className="text-sm font-medium text-white">{question}</span>
+                        <span className="text-sm font-medium text-white capitalize">{question}</span>
                     </div>
 
                     {/* Right side - Stats */}
@@ -182,7 +182,7 @@ export default function BetDetailPage() {
                 if (response.prediction?.bets) {
                     const betsArray: BetData[] = response.prediction.bets;
                     const choiceTotals = betsArray.reduce((acc, b) => {
-                        acc[b.choice] = (acc[b.choice] || 0) + b.amount;
+                        acc[b.choice.toLowerCase()] = (acc[b.choice.toLowerCase()] || 0) + b.amount;
                         return acc;
                     }, {} as Record<string, number>) || {};
 
@@ -293,11 +293,11 @@ export default function BetDetailPage() {
                                             </div>
                                             <div>
                                                 <h3 className="text-sm font-medium text-default-400 mb-1">Your Choice</h3>
-                                                <Chip color="secondary" className="bg-primary/20">{bet.choice}</Chip>
+                                                <Chip color="secondary" className="bg-primary/20 capitalize">{bet.choice}</Chip>
                                             </div>
                                             <div>
                                                 <h3 className="text-sm font-medium text-default-400 mb-1">Creator&apos;s Choice</h3>
-                                                <Chip color="secondary" className="bg-primary/20">{bet.predicted_outcome || bet.creator_choice}</Chip>
+                                                <Chip color="secondary" className="bg-primary/20 capitalize">{bet.predicted_outcome || bet.creator_choice}</Chip>
                                             </div>
                                             <div>
                                                 <h3 className="text-sm font-medium text-default-400 mb-1">Validation Source</h3>

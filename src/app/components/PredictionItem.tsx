@@ -18,7 +18,7 @@ export function PredictionItem({ prediction, onClick }: PredictionItemProps) {
         if (!b) {
           return acc;
         }
-        acc[b.choice] = (acc[b.choice] || 0) + b.amount;
+        acc[b.choice.toLowerCase()] = (acc[b.choice.toLowerCase()] || 0) + b.amount;
         return acc;
       }, {} as Record<string, number>) || {};
 
@@ -33,7 +33,7 @@ export function PredictionItem({ prediction, onClick }: PredictionItemProps) {
           amount,
           odds,
           percentage: percentage.toFixed(1),
-          count: betsArray.filter(bet => bet && bet.choice === choice).length
+          count: betsArray.filter(bet => bet && bet.choice.toLowerCase() === choice.toLowerCase()).length
         };
       });
       setChoiceOdds(newChoiceOdds);
@@ -72,7 +72,7 @@ export function PredictionItem({ prediction, onClick }: PredictionItemProps) {
                 {choiceOdds.map(({ choice, odds, percentage }) => (
                   <Chip
                     key={choice}
-                    className={`${choice === prediction.creator_choice
+                    className={`${choice.toLowerCase() === prediction.creator_choice.toLowerCase()
                       ? 'bg-success/20 text-success-500 icon-thumbs-up'
                       : 'bg-danger/20 text-danger-600 icon-thumbs-down'
                       }`}
@@ -87,7 +87,7 @@ export function PredictionItem({ prediction, onClick }: PredictionItemProps) {
                 <Chip
                   color={
                     prediction.status !== "open"
-                      ? prediction.outcome === prediction.creator_choice
+                      ? (prediction.outcome?.toLowerCase() ?? '') === (prediction.creator_choice?.toLowerCase() ?? '')
                         ? "success"
                         : "danger"
                       : "primary"
@@ -97,7 +97,7 @@ export function PredictionItem({ prediction, onClick }: PredictionItemProps) {
                   className="capitalize"
                 >
                   {prediction.status == "resolved"
-                    ? prediction.outcome === prediction.creator_choice
+                    ? (prediction.outcome?.toLowerCase() ?? '') === (prediction.creator_choice?.toLowerCase() ?? '')
                       ? "Won"
                       : "Lost"
                     : prediction.status == "awaiting_confirmation"
