@@ -122,7 +122,7 @@ export default function AgentProfile() {
         script.src = "https://telegram.org/js/telegram-widget.js?22";
         script.async = true;
         script.setAttribute('data-telegram-login', 'AntelopeTerminal_Bot');
-        script.setAttribute('data-size', 'small');
+        script.setAttribute('data-size', 'large');
         script.setAttribute('data-request-access', 'write');
         script.setAttribute('data-onauth', 'onTelegramAuth');
         document.body.appendChild(script);
@@ -227,9 +227,6 @@ export default function AgentProfile() {
 
     return (
         <div className="space-y-8">
-            {/* Add this div where you want the Telegram login button to appear */}
-            <div id="telegram-login"></div>
-
             {/* Profile Info Section */}
             <div className="bg-content1/50 backdrop-blur-md rounded-2xl p-8 shadow-lg hover:shadow-xl transition-all duration-300 border border-white/10">
                 <h2 className="text-2xl font-bold mb-4">Profile Information</h2>
@@ -288,7 +285,7 @@ export default function AgentProfile() {
                 </div>
 
                 {/* Save Profile Info Button */}
-                <div className="mt-6">
+                <div className="mt-6 flex items-center gap-4">
                     <Button
                         color="primary"
                         variant="shadow"
@@ -298,6 +295,8 @@ export default function AgentProfile() {
                     >
                         Update Profile
                     </Button>
+                    {/* Add this div where you want the Telegram login button to appear */}
+                    <div id="telegram-login"></div>
                 </div>
             </div>
 
