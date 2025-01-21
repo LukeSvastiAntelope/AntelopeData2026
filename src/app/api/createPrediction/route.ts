@@ -23,10 +23,10 @@ export async function POST(req: NextRequest) {
     if (!jwtPayload) {
         return Response.json({ status: false, message: 'Invalid token' });
     }
-
+    
     try {
         const data = {
-            creator_id: jwtPayload.email as number,
+            user_id: jwtPayload.email as number,
             description: prediction.description || '',
             source: prediction.source || '',
             source_url: "",
@@ -75,7 +75,7 @@ export async function POST(req: NextRequest) {
         } else if (data.source == "sportDB" && (!data.event_id || !data.team_a || !data.team_b || !data.resolution_date || !data.bet_amount || !data.creator_choice || !data.league_id || !data.description)) {
             return Response.json({ status: false, message: 'All fields are required' });
         }
-        const user = await UserRepo.getUserById(data.creator_id.toString());
+        const user = await UserRepo.getUserById(data.user_id.toString());
         if (data.bet_amount <= 0) {
             return Response.json({ status: false, message: 'Bet amount must be greater than 0' });
         }

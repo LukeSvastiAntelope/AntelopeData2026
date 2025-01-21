@@ -10,8 +10,8 @@ export async function POST(req: NextRequest) {
     }
 
     try {
-        const { id, nft_address } = await req.json();
-        await UserRepo.updateAgentNftAddress(id, nft_address);
+        const { id, nft_address, ipfs_hash } = await req.json();
+        await UserRepo.updateAgentNftAddress(id, nft_address, ipfs_hash);
         return Response.json({ status: true, message: 'Agent profile updated successfully' }, { status: 200 });
     } catch (error) {
         console.log(error);

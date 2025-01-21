@@ -10,6 +10,23 @@ import { Skeleton } from "@nextui-org/skeleton";
 import { useFetch } from "@/app/utils/lib";
 import type { IAgentProfile } from "@/app/utils/interface";
 
+interface TelegramUser {
+    id: number;
+    first_name: string;
+    last_name?: string;
+    username?: string;
+    photo_url?: string;
+    auth_date: number;
+    hash: string;
+}
+
+// Extend the Window interface to include our custom property
+declare global {
+    interface Window {
+        onTelegramAuth?: (user: TelegramUser) => void;
+    }
+}
+
 // Skeleton for loading state
 const ProfileSkeleton = () => {
     return (
@@ -99,6 +116,30 @@ export default function AgentProfile() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
+    // Add this useEffect to handle the Telegram widget
+    useEffect(() => {
+        const script = document.createElement('script');
+        script.src = "https://telegram.org/js/telegram-widget.js?22";
+        script.async = true;
+        script.setAttribute('data-telegram-login', 'AntelopeTerminal_Bot');
+        script.setAttribute('data-size', 'small');
+        script.setAttribute('data-request-access', 'write');
+        script.setAttribute('data-onauth', 'onTelegramAuth');
+        document.body.appendChild(script);
+
+        // Now we can type window properly without 'any'
+        window.onTelegramAuth = (user: TelegramUser) => {
+            console.log('Logged in as', user.first_name, user.last_name,
+                '(' + user.id + (user.username ? ', @' + user.username : '') + ')');
+            // Handle the auth data here
+        };
+
+        return () => {
+            document.body.removeChild(script);
+            delete window.onTelegramAuth;
+        };
+    }, []);
+
     // Save "Profile Info"
     const handleSaveProfile = async () => {
         if (!agent) return;
@@ -186,6 +227,9 @@ export default function AgentProfile() {
 
     return (
         <div className="space-y-8">
+            {/* Add this div where you want the Telegram login button to appear */}
+            <div id="telegram-login"></div>
+
             {/* Profile Info Section */}
             <div className="bg-content1/50 backdrop-blur-md rounded-2xl p-8 shadow-lg hover:shadow-xl transition-all duration-300 border border-white/10">
                 <h2 className="text-2xl font-bold mb-4">Profile Information</h2>

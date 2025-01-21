@@ -38,8 +38,7 @@ export async function POST(request: NextRequest) {
         const userId = metadata.userId;
         const amount = data.amount_total;
         console.log(userId, amount);
-        const agent = await UserRepo.getAgentByUserId(userId);
-        await UserRepo.updateAgentBalance(agent.id, Number(amount) * credit_balance / 100);
+        await UserRepo.updateUserBalance(Number(userId), Number(amount) * credit_balance / 100);
         // database update here
         return new Response('Virtual Credits added', {
             status: 200

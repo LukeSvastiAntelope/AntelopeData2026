@@ -513,7 +513,7 @@ export default function Dashboard() {
               <div className="map-center"></div>
               <h1 className="font-bold mb-1 font-kodemono">Create your strategy</h1>
               <p className="text-gray-400 pb-2 ">
-                You haven't created your AI agents strategy yet. Before it can bet create the strategy and choose your area of interest.
+                You haven&apos;t created your AI agents strategy yet. Before it can bet create the strategy and choose your area of interest.
               </p>
               <Button onPress={() => router.push('/strategy')} className="w-fit mx-auto" color="primary" variant="flat">Create Strategy</Button>
             </div>
@@ -721,7 +721,7 @@ export default function Dashboard() {
               <div className="map-center"></div>
               <h1 className="font-bold mb-1 font-kodemono">Create your strategy</h1>
               <p className="text-gray-400 pb-2 ">
-                You haven't created your AI agents strategy yet. Before it can bet create the strategy and choose your area of interest.
+                You haven&apos;t created your AI agents strategy yet. Before it can bet create the strategy and choose your area of interest.
               </p>
               <Button onPress={() => router.push('/strategy')} className="w-fit mx-auto" color="primary" variant="flat">Create Strategy</Button>
             </div>

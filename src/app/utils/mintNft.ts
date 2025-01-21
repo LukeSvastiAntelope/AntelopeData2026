@@ -14,6 +14,7 @@ import { IAgentProfile } from './interface'
 export const mintNft = async (
     wallet: WalletContextState,
     agent: IAgentProfile,
+    agentSuccessRate: number
 ) => {
     if (!wallet.publicKey) {
         throw new Error("Pls connect wallet");
@@ -63,7 +64,7 @@ export const mintNft = async (
 
     const metadata = {
         name: agent.name,
-        description: agent.description,
+        description: `${agent.description} success rate: ${Number(agentSuccessRate.toFixed(2))}%`,
         image: `https://${process.env.PINATA_GATEWAY}/ipfs/${fileUrl}`,
         symbol: "Agent",
         external_url: 'https://getantelope.com',
@@ -145,14 +146,12 @@ export const mintNft = async (
         console.log(`https://explorer.solana.com/tx/${signature}?cluster=devnet`)
     }
 
-    // Finally we can deserialize the signature that we can check on chain.
-
     // Log out the signature and the links to the transaction and the NFT.
     console.log('\nNFT Operation Completed')
     console.log('View Transaction on Solana Explorer')
     console.log('\n')
     console.log('View NFT on Metaplex Explorer')
     console.log(`https://core.metaplex.com/explorer/${nftPublicKey}?env=devnet`)
-    return nftPublicKey.toString();
+    return { nftAddress: nftPublicKey.toString(), ipfsHash: metaResponse.IpfsHash };
 }
 

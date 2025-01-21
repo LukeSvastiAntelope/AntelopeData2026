@@ -42,7 +42,14 @@ export const UserRepo = {
     updateBettingStatus,
     getRecentActivity,
     createAgentJoinAction,
-    updateAgentTraining
+    updateAgentTraining,
+    getPlatformAccountByUserId
+}
+
+async function getPlatformAccountByUserId(userId: number) {
+    const db = await getMySQLConnection();
+    const [rows] = await db.execute<(RowDataPacket)[]>('SELECT * FROM platform_accounts WHERE user_id = ?', [userId]);
+    return rows[0];
 }
 
 async function insertConversation(userId: number, agentId: number, message: string, type: string) {
@@ -89,7 +96,7 @@ async function getRecentActivity(limit: number, offset: number) {
         (SELECT 
           'prediction' as type,
           '0' as bet_id,
-          predictions.creator_id as user_id,
+          predictions.user_id as user_id,
           predictions.id as prediction_id,
           predictions.created_at as created_at,
           predictions.bet_amount as amount,
@@ -101,7 +108,7 @@ async function getRecentActivity(limit: number, offset: number) {
           '' as agent_name,
           '' as agent_image
         FROM predictions
-        JOIN users ON predictions.creator_id = users.id)
+        JOIN users ON predictions.user_id = users.id)
 
         UNION ALL
 
@@ -144,9 +151,9 @@ async function createBet(predictionId: number, agentId: number, choice: string, 
 async function createPrediction(data: CreatePredictionInput) {
     const db = await getMySQLConnection();
     const [result] = await db.execute<ResultSetHeader>(
-        'INSERT INTO predictions (creator_id, description, source, source_url, created_at, status, bet_amount, creator_choice, event_id, league_id, team_a, team_b, str_thumb, predicted_outcome, agent_id, source_type, bet_type, resolution_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        'INSERT INTO predictions (user_id, description, source, source_url, created_at, status, bet_amount, creator_choice, event_id, league_id, team_a, team_b, str_thumb, predicted_outcome, agent_id, source_type, bet_type, resolution_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
         [
-            data.creator_id ?? 0,
+            data.user_id ?? 0,
             data.description ?? '',
             data.source ?? '',
             data.source_url ?? '',
@@ -223,19 +230,12 @@ async function registerPassword({ username, password }: { username: string, pass
     const [rows] = await db.execute<(UserDB & RowDataPacket)[]>('SELECT * FROM users WHERE username = ?', [username]);
     const user = rows[0];
 
-    if (!user) {
-        throw new Error('Username "' + username + '" is not registered yet. Pls join the telegram bot to register. ' + process.env.TELEGRAM_BOT_USERNAME);
+    if (user) {
+        throw new Error('Username "' + username + '" is already registered.');
     }
-
-    if (user.password && user.is_verified == 1) {
-        throw new Error('Password already set for user "' + username + '".');
-    }
-
-    const token = await generateConfirmationToken(username);
 
     const hashedPassword = bcrypt.hashSync(password, 10);
-    await db.execute('UPDATE users SET password = ? WHERE username = ?', [hashedPassword, username]);
-    return { token, chatId: user.telegram_id };
+    await db.execute('INSERT INTO users (username, password, is_verified) VALUES (?, ?, 1)', [username, hashedPassword]);
 }
 
 async function verifyAccount(username: string) {
@@ -257,15 +257,15 @@ async function getUserByUsername(username: string) {
 
 async function getAgentByUserId(id: string) {
     const db = await getMySQLConnection();
-    const [rows] = await db.execute<(AgentDB & RowDataPacket)[]>('SELECT * FROM agents WHERE user_id = ?', [id]);
+    const [rows] = await db.execute<(AgentDB & RowDataPacket)[]>('SELECT agents.*, users.wallet_balance, users.escrow_balance FROM agents JOIN users ON agents.user_id = users.id WHERE users.id = ?', [id]);
     return rows[0];
 }
 
 async function createAgent(id: string) {
     const db = await getMySQLConnection();
     await db.execute(
-        'INSERT INTO agents (user_id, riskLevel, conservativeBetSize, moderateBetSize, aggressiveBetSize, wallet_balance) VALUES (?, ?, ?, ?, ?, ?)',
-        [Number(id), AGENT_RISK_LEVEL[0], 0, 0, 0, process.env.CREDIT_BALANCE || 1000]
+        'INSERT INTO agents (user_id, riskLevel, conservativeBetSize, moderateBetSize, aggressiveBetSize) VALUES (?, ?, ?, ?, ?)',
+        [Number(id), AGENT_RISK_LEVEL[0], 0, 0, 0]
     );
     return await getAgentByUserId(id);
 }
@@ -327,7 +327,7 @@ async function getPredictionsByAgentId(id: number) {
 
 async function getBetsByAgentId(id: number) {
     const db = await getMySQLConnection();
-    const [rows] = await db.execute('SELECT * FROM bets JOIN predictions ON bets.prediction_id = predictions.id WHERE bets.agent_id = ? AND bets.is_secret = 0 ORDER BY bets.created_at DESC', [id]);
+    const [rows] = await db.execute<(RowDataPacket)[]>(`SELECT * FROM bets JOIN predictions ON bets.prediction_id = predictions.id WHERE bets.agent_id = ? AND bets.is_secret = 0 ORDER BY bets.created_at DESC`, [id]);
     return rows;
 }
 
@@ -389,7 +389,7 @@ async function getPredictionsByUserId(id: string) {
                     AND is_secret = 0
             ) as agent_bets
         FROM predictions
-        WHERE predictions.creator_id = ? AND predictions.agent_id = 0
+        WHERE predictions.user_id = ? AND predictions.agent_id = 0
         GROUP BY predictions.id
         ORDER BY predictions.created_at DESC`,
         [id]
@@ -427,9 +427,9 @@ async function updateUserBalance(userId: number, creditAmount: number) {
     await db.execute('UPDATE users set wallet_balance = wallet_balance - ?, escrow_balance = escrow_balance + ? WHERE id = ?', [creditAmount, creditAmount, userId]);
 }
 
-async function updateAgentNftAddress(agentId: number, nftAddress: string) {
+async function updateAgentNftAddress(agentId: number, nftAddress: string, ipfsHash: string) {
     const db = await getMySQLConnection();
-    await db.execute('UPDATE agents SET nft_address = ? WHERE id = ?', [nftAddress, agentId]);
+    await db.execute('UPDATE agents SET nft_address = ?, ipfs_hash = ? WHERE id = ?', [nftAddress, ipfsHash, agentId]);
 }
 
 async function getPredictionById(id: string) {
@@ -483,7 +483,7 @@ async function getPredictionById(id: string) {
 async function getBetById(id: string) {
     try {
         const db = await getMySQLConnection();
-        const [rows] = await db.execute<(IBet & RowDataPacket)[]>('SELECT *, bets.pinecone_id as pinecone_id FROM bets JOIN predictions ON bets.prediction_id = predictions.id WHERE bets.id = ?', [id]);
+        const [rows] = await db.execute<(IBet & RowDataPacket)[]>('SELECT bets.* FROM bets JOIN predictions ON bets.prediction_id = predictions.id WHERE bets.id = ?', [id]);
         return rows[0];
     } catch (error) {
         console.error("Error in getBetById: ", error);

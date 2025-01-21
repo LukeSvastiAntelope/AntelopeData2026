@@ -17,6 +17,7 @@ export interface IAgentProfile {
     nft_address: string;
     trainCount: number;
     train_index: string;
+    ipfs_hash?: string;
 }
 
 export interface IFormDataAgentProfile {
@@ -138,7 +139,7 @@ export interface MarketData {
 
 export interface Prediction {
     id: number;
-    creator_id: number;
+    user_id: number;
     description: string;
     source: string;
     status: 'open' | 'closed' | 'resolved';
@@ -255,6 +256,7 @@ export interface PaymentIntentDB {
     id: number;
     payment_id: string;
     user_id: number;
+    platform_id: number;
     agent_id: number;
     amount: number;
     credit_amount: number;
@@ -266,7 +268,8 @@ export interface PaymentIntentDB {
 
 export interface PredictionDB {
     id: number;
-    creator_id: number;
+    user_id: number;
+    platform_id: number;
     description: string;
     source: string;
     status: string;
@@ -325,7 +328,7 @@ export interface ILeaderboardData {
 }
 
 export interface CreatePredictionInput {
-    creator_id: number;
+    user_id: number;
     description: string;
     source: string;
     source_url: string;

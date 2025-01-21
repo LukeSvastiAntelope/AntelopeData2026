@@ -35,8 +35,10 @@ export async function GET(req: NextRequest) {
         }
 
         const prediction = await UserRepo.getPredictionById(bet.prediction_id);
+        const email = jwtPayload.email as number;
+        console.log(bet.user_id, jwtPayload);
 
-        if (bet.pinecone_id && bet.user_id === jwtPayload.id) {
+        if (bet.pinecone_id && bet.user_id == email) {
             const pinecone = new Pinecone({
                 apiKey: process.env.PINECONE_API_KEY as string
             });

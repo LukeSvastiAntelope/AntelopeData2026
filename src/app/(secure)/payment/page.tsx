@@ -11,7 +11,7 @@ import {
 import { Input } from '@nextui-org/input';
 import { Button } from '@nextui-org/button';
 import { Select, SelectItem } from '@nextui-org/select';
-import { IconWallet, IconCreditCard, IconNft } from "@/app/components/icons"; // You'll need to create these icons
+import { IconWallet, IconCreditCard, IconNft } from "@/app/components/icons";
 import { IAgentProfile } from '@/app/utils/interface';
 import { useFetch } from '@/app/utils/lib';
 import { toast } from 'react-hot-toast';
@@ -28,6 +28,24 @@ import { CircularProgress } from '@nextui-org/progress';
 import { buyTransaction } from '@/app/utils/buyTransaction';
 import { loadStripe } from '@stripe/stripe-js';
 import { mintNft } from '@/app/utils/mintNft';
+import { fetchDigitalAsset } from '@metaplex-foundation/mpl-token-metadata'
+import { createUmi } from '@metaplex-foundation/umi-bundle-defaults';
+import { mplCore } from '@metaplex-foundation/mpl-core';
+import { walletAdapterIdentity } from '@metaplex-foundation/umi-signer-wallet-adapters';
+import {
+    publicKey
+} from '@metaplex-foundation/umi'
+import { Image, Tooltip } from '@nextui-org/react';
+
+interface INftMetadata {
+    name: string;
+    symbol: string;
+    description: string;
+    image: string;
+    metadata?: {
+        uri: string;
+    };
+}
 
 const PaymentPage = () => {
     const wallet = useWallet();
@@ -47,6 +65,8 @@ const PaymentPage = () => {
     const { isOpen, onOpen, onClose } = useDisclosure();
     const [isProcessing, setIsProcessing] = useState(false);
     const [isMinting, setIsMinting] = useState(false);
+    const [nftMetadata, setNftMetadata] = useState<INftMetadata | null>(null);
+    const [agentSuccessRate, setAgentSuccessRate] = useState(0);
 
     const isWithdrawDisabled = () => {
         return true;
@@ -94,7 +114,6 @@ const PaymentPage = () => {
             }
         } else {
             try {
-                // First get a payment intent from the server
                 const intentResponse = await fetchData.post('/api/createPaymentIntent', {
                     amount: Number(paymentAmount),
                     creditAmount: Number(creditAmount),
@@ -108,7 +127,6 @@ const PaymentPage = () => {
 
                 const paymentId = intentResponse.paymentId;
 
-                // Execute the blockchain transaction with the payment ID
                 const signature = await buyTransaction(
                     wallet,
                     connection,
@@ -117,7 +135,6 @@ const PaymentPage = () => {
                     paymentId
                 );
 
-                // Verify the transaction and update credits in one atomic operation
                 const verifyResponse = await fetchData.post('/api/verifyAndCredit', {
                     paymentId,
                     signature
@@ -139,7 +156,6 @@ const PaymentPage = () => {
     }
 
     const handleWithdraw = async () => {
-        // Implement withdrawal logic
     };
 
     const handleMintNFT = async () => {
@@ -149,10 +165,11 @@ const PaymentPage = () => {
         }
         setIsMinting(true);
         try {
-            const nftAddress = await mintNft(wallet, agent);
+            const { nftAddress, ipfsHash } = await mintNft(wallet, agent, agentSuccessRate);
             const result = await fetchData.post('/api/saveNftAddress', {
                 id: agent.id,
-                nft_address: nftAddress
+                nft_address: nftAddress,
+                ipfs_hash: ipfsHash
             });
             if (result.status) {
                 toast.success("NFT minted successfully");
@@ -202,6 +219,44 @@ const PaymentPage = () => {
         }
     };
 
+    const fetchNftMetadata = async (nftAddress: string, ipfsHash: string) => {
+        try {
+            const umi = createUmi('https://api.devnet.solana.com')
+                .use(mplCore())
+                .use(walletAdapterIdentity(wallet));
+            
+            const nftPublicKey = publicKey(nftAddress);
+            
+            try {
+                const metadata = await fetchDigitalAsset(umi, nftPublicKey);
+                console.log("metadata", metadata);
+                
+                // Fetch additional metadata from URI if needed
+                if (metadata.metadata.uri) {
+                    const response = await fetch(metadata.metadata.uri);
+                    const jsonMetadata = await response.json();
+                    setNftMetadata({
+                        ...metadata,
+                        ...jsonMetadata
+                    });
+                }
+            } catch (error) {
+                if (error instanceof Error && error.name === 'AccountNotFoundError') {
+                    console.log('NFT metadata not found - this may be normal for newly minted NFTs');
+                    const response = await fetch(`https://${process.env.PINATA_GATEWAY}/ipfs/${ipfsHash}`);
+                    const jsonMetadata = await response.json();
+                    setNftMetadata(jsonMetadata);
+                } else {
+                    throw error; // Re-throw other errors
+                }
+            }
+        } catch (error) {
+            console.error('Error fetching NFT metadata:', error);
+            toast.error('Failed to load NFT details. This may be normal for newly minted NFTs.');
+            setNftMetadata(null);
+        }
+    };
+
     useEffect(() => {
         const fetchAgentProfile = async () => {
             try {
@@ -209,6 +264,7 @@ const PaymentPage = () => {
                 if (response.status) {
                     setAgent(response.agent);
                     setAgentBalance(response.agent.wallet_balance);
+                    setAgentSuccessRate(response.successRate);
                 } else {
                     toast.error(response.message);
                 }
@@ -224,6 +280,7 @@ const PaymentPage = () => {
             const data = await response.json();
             setSolPrice(data.price);
         }
+
         fetchAgentProfile();
         const query = new URLSearchParams(window.location.search);
         if (query.get('success')) {
@@ -234,6 +291,12 @@ const PaymentPage = () => {
             toast.error('Order canceled -- continue to buy credits when you are ready.');
         }
     }, []);
+
+    useEffect(() => {
+        if (agent?.nft_address && agent?.ipfs_hash) {
+            fetchNftMetadata(agent.nft_address, agent.ipfs_hash);
+        }
+    }, [agent?.nft_address, agent?.ipfs_hash]);
 
     return (
         <>
@@ -364,7 +427,7 @@ const PaymentPage = () => {
                             color="success"
                             size="lg"
                             className="w-full"
-                            onClick={handleWithdraw}
+                            onPress={handleWithdraw}
                             isDisabled={isWithdrawDisabled()}
                         >
                             {!wallet.publicKey
@@ -391,32 +454,89 @@ const PaymentPage = () => {
                         <h2 className="text-2xl font-bold">NFT Marketplace</h2>
                     </div>
                 </CardHeader>
-                <CardBody className="space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="space-y-4">
-                            <h3 className="text-xl font-semibold">Mint NFT with your agent</h3>
-                            <p className="text-default-500">
-                                Create your unique NFT on the Solana blockchain. Each NFT represents exclusive benefits in our platform.
-                            </p>
-                            <Button
-                                color="primary"
-                                size="lg"
-                                className="w-full"
-                                onPress={handleMintNFT}
-                                isDisabled={isMinting ? true : false}
-                            >
-                                {isMinting ? <CircularProgress size="sm" color="primary" /> : agent?.nft_address ? "Update NFT" : "Mint NFT"}
-                            </Button>
+                <CardBody>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        {/* Left Column - Mint Controls */}
+                        <div className="space-y-6">
+                            <div className="bg-content1 rounded-xl p-6">
+                                <h3 className="text-xl font-semibold mb-3">Mint NFT with your agent</h3>
+                                <p className="text-default-500 mb-6">
+                                    Create your unique NFT on the Solana blockchain. Each NFT represents exclusive benefits in our platform.
+                                </p>
+                                <Button
+                                    color="primary"
+                                    size="lg"
+                                    className="w-full"
+                                    onPress={handleMintNFT}
+                                    isDisabled={isMinting}
+                                >
+                                    {isMinting ? (
+                                        <div className="flex items-center gap-2">
+                                            <CircularProgress size="sm" color="primary" />
+                                            <span>Minting...</span>
+                                        </div>
+                                    ) : agent?.nft_address ? "Update NFT" : "Mint NFT"}
+                                </Button>
+                            </div>
                         </div>
-                        <div className="bg-default-100 rounded-lg p-4 text-center">
-                            <h3 className="text-xl font-semibold mb-2">Your NFT Collection</h3>
-                            <p className="text-default-500">
-                                {
-                                    agent?.nft_address ?
-                                        <p className="text-default-500">Your NFT address: {agent?.nft_address}</p> :
-                                        <p className="text-default-500">You have not minted an NFT yet.</p>
-                                }
-                            </p>
+
+                        {/* Right Column - NFT Display */}
+                        <div className="bg-content1 rounded-xl p-6">
+                            <div className="flex justify-between items-center mb-4">
+                                <h3 className="text-xl font-semibold">Your NFT</h3>
+                                {agent?.nft_address && (
+                                    <Button
+                                        as="a"
+                                        href={`https://explorer.solana.com/address/${agent.nft_address}?cluster=devnet`}
+                                        target="_blank"
+                                        variant="flat"
+                                        color="primary"
+                                        size="sm"
+                                    >
+                                        View on Explorer
+                                    </Button>
+                                )}
+                            </div>
+                            
+                            {agent?.nft_address ? (
+                                nftMetadata ? (
+                                    <div className="space-y-6">
+                                        {nftMetadata.image && (
+                                            <div className="relative aspect-square w-full max-w-[200px] mx-auto overflow-hidden rounded-xl">
+                                                <Tooltip content={`${nftMetadata.name} on Metaplex Explorer`}>
+                                                    <Image
+                                                        src={nftMetadata.image}
+                                                        alt={nftMetadata.name}
+                                                        className="w-[200px] h-[200px] object-cover hover:scale-105 transition-transform duration-300"
+                                                        isBlurred
+                                                    />
+                                                </Tooltip>
+                                            </div>
+                                        )}
+                                        <div className="space-y-3 bg-content2 rounded-lg p-4">
+                                            <div className="grid grid-cols-[100px_1fr] gap-2">                                                
+                                                <span className="text-default-500">Symbol:</span>
+                                                <span className="font-medium">{nftMetadata.symbol}</span>
+                                                <span className="text-default-500">Description:</span>
+                                                <span className="font-medium">{nftMetadata.description}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="flex flex-col items-center justify-center h-[300px] gap-4">
+                                        <CircularProgress size="lg" />
+                                        <p className="text-default-500">Loading NFT details...</p>
+                                    </div>
+                                )
+                            ) : (
+                                <div className="flex flex-col items-center justify-center h-[300px] bg-content2 rounded-xl">
+                                    <IconNft />
+                                    <p className="text-default-500 text-center">
+                                        You haven&apos;t minted an NFT yet.<br />
+                                        Mint one to get started!
+                                    </p>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </CardBody>

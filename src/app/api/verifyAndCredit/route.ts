@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
             throw new Error('Sender address mismatch');
         }
 
-        await UserRepo.updateAgentBalance(paymentIntent.agent_id, paymentIntent.credit_amount);
+        await UserRepo.updateUserBalance(paymentIntent.user_id, paymentIntent.credit_amount);
         await UserRepo.updatePaymentIntent(paymentId, 'completed');
         return Response.json({ status: true, message: "Credits purchased successfully" });
     } catch (error: unknown) {

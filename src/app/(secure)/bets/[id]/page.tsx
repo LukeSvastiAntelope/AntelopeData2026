@@ -84,7 +84,7 @@ const MultiChoiceOddsBar = ({ choices }: MultiChoiceOddsBarProps) => {
             <div className="relative w-full bg-white/5 rounded-lg overflow-hidden p-4">
                 {/* Single combined bar */}
                 <div className="h-2 w-full bg-white/10 rounded-full mb-3 relative overflow-hidden">
-                    {choices.map((c, idx) => {
+                    {choices.map(c => {
                         // Decide a color style for each choice
                         let segmentColor = "bg-orange-400/90";
                         if (c.choice.toLowerCase() === "yes") {

@@ -116,7 +116,7 @@ export class AutomaticBettingAgent {
     }
 
     private async processChunk(predictions: Prediction[]): Promise<BetDecision[]> {
-        const openPredictions = predictions.filter(p => p.creator_id !== this.agent.user_id);
+        const openPredictions = predictions.filter(p => p.user_id !== this.agent.user_id);
         const predictionSource = this.getPredictionSource();
         const categoryPredictions = openPredictions.filter(p => p.source === predictionSource);
 
@@ -442,7 +442,7 @@ ${p.metadata?.comment ? `- Agent Controller Comment: ${p.metadata.comment}` : ''
             // Transform the records into Predictions with metadata
             return Object.values(response.records).map(record => ({
                 id: parseInt(record.id),
-                creator_id: this.agent.id,
+                user_id: this.agent.id,
                 description: record.metadata?.question as string || '',
                 source: '',
                 status: 'resolved',
