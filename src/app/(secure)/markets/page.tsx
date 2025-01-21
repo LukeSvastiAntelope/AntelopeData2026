@@ -9,6 +9,7 @@ import { useFetch } from "@/app/utils/lib";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import { PredictionItem } from "@/app/components/PredictionItem";
+import { Tooltip } from "@nextui-org/tooltip";
 
 export default function MarketsPage() {
   const [activeTab, setActiveTab] = useState<"predictions" | "sports" | "general" | "crypto" | "markets" | "leaderboard">("predictions");
@@ -274,48 +275,78 @@ export default function MarketsPage() {
       </div>
       {/* Tabs */}
       <div className="flex gap-2 font-kodemono mb-2 text-small">
-        <button
-          onClick={() => setActiveTab("predictions")}
-          className={`px-1 py-2 hover:text-white ${activeTab === "predictions" ? "text-white" : "text-default-400"
-            }`}
+        <Tooltip
+          content="View overall predictions."
+          showArrow
         >
-          Predictions
-        </button>
-        <button
-          onClick={() => setActiveTab("sports")}
-          className={`px-1 py-2 hover:text-white ${activeTab === "sports" ? "text-white" : "text-default-400"
-            }`}
+          <button
+            onClick={() => setActiveTab("predictions")}
+            className={`px-1 py-2 hover:text-white ${activeTab === "predictions" ? "text-white" : "text-default-400"
+              }`}
+          >
+            Predictions
+          </button>
+        </Tooltip>
+        <Tooltip
+          content="Bet on sports events."
+          showArrow
         >
-          Sports
-        </button>
-        <button
-          onClick={() => setActiveTab("general")}
-          className={`px-1 py-2 hover:text-white ${activeTab === "general" ? "text-white" : "text-default-400"
-            }`}
+          <button
+            onClick={() => setActiveTab("sports")}
+            className={`px-1 py-2 hover:text-white ${activeTab === "sports" ? "text-white" : "text-default-400"
+              }`}
+          >
+            Sports
+          </button>
+        </Tooltip>
+        <Tooltip
+          content="Broader topics and forecasts."
+          showArrow
         >
-          General
-        </button>
-        <button
-          onClick={() => setActiveTab("crypto")}
-          className={`px-1 py-2 hover:text-white ${activeTab === "crypto" ? "text-white" : "text-default-400"
-            }`}
+          <button
+            onClick={() => setActiveTab("general")}
+            className={`px-1 py-2 hover:text-white ${activeTab === "general" ? "text-white" : "text-default-400"
+              }`}
+          >
+            General
+          </button>
+        </Tooltip>
+        <Tooltip
+          content="Cryptocurrency predictions."
+          showArrow
         >
-          Crypto
-        </button>
-        <button
-          onClick={() => setActiveTab("markets")}
-          className={`px-1 py-2 hover:text-white ${activeTab === "markets" ? "text-white" : "text-default-400"
-            }`}
+          <button
+            onClick={() => setActiveTab("crypto")}
+            className={`px-1 py-2 hover:text-white ${activeTab === "crypto" ? "text-white" : "text-default-400"
+              }`}
+          >
+            Crypto
+          </button>
+        </Tooltip>
+        <Tooltip
+          content="Market predictions (stocks, etc)."
+          showArrow
         >
-          Markets
-        </button>
-        <button
-          onClick={() => setActiveTab("leaderboard")}
-          className={`px-1 py-2 hover:text-white ${activeTab === "leaderboard" ? "text-white" : "text-default-400"
-            }`}
+          <button
+            onClick={() => setActiveTab("markets")}
+            className={`px-1 py-2 hover:text-white ${activeTab === "markets" ? "text-white" : "text-default-400"
+              }`}
+          >
+            Markets
+          </button>
+        </Tooltip>
+        <Tooltip
+          content="View the leaderboards."
+          showArrow
         >
-          Leaderboard
-        </button>
+          <button
+            onClick={() => setActiveTab("leaderboard")}
+            className={`px-1 py-2 hover:text-white ${activeTab === "leaderboard" ? "text-white" : "text-default-400"
+              }`}
+          >
+            Leaderboard
+          </button>
+        </Tooltip>
       </div>
 
       {/* Search Field for Predictions */}

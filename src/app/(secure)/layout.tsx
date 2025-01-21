@@ -218,11 +218,11 @@ const SecureLayout = ({ children }: { children: React.ReactNode }) => {
                                                 <Link
                                                     href="#"
                                                     onClick={openPredictionDialog}
-                                                    className="flex items-center group md:gap-2 text-default-400 hover:text-white"
+                                                    className="flex items-center group md:gap-2 text-default-400 hover:text-white p-2 border border-white/10 rounded-lg"
                                                 >
-                                                    <span className={`plus-circle group-hover:block text-white ${pathname === '/strategy' ? 'block' : 'hidden'}`} />
-                                                    <span className={`plus-circle group-hover:hidden ${pathname === '/strategy' ? 'hidden' : 'block'}`} />
-                                                    <span className="hidden font-kodemono md:inline-block">Prediction</span>
+                                                    <span className="plus-circle-on group-hover:border-white hidden group-hover:block text-white" />
+                                                    <span className="plus-circle-off block group-hover:hidden" />
+                                                    <span className="hidden font-kodemono md:inline-block">Add Prediction</span>
                                                 </Link>
                                             </div>
 

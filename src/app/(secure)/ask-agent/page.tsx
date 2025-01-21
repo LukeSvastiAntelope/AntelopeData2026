@@ -385,6 +385,9 @@ export default function AskAgent() {
             className="w-[200px]"
             selectedKeys={new Set([mode])}
             onChange={(e) => setMode(e.target.value)}
+            classNames={{
+                trigger: "border-1 border-white/20 hover:border-white/40",
+              }}
           >
             {modeList.map((mode) => (
               <SelectItem key={mode.key} value={mode.key}>
@@ -410,7 +413,7 @@ export default function AskAgent() {
             return (
               <div
                 key={index}
-                className={`px-2 py-2 rounded-md w-full ${isUser ? "bg-primary/20 self-end" : "bg-gray-800 self-start"
+                className={`px-2 py-2 rounded-md w-full ${isUser ? "bg-primary/20 self-end" : " self-start"
                   }`}
                 style={{ whiteSpace: "pre-wrap" }}
               >

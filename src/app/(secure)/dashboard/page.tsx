@@ -513,7 +513,7 @@ export default function Dashboard() {
               <div className="map-center"></div>
               <h1 className="font-bold mb-1 font-kodemono">Create your strategy</h1>
               <p className="text-gray-400 pb-2 ">
-                You haven’t created your AI agents strategy yet. Before it can bet create the strategy and choose your area of interest.
+                You haven't created your AI agents strategy yet. Before it can bet create the strategy and choose your area of interest.
               </p>
               <Button onPress={() => router.push('/strategy')} className="w-fit mx-auto" color="primary" variant="flat">Create Strategy</Button>
             </div>
@@ -721,7 +721,7 @@ export default function Dashboard() {
               <div className="map-center"></div>
               <h1 className="font-bold mb-1 font-kodemono">Create your strategy</h1>
               <p className="text-gray-400 pb-2 ">
-                You haven’t created your AI agents strategy yet. Before it can bet create the strategy and choose your area of interest.
+                You haven't created your AI agents strategy yet. Before it can bet create the strategy and choose your area of interest.
               </p>
               <Button onPress={() => router.push('/strategy')} className="w-fit mx-auto" color="primary" variant="flat">Create Strategy</Button>
             </div>
@@ -962,15 +962,17 @@ export default function Dashboard() {
             )}
             {hasMoreActivity && !isLoadingActivity && activity.length > 0 && (
               <div className="flex justify-center mt-4">
-                <Button
-                  color="primary"
-                  variant="flat"
-                  onPress={loadMoreActivity}
-                  isLoading={isLoadingActivity}
-                  className="min-w-[200px]"
-                >
-                  {isLoadingActivity ? "Loading..." : "Show More"}
-                </Button>
+                <Tooltip content="Load more recent activity" showArrow>
+                  <Button
+                    color="primary"
+                    variant="flat"
+                    onPress={loadMoreActivity}
+                    isLoading={isLoadingActivity}
+                    className="min-w-[200px]"
+                  >
+                    {isLoadingActivity ? "Loading..." : "Show More"}
+                  </Button>
+                </Tooltip>
               </div>
             )}
             {isLoadingActivity && activity.length > 0 && (

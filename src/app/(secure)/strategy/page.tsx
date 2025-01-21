@@ -13,9 +13,10 @@ import { IAgentProfile } from "@/app/utils/interface";
 import { convertDaysToYMD } from "@/app/utils/lib";
 import { CATEGORIES } from "@/app/utils/const";
 import { Switch } from "@nextui-org/switch";
+import { Tooltip } from "@nextui-org/tooltip";
 
 /**
- * StrategySkeleton: Skeleton loader that matches the layout for “Strategy Page”
+ * StrategySkeleton: Skeleton loader that matches the layout for "Strategy Page"
  * Adapted from ProfileSkeleton for consistency.
  */
 const StrategySkeleton = () => {
@@ -134,7 +135,7 @@ const StrategySkeleton = () => {
 
 /**
  * StrategyPage: 
- * A dedicated page to show the user’s betting strategy details, 
+ * A dedicated page to show the user's betting strategy details, 
  * risk profile, etc., matching the layout from the Profile page.
  */
 export default function StrategyPage() {
@@ -205,21 +206,42 @@ export default function StrategyPage() {
       </div>
 
       <div className="flex flex-col banner-image p-6 rounded-lg mt-8">
-        <h3 className="text-2xl font-bold text-white font-kodemono mb-2">Train Your Agent</h3>
-        <p className="text-small w-1/2 text-white mb-4">Tell the agent your interest and it will ask you a set of questions to understand your line of thinking.</p>
-        <Button color="primary" variant="flat" className="text-small w-fit bg-white px-8" href="/ask-agent?mode=train" size="sm" as="a">
-          Start Training
-        </Button>
+        <Tooltip content="Begin an interactive session to train your agent" showArrow>
+          <h3 className="text-2xl font-bold text-white font-kodemono mb-2">Train Your Agent</h3>
+        </Tooltip>
+        <p className="text-small w-1/2 text-white mb-4">
+          Tell the agent your interest and it will ask you a set of questions to understand your line of thinking.
+        </p>
+        <Tooltip content="Click here to start an AI-driven training dialog" showArrow>
+          <Button
+            color="primary"
+            variant="flat"
+            className="text-small w-fit bg-white px-8"
+            href="/ask-agent?mode=train"
+            size="sm"
+            as="a"
+          >
+            Start Training
+          </Button>
+        </Tooltip>
       </div>
 
       <Card className="my-8 bg-content0">
         <CardBody className="flex flex-row justify-between items-center">
-          <div>
-            {/* <h3 className="text-small font-regular">Betting Status</h3> */}
-            <p className="text-default-500 text-small">
-              {isBettingEnabled ? "Betting is currently enabled" : "Betting is currently disabled"}
-            </p>
-          </div>
+          <Tooltip
+            content={
+              isBettingEnabled
+                ? "Agent's automated betting is currently enabled"
+                : "Agent's automated betting is currently disabled"
+            }
+            showArrow
+          >
+            <div>
+              <p className="text-default-500 text-small">
+                {isBettingEnabled ? "Betting is currently enabled" : "Betting is currently disabled"}
+              </p>
+            </div>
+          </Tooltip>
           <Switch
             isSelected={isBettingEnabled}
             onValueChange={handleBettingToggle}
@@ -231,7 +253,7 @@ export default function StrategyPage() {
 
       <Card className="my-8 bg-content0 ">
         <CardHeader className="text-small font-regular flex justify-between">
-          <span className="message-circle ml-1">Talk with your betting agent to analyze your strategy</span>
+          <span className="message-circle ml-1">Talk strategy with your agent</span>
           <Button color="primary" variant="flat" className="text-small" href="/ask-agent" size="sm" as="a">
             Talk
           </Button>
@@ -241,23 +263,27 @@ export default function StrategyPage() {
       <Card className="my-8 bg-content0">
         <CardHeader className="text-small font-regular flex justify-between ml-2">
           Betting Basic
-          <Button
-            color="default"
-            variant="flat"
-            className="mr-2"
-            href="/editBasicStrategy"
-            as="a"
-            size="sm"
-          >
-            Edit
-          </Button>
+          <Tooltip content="Adjust your agent's basic betting preferences" showArrow>
+            <Button
+              color="default"
+              variant="flat"
+              className="mr-2"
+              href="/editBasicStrategy"
+              as="a"
+              size="sm"
+            >
+              Edit
+            </Button>
+          </Tooltip>
         </CardHeader>
         <Divider />
 
         <CardBody>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 ml-2">
             <div>
-              <h3 className="text-default-500 mb-2 text-small">Main Category</h3>
+              <Tooltip content="Focus area for this agent's predictions" showArrow>
+                <h3 className="text-default-500 mb-2 text-small">Main Category</h3>
+              </Tooltip>
               <Chip color="primary" variant="flat" size="sm">
                 {agent?.category
                   ? CATEGORIES.find(
@@ -269,7 +295,9 @@ export default function StrategyPage() {
             </div>
 
             <div>
-              <h3 className="text-default-500 mb-2 text-small">Resolution Preference</h3>
+              <Tooltip content="How many days into the future your agent is willing to wait for a bet resolution" showArrow>
+                <h3 className="text-default-500 mb-2 text-small">Resolution Preference</h3>
+              </Tooltip>
               <p className="font-semibold text-small">{resolutionDate}</p>
             </div>
 
@@ -292,26 +320,27 @@ export default function StrategyPage() {
         </CardBody>
       </Card>
 
-
-
       {/* Betting Principles */}
       <Card className="mb-8 bg-content0">
         <CardHeader className="text-small font-regular flex justify-between mx-2">
+        <Tooltip content="A principle guides the agent's betting ethics or approach" showArrow>
           Betting Principles
-          <Button
-            color="default"
-            variant="flat"
-            className="mr-2"
-            href="/editPrinciples"
-            as="a"
-            size="sm"
-          >
-            Edit
-          </Button>
+        </Tooltip>
+          <Tooltip content="Edit the guidelines that shape your agent's betting approach" showArrow>
+            <Button
+              color="default"
+              variant="flat"
+              className="mr-2"
+              href="/editPrinciples"
+              as="a"
+              size="sm"
+            >
+              Edit
+            </Button>
+          </Tooltip>
         </CardHeader>
         <Divider />
         <CardBody>
-
           <div className="grid grid-cols-1 md:grid-cols-1 gap-1 text-small">
             {agent?.principles && agent?.principles.length > 0 ? (
               agent?.principles.map((principle, index) => (
@@ -326,47 +355,53 @@ export default function StrategyPage() {
               <p className="text-default-500">No principles added.</p>
             )}
           </div>
-
         </CardBody>
-
       </Card>
 
       {/* Risk Profile */}
       <Card className="bg-content0">
         <CardHeader className="text-small font-regular flex justify-between mx-2">
-          Risk Profile ({agent?.riskLevel})
-          <Button
-            color="default"
-            variant="flat"
-            className="mr-2"
-            href="/editRiskStrategy"
-            as="a"
-            size="sm"
-          >
-            Edit
-          </Button>
+          <Tooltip content="Fine-tune your agent's risk thresholds and bet sizes" showArrow>
+            <span>Risk Profile ({agent?.riskLevel})</span>
+          </Tooltip>
+          <Tooltip content="Fine-tune your agent's risk thresholds and bet sizes" showArrow>
+            <Button
+              color="default"
+              variant="flat"
+              className="mr-2"
+              href="/editRiskStrategy"
+              as="a"
+              size="sm"
+            >
+              Edit
+            </Button>
+          </Tooltip>
         </CardHeader>
         <Divider />
         <CardBody>
           <div className="space-y-6 text-small mx-2">
+      
             <RiskItem
               level="Conservative"
               description={agent?.conservativeBetSize?.toString() || "0"}
               value={(agent?.conservativeBetSize ?? 0) * 100 / (agent?.maxBetSize ?? 1)}
               color="success"
             />
+     
             <RiskItem
               level="Moderate"
               description={agent?.moderateBetSize?.toString() || "0"}
               value={(agent?.moderateBetSize ?? 0) * 100 / (agent?.maxBetSize ?? 1)}
               color="warning"
-            />
+              />
+    
             <RiskItem
               level="Aggressive"
               description={agent?.aggressiveBetSize?.toString() || "0"}
               value={(agent?.aggressiveBetSize ?? 0) * 100 / (agent?.maxBetSize ?? 1)}
               color="danger"
             />
+        
           </div>
         </CardBody>
       </Card>
@@ -383,7 +418,9 @@ interface PrincipleCardProps {
 const PrincipleCard = ({ title, description }: PrincipleCardProps) => (
   <Card shadow="none" className="bg-transparent">
     <CardBody>
-      <h3 className="font-regular mb-2">{title}</h3>
+      
+        <h3 className="font-regular mb-2">{title}</h3>
+     
       <p className="text-default-500">{description}</p>
     </CardBody>
   </Card>
@@ -399,7 +436,10 @@ interface RiskItemProps {
 const RiskItem = ({ level, description, value, color }: RiskItemProps) => (
   <div className="space-y-2">
     <div className="flex justify-between items-center">
-      <span className="font-regular">{level}</span>
+      <Tooltip content={`${level} risk attitude label`} showArrow>
+     
+        <span className="font-regular">{level}</span>
+      </Tooltip>
       <span className="text-default-500">{description}</span>
     </div>
 

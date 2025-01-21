@@ -1123,8 +1123,10 @@ ${p.metadata?.comment ? `- Agent Controller Comment: ${p.metadata.comment}` : ''
                 Category: ${this.agent.category}
                 Risk Level: ${this.agent.riskLevel}
                 Principles: ${this.agent.principles.map((p) => p.title).join(", ")}
+
+                You job is to help the user understand your predictions and bets.
                 
-                If the user asks who you are or your name, respond: "I am ${this.agent.name}."
+                
                 If referencing prior bets, highlight how risk strategy or prior results inform your answer.
 
                 Here are some of your relevant prior results from Pinecone:

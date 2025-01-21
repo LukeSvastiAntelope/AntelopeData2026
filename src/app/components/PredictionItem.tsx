@@ -1,5 +1,6 @@
 import { Image } from "@nextui-org/image";
 import { Chip } from "@nextui-org/chip";
+import { Tooltip } from "@nextui-org/tooltip";
 import { IBet, IPrediction } from "@/app/utils/interface";
 import { useState, useEffect } from "react";
 
@@ -60,18 +61,27 @@ export function PredictionItem({ prediction, onClick }: PredictionItemProps) {
 
           {/* Text block - Updated layout */}
           <div className="flex flex-col w-full gap-1">
-            <p className="text-base font-medium break-words mb-0">
-              {prediction.description}
-            </p>
+            <Tooltip content="Prediction description" showArrow>
+              <p className="text-base font-medium break-words mb-0">
+                {prediction.description}
+              </p>
+            </Tooltip>
 
             <div className="flex flex-wrap gap-1 items-center text-sm">
-              <div className="flex items-center gap-1 text-default-500">
-                <span className="icon-user text-primary pl-4">{prediction.bets_count}</span>
+              <Tooltip content="Number of bets placed" showArrow>
+                <div className="flex items-center gap-1 text-default-500">
+                  <span className="icon-user text-primary pl-4">{prediction.bets_count}</span>
+                </div>
+              </Tooltip>
 
-                {/* Market Odds */}
-                {choiceOdds.map(({ choice, odds, percentage }) => (
+              {/* Market Odds */}
+              {choiceOdds.map(({ choice, odds, percentage }) => (
+                <Tooltip
+                  key={choice}
+                  content={`Choice: ${choice.toUpperCase()}, Odds: ${odds}x, ${percentage}%`}
+                  showArrow
+                >
                   <Chip
-                    key={choice}
                     className={`${choice.toLowerCase() === prediction.creator_choice.toLowerCase()
                       ? 'bg-success/20 text-success-500 icon-thumbs-up'
                       : 'bg-danger/20 text-danger-600 icon-thumbs-down'
@@ -80,10 +90,17 @@ export function PredictionItem({ prediction, onClick }: PredictionItemProps) {
                   >
                      ({odds}x) {percentage}%
                   </Chip>
-                ))}
-              </div>
+                </Tooltip>
+              ))}
 
-              <div className="flex items-center gap-1">
+              <Tooltip
+                content={
+                  prediction.status === "open"
+                    ? "This prediction is open for betting"
+                    : "No longer open"
+                }
+                showArrow
+              >
                 <Chip
                   color={
                     prediction.status !== "open"
@@ -104,7 +121,7 @@ export function PredictionItem({ prediction, onClick }: PredictionItemProps) {
                       ? "Awaiting"
                       : "Open"}
                 </Chip>
-              </div>
+              </Tooltip>
             </div>
           </div>
         </div>

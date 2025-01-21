@@ -327,8 +327,17 @@ max-width: 80px;
   min-height: 160px;
 }
 
-.plus-circle {
-  background-image: url('/assets/images/plus-circle.svg');
+.plus-circle-on {
+  background-image: url('/assets/images/plus_circle_on.svg');
+  background-size: 20px 20px;
+  background-repeat: no-repeat;
+  background-position: center;
+  width: 20px;
+  height: 20px;
+}
+
+.plus-circle-off {
+  background-image: url('/assets/images/plus_circle_off.svg');
   background-size: 20px 20px;
   background-repeat: no-repeat;
   background-position: center;

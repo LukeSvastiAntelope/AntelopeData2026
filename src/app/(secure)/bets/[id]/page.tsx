@@ -3,6 +3,7 @@
 import { Chip } from "@nextui-org/chip";
 import { Image } from "@nextui-org/image";
 import { Button } from "@nextui-org/button";
+import { Tooltip } from "@nextui-org/tooltip";
 import { useState, useEffect } from "react";
 import { useFetch } from "@/app/utils/lib";
 import { IBet, PredictionDB } from "@/app/utils/interface";
@@ -15,7 +16,6 @@ import {
     CategoryScale,
     LinearScale,
     Title,
-    Tooltip,
     Legend,
 } from "chart.js";
 
@@ -24,7 +24,6 @@ ChartJS.register(
     CategoryScale,
     LinearScale,
     Title,
-    Tooltip,
     Legend
 );
 
@@ -77,7 +76,7 @@ interface MultiChoiceOddsBarProps {
 }
 
 const MultiChoiceOddsBar = ({ choices }: MultiChoiceOddsBarProps) => {
-    // Accumulator to position each segment’s left offset
+    // Accumulator to position each segment's left offset
     let accumulated = 0;
 
     return (
@@ -105,12 +104,21 @@ const MultiChoiceOddsBar = ({ choices }: MultiChoiceOddsBarProps) => {
                         // Update the accumulated offset for the next segment
                         accumulated += widthFraction;
 
+                        const tooltipContent = `${c.choice[0].toUpperCase() + c.choice.slice(1)}: ${c.percentage}% (${c.odds}) | Bets: ${c.count}`;
+
                         return (
-                            <div
-                                key={idx}
-                                className={`absolute top-0 bottom-0 ${segmentColor} transition-all duration-300`}
-                                style={style}
-                            />
+                            <Tooltip 
+                                key={c.choice}
+                                content={tooltipContent}
+                                showArrow
+                                placement="top"
+                                color="primary"
+                            >
+                                <div
+                                    className={`absolute top-0 bottom-0 ${segmentColor} transition-all duration-300 cursor-pointer`}
+                                    style={style}
+                                />
+                            </Tooltip>
                         );
                     })}
                 </div>
@@ -118,7 +126,7 @@ const MultiChoiceOddsBar = ({ choices }: MultiChoiceOddsBarProps) => {
                 {/* Below the progress bar, show details */}
                 <div className="flex items-center justify-between">
                     <div className="text-sm text-white/60">
-                        {/* Could show “Yes / No / Draw” or any other info */}
+                        {/* Could show "Yes / No / Draw" or any other info */}
                         Combined Odds
                     </div>
                     <div className="flex items-center gap-4">
@@ -181,15 +189,20 @@ export default function BetDetailPage() {
                 // Parse the bets string and calculate totals
                 if (response.prediction?.bets) {
                     const betsArray: BetData[] = response.prediction.bets;
+                    
+                    // Filter or just calculate totals for yes and no 
                     const choiceTotals = betsArray.reduce((acc, b) => {
-                        acc[b.choice.toLowerCase()] = (acc[b.choice.toLowerCase()] || 0) + b.amount;
+                        // Only track yes/no (or yes/no/draw if you prefer)
+                        const lowered = b.choice.toLowerCase();
+                        if (lowered === "yes" || lowered === "no") {
+                            acc[lowered] = (acc[lowered] || 0) + b.amount;
+                        }
                         return acc;
-                    }, {} as Record<string, number>) || {};
+                    }, {} as Record<string, number>);
 
                     const totalAmount = Object.values(choiceTotals).reduce((sum, amount) => sum + amount, 0);
 
-                    // Calculate odds for each choice
-                    const choiceOdds = Object.entries(choiceTotals).map(([choice, amount]) => {
+                    const newChoiceOdds = Object.entries(choiceTotals).map(([choice, amount]) => {
                         const percentage = totalAmount > 0 ? (amount / totalAmount) * 100 : 0;
                         const odds = percentage > 0 ? (100 / percentage).toFixed(2) : "∞";
                         return {
@@ -197,10 +210,12 @@ export default function BetDetailPage() {
                             amount,
                             odds,
                             percentage: percentage.toFixed(1),
-                            count: betsArray.filter(bet => bet.choice === choice).length
+                            count: betsArray.filter(bet => bet.choice.toLowerCase() === choice).length
                         };
                     });
-                    setChoiceOdds(choiceOdds);
+
+                    // This newChoiceOdds will have two entries: one for 'yes', one for 'no'
+                    setChoiceOdds(newChoiceOdds);
                 }
             } else {
                 toast.error(response.message);
@@ -286,12 +301,25 @@ export default function BetDetailPage() {
                                         <div className="grid grid-cols-2 grid-rows-4 md:grid-cols-4 md:grid-rows-2 gap-4">
                                             <div>
                                                 <h3 className="text-sm font-medium text-default-400 mb-1 ">Status</h3>
-                                                <Chip color={bet.status !== "open" ? (bet.outcome === bet.choice ? "success" : "danger") : "primary"} className="bg-primary/20">
-                                                    {bet.status !== "open"
-                                                        ? (bet.outcome === bet.choice ? "Won" : "Lost")
-                                                        : bet.status
+                                                <Tooltip
+                                                    content={
+                                                        bet.status === "open"
+                                                            ? "Currently open for betting"
+                                                            : bet.outcome === bet.choice
+                                                            ? "You won this bet!"
+                                                            : "You lost this bet."
                                                     }
-                                                </Chip>
+                                                    color="primary"
+                                                    showArrow
+                                                    placement="top-start"
+                                                >
+                                                    <Chip color={bet.status !== "open" ? (bet.outcome === bet.choice ? "success" : "danger") : "primary"} className="bg-primary/20">
+                                                        {bet.status !== "open"
+                                                            ? (bet.outcome === bet.choice ? "Won" : "Lost")
+                                                            : bet.status
+                                                        }
+                                                    </Chip>
+                                                </Tooltip>
                                             </div>
                                             <div>
                                                 <h3 className="text-sm font-medium text-default-400 mb-1">Credits</h3>
@@ -299,27 +327,64 @@ export default function BetDetailPage() {
                                             </div>
                                             <div>
                                                 <h3 className="text-sm font-medium text-default-400 mb-1">Your Choice</h3>
-                                                <Chip color="secondary" className="bg-primary/20 capitalize">{bet.choice}</Chip>
+                                                <Tooltip
+                                                    content={`This was your bet choice: "${bet.choice}"`}
+                                                    color="primary"
+                                                    showArrow
+                                                    placement="top-start"
+                                                >
+                                                    <Chip color="secondary" className="bg-primary/20 capitalize">{bet.choice}</Chip>
+                                                </Tooltip>
                                             </div>
                                             <div>
                                                 <h3 className="text-sm font-medium text-default-400 mb-1">Creator&apos;s Choice</h3>
-                                                <Chip color="secondary" className="bg-primary/20 capitalize">{bet.predicted_outcome || bet.creator_choice}</Chip>
+                                                <Tooltip
+                                                    content={`The creator predicted: "${
+                                                        bet.predicted_outcome || bet.creator_choice
+                                                    }"`}
+                                                    color="primary"
+                                                    showArrow
+                                                    placement="top-start"
+                                                >
+                                                    <Chip color="secondary" className="bg-primary/20 capitalize">{bet.predicted_outcome || bet.creator_choice}</Chip>
+                                                </Tooltip>
                                             </div>
                                             <div>
                                                 <h3 className="text-sm font-medium text-default-400 mb-1">Validation Source</h3>
-                                                <p className="text-sm font-semibold">{bet.source}</p>
+                                                <Tooltip
+                                                    content={`The outcome is validated by: ${bet.source}`}
+                                                    color="primary"
+                                                    showArrow
+                                                    placement="top-start"
+                                                >
+                                                    <p className="text-sm font-semibold">{bet.source}</p>
+                                                </Tooltip>
                                             </div>
 
                                             <div className="flex flex-col gap-1">
                                                 {bet.status === "open" ? (
                                                     <>
                                                         <h3 className="text-sm font-medium text-default-400">Created</h3>
-                                                        <p className="text-sm font-semibold">{new Date(bet.created_at).toLocaleDateString()}</p>
+                                                        <Tooltip
+                                                            content="Bet created date"
+                                                            color="primary"
+                                                            showArrow
+                                                            placement="top-start"
+                                                        >
+                                                            <p className="text-sm font-semibold">{new Date(bet.created_at).toLocaleDateString()}</p>
+                                                        </Tooltip>
                                                     </>
                                                 ) : (
                                                     <>
                                                         <h3 className="text-sm font-medium text-default-400">Resolved</h3>
-                                                        <p className="text-sm font-semibold">{new Date(bet.resolution_date).toLocaleDateString()}</p>
+                                                        <Tooltip
+                                                            content="Bet resolution date"
+                                                            color="primary"
+                                                            showArrow
+                                                            placement="top-start"
+                                                        >
+                                                            <p className="text-sm font-semibold">{new Date(bet.resolution_date).toLocaleDateString()}</p>
+                                                        </Tooltip>
                                                     </>
                                                 )}
                                             </div>
