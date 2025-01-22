@@ -11,16 +11,45 @@ export default function Home() {
           alt="Hero Image"
           width={120}
           height={120}
-          className="mb-4"
+          className="mb-2"
         />
-        <h1 className="textGradient text-2xl md:text-small font-bold mb-8">
+        <h1 className="textGradient text-2xl md:text-small font-bold mb-2">
           Synthetic Prediction Market
         </h1>
+
+        <div className="flex flex-row items-center space-x-4 mt-4">
+          <Link href="https://twitter.com/YourAntelopePage" target="_blank">
+            <Image
+              src="/assets/images/x-logo.svg"
+              alt="Twitter"
+              width={24}
+              height={24}
+            />
+          </Link>
+          <Link href="https://discord.gg/YourAntelopePage" target="_blank">
+            <Image
+              src="/assets/images/discord-logo.svg"
+              alt="Discord"
+              width={24}
+              height={24}
+            />
+          </Link>
+          <Link href="https://t.me/YourAntelopePage" target="_blank">
+            <Image
+              src="/assets/images/telegram-logo.svg"
+              alt="Telegram"
+              width={24}
+              height={24}
+            />
+          </Link>
+        </div>
         
         <label className=" label-primary mt-8 mb-2 font-bold text-tiny">INRODUCING</label>
         <h2 className="text-white font-light text-md md:text-3xl mb-10 w-[75%] leading-loose">
         Antelope is the worlds first synthetic prediction market run by self-learning autonomous agents and, trained by you.
         </h2>
+
+        
 
         <div className="flex flex-col md:flex-row gap-4 w-full justify-center">
           <Link
@@ -37,14 +66,45 @@ export default function Home() {
           </Link>
         </div>
         
-        <p className="text-default-500 text-md md:text-lg mb-6">
+        {/* <p className="text-default-500 text-md md:text-lg mb-6">
           Train AI agents to forecast real-world events, turn them into NFTs,
           and watch their insights grow. You can refine these AI agents with
           your own expertise, track their performance, and share your
           strategies with a community of forward-thinkers.
-        </p>
+        </p> */}
        
       </div>
+
+ {/* Key Features & Benefits */}
+ <section className="mt-8 max-w-screen-md mx-auto text-left">
+  {/* Top row - 3 items */}
+  <div className="grid grid-cols-3 gap-4 mb-4 text-default-500">
+    <div className="text-center icon-house">
+      <h3 className="text-white font-bold text-md mb-2">Bet on Anything</h3>
+      From the outcome of a sports game to the price of a stock.
+    </div>
+    <div className="text-center icon-train text-default-500">
+      <h3 className="text-white font-bold text-md mb-2">Train your own AI Agent</h3>
+      Bet on anything by providing it with data and instructions.
+    </div>
+    <div className="text-center icon-refine text-default-500">
+      <h3 className="text-white font-bold text-md mb-2">Refine Betting Strategies</h3>
+      Build, refine, and share strategies that adapt to real-world data.
+    </div>
+  </div>
+  
+  {/* Bottom row - 2 items */}
+  <div className="grid grid-cols-2 gap-4">
+    <div className="w-2/3 col-span-1 col-center-2 text-center icon-tokenize flex flex-col items-center justify-center mx-auto text-default-500">
+      <h3 className="text-white font-bold text-md mb-2">Tokenize your AI agent</h3>
+      Turn your AI agent into an NFT with tracked performance and trade it on the market.
+    </div>
+    <div className="w-2/3 col-span-1 col-center-1 text-center icon-chat flex flex-col items-center justify-center mx-auto text-default-500">
+      <h3 className="text-white font-bold text-md mb-2">Trade Strategies</h3>
+      Engage with a vibrant community, discuss ideas, and learn from peers.
+    </div>
+  </div>
+</section>
 
       {/* Why Antelope Section */}
       <section className="mt-12 max-w-screen-md mx-auto text-left">
@@ -74,34 +134,7 @@ export default function Home() {
   <p className="text-default-500 text-md mb-8">By harnessing cutting-edge AI to anticipate future events, we hope to illuminate new possibilities in forecasting and decentralized collaboration. This is our manifesto—a vision of a synthetic prediction market that learns, adapts, and grows through data, principles, and the unstoppable curiosity of AI agents.</p>    
       </section>
 
-      {/* Key Features & Benefits */}
-      <section className="mt-8 max-w-screen-md mx-auto text-left">
-        <h2 className="text-xl md:text-2xl font-semibold text-white mb-2">
-          Key Features &amp; Benefits
-        </h2>
-        <ul className="list-disc list-inside text-default-500 space-y-3">
-          <li>
-            <strong>Intuitive Market Management:</strong> Quickly create,
-            oversee, and personalize markets with minimal fuss.
-          </li>
-          <li>
-            <strong>AI-Powered Analytics:</strong> Leverage cutting-edge
-            machine learning tools to guide your predictions.
-          </li>
-          <li>
-            <strong>Versatile Betting Strategies:</strong> Build, refine, and
-            share strategies that adapt to real-world data.
-          </li>
-          <li>
-            <strong>Real-Time Performance Tracking:</strong> View market
-            fluctuations, wins, and losses as they happen.
-          </li>
-          <li>
-            <strong>Active Community Collaboration:</strong> Exchange ideas,
-            discuss tactics, and team up with fellow enthusiasts.
-          </li>
-        </ul>
-      </section>
+     
 
       {/* Getting Started Section */}
       <section className="mt-8 max-w-screen-md mx-auto text-left mb-12">

@@ -289,10 +289,9 @@ export default function BetDetailPage() {
                                             <Button
                                                 color="primary"
                                                 variant="light"
-                                                className="text-primary bg-primary/20 underline text-sm mt-2 hover:bg-primary/40"
+                                                className="text-primary bg-primary/20 text-sm mt-2 hover:bg-primary hover:text-white"
                                                 onPress={() => setShowCommentModal(true)}
-                                            >
-                                                Adjust Reasoning
+                                            > Adjust Reasoning
                                             </Button>
                                         </div>
                                     }
@@ -389,26 +388,6 @@ export default function BetDetailPage() {
                                                 )}
                                             </div>
                                         </div>
-                                    </div>
-                                    <div className="">
-                                        <h2 className="text-base font-semibold mt-2">Reasoning</h2>
-                                        <p className="text-default-400 leading-relaxed ">{bet.reason}</p>
-                                        {
-                                            pineconeData && pineconeData.metadata?.comment && (
-                                                <>
-                                                    <h2 className="text-lg font-semibold mb-4 mt-4">Comment</h2>
-                                                    <p className="text-default-400 leading-relaxed ">{pineconeData.metadata.comment as string}</p>
-                                                </>
-                                            )
-                                        }
-                                        <Button
-                                            color="primary"
-                                            variant="light"
-                                            className="text-primary bg-primary/20 underline text-sm mt-2 hover:bg-primary/40"
-                                            onPress={() => setShowCommentModal(true)}
-                                        >
-                                            Adjust Reasoning
-                                        </Button>
                                     </div>
                                 </div>
                             </div>

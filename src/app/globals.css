@@ -555,6 +555,56 @@ max-width: 80px;
   background-color: #232a3e;
 }
 
+.icon-house {
+  background-image: url('/assets/images/store-01.svg');
+  background-size: 64px 64px;
+  background-repeat: no-repeat;
+  background-position: center top;
+  margin-bottom: 80px;
+  padding-top: 64px;
+
+}
+
+.icon-train   {
+  background-image: url('/assets/images/train.svg');
+  background-size: 64px 64px;
+  background-repeat: no-repeat;
+  background-position: center top;
+  margin-bottom: 80px;
+  padding-top: 64px;
+  
+}
+
+.icon-chat {
+  background-image: url('/assets/images/chat-connection.svg');
+  background-size: 64px 64px;
+  background-repeat: no-repeat;
+  background-position: center top;
+  margin-bottom: 80px;
+  padding-top: 64px;
+
+}
+
+.icon-refine {
+  background-image: url('/assets/images/route-02.svg');
+  background-size: 64px 64px;
+  background-repeat: no-repeat;
+  background-position: center top;
+  margin-bottom: 80px;
+  padding-top: 64px;
+
+}
+
+.icon-tokenize {
+  background-image: url('/assets/images/currency-ethereum.svg');
+  background-size: 64px 64px;
+  background-repeat: no-repeat;
+  background-position: center top;
+  margin-bottom: 80px;
+  padding-top: 64px;
+}
+
+
 @media (prefers-color-scheme: dark) {
   :root {
     --background: #0a0a0a;
