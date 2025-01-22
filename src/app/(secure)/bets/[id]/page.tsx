@@ -339,13 +339,13 @@ export default function BetDetailPage() {
                                                 <h3 className="text-sm font-medium text-default-400 mb-1">Creator&apos;s Choice</h3>
                                                 <Tooltip
                                                     content={`The creator predicted: "${
-                                                        bet.predicted_outcome || bet.creator_choice
+                                                        prediction?.creator_choice
                                                     }"`}
                                                     color="primary"
                                                     showArrow
                                                     placement="top-start"
                                                 >
-                                                    <Chip color="secondary" className="bg-primary/20 capitalize">{bet.predicted_outcome || bet.creator_choice}</Chip>
+                                                    <Chip color="secondary" className="bg-primary/20 capitalize">{prediction?.creator_choice}</Chip>
                                                 </Tooltip>
                                             </div>
                                             <div>

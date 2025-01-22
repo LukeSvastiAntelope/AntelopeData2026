@@ -520,7 +520,12 @@ async function getPredictionById(id: string) {
 async function getBetById(id: string) {
     try {
         const db = await getMySQLConnection();
-        const [rows] = await db.execute<(IBet & RowDataPacket)[]>('SELECT bets.* FROM bets JOIN predictions ON bets.prediction_id = predictions.id WHERE bets.id = ?', [id]);
+        const [rows] = await db.execute<(IBet & RowDataPacket)[]>(
+            `SELECT bets.*, predictions.creator_choice, predictions.str_thumb, predictions.outcome, predictions.resolution_date
+            FROM bets 
+            JOIN predictions ON bets.prediction_id = predictions.id 
+            WHERE bets.id = ?`, 
+        [id]);
         return rows[0];
     } catch (error) {
         console.error("Error in getBetById: ", error);
