@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
         if (agent.platform_id) {
             return Response.json({ error: 'Telegram already connected' }, { status: 400 });
         }
-        await UserRepo.connectTelegram(jwtPayload.email as string, telegram_id, username, first_name, last_name);
+        await UserRepo.connectTelegram(jwtPayload.email as string, telegram_id.toString(), username, first_name, last_name);
         return Response.json({status: true, message: "Telegram connected successfully!"})
     } catch (err) {
         console.log(err);

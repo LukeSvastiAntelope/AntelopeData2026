@@ -47,7 +47,7 @@ export const UserRepo = {
     connectTelegram
 }
 
-async function connectTelegram(userId: string, telegram_id: number, username: string, first_name: string, last_name: string) {
+async function connectTelegram(userId: string, telegram_id: string, username: string, first_name: string, last_name: string) {
     const db = await getMySQLConnection();
     const telegram_username = username ? username : first_name + ' ' + last_name;
     const [rows] = await db.execute<(RowDataPacket)[]>('SELECT * FROM platform_accounts WHERE platform_id = ?', [telegram_id]);
@@ -55,7 +55,6 @@ async function connectTelegram(userId: string, telegram_id: number, username: st
         if (rows[0].user_id) {
             throw new Error('This Telegram account is already connected to another account.');
         } else {
-            // Convert wallet_balance and escrow_balance to numbers
             const walletBalance = parseFloat(rows[0].wallet_balance) || 0;
             const escrowBalance = parseFloat(rows[0].escrow_balance) || 0;
             
