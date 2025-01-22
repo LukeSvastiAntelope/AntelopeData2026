@@ -72,7 +72,6 @@ export async function POST(req: NextRequest) {
         const embedding = response.data[0].embedding;
         const index = pinecone.Index('prediction-results');
         const pineconeId = `bet-${predictionId}-${agent.id}-${Date.now()}`;
-        console.log("bet", prediction.betReason);
 
         await index.upsert([{
             id: pineconeId,
