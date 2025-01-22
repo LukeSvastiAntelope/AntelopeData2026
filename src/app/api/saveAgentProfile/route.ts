@@ -16,11 +16,30 @@ export async function POST(req: NextRequest) {
         const agent = await UserRepo.getAgentByUserId(jwtPayload.email as string);
         const formData = await req.formData();
         const file = formData.get("avatar") as File;
+        let imageUrl = "";
         if (file) {
             const arrayBuffer = await file.arrayBuffer();
             const buffer = new Uint8Array(arrayBuffer);
-            await fs.writeFile(`./public/avatar/${file.name}`, buffer);
-            revalidatePath("/", "layout");
+            
+            const formData = new FormData();
+            const fileName = `image_${Date.now()}.${file.name.split('.').pop()}`; // Use original file extension
+            formData.append("file", new Blob([buffer], { type: file.type }), fileName);
+
+            const response = await fetch("https://api.pinata.cloud/pinning/pinFileToIPFS", {
+                method: "POST",
+                headers: {
+                    Authorization: `Bearer ${process.env.PINATA_JWT}`,
+                },
+                body: formData,
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to upload image to Pinata');
+            }
+
+            const result = await response.json();
+            // Update the image URL to use the IPFS hash
+            imageUrl = `${process.env.PINATA_GATEWAY}/ipfs/${result.IpfsHash}`;
         }
 
         const updateParams: Partial<IFormDataAgentProfile> = {
@@ -35,7 +54,7 @@ export async function POST(req: NextRequest) {
             moderateBetSize: formData.get("moderateBetSize") ? parseInt(formData.get("moderateBetSize") as string) : agent.moderateBetSize,
             aggressiveBetSize: formData.get("aggressiveBetSize") ? parseInt(formData.get("aggressiveBetSize") as string) : agent.aggressiveBetSize,
             principles: formData.get("principles") ? formData.get("principles") as string : agent.principles as string,
-            image: file ? `/avatar/${file.name}` : formData.get("image") ? formData.get("image") as string : agent.image,
+            image: file ? imageUrl : formData.get("image") ? formData.get("image") as string : agent.image,
             maxTimelineLimit: formData.get("maxTimelineLimit") ? parseInt(formData.get("maxTimelineLimit") as string) : agent.maxTimelineLimit,
             category: formData.get("category") ? formData.get("category") as string : agent.category
         };
