@@ -3,7 +3,14 @@ import Image from "next/image";
 
 export default function Home() {
   return (
-    <main className="flex flex-col items-center justify-start w-screen min-h-screen bg-mainGradient bg-cover bg-center bg-no-repeat m-0 pt-4 px-4 md:px-8 text-white font-sans">
+    <main className="flex flex-col items-center justify-start w-screen min-h-screen bg-mainGradient bg-cover bg-center bg-no-repeat m-0 pt-0 px-4 md:px-8 text-white font-sans">
+      
+      {/* Create header bar across in top sticky for announcement */}
+      <div className="announcement">
+       
+        Looking for a way to make money? Try our prediction market!
+      </div>
+      
       {/* Hero Section */}
       <div className="flex flex-col items-center justify-center text-center max-w-screen-md mx-auto">
         <Image
@@ -50,6 +57,50 @@ export default function Home() {
         </h2>
 
         
+        <div className="flex justify-center mt-8">
+  <div id="mc_embed_signup" className="w-full max-w-md mx-auto">
+    <form
+      action="https://ghostnoteapp.us2.list-manage.com/subscribe/post?u=70988277cb322d150c4001f07&amp;id=38ee44dc1c&amp;f_id=00f66ae3f0"
+      method="post"
+      id="mc-embedded-subscribe-form"
+      name="mc-embedded-subscribe-form"
+      target="_blank"
+      className="validate relative"
+    >
+      <div className="relative">
+        {/* Email Field */}
+        <input
+          type="email"
+          name="EMAIL"
+          id="mce-EMAIL"
+          required
+          placeholder="Enter your email"
+          className="w-full py-3 pr-32 pl-4 border border-white/10 bg-transparent text-white rounded-md focus:outline-none"
+        />
+        {/* “Subscribe” button positioned inside the same field, at the right */}
+        <button
+          type="submit"
+          name="subscribe"
+          id="mc-embedded-subscribe"
+          className="absolute top-1 right-1 bottom-1 px-4 text-sm bg-primary hover:bg-primary/80 text-white rounded-md"
+        >
+          Subscribe
+        </button>
+      </div>
+      {/* Hidden input for spam prevention */}
+      <div style={{ position: "absolute", left: "-5000px" }} aria-hidden="true">
+        <input
+          type="text"
+          name="b_70988277cb322d150c4001f07_38ee44dc1c"
+          tabIndex={-1}
+          value=""
+          readOnly
+        />
+      </div>
+    </form>
+  </div>
+</div>
+        
 
         <div className="flex flex-col md:flex-row gap-4 w-full justify-center">
           <Link
@@ -66,6 +117,10 @@ export default function Home() {
           </Link>
         </div>
         
+
+        <img src="/assets/images/hero-image.png" alt="Hero Image" className="w-full h-auto mt-8" />
+
+
         {/* <p className="text-default-500 text-md md:text-lg mb-6">
           Train AI agents to forecast real-world events, turn them into NFTs,
           and watch their insights grow. You can refine these AI agents with
