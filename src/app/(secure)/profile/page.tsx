@@ -9,6 +9,7 @@ import { validatePassword } from "@/app/utils/validation";
 import { Skeleton } from "@nextui-org/skeleton";
 import { useFetch } from "@/app/utils/lib";
 import type { IAgentProfile } from "@/app/utils/interface";
+import { LoginButton } from '@telegram-auth/react';
 
 interface TelegramUser {
     id: number;
@@ -114,30 +115,6 @@ export default function AgentProfile() {
         };
         fetchAgentProfile();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
-
-    // Add this useEffect to handle the Telegram widget
-    useEffect(() => {
-        const script = document.createElement('script');
-        script.src = "https://telegram.org/js/telegram-widget.js?22";
-        script.async = true;
-        script.setAttribute('data-telegram-login', 'AntelopeTerminal_Bot');
-        script.setAttribute('data-size', 'large');
-        script.setAttribute('data-request-access', 'write');
-        script.setAttribute('data-onauth', 'onTelegramAuth');
-        document.body.appendChild(script);
-
-        // Now we can type window properly without 'any'
-        window.onTelegramAuth = (user: TelegramUser) => {
-            console.log('Logged in as', user.first_name, user.last_name,
-                '(' + user.id + (user.username ? ', @' + user.username : '') + ')');
-            // Handle the auth data here
-        };
-
-        return () => {
-            document.body.removeChild(script);
-            delete window.onTelegramAuth;
-        };
     }, []);
 
     // Save "Profile Info"
@@ -296,7 +273,16 @@ export default function AgentProfile() {
                         Update Profile
                     </Button>
                     {/* Add this div where you want the Telegram login button to appear */}
-                    <div id="telegram-login"></div>
+                    <LoginButton
+                        botUsername="AntelopeTerminal_Bot"
+                        buttonSize="large"
+                        cornerRadius={5}
+                        showAvatar={true}
+                        lang="en"
+                        onAuthCallback={(data) => {
+                            console.log(data);
+                        }}
+                    />
                 </div>
             </div>
 
