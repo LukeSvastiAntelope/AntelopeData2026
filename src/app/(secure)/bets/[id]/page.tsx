@@ -104,7 +104,7 @@ const MultiChoiceOddsBar = ({ choices }: MultiChoiceOddsBarProps) => {
                         // Update the accumulated offset for the next segment
                         accumulated += widthFraction;
 
-                        const tooltipContent = `${c.choice[0].toUpperCase() + c.choice.slice(1)}: ${c.percentage}% (${c.odds}) | Bets: ${c.count}`;
+                        const tooltipContent = `${c.choice[0]?.toUpperCase() + c.choice.slice(1)}: ${c.percentage}% (${c.odds}) | Bets: ${c.count}`;
 
                         return (
                             <Tooltip 
@@ -255,7 +255,7 @@ export default function BetDetailPage() {
                             {/* Header Section */}
                             <div className="flex gap-6 mb-8 flex-col w-full bg-content0 rounded-xl p-8">
                                 <Image
-                                    src={bet.str_thumb}
+                                    src={prediction?.str_thumb}
                                     alt="Event"
                                     className="w-full object-cover rounded-xl "
                                     style={{ maxWidth: "100%", minWidth: "-webkit-fill-available;", height: "200px" }}

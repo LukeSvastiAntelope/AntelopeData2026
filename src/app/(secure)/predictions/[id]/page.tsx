@@ -91,7 +91,7 @@ function MultiChoiceOddsBar({ choices }: { choices: ChoiceOdds[] }) {
           // Build a tooltip string with relevant stats
           // e.g.: "Choice: No | 45.0% | 2.22x | Bets: 12"
           const tooltipContent = `${
-            c.choice[0].toUpperCase() + c.choice.slice(1)
+            c.choice[0]?.toUpperCase() + c.choice.slice(1)
           }: ${c.percentage}% (${formatOdds(c.odds)}) | Bets: ${c.count}`;
 
           return (
