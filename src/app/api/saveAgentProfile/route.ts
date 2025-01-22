@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
             const arrayBuffer = await file.arrayBuffer();
             const buffer = new Uint8Array(arrayBuffer);
             await fs.writeFile(`./public/avatar/${file.name}`, buffer);
-            revalidatePath("/");
+            revalidatePath("/", "layout");
         }
 
         const updateParams: Partial<IFormDataAgentProfile> = {

@@ -282,8 +282,22 @@ async function getUserById(id: string) {
 
 async function getUserByUsername(username: string) {
     const db = await getMySQLConnection();
-    const [rows] = await db.execute<(UserDB & RowDataPacket)[]>('SELECT * FROM users WHERE username = ?', [username]);
-    return rows[0];
+    const [userRows] = await db.execute<(UserDB & RowDataPacket)[]>(
+        'SELECT * FROM users WHERE username = ?', 
+        [username]
+    );
+    
+    if (!userRows[0]) return null;
+    
+    const [platformRows] = await db.execute<RowDataPacket[]>(
+        'SELECT * FROM platform_accounts WHERE user_id = ?',
+        [userRows[0].id]
+    );
+
+    return {
+        ...userRows[0],
+        platform_accounts: platformRows
+    };
 }
 
 async function getAgentByUserId(id: string) {
