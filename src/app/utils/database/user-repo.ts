@@ -486,18 +486,59 @@ async function updateAgentNftAddress(agentId: number, nftAddress: string, ipfsHa
 async function getPredictionById(id: string) {
     try {
         const db = await getMySQLConnection();
+        // const [rows] = await db.execute<(PredictionDB & RowDataPacket)[]>(`
+        //     SELECT 
+        //         p.*,
+        //         GROUP_CONCAT(
+        //             JSON_OBJECT(
+        //                 'id', b.id,
+        //                 'amount', b.amount,
+        //                 'choice', COALESCE(b.choice, ''),
+        //                 'reason', COALESCE(b.reason, ''),
+        //                 'pinecone_id', COALESCE(b.pinecone_id, ''),
+        //                 'created_at', DATE_FORMAT(b.created_at, '%Y-%m-%dT%H:%i:%s.000Z')
+        //             ) SEPARATOR '|||'
+        //         ) as bets
+        //     FROM predictions p
+        //     LEFT JOIN bets b ON p.id = b.prediction_id AND b.is_secret = ?
+        //     WHERE p.id = ?
+        //     GROUP BY p.id`,
+        //     [0, id]
+        // );
+
+        // if (!rows[0]) {
+        //     return null;
+        // }
+
+        // // Parse the GROUP_CONCAT result into an array
+        // rows[0].bets = (typeof rows[0].bets === 'string' && rows[0].bets as string)
+        //     ? (rows[0].bets as string).split('|||').map(bet => {
+        //         try {
+        //             return JSON.parse(bet);
+        //         } catch (e) {
+        //             console.error('Failed to parse bet:', e);
+        //             return null;
+        //         }
+        //     }).filter(bet => bet !== null)
+        //     : [];
+
+        // return rows[0];
+
         const [rows] = await db.execute<(PredictionDB & RowDataPacket)[]>(`
             SELECT 
                 p.*,
-                GROUP_CONCAT(
-                    JSON_OBJECT(
-                        'id', b.id,
-                        'amount', b.amount,
-                        'choice', COALESCE(b.choice, ''),
-                        'reason', COALESCE(b.reason, ''),
-                        'pinecone_id', COALESCE(b.pinecone_id, ''),
-                        'created_at', DATE_FORMAT(b.created_at, '%Y-%m-%dT%H:%i:%s.000Z')
-                    ) SEPARATOR '|||'
+                JSON_ARRAYAGG(
+                    IF(b.id IS NOT NULL,
+                        JSON_OBJECT(
+                            'id', b.id,
+                            'amount', COALESCE(b.amount, 0),
+                            'choice', COALESCE(b.choice, ''),
+                            'reason', COALESCE(b.reason, ''),
+                            'pinecone_id', COALESCE(b.pinecone_id, ''),
+                            'created_at', DATE_FORMAT(b.created_at, '%Y-%m-%dT%H:%i:%s.000Z')
+                        ),
+                        NULL
+                    )
                 ) as bets
             FROM predictions p
             LEFT JOIN bets b ON p.id = b.prediction_id AND b.is_secret = ?
@@ -510,19 +551,13 @@ async function getPredictionById(id: string) {
             return null;
         }
 
-        // Parse the GROUP_CONCAT result into an array
-        rows[0].bets = (typeof rows[0].bets === 'string' && rows[0].bets as string)
-            ? (rows[0].bets as string).split('|||').map(bet => {
-                try {
-                    return JSON.parse(bet);
-                } catch (e) {
-                    console.error('Failed to parse bet:', e);
-                    return null;
-                }
-            }).filter(bet => bet !== null)
-            : [];
-
-        return rows[0];
+        // Clean up the results by removing null values from bets
+        return {
+            ...rows[0],
+            bets: Array.isArray(rows[0].bets) 
+                ? rows[0].bets.filter(Boolean)
+                : []
+        };
     } catch (error) {
         if (error instanceof Error) {
             console.error(`Error in getPredictionById for id ${id}:`, error.message);
@@ -549,57 +584,25 @@ async function getBetById(id: string) {
 
 async function getPredictionsWithoutAgentId(id: number) {
     const db = await getMySQLConnection();
-    // const [rows] = await db.execute<(RowDataPacket)[]>(`
-    //     SELECT 
-    //         predictions.*, 
-    //         COUNT(DISTINCT CASE WHEN bets.is_secret = 0 THEN bets.id END) as bets_count,
-    //         CONCAT('[', 
-    //             GROUP_CONCAT(
-    //                 IF(bets.is_secret = 0,
-    //                     JSON_OBJECT(
-    //                         'id', bets.id,
-    //                         'amount', COALESCE(bets.amount, 0),
-    //                         'choice', COALESCE(bets.choice, ''),
-    //                         'reason', COALESCE(bets.reason, ''),
-    //                         'pinecone_id', COALESCE(bets.pinecone_id, ''),
-    //                         'created_at', DATE_FORMAT(bets.created_at, '%Y-%m-%dT%H:%i:%s.000Z')
-    //                     ),
-    //                     NULL
-    //                 )
-    //             ),
-    //         ']') as agent_bets
-    //     FROM predictions 
-    //     LEFT JOIN bets ON predictions.id = bets.prediction_id
-    //     WHERE predictions.agent_id <> ? 
-    //     GROUP BY predictions.id 
-    //     ORDER BY predictions.created_at DESC`,
-    //     [id]
-    // );
-
-    // // Simplified parsing since we're now getting a proper JSON array string
-    // return rows.map(row => ({
-    //     ...row,
-    //     agent_bets: row.agent_bets && row.agent_bets !== '[null]'
-    //         ? JSON.parse(row.agent_bets).filter(Boolean)
-    //         : []
-    // }));
     const [rows] = await db.execute<(RowDataPacket)[]>(`
         SELECT 
             predictions.*, 
             COUNT(DISTINCT CASE WHEN bets.is_secret = 0 THEN bets.id END) as bets_count,
-            JSON_ARRAYAGG(
-                IF(bets.is_secret = 0,
-                    JSON_OBJECT(
-                        'id', bets.id,
-                        'amount', COALESCE(bets.amount, 0),
-                        'choice', COALESCE(bets.choice, ''),
-                        'reason', COALESCE(bets.reason, ''),
-                        'pinecone_id', COALESCE(bets.pinecone_id, ''),
-                        'created_at', DATE_FORMAT(bets.created_at, '%Y-%m-%dT%H:%i:%s.000Z')
-                    ),
-                    NULL
-                )
-            ) as agent_bets
+            CONCAT('[', 
+                GROUP_CONCAT(
+                    IF(bets.is_secret = 0,
+                        JSON_OBJECT(
+                            'id', bets.id,
+                            'amount', COALESCE(bets.amount, 0),
+                            'choice', COALESCE(bets.choice, ''),
+                            'reason', COALESCE(bets.reason, ''),
+                            'pinecone_id', COALESCE(bets.pinecone_id, ''),
+                            'created_at', DATE_FORMAT(bets.created_at, '%Y-%m-%dT%H:%i:%s.000Z')
+                        ),
+                        NULL
+                    )
+                ),
+            ']') as agent_bets
         FROM predictions 
         LEFT JOIN bets ON predictions.id = bets.prediction_id
         WHERE predictions.agent_id <> ? 
@@ -608,13 +611,45 @@ async function getPredictionsWithoutAgentId(id: number) {
         [id]
     );
 
-    // Clean up the results by removing null values from agent_bets
+    // Simplified parsing since we're now getting a proper JSON array string
     return rows.map(row => ({
         ...row,
-        agent_bets: Array.isArray(row.agent_bets)
-            ? row.agent_bets.filter(Boolean)
+        agent_bets: row.agent_bets && row.agent_bets !== '[null]'
+            ? JSON.parse(row.agent_bets).filter(Boolean)
             : []
     }));
+    // const [rows] = await db.execute<(RowDataPacket)[]>(`
+    //     SELECT 
+    //         predictions.*, 
+    //         COUNT(DISTINCT CASE WHEN bets.is_secret = 0 THEN bets.id END) as bets_count,
+    //         JSON_ARRAYAGG(
+    //             IF(bets.is_secret = 0,
+    //                 JSON_OBJECT(
+    //                     'id', bets.id,
+    //                     'amount', COALESCE(bets.amount, 0),
+    //                     'choice', COALESCE(bets.choice, ''),
+    //                     'reason', COALESCE(bets.reason, ''),
+    //                     'pinecone_id', COALESCE(bets.pinecone_id, ''),
+    //                     'created_at', DATE_FORMAT(bets.created_at, '%Y-%m-%dT%H:%i:%s.000Z')
+    //                 ),
+    //                 NULL
+    //             )
+    //         ) as agent_bets
+    //     FROM predictions 
+    //     LEFT JOIN bets ON predictions.id = bets.prediction_id
+    //     WHERE predictions.agent_id <> ? 
+    //     GROUP BY predictions.id 
+    //     ORDER BY predictions.created_at DESC`,
+    //     [id]
+    // );
+
+    // // Clean up the results by removing null values from agent_bets
+    // return rows.map(row => ({
+    //     ...row,
+    //     agent_bets: Array.isArray(row.agent_bets)
+    //         ? row.agent_bets.filter(Boolean)
+    //         : []
+    // }));
 }
 
 async function getGeneralData(id: number) {
