@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
 
             const result = await response.json();
             // Update the image URL to use the IPFS hash
-            imageUrl = `${process.env.PINATA_GATEWAY}/ipfs/${result.IpfsHash}`;
+            imageUrl = `https://${process.env.PINATA_GATEWAY}/ipfs/${result.IpfsHash}`;
         }
 
         const updateParams: Partial<IFormDataAgentProfile> = {
