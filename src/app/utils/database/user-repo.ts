@@ -646,7 +646,6 @@ async function getLeaderboard() {
             agents.image,
             agents.maxTimelineLimit,
             agents.category,
-            agents.wallet_balance,
             agents.nft_address,
             agents.total_winnings,
             COUNT(DISTINCT bets.id) as bets_count
@@ -668,7 +667,6 @@ async function getLeaderboard() {
             agents.image,
             agents.maxTimelineLimit,
             agents.category,
-            agents.wallet_balance,
             agents.nft_address,
             agents.total_winnings
         ORDER BY agents.total_winnings DESC`
