@@ -55,11 +55,26 @@ async function connectTelegram(userId: string, telegram_id: number, username: st
         if (rows[0].user_id) {
             throw new Error('This Telegram account is already connected to another account.');
         } else {
-            await db.execute('UPDATE platform_accounts SET user_id = ?, username = ?, wallet_balance = ?, escrow_balance = ? WHERE platform_id = ?', [userId, telegram_username, 0, 0, telegram_id]);
-            await db.execute('UPDATE users SET wallet_balance = wallet_balance + ?, escrow_balance = escrow_balance + ? WHERE id = ?', [rows[0].wallet_balance, rows[0].escrow_balance, userId]);
+            // Convert wallet_balance and escrow_balance to numbers
+            const walletBalance = parseFloat(rows[0].wallet_balance) || 0;
+            const escrowBalance = parseFloat(rows[0].escrow_balance) || 0;
+            
+            // Update platform account with numeric values
+            await db.execute(
+                'UPDATE platform_accounts SET user_id = ?, username = ?, wallet_balance = ?, escrow_balance = ? WHERE platform_id = ?',
+                [userId, telegram_username, 0, 0, telegram_id]
+            );
+            
+            await db.execute(
+                'UPDATE users SET wallet_balance = wallet_balance + ?, escrow_balance = escrow_balance + ? WHERE id = ?',
+                [walletBalance, escrowBalance, userId]
+            );
         }
     } else {
-        await db.execute('INSERT INTO platform_accounts (platform_id, user_id, username, platform) VALUES (?, ?, ?, ?)', [telegram_id, userId, telegram_username, 'telegram']);
+        await db.execute(
+            'INSERT INTO platform_accounts (platform_id, user_id, username, platform, wallet_balance, escrow_balance) VALUES (?, ?, ?, ?, ?, ?)',
+            [telegram_id, userId, telegram_username, 'telegram', 0, 0]
+        );
     }
 }
 
