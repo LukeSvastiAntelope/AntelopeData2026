@@ -1,6 +1,4 @@
 import { NextRequest } from "next/server";
-import { revalidatePath } from "next/cache";
-import fs from "node:fs/promises";
 import { UserRepo } from "@/app/utils/database/user-repo";
 import { verifyConfirmationToken } from "@/app/utils/api/token"
 import { IFormDataAgentProfile } from "@/app/utils/interface";
