@@ -606,12 +606,11 @@ max-width: 80px;
 .announcement {
   background: linear-gradient(86deg, #7A34E2 -3.84%, #1DA1F2 100%);
   padding: 16px;
-  
   position: sticky;
   top: 0;
   z-index: 1000;
   margin: 0;
-  padding: 0;
+  padding: 8px 0;
   width: 100vw;
   text-align: center;
 }
