@@ -277,8 +277,8 @@ async function getAgentByUserId(id: string) {
     const [rows] = await db.execute<(AgentDB & RowDataPacket)[]>(
         `SELECT agents.*, users.wallet_balance, users.escrow_balance, platform_accounts.platform_id 
         FROM agents JOIN users ON agents.user_id = users.id
-        JOIN platform_accounts ON users.id = platform_accounts.user_id
-        WHERE users.id = ?`, 
+        LEFT JOIN platform_accounts ON users.id = platform_accounts.user_id
+        WHERE users.id = ?`,
         [id]
     );
     return rows[0];
