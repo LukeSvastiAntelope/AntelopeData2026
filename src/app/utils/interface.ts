@@ -18,6 +18,7 @@ export interface IAgentProfile {
     trainCount: number;
     train_index: string;
     ipfs_hash?: string;
+    platform_id: number;
 }
 
 export interface IFormDataAgentProfile {
@@ -250,6 +251,7 @@ export interface AgentDB {
     wallet_balance: number;
     escrow_balance: number;
     nft_address: string;
+    platform_id: number;
 }
 
 export interface PaymentIntentDB {

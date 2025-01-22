@@ -9,24 +9,7 @@ import { validatePassword } from "@/app/utils/validation";
 import { Skeleton } from "@nextui-org/skeleton";
 import { useFetch } from "@/app/utils/lib";
 import type { IAgentProfile } from "@/app/utils/interface";
-import { LoginButton } from '@telegram-auth/react';
-
-interface TelegramUser {
-    id: number;
-    first_name: string;
-    last_name?: string;
-    username?: string;
-    photo_url?: string;
-    auth_date: number;
-    hash: string;
-}
-
-// Extend the Window interface to include our custom property
-declare global {
-    interface Window {
-        onTelegramAuth?: (user: TelegramUser) => void;
-    }
-}
+import { LoginButton, TelegramAuthData } from '@telegram-auth/react';
 
 // Skeleton for loading state
 const ProfileSkeleton = () => {
@@ -200,6 +183,20 @@ export default function AgentProfile() {
         setIsSubmittingPassword(false);
     };
 
+    const connectTelegram = async (data: TelegramAuthData) => {
+        const response = await fetchData.post("/api/connectTelegram", {
+            telegram_id: data.id,
+            username: data.username,
+            first_name: data.first_name,
+            last_name: data.last_name,
+        });
+        if (response.status) {
+            toast.success(response.message || "Telegram connected successfully!");
+        } else {
+            toast.error(response.message || "Failed to connect Telegram.");
+        }
+    }
+
     if (isLoading) return <ProfileSkeleton />;
 
     return (
@@ -272,17 +269,18 @@ export default function AgentProfile() {
                     >
                         Update Profile
                     </Button>
-                    {/* Add this div where you want the Telegram login button to appear */}
-                    <LoginButton
-                        botUsername="AntelopeTerminal_Bot"
-                        buttonSize="large"
-                        cornerRadius={5}
-                        showAvatar={true}
-                        lang="en"
-                        onAuthCallback={(data) => {
-                            console.log(data);
-                        }}
-                    />
+                    {
+                        !agent?.platform_id && (
+                            <LoginButton
+                                botUsername="AntelopeTerminal_Bot"
+                                buttonSize="large"
+                                cornerRadius={5}
+                                showAvatar={true}
+                                lang="en"
+                                onAuthCallback={(data) => connectTelegram(data)}
+                            />
+                        )
+                    }
                 </div>
             </div>
 

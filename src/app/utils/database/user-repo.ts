@@ -43,7 +43,24 @@ export const UserRepo = {
     getRecentActivity,
     createAgentJoinAction,
     updateAgentTraining,
-    getPlatformAccountByUserId
+    getPlatformAccountByUserId,
+    connectTelegram
+}
+
+async function connectTelegram(userId: string, telegram_id: number, username: string, first_name: string, last_name: string) {
+    const db = await getMySQLConnection();
+    const telegram_username = username ? username : first_name + ' ' + last_name;
+    const [rows] = await db.execute<(RowDataPacket)[]>('SELECT * FROM platform_accounts WHERE platform_id = ?', [telegram_id]);
+    if (rows.length > 0) {
+        if (rows[0].user_id) {
+            throw new Error('This Telegram account is already connected to another account.');
+        } else {
+            await db.execute('UPDATE platform_accounts SET user_id = ?, username = ?, wallet_balance = ?, escrow_balance = ? WHERE platform_id = ?', [userId, telegram_username, 0, 0, telegram_id]);
+            await db.execute('UPDATE users SET wallet_balance = wallet_balance + ?, escrow_balance = escrow_balance + ? WHERE id = ?', [rows[0].wallet_balance, rows[0].escrow_balance, userId]);
+        }
+    } else {
+        await db.execute('INSERT INTO platform_accounts (platform_id, user_id, username, platform) VALUES (?, ?, ?, ?)', [telegram_id, userId, telegram_username, 'telegram']);
+    }
 }
 
 async function getPlatformAccountByUserId(userId: number) {
@@ -257,7 +274,13 @@ async function getUserByUsername(username: string) {
 
 async function getAgentByUserId(id: string) {
     const db = await getMySQLConnection();
-    const [rows] = await db.execute<(AgentDB & RowDataPacket)[]>('SELECT agents.*, users.wallet_balance, users.escrow_balance FROM agents JOIN users ON agents.user_id = users.id WHERE users.id = ?', [id]);
+    const [rows] = await db.execute<(AgentDB & RowDataPacket)[]>(
+        `SELECT agents.*, users.wallet_balance, users.escrow_balance, platform_accounts.platform_id 
+        FROM agents JOIN users ON agents.user_id = users.id
+        JOIN platform_accounts ON users.id = platform_accounts.user_id
+        WHERE users.id = ?`, 
+        [id]
+    );
     return rows[0];
 }
 
