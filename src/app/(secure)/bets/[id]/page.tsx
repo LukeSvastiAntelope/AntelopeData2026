@@ -255,7 +255,7 @@ export default function BetDetailPage() {
                             {/* Header Section */}
                             <div className="flex gap-6 mb-8 flex-col w-full bg-content0 rounded-xl p-8">
                                 <Image
-                                    src={prediction?.str_thumb}
+                                    src={bet.str_thumb}
                                     alt="Event"
                                     className="w-full object-cover rounded-xl "
                                     style={{ maxWidth: "100%", minWidth: "-webkit-fill-available;", height: "200px" }}

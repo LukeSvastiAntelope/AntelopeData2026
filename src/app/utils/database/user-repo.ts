@@ -521,7 +521,7 @@ async function getBetById(id: string) {
     try {
         const db = await getMySQLConnection();
         const [rows] = await db.execute<(IBet & RowDataPacket)[]>(
-            `SELECT bets.*, predictions.creator_choice, predictions.str_thumb, predictions.outcome, predictions.resolution_date
+            `SELECT bets.*, predictions.creator_choice, predictions.str_thumb, predictions.outcome, predictions.resolution_date, predictions.predicted_outcome, predictions.source
             FROM bets 
             JOIN predictions ON bets.prediction_id = predictions.id 
             WHERE bets.id = ?`, 
