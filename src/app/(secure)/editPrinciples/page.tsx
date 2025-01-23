@@ -1,7 +1,6 @@
 'use client';
 
 import { Card, CardBody, CardHeader } from "@nextui-org/card";
-import { Input, Textarea } from "@nextui-org/input";
 import { Button } from "@nextui-org/button";
 import { useState, useEffect } from "react";
 import { IoArrowBack, IoSave } from "react-icons/io5";

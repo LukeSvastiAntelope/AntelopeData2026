@@ -21,16 +21,16 @@ interface ChatMessage {
   type: "training" | "ask" | "strategy";
 }
 
-interface StrategyStep {
-  id: string;
-  title: string;
-  description: string;
-}
-
 interface TrainingMessageProps {
   agent: IAgentProfile;
   setIsTraining: Dispatch<SetStateAction<boolean>>;
   setAgent: Dispatch<SetStateAction<IAgentProfile | null>>;
+}
+
+interface StrategyMessageProps {
+  agent: IAgentProfile;
+  setAgent: Dispatch<SetStateAction<IAgentProfile | null>>;
+  strategyFinish: () => Promise<void>;
 }
 
 const TrainingMessageComponent = ({ agent, setIsTraining, setAgent }: TrainingMessageProps) => {
@@ -224,15 +224,7 @@ const TrainStart = ({ setTrain }: { setTrain: () => void }) => {
   )
 }
 
-const StrategyMessageComponent = (
-  { agent, setAgent, strategyFinish }:
-    {
-      agent: IAgentProfile,
-      setAgent: Dispatch<SetStateAction<IAgentProfile | null>>,
-      strategyFinish: () => Promise<void>
-    }
-) => {
-
+const StrategyMessageComponent = ({ agent, setAgent, strategyFinish }: StrategyMessageProps) => {
   const [strategyStep, setStrategyStep] = useState(0);
   const strategyList = ["Update Agent Category", "Update Agent Principles", "Update Agent Risk Level"];
 
@@ -495,7 +487,7 @@ const StrategyStart = ({ setStartStrategy }: { setStartStrategy: () => void }) =
     <div className="flex flex-col gap-2 mb-8 border border-white/10 rounded-xl p-6 text-center empty-state place-content-center">
       <div className="strategy-center"></div>
       <div className="text-gray-400 pb-2 ">
-        Set your agent's strategy to start asking questions.
+        Set your agent&apos;s strategy to start asking questions.
       </div>
       <Button className="w-fit mx-auto" color="primary" variant="flat" onPress={setStartStrategy}>Begin Strategy</Button>
     </div>
