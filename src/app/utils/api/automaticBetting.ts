@@ -1125,6 +1125,8 @@ ${p.metadata?.comment ? `- Agent Controller Comment: ${p.metadata.comment}` : ''
                 Principles: ${this.agent.principles.map((p) => p.title).join(", ")}
 
                 You job is to help the user understand your predictions and bets.
+
+                Always look  in the Pinecone index for prior bets and predictions or any other relevant information.
                 
                 
                 If referencing prior bets, highlight how risk strategy or prior results inform your answer.
