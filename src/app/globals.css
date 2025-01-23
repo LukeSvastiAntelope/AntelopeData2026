@@ -92,9 +92,9 @@ background-clip: text;
 .center-logo {
 max-width: 80px;
     background: url(/assets/images/logo-simple.svg);
-    width: 20px;
-    height: 20px;
-    background-size: 20px;
+    width: 40px;
+    height: 40px;
+    background-size: 40px;
     background-position: top;
   }
 
@@ -250,6 +250,16 @@ max-width: 80px;
 
 .training-center {
   background-image: url('/assets/images/training.svg');
+  background-size: 80px 80px;
+  background-repeat: no-repeat;
+  background-position: center;
+ 
+  min-width: 80px;
+  min-height: 80px;
+}
+
+.chat-center {
+  background-image: url('/assets/images/chat.svg');
   background-size: 80px 80px;
   background-repeat: no-repeat;
   background-position: center;

@@ -165,7 +165,7 @@ const SecureLayout = ({ children }: { children: React.ReactNode }) => {
                                                 <div className="flex md:inline-block items-center ">
                                                     {/* Large logo for md+ */}
                                                     <Link href="/">
-                                                    <span className="hidden md:inline-block ">
+                                                    <span className="hidden md:inline-block">
                                                         <Image
                                                             src={"/assets/images/logo-text.svg"}
                                                             alt="Dashboard Logo"
@@ -235,7 +235,7 @@ const SecureLayout = ({ children }: { children: React.ReactNode }) => {
                                                 <Link
                                                     href="#"
                                                     onClick={openPredictionDialog}
-                                                    className="flex items-center group md:gap-2 text-default-400 hover:text-white p-2 border border-white/10 rounded-lg w-fit"
+                                                    className="flex items-center group md:gap-2 text-default-400 hover:text-white p-2 border border-white/10 rounded-lg w-fit hidden md:flex"
                                                 >
                                                     <span className="plus-circle-on group-hover:border-white hidden group-hover:block text-white" />
                                                     <span className="plus-circle-off block group-hover:hidden" />

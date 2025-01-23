@@ -191,7 +191,7 @@ const TrainStart = ({ setTrain }: { setTrain: () => void }) => {
     <div className="flex flex-col gap-2 mb-8 border border-white/10 rounded-xl p-6 text-center empty-state place-content-center">
       <div className="training-center"></div>
       <p className="text-gray-400 pb-2 ">
-        Thank you agent to reason about your subject of interest by breaking down your own reasoning based on relevants bets.
+        Teach your agent to reason about your subject of interest by breaking down your own reasoning based on relevants bets.
       </p>
       <Button className="w-fit mx-auto" color="primary" variant="flat" onPress={setTrain}>Begin Training</Button>
     </div>
@@ -404,9 +404,13 @@ export default function AskAgent() {
         className="flex-1 overflow-y-auto p-2 space-y-4 text-small w-full"
       >
         {messages.length === 0 ? (
-          <div className="flex items-center justify-center h-full">
-            <p className="text-default-400">Ask the agent any question about, previous bets, strategy, etc.</p>
-          </div>
+         <div className="flex flex-col gap-2 mb-8 border border-white/10 rounded-xl p-6 text-center empty-state place-content-center">
+         <div className="chat-center"></div>
+         <p className="text-gray-400 pb-2 ">
+           Ask your agent any question about, previous bets, strategy or anything that you want to know about your agent.
+         </p>
+         
+       </div>
         ) : (
           messages.map((msg, index) => {
             const isUser = msg.role === "user";
