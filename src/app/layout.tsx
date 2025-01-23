@@ -4,6 +4,7 @@ import { Rubik } from 'next/font/google';
 import { Toaster } from "react-hot-toast";
 import { Providers } from "./components/provider/mainProvider";
 import { SolProvider } from "./components/provider/solProvider";
+import Script from "next/script";
 
 export const metadata: Metadata = {
   title: "Antelope",
@@ -22,6 +23,20 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="bg-mainGradient min-h-screen" style={{ backgroundColor: '#16181c' }}>
+            <head>
+        <Script 
+          src="https://www.googletagmanager.com/gtag/js?id=G-RE8DXNRE5W"
+          strategy="afterInteractive"
+        />
+        <Script id="google-analytics" strategy="afterInteractive">
+          {`
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){ dataLayer.push(arguments); }
+            gtag('js', new Date());
+            gtag('config', 'G-RE8DXNRE5W');
+          `}
+        </Script>
+      </head>
       <body
         className={`${rubik.className} antialiased dark text-foreground bg-mainGradient `}
       >
