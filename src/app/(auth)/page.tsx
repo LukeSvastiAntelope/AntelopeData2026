@@ -14,7 +14,7 @@ export default function Home() {
       {/* Create header bar across in top sticky for announcement */}
       <div className="announcement text-sm">
        
-        Want to join the Antelope team? Connect with us on <a href="https://t.me/+F5F2ah0bBzU0ZDAx" target="_blank" className="underline">Telegram</a>
+        Want to join the Antelope team? Connect with us on <a href="https://t.me/+F5F2ah0bBzU0ZDAx" target="_blank" className="underline telegram-inline-icon">Telegram</a>
         </div>
       
       {/* Hero Section */}
