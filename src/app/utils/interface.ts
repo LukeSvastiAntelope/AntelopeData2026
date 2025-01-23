@@ -22,7 +22,7 @@ export interface IAgentProfile {
 }
 
 export interface IFormDataAgentProfile {
-    id: number;
+    id: number; 
     user_id: number;
     name: string;
     description: string;

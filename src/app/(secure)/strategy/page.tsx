@@ -14,7 +14,7 @@ import { convertDaysToYMD } from "@/app/utils/lib";
 import { CATEGORIES } from "@/app/utils/const";
 import { Switch } from "@nextui-org/switch";
 import { Tooltip } from "@nextui-org/tooltip";
-import * as XLSX from 'xlsx';
+import { FaDownload, FaUpload } from "react-icons/fa";
 
 const StrategySkeleton = () => {
   return (
@@ -148,26 +148,111 @@ export default function StrategyPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isBettingEnabled, setIsBettingEnabled] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const fetch = useFetch();
 
-  const handlePineconeDownload = async () => {
+  const handlePrinciplesDownload = async () => {
     setIsDownloading(true);
     try {
-      const response = await fetch.get('/api/pinecone');
-      const wb = XLSX.utils.book_new();
-      const ws = XLSX.utils.json_to_sheet(response);
-      XLSX.utils.book_append_sheet(wb, ws, "Predictions");
-      XLSX.writeFile(wb, "predictions.xlsx");
+      // Format principles as markdown
+      const markdown = `# Betting Principles\n\n${agent?.principles?.map((principle, index) => (
+        `## ${index + 1}. ${principle.title}\n${principle.description}\n`
+      )).join('\n') || 'No principles defined.'}`;
+
+      // Create blob from the markdown text
+      const blob = new Blob([markdown], { type: 'text/markdown' });
+
+      // Create download link
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'principles.md';
+
+      // Trigger download
+      document.body.appendChild(a);
+      a.click();
+
+      // Cleanup
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
     } catch (error) {
-      console.error("Error downloading excel:", error);
-      toast.error("Failed to download excel");
+      console.error("Error downloading principles:", error);
+      toast.error("Failed to download principles");
     } finally {
       setIsDownloading(false);
     }
   };
 
-  const handlePineconeUpload = async () => {
-    console.log("Uploading Pinecone memory...");
+  const handlePrinciplesUpload = async () => {
+    try {
+      // Create file input element
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.md';
+
+      input.onchange = async (e) => {
+        setIsUploading(true);
+        try {
+          const file = (e.target as HTMLInputElement).files?.[0];
+          if (!file) return;
+
+          const text = await file.text();
+
+          // Parse markdown content
+          const principles: { title: string; description: string }[] = [];
+          let currentTitle = '';
+          let currentDescription = '';
+
+          // Split content into lines and process
+          const lines = text.split('\n');
+          for (const line of lines) {
+            if (line.startsWith('## ')) {
+              // If we have a previous principle, save it
+              if (currentTitle && currentDescription) {
+                principles.push({ title: currentTitle, description: currentDescription.trim() });
+              }
+              // Start new principle (remove '## ' and any number/dot prefix)
+              currentTitle = line.replace(/^## \d+\.\s*/, '').trim();
+              currentDescription = '';
+            } else if (line && !line.startsWith('#')) {
+              // Add to description if it's not a header
+              currentDescription += (currentDescription ? '\n' : '') + line.trim();
+            }
+          }
+
+          // Add the last principle if exists
+          if (currentTitle && currentDescription) {
+            principles.push({ title: currentTitle, description: currentDescription.trim() });
+          }
+
+          // Update principles via API
+          const response = await fetch.post("/api/managePrinciples", {
+            agent,
+            principles
+          });
+
+          if (response.status) {
+            setAgent(prev => prev ? { ...prev, principles } : null);
+            toast.success("Principles updated successfully");
+          } else {
+            toast.error(response.message || "Failed to update principles");
+          }
+        } catch (error) {
+          console.error("Error uploading principles:", error);
+          toast.error("Failed to upload principles");
+        } finally {
+          setIsUploading(false);
+        }
+      };
+
+      // Trigger file selection
+      input.click();
+
+    } catch (error) {
+      console.error("Error uploading principles:", error);
+      toast.error("Failed to upload principles");
+    }
   };
 
   useEffect(() => {
@@ -276,49 +361,21 @@ export default function StrategyPage() {
 
       <Card className="my-8 bg-content0 ">
         <CardHeader className="text-small font-regular flex justify-between">
-        <Tooltip content="Begin an interactive session to train your agent" showArrow>
-          <span className="message-circle ml-1">Talk strategy with your agent</span>  
+          <Tooltip content="Begin an interactive session to train your agent" showArrow>
+            <span className="message-circle ml-1">Talk strategy with your agent</span>
           </Tooltip>
           <Tooltip content="Begin an interactive session to train your agent" showArrow>
-          <Button color="primary" variant="flat" className="text-small" href="/ask-agent" size="sm" as="a">
-            Talk
-          </Button>
+            <Button color="primary" variant="flat" className="text-small" href="/ask-agent" size="sm" as="a">
+              Talk
+            </Button>
           </Tooltip>
-        </CardHeader>
-      </Card>
-
-      {/* New Pinecone Data Management Card */}
-      <Card className="my-8 bg-content0">
-        <CardHeader className="text-small font-regular flex justify-between">
-          <span className="message-circle ml-1">Agent Memory Management</span>
-          <div className="flex gap-2">
-            <Button
-              color="primary"
-              variant="flat"
-              className="text-small"
-              size="sm"
-              onPress={() => handlePineconeDownload()}
-              isLoading={isDownloading}
-            >
-              Download Memory
-            </Button>
-            <Button
-              color="primary"
-              variant="flat"
-              className="text-small"
-              size="sm"
-              onPress={() => handlePineconeUpload()}
-            >
-              Upload Memory
-            </Button>
-          </div>
         </CardHeader>
       </Card>
 
       <Card className="my-8 bg-content0">
         <CardHeader className="text-small font-regular flex justify-between ml-2">
-        <Tooltip content="Choose the category of events your agent will focus on" showArrow>
-          Betting Category
+          <Tooltip content="Choose the category of events your agent will focus on" showArrow>
+            Betting Category
           </Tooltip>
           <Tooltip content="Modify the category of events your agent will focus on" showArrow>
             <Button
@@ -383,18 +440,44 @@ export default function StrategyPage() {
           <Tooltip content="A principle guides the agent's betting ethics or approach" showArrow>
             Betting Principles
           </Tooltip>
-          <Tooltip content="Edit the guidelines that shape your agent's betting approach" showArrow>
+          <div className="flex gap-1 items-center">
+            <Tooltip content="Edit the guidelines that shape your agent's betting approach" showArrow>
+              <Button
+                color="default"
+                variant="flat"
+                className="mr-2"
+                href="/editPrinciples"
+                as="a"
+                size="sm"
+              >
+                Edit
+              </Button>
+            </Tooltip>
             <Button
               color="default"
               variant="flat"
               className="mr-2"
-              href="/editPrinciples"
               as="a"
               size="sm"
+              onPress={handlePrinciplesDownload}
+              isLoading={isDownloading}
             >
-              Edit
+              <FaDownload className="w-4 h-4" />
+              Download
             </Button>
-          </Tooltip>
+            <Button
+              color="default"
+              variant="flat"
+              className="mr-2"
+              as="a"
+              size="sm"
+              onPress={handlePrinciplesUpload}
+              isLoading={isUploading}
+            >
+              <FaUpload className="w-4 h-4" />
+              Upload
+            </Button>
+          </div>
         </CardHeader>
         <Divider />
         <CardBody>
