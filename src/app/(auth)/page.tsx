@@ -9,14 +9,14 @@ export default function Home() {
   const [showVideo, setShowVideo] = useState(false);
 
   return (
-    <main className="flex flex-col items-center justify-start w-screen min-h-screen bg-mainGradient bg-cover bg-center bg-no-repeat m-0 pt-0 px-4 md:px-8 text-white font-sans ">
-
+    <main className="flex flex-col items-center justify-start w-screen w-full min-h-screen bg-mainGradient bg-cover bg-center bg-no-repeat m-0 pt-0 px-4 md:px-8 text-white font-sans ">
+      
       {/* Create header bar across in top sticky for announcement */}
       <div className="announcement text-sm">
-
-        Want to join the Antelope team? Mail us at <a href="mailto:hello@antelope.market">hello@antelope.market</a> 🚀
-      </div>
-
+       
+        Want to join the Antelope team? Connect with us on <a href="https://t.me/+F5F2ah0bBzU0ZDAx" target="_blank" className="underline">Telegram</a>
+        </div>
+      
       {/* Hero Section */}
       <div className="flex flex-col items-center justify-center text-center max-w-screen-md mx-auto mt-12">
         <Image
@@ -171,7 +171,7 @@ export default function Home() {
       </div>
 
  {/* Key Features & Benefits */}
- <section className="mt-8 mx-auto text-left">
+ <section className="mt-8 mx-auto max-w-screen-md text-left">
   {/* Top row - 3 items */}
   <div className="grid md:grid-cols-3 grid-cols-1 gap-4 mb-4 text-default-500 px-8 md:px-0">
     <div className="text-center icon-house">
