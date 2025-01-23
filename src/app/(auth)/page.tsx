@@ -39,7 +39,7 @@ export default function Home() {
               height={24}
             />
           </Link>
-          <Link href="https://discord.gg/YourAntelopePage" target="_blank">
+          <Link href="https://discord.gg/eNpdWQJr" target="_blank">
             <Image
               src="/assets/images/discord-logo.svg"
               alt="Discord"
@@ -47,7 +47,7 @@ export default function Home() {
               height={24}
             />
           </Link>
-          <Link href="https://web.telegram.org/k/#@antelopechannel" target="_blank">
+          <Link href="https://t.me/+F5F2ah0bBzU0ZDAx" target="_blank">
             <Image
               src="/assets/images/telegram-logo.svg"
               alt="Telegram"
@@ -133,7 +133,7 @@ export default function Home() {
             alt="Click to watch Antelope video"
             width={400}
             height={320}
-            className="rounded-lg shadow-lg mx-auto hover:scale-105    transition-all ease-in-out duration-200"
+            className="rounded-lg shadow-lg mx-auto hover:scale-105    transition-all ease-in-out duration-200 mb-8"
           />
          
         </button>
@@ -171,16 +171,16 @@ export default function Home() {
       </div>
 
  {/* Key Features & Benefits */}
- <section className="mt-8 max-w-screen-md mx-auto text-left">
+ <section className="mt-8 mx-auto text-left">
   {/* Top row - 3 items */}
   <div className="grid md:grid-cols-3 grid-cols-1 gap-4 mb-4 text-default-500 px-8 md:px-0">
     <div className="text-center icon-house">
       <h3 className="text-white font-bold text-md mb-2">Bet on Anything</h3>
-      From the outcome of a sports game to the price of a stock.
+      From the outcome of a sports game or stock to the outcome of a political election.
     </div>
     <div className="text-center icon-train text-default-500">
       <h3 className="text-white font-bold text-md mb-2">Train your own AI Agent</h3>
-      Bet on anything by providing it with data and instructions.
+      Teach your agent to bet on anything by providing it with data and instructions.
     </div>
     <div className="text-center icon-refine text-default-500">
       <h3 className="text-white font-bold text-md mb-2">Refine Betting Strategies</h3>
@@ -226,7 +226,7 @@ export default function Home() {
 <h1 className="text-white font-bold text-md mb-2"> 7. Responsibility & Compliance</h1>
 <p className="text-default-500 text-md mb-8">We respect the boundaries of applicable laws and regulations. This market is about research and innovation—no real-money gambling, no promise of earnings. Our token and NFTs are tools to access our platform, not vehicles for unregulated speculation. We continue to seek legal guidance to ensure a compliant, forward-thinking environment.</p>    
 
-  <p className="text-default-500 text-md mb-8">By harnessing cutting-edge AI to anticipate future events, we hope to illuminate new possibilities in forecasting and decentralized collaboration. This is our manifesto—a vision of a synthetic prediction market that learns, adapts, and grows through data, principles, and the unstoppable curiosity of AI agents.</p>    
+<p className="text-default-500 text-md mb-8">By harnessing cutting-edge AI to anticipate future events, we hope to illuminate new possibilities in forecasting and decentralized collaboration. This is our manifesto—a vision of a synthetic prediction market that learns, adapts, and grows through data, principles, and the unstoppable curiosity of AI agents.</p>    
       </section>
 
      
@@ -244,32 +244,7 @@ export default function Home() {
         </p>
 
         {/* Community Links */}
-        <div className="flex flex-row items-center space-x-4 mt-4">
-          <Link href="https://twitter.com/YourAntelopePage" target="_blank">
-            <Image
-              src="/assets/images/x-logo.svg"
-              alt="Twitter"
-              width={24}
-              height={24}
-            />
-          </Link>
-          <Link href="https://discord.gg/YourAntelopePage" target="_blank">
-            <Image
-              src="/assets/images/discord-logo.svg"
-              alt="Discord"
-              width={24}
-              height={24}
-            />
-          </Link>
-          <Link href="https://t.me/YourAntelopePage" target="_blank">
-            <Image
-              src="/assets/images/telegram-logo.svg"
-              alt="Telegram"
-              width={24}
-              height={24}
-            />
-          </Link>
-        </div>
+
       </section>
     </main>
   );

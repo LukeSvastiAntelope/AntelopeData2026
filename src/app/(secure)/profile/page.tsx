@@ -211,6 +211,8 @@ export default function AgentProfile() {
         });
         if (response.status) {
             toast.success(response.message || "Telegram connected successfully!");
+            // Optionally you can refetch or update local state to show "Connected"
+            setAgent(prev => prev ? { ...prev, platform_id: data.id } : null);
         } else {
             toast.error(response.message || "Failed to connect Telegram.");
         }
@@ -222,7 +224,7 @@ export default function AgentProfile() {
         <div className="space-y-8">
             {/* Profile Info Section */}
             <div className="bg-content1/50 backdrop-blur-md rounded-2xl p-8 shadow-lg hover:shadow-xl transition-all duration-300 border border-white/10">
-                <h2 className="text-2xl font-bold mb-4">Profile Information</h2>
+                <h2 className="text-base font-bold mb-4">Profile Information</h2>
 
                 {/* Avatar Upload */}
                 <div className="flex flex-col md:flex-row items-center gap-8 mb-6">
@@ -288,24 +290,41 @@ export default function AgentProfile() {
                     >
                         Update Profile
                     </Button>
-                    {
-                        !agent?.platform_id && (
-                            <LoginButton
-                                botUsername="AntelopeTerminal_Bot"
-                                buttonSize="large"
-                                cornerRadius={5}
-                                showAvatar={true}
-                                lang="en"
-                                onAuthCallback={(data) => connectTelegram(data)}
-                            />
-                        )
-                    }
+                    
                 </div>
+            </div>
+
+            {/* Telegram Connection Status */}
+            <div className="bg-content1/50 backdrop-blur-md rounded-2xl p-8 shadow-lg hover:shadow-xl transition-all duration-300 border border-white/10">
+                <h2 className="text-base font-bold mb-4">External Connections</h2>
+                {agent?.platform_id ? (
+                    <div className="flex items-center gap-2">
+                        <span className="bg-success-50 text-success-600 px-2 py-1 rounded-lg">
+                            Connected
+                        </span>
+                        {/* Optional: Show Telegram username if you store it */}
+                        {/* <span className="text-white">(@{agent?.telegramUsername})</span> */}
+                    </div>
+                ) : (
+                    <div className="space-y-2">
+                        <p className="text-default-500 text-md">
+                            No Telegram connection is active.
+                        </p>
+                        <LoginButton
+                            botUsername="AntelopeTerminal_Bot"
+                            buttonSize="large"
+                            cornerRadius={5}
+                            showAvatar={true}
+                            lang="en"
+                            onAuthCallback={(data) => connectTelegram(data)}
+                        />
+                    </div>
+                )}
             </div>
 
             {/* Credentials Section */}
             <div className="bg-content1/50 backdrop-blur-md rounded-2xl p-8 shadow-lg hover:shadow-xl transition-all duration-300 border border-white/10">
-                <h2 className="text-2xl font-bold mb-4">Credentials</h2>
+                <h2 className="text-base font-bold mb-4">Credentials</h2>
                 <div className="flex flex-col gap-4 max-w-md">
                     <Input
                         label="Current Password"
