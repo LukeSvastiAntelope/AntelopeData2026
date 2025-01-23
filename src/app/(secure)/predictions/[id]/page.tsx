@@ -73,11 +73,11 @@ function MultiChoiceOddsBar({ choices }: { choices: ChoiceOdds[] }) {
         {sortedChoices.map((c) => {
           let segmentColor = "bg-sky-400/90";
           if (c.choice.toLowerCase() === "no") {
-            segmentColor = "bg-red-400/90";
+            segmentColor = "bg-danger";
           } else if (c.choice.toLowerCase() === "yes") {
-            segmentColor = "bg-emerald-400/90";
+            segmentColor = "bg-success";
           } else if (c.choice.toLowerCase() === "draw") {
-            segmentColor = "bg-yellow-400/90";
+            segmentColor = "bg-warning";
           }
 
           const widthFraction = parseFloat(c.percentage) || 0;
@@ -354,7 +354,7 @@ export default function PredictionDetail() {
                     >
                       <Chip
                         color={
-                          prediction.status === "open" ? "primary" : "secondary"
+                          prediction.status === "open" ? "primary" : "danger"
                         }
                         variant="flat"
                       >
@@ -385,8 +385,7 @@ export default function PredictionDetail() {
                 </div>
               </div>
             </div>
-          </CardBody>
-        </Card>
+
 
         {/* Single multi-segment bar with No on left, Combined label center, Yes on right */}
         {choiceOdds.length > 0 && (
@@ -395,6 +394,9 @@ export default function PredictionDetail() {
             <MultiChoiceOddsBar choices={choiceOdds} />
           </div>
         )}
+
+</CardBody>
+</Card>
 
         {/* Prediction Timeline */}
         <div className="space-y-4 mt-8">

@@ -62,7 +62,7 @@ export function PredictionItem({ prediction, onClick }: PredictionItemProps) {
           {/* Text block - Updated layout */}
           <div className="flex flex-col w-full gap-1">
             <Tooltip content="Prediction description" showArrow>
-              <p className="text-base font-medium break-words mb-0">
+              <p className="text-base font-regular break-words mb-0">
                 {prediction.description}
               </p>
             </Tooltip>

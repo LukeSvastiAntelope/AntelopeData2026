@@ -31,22 +31,21 @@ export async function POST(req: NextRequest) {
             return Response.json({ error: 'Agent not found' }, { status: 404 });
         }
 
-        const { predictionId, choice, amount, reasoning, confidence, question, description, category } = await req.json();
+        const { predictionId, choice, amount, reasoning, confidence, question, category } = await req.json();
 
         const pinecone = new Pinecone({
             apiKey: process.env.PINECONE_API_KEY!,
         });
 
-        const normalizedText = `${question} ${description}`.toLowerCase();
         const index = pinecone.index("prediction-results");
-        const embedding = await getEmbedding(normalizedText);
+        const embedding = await getEmbedding(question);
+        console.log("question", question);
 
         await index.upsert([{
             id: predictionId,
             values: embedding,
             metadata: {
-                question: question,
-                description: description,
+                description: question,
                 choice: choice,
                 amount: amount,
                 category: category,

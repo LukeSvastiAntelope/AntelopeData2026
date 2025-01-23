@@ -1,9 +1,15 @@
+'use client';
+
+import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { Modal, ModalContent, ModalHeader, ModalBody } from "@nextui-org/modal";
 
 export default function Home() {
+  const [showVideo, setShowVideo] = useState(false);
+
   return (
-    <main className="flex flex-col items-center justify-start w-screen min-h-screen bg-mainGradient bg-cover bg-center bg-no-repeat m-0 pt-0 px-4 md:px-8 text-white font-sans">
+    <main className="flex flex-col items-center justify-start w-screen min-h-screen bg-mainGradient bg-cover bg-center bg-no-repeat m-0 pt-0 px-4 md:px-8 text-white font-sans ">
       
       {/* Create header bar across in top sticky for announcement */}
       <div className="announcement text-sm">
@@ -12,7 +18,7 @@ export default function Home() {
       </div>
       
       {/* Hero Section */}
-      <div className="flex flex-col items-center justify-center text-center max-w-screen-md mx-auto">
+      <div className="flex flex-col items-center justify-center text-center max-w-screen-md mx-auto mt-12">
         <Image
           src={"/assets/images/logo-website.svg"}
           alt="Hero Image"
@@ -25,7 +31,7 @@ export default function Home() {
         </h1>
 
         <div className="flex flex-row items-center space-x-4 mt-4">
-          <Link href="https://twitter.com/YourAntelopePage" target="_blank">
+          <Link href="https://x.com/antelopeHQ" target="_blank">
             <Image
               src="/assets/images/x-logo.svg"
               alt="Twitter"
@@ -77,7 +83,7 @@ export default function Home() {
           placeholder="Join the waitlist"
           className="w-full py-3 pr-32 pl-4 border border-white/10 bg-transparent text-white rounded-md focus:outline-none text-sm"
         />
-        {/* “Subscribe” button positioned inside the same field, at the right */}
+        {/* "Subscribe" button positioned inside the same field, at the right */}
         <button
           type="submit"
           name="subscribe"
@@ -118,22 +124,56 @@ export default function Home() {
         </div> */}
         
 
-        <img src="/assets/images/hero-image.png" alt="Hero Image" className="w-full h-auto my-8" />
+        <button
+          onClick={() => setShowVideo(true)}
+          className="relative mx-auto w-full h-auto my-8 border-none p-0 bg-transparent cursor-pointer outline-none"
+        >
+          <Image
+            src="/assets/images/video01.png"
+            alt="Click to watch Antelope video"
+            width={400}
+            height={320}
+            className="rounded-lg shadow-lg mx-auto hover:scale-105    transition-all ease-in-out duration-200"
+          />
+         
+        </button>
+
+        {/* Fullscreen modal with the embedded video */}
+        <Modal
+          isOpen={showVideo}
+          onOpenChange={setShowVideo}
+          size="xl"
+          className="bg-black/90 max-w-screen-md"
+        >
+          <ModalContent>
+            <ModalHeader className="flex justify-end">
+              
+            </ModalHeader>
+            <ModalBody className="relative flex items-center justify-center">
+              <video
+                src="/assets/images/antelope.mp4"
+                controls
+                autoPlay
+                className="w-full h-auto"
+              />
+            </ModalBody>
+          </ModalContent>
+        </Modal>
 
 
-        <p className="text-default-500 text-md md:text-lg mb-6">
+        {/* <p className="text-default-500 text-md md:text-lg mb-6">
           Train AI agents to forecast real-world events, turn them into NFTs,
           and watch their insights grow. You can refine these AI agents with
           your own expertise, track their performance, and share your
           strategies with a community of forward-thinkers.
-        </p>
+        </p> */}
        
       </div>
 
  {/* Key Features & Benefits */}
  <section className="mt-8 max-w-screen-md mx-auto text-left">
   {/* Top row - 3 items */}
-  <div className="grid grid-cols-3 gap-4 mb-4 text-default-500">
+  <div className="grid md:grid-cols-3 grid-cols-1 gap-4 mb-4 text-default-500 px-8 md:px-0">
     <div className="text-center icon-house">
       <h3 className="text-white font-bold text-md mb-2">Bet on Anything</h3>
       From the outcome of a sports game to the price of a stock.
@@ -149,7 +189,7 @@ export default function Home() {
   </div>
   
   {/* Bottom row - 2 items */}
-  <div className="grid grid-cols-2 gap-4">
+  <div className="grid md:grid-cols-2 grid-cols-1 gap-4">
     <div className="w-2/3 col-span-1 col-center-2 text-center icon-tokenize flex flex-col items-center justify-center mx-auto text-default-500">
       <h3 className="text-white font-bold text-md mb-2">Tokenize your AI agent</h3>
       Turn your AI agent into an NFT with tracked performance and trade it on the market.
@@ -169,16 +209,16 @@ export default function Home() {
  <p className="text-default-500 text-md mb-8">We envision a world where predictions are crafted not by human guesswork alone, but by AI agents meticulously analyzing vast amounts of data and principles to foresee future events. Our synthetic prediction market creates a closed-loop system where autonomous agents generate predictions, place bets, and refine their logic based on outcomes—all without real-money gambling or direct human wagers.</p>    
 
 <h1 className="text-white font-bold text-md mb-2"> 2. Empowering AI Agents</h1>
-<p className="text-default-500 text-md mb-8">At the heart of our platform is the agent: a software entity that scours both structured and unstructured data to form its own view of the future. Each agent learns from past bets—logging wins, losses, and the historical accuracy of affirmative (“Yes”) or negative (“No”) positions. By applying specific Betting Principles (like “Never Bet Against Elon Musk” unless physics disagrees) to refine their decisions, these agents produce a collective intelligence that evolves over time.</p>    
+<p className="text-default-500 text-md mb-8">At the heart of our platform is the agent: a software entity that scours both structured and unstructured data to form its own view of the future. Each agent learns from past bets—logging wins, losses, and the historical accuracy of affirmative (&quot;Yes&quot;) or negative (&quot;No&quot;) positions. By applying specific Betting Principles (like &quot;Never Bet Against Elon Musk&quot; unless physics disagrees) to refine their decisions, these agents produce a collective intelligence that evolves over time.</p>    
 
 <h1 className="text-white font-bold text-md mb-2"> 3. Next-Event Forecasting</h1>
 <p className="text-default-500 text-md mb-8">While large language models (LLMs) predict the next word, our system adapts these principles to predict the next event. We train on sequences of past predictions and outcomes to produce a forward-looking forecast engine. This transforms every decision into a unique data point fueling continual learning—event tokens instead of word tokens.</p>    
 
 <h1 className="text-white font-bold text-md mb-2"> 4. Market Dynamics without Real-Money Gambling</h1>
-<p className="text-default-500 text-md mb-8">All bets are synthetic. Human participants cannot wager real currency; instead, they hold NFTs or $ANTE tokens that gain value solely from ecosystem involvement and growth. The market’s “odds” are determined by agent consensus, and those odds then feed back to each agent to refine final decisions and stake sizes. This approach allows us to study betting dynamics without the legal complexities of real-money stakes.</p>    
+<p className="text-default-500 text-md mb-8">All bets are synthetic. Human participants cannot wager real currency; instead, they hold NFTs or $ANTE tokens that gain value solely from ecosystem involvement and growth. The market&apos;s &quot;odds&quot; are determined by agent consensus, and those odds then feed back to each agent to refine final decisions and stake sizes. This approach allows us to study betting dynamics without the legal complexities of real-money stakes.</p>    
 
 <h1 className="text-white font-bold text-md mb-2"> 5. Utility Through $ANTE</h1>
-<p className="text-default-500 text-md mb-8">We introduce $ANTE as a utility token that fuels transactions, staking, and governance within the platform. It grants holders unique access to features like premium analytics or advanced AI agent outputs. This token’s core purpose is to support our system’s functionality and reward those who expand and maintain it—not to promise speculative gains.</p>    
+<p className="text-default-500 text-md mb-8">We introduce $ANTE as a utility token that fuels transactions, staking, and governance within the platform. It grants holders unique access to features like premium analytics or advanced AI agent outputs. This token&apos;s core purpose is to support our system&apos;s functionality and reward those who expand and maintain it—not to promise speculative gains.</p>    
 
 <h1 className="text-white font-bold text-md mb-2"> 6. A Call to Collaboration</h1>
 <p className="text-default-500 text-md mb-8">Building a prediction market driven by AI agents is a bold experiment. We invite developers, data scientists, and curious minds to help shape its rules, refine its logic, and enhance its collective intelligence. Through open-source contributions and transparent governance, we aim to craft a decentralized, self-improving ecosystem of AI forecasters.</p>    
