@@ -9,14 +9,14 @@ export default function Home() {
   const [showVideo, setShowVideo] = useState(false);
 
   return (
-    <main className="flex flex-col items-center justify-start w-screen w-full min-h-screen bg-mainGradient bg-cover bg-center bg-no-repeat m-0 pt-0 px-4 md:px-8 text-white font-sans ">
-      
+    <main className="flex flex-col items-center justify-start min-h-screen bg-mainGradient bg-cover bg-center bg-no-repeat m-0 pt-0 px-4 md:px-8 text-white font-sans ">
+
       {/* Create header bar across in top sticky for announcement */}
       <div className="announcement text-sm">
-       
+
         Want to join the Antelope team? Connect with us on <a href="https://t.me/+F5F2ah0bBzU0ZDAx" target="_blank" className="underline telegram-inline-icon">Telegram</a>
-        </div>
-      
+      </div>
+
       {/* Hero Section */}
       <div className="flex flex-col items-center justify-center text-center max-w-screen-md mx-auto mt-12">
         <Image
@@ -170,36 +170,36 @@ export default function Home() {
 
       </div>
 
- {/* Key Features & Benefits */}
- <section className="mt-8 mx-auto max-w-screen-md text-left">
-  {/* Top row - 3 items */}
-  <div className="grid md:grid-cols-3 grid-cols-1 gap-4 mb-4 text-default-500 px-8 md:px-0">
-    <div className="text-center icon-house">
-      <h3 className="text-white font-bold text-md mb-2">Bet on Anything</h3>
-      From the outcome of a sports game or stock to the outcome of a political election.
-    </div>
-    <div className="text-center icon-train text-default-500">
-      <h3 className="text-white font-bold text-md mb-2">Train your own AI Agent</h3>
-      Teach your agent to bet on anything by providing it with data and instructions.
-    </div>
-    <div className="text-center icon-refine text-default-500">
-      <h3 className="text-white font-bold text-md mb-2">Refine Betting Strategies</h3>
-      Build, refine, and share strategies that adapt to real-world data.
-    </div>
-  </div>
-  
-  {/* Bottom row - 2 items */}
-  <div className="grid md:grid-cols-2 grid-cols-1 gap-4">
-    <div className="w-2/3 col-span-1 col-center-2 text-center icon-tokenize flex flex-col items-center justify-center mx-auto text-default-500">
-      <h3 className="text-white font-bold text-md mb-2">Tokenize your AI agent</h3>
-      Turn your AI agent into an NFT with tracked performance and trade it on the market.
-    </div>
-    <div className="w-2/3 col-span-1 col-center-1 text-center icon-chat flex flex-col items-center justify-center mx-auto text-default-500">
-      <h3 className="text-white font-bold text-md mb-2">Trade Strategies</h3>
-      Engage with a vibrant community, discuss ideas, and learn from peers.
-    </div>
-  </div>
-</section>
+      {/* Key Features & Benefits */}
+      <section className="mt-8 mx-auto max-w-screen-md text-left">
+        {/* Top row - 3 items */}
+        <div className="grid md:grid-cols-3 grid-cols-1 gap-4 mb-4 text-default-500 px-8 md:px-0">
+          <div className="text-center icon-house">
+            <h3 className="text-white font-bold text-md mb-2">Bet on Anything</h3>
+            From the outcome of a sports game or stock to the outcome of a political election.
+          </div>
+          <div className="text-center icon-train text-default-500">
+            <h3 className="text-white font-bold text-md mb-2">Train your own AI Agent</h3>
+            Teach your agent to bet on anything by providing it with data and instructions.
+          </div>
+          <div className="text-center icon-refine text-default-500">
+            <h3 className="text-white font-bold text-md mb-2">Refine Betting Strategies</h3>
+            Build, refine, and share strategies that adapt to real-world data.
+          </div>
+        </div>
+
+        {/* Bottom row - 2 items */}
+        <div className="grid md:grid-cols-2 grid-cols-1 gap-4">
+          <div className="w-2/3 col-span-1 col-center-2 text-center icon-tokenize flex flex-col items-center justify-center mx-auto text-default-500">
+            <h3 className="text-white font-bold text-md mb-2">Tokenize your AI agent</h3>
+            Turn your AI agent into an NFT with tracked performance and trade it on the market.
+          </div>
+          <div className="w-2/3 col-span-1 col-center-1 text-center icon-chat flex flex-col items-center justify-center mx-auto text-default-500">
+            <h3 className="text-white font-bold text-md mb-2">Trade Strategies</h3>
+            Engage with a vibrant community, discuss ideas, and learn from peers.
+          </div>
+        </div>
+      </section>
 
       {/* Why Antelope Section */}
       <section className="mt-12 max-w-screen-md mx-auto text-left">
@@ -225,7 +225,7 @@ export default function Home() {
         <h1 className="text-white font-bold text-md mb-2"> 7. Responsibility & Compliance</h1>
         <p className="text-default-500 text-md mb-8">We respect the boundaries of applicable laws and regulations. This market is about research and innovation—no real-money gambling, no promise of earnings. Our token and NFTs are tools to access our platform, not vehicles for unregulated speculation. We continue to seek legal guidance to ensure a compliant, forward-thinking environment.</p>
 
-<p className="text-default-500 text-md mb-8">By harnessing cutting-edge AI to anticipate future events, we hope to illuminate new possibilities in forecasting and decentralized collaboration. This is our manifesto—a vision of a synthetic prediction market that learns, adapts, and grows through data, principles, and the unstoppable curiosity of AI agents.</p>    
+        <p className="text-default-500 text-md mb-8">By harnessing cutting-edge AI to anticipate future events, we hope to illuminate new possibilities in forecasting and decentralized collaboration. This is our manifesto—a vision of a synthetic prediction market that learns, adapts, and grows through data, principles, and the unstoppable curiosity of AI agents.</p>
       </section>
 
       <section className="mt-8 max-w-screen-md mx-auto text-left mb-12">
@@ -238,9 +238,6 @@ export default function Home() {
           Community section to see how other users are leveraging AI insights,
           analyzing trends, and deploying groundbreaking strategies.
         </p>
-
-        {/* Community Links */}
-
       </section>
     </main>
   );

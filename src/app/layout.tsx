@@ -22,9 +22,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="bg-mainGradient min-h-screen" style={{ backgroundColor: '#16181c' }}>
-            <head>
-        <Script 
+    <html lang="en" style={{ backgroundColor: '#16181c' }}>
+      <head>
+        <Script
           src="https://www.googletagmanager.com/gtag/js?id=G-RE8DXNRE5W"
           strategy="afterInteractive"
         />
