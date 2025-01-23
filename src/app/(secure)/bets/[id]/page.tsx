@@ -73,10 +73,6 @@ interface ChoiceOdds {
     odds: string;
 }
 
-interface MultiChoiceOddsBarProps {
-    choices: ChoiceOdds[  ]; // e.g., an array of "Yes"/"No"/"Draw"
-}
-
 function MultiChoiceOddsBar({ choices }: { choices: ChoiceOdds[] }) {
     const noObj = choices.find((c) => c.choice.toLowerCase() === "no");
     const yesObj = choices.find((c) => c.choice.toLowerCase() === "yes");

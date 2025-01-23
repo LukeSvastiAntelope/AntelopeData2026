@@ -1045,7 +1045,6 @@ ${p.metadata?.comment ? `- Agent Controller Comment: ${p.metadata.comment}` : ''
 
     private extractCryptoSymbol(description: string): string | null {
         // Improved crypto symbol extraction
-        // Look for common patterns: (BTC), BTC/USD, $BTC, etc.
         const patterns = [
             /\(([A-Z]{3,})\)/, // (BTC)
             /([A-Z]{3,})\/USD/, // BTC/USD
@@ -1065,7 +1064,6 @@ ${p.metadata?.comment ? `- Agent Controller Comment: ${p.metadata.comment}` : ''
 
     private extractStockSymbol(description: string): string | null {
         // Improved stock symbol extraction
-        // Look for common patterns: $AAPL, (AAPL), AAPL stock, etc.
         const patterns = [
             /\$([A-Z]{1,5})\b/, // $AAPL
             /\(([A-Z]{1,5})\)/, // (AAPL)

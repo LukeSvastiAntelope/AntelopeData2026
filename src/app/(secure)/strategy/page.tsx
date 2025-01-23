@@ -14,11 +14,8 @@ import { convertDaysToYMD } from "@/app/utils/lib";
 import { CATEGORIES } from "@/app/utils/const";
 import { Switch } from "@nextui-org/switch";
 import { Tooltip } from "@nextui-org/tooltip";
+import * as XLSX from 'xlsx';
 
-/**
- * StrategySkeleton: Skeleton loader that matches the layout for "Strategy Page"
- * Adapted from ProfileSkeleton for consistency.
- */
 const StrategySkeleton = () => {
   return (
     <div>
@@ -35,6 +32,14 @@ const StrategySkeleton = () => {
         <Skeleton className="h-6 w-64 rounded-lg" />
         <Skeleton className="h-10 w-32 rounded-lg" />
       </div>
+
+      {/* Talk Strategy Card */}
+      <Card className="my-8 bg-content0">
+        <CardHeader className="text-small font-regular flex justify-between">
+          <Skeleton className="h-6 w-48 rounded-lg" />
+          <Skeleton className="h-8 w-24 rounded-lg" />
+        </CardHeader>
+      </Card>
 
       {/* Betting Settings Card */}
       <Card className="mb-8 bg-content0">
@@ -88,31 +93,30 @@ const StrategySkeleton = () => {
 
       {/* Principles Skeleton */}
       <Card className="mb-8">
-        <CardHeader>
+        <CardHeader className="flex justify-between">
           <Skeleton className="h-6 w-40 rounded-lg" />
+          <Skeleton className="h-8 w-24 rounded-lg" />
         </CardHeader>
         <Divider />
         <CardBody>
           <div className="space-y-4">
             {[...Array(2)].map((_, i) => (
-              <Card key={i} shadow="sm">
-                <CardBody className="p-2 bg-none">
+              <Card key={i} shadow="none" className="bg-transparent">
+                <CardBody>
                   <Skeleton className="h-5 w-32 rounded-lg mb-2" />
                   <Skeleton className="h-4 w-full rounded-lg" />
                 </CardBody>
-
               </Card>
-
             ))}
           </div>
         </CardBody>
-
       </Card>
 
       {/* Risk Profile Skeleton */}
       <Card>
-        <CardHeader>
+        <CardHeader className="flex justify-between">
           <Skeleton className="h-6 w-32 rounded-lg" />
+          <Skeleton className="h-8 w-24 rounded-lg" />
         </CardHeader>
         <Divider />
         <CardBody>
@@ -143,14 +147,33 @@ export default function StrategyPage() {
   const [resolutionDate, setResolutionDate] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isBettingEnabled, setIsBettingEnabled] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
   const fetch = useFetch();
+
+  const handlePineconeDownload = async () => {
+    setIsDownloading(true);
+    try {
+      const response = await fetch.get('/api/pinecone');
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.json_to_sheet(response);
+      XLSX.utils.book_append_sheet(wb, ws, "Predictions");
+      XLSX.writeFile(wb, "predictions.xlsx");
+    } catch (error) {
+      console.error("Error downloading excel:", error);
+      toast.error("Failed to download excel");
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
+  const handlePineconeUpload = async () => {
+    console.log("Uploading Pinecone memory...");
+  };
 
   useEffect(() => {
     const fetchAgentProfile = async () => {
       setIsLoading(true);
       try {
-        // For demonstration, reusing the same endpoint as the profile.
-        // If your backend provides a separate endpoint, replace accordingly.
         const response = await fetch.get("/api/getAgentProfile");
         if (response.status) {
           setAgent(response.agent);
@@ -264,6 +287,34 @@ export default function StrategyPage() {
         </CardHeader>
       </Card>
 
+      {/* New Pinecone Data Management Card */}
+      <Card className="my-8 bg-content0">
+        <CardHeader className="text-small font-regular flex justify-between">
+          <span className="message-circle ml-1">Agent Memory Management</span>
+          <div className="flex gap-2">
+            <Button
+              color="primary"
+              variant="flat"
+              className="text-small"
+              size="sm"
+              onPress={() => handlePineconeDownload()}
+              isLoading={isDownloading}
+            >
+              Download Memory
+            </Button>
+            <Button
+              color="primary"
+              variant="flat"
+              className="text-small"
+              size="sm"
+              onPress={() => handlePineconeUpload()}
+            >
+              Upload Memory
+            </Button>
+          </div>
+        </CardHeader>
+      </Card>
+
       <Card className="my-8 bg-content0">
         <CardHeader className="text-small font-regular flex justify-between ml-2">
         <Tooltip content="Choose the category of events your agent will focus on" showArrow>
@@ -329,9 +380,9 @@ export default function StrategyPage() {
       {/* Betting Principles */}
       <Card className="mb-8 bg-content0">
         <CardHeader className="text-small font-regular flex justify-between mx-2">
-        <Tooltip content="A principle guides the agent's betting ethics or approach" showArrow>
-          Betting Principles
-        </Tooltip>
+          <Tooltip content="A principle guides the agent's betting ethics or approach" showArrow>
+            Betting Principles
+          </Tooltip>
           <Tooltip content="Edit the guidelines that shape your agent's betting approach" showArrow>
             <Button
               color="default"
@@ -386,28 +437,28 @@ export default function StrategyPage() {
         <Divider />
         <CardBody>
           <div className="space-y-6 text-small mx-2">
-      
+
             <RiskItem
               level="Conservative"
               description={agent?.conservativeBetSize?.toString() || "0"}
               value={(agent?.conservativeBetSize ?? 0) * 100 / (agent?.maxBetSize ?? 1)}
               color="success"
             />
-     
+
             <RiskItem
               level="Moderate"
               description={agent?.moderateBetSize?.toString() || "0"}
               value={(agent?.moderateBetSize ?? 0) * 100 / (agent?.maxBetSize ?? 1)}
               color="warning"
-              />
-    
+            />
+
             <RiskItem
               level="Aggressive"
               description={agent?.aggressiveBetSize?.toString() || "0"}
               value={(agent?.aggressiveBetSize ?? 0) * 100 / (agent?.maxBetSize ?? 1)}
               color="danger"
             />
-        
+
           </div>
         </CardBody>
       </Card>
@@ -424,9 +475,9 @@ interface PrincipleCardProps {
 const PrincipleCard = ({ title, description }: PrincipleCardProps) => (
   <Card shadow="none" className="bg-transparent">
     <CardBody>
-      
-        <h3 className="font-regular mb-2">{title}</h3>
-     
+
+      <h3 className="font-regular mb-2">{title}</h3>
+
       <p className="text-default-500">{description}</p>
     </CardBody>
   </Card>
@@ -443,7 +494,7 @@ const RiskItem = ({ level, description, value, color }: RiskItemProps) => (
   <div className="space-y-2">
     <div className="flex justify-between items-center">
       <Tooltip content={`${level} risk attitude label`} showArrow>
-     
+
         <span className="font-regular">{level}</span>
       </Tooltip>
       <span className="text-default-500">{description}</span>

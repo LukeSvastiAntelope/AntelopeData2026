@@ -14,22 +14,41 @@ import { LoginButton, TelegramAuthData } from '@telegram-auth/react';
 // Skeleton for loading state
 const ProfileSkeleton = () => {
     return (
-        <div className="bg-content1/50 backdrop-blur-md rounded-2xl p-8 shadow-lg border border-white/10">
-            <div className="flex flex-col md:flex-row items-center gap-8">
-                <div className="relative">
+        <div className="space-y-8">
+            {/* Profile Info Section Skeleton */}
+            <div className="bg-content1/50 backdrop-blur-md rounded-2xl p-8 shadow-lg border border-white/10">
+                <Skeleton className="h-8 w-48 mb-4" /> {/* "Profile Information" heading */}
+                
+                {/* Avatar and Upload Button */}
+                <div className="flex flex-col md:flex-row items-center gap-8 mb-6">
                     <Skeleton className="w-[140px] h-[140px] rounded-full" />
-                    <div className="absolute -bottom-3 left-1/2 -translate-x-1/2">
-                        <Skeleton className="h-8 w-28 rounded-lg" />
+                    <Skeleton className="h-10 w-32" /> {/* Change Avatar button */}
+                </div>
+
+                <div className="flex flex-col md:flex-row items-start gap-8">
+                    <div className="flex-1 space-y-4">
+                        <Skeleton className="h-14 w-full max-w-md" /> {/* Name input */}
+                        <Skeleton className="h-24 w-full max-w-md" /> {/* Description textarea */}
                     </div>
                 </div>
-                <div className="flex-1 text-center md:text-left space-y-3">
-                    <Skeleton className="h-10 w-64 rounded-lg mb-2" />
-                    <Skeleton className="h-20 w-full rounded-lg mb-4" />
-                    <div className="flex flex-wrap gap-2 mt-4 justify-center md:justify-start">
-                        {[...Array(3)].map((_, i) => (
-                            <Skeleton key={i} className="h-8 w-28 rounded-full" />
-                        ))}
-                    </div>
+
+                {/* Action Buttons */}
+                <div className="mt-6 flex items-center gap-4">
+                    <Skeleton className="h-10 w-32" /> {/* Update Profile button */}
+                    <Skeleton className="h-10 w-36" /> {/* Telegram button */}
+                </div>
+            </div>
+
+            {/* Credentials Section Skeleton */}
+            <div className="bg-content1/50 backdrop-blur-md rounded-2xl p-8 shadow-lg border border-white/10">
+                <Skeleton className="h-8 w-32 mb-4" /> {/* "Credentials" heading */}
+                <div className="flex flex-col gap-4 max-w-md">
+                    <Skeleton className="h-14 w-full" /> {/* Current Password */}
+                    <Skeleton className="h-14 w-full" /> {/* New Password */}
+                    <Skeleton className="h-14 w-full" /> {/* Confirm Password */}
+                </div>
+                <div className="mt-6">
+                    <Skeleton className="h-10 w-36" /> {/* Update Password button */}
                 </div>
             </div>
         </div>
