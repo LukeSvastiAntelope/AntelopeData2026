@@ -9,6 +9,7 @@ import Link from "next/link";
 import Image from "next/image";
 import PredictionDialog from "../components/PredictionDialog";
 import AgentProfileDialog from "../components/AgentProfileDialog";
+import { Tooltip as NextUITooltip } from "@nextui-org/tooltip";
 
 const AsideSkeleton = () => {
     return (
@@ -163,6 +164,7 @@ const SecureLayout = ({ children }: { children: React.ReactNode }) => {
                                             <div className="flex flex-row md:flex-col justify-evenly w-full md:gap-4">
                                                 <div className="flex md:inline-block items-center ">
                                                     {/* Large logo for md+ */}
+                                                    <Link href="/">
                                                     <span className="hidden md:inline-block ">
                                                         <Image
                                                             src={"/assets/images/logo-text.svg"}
@@ -172,6 +174,7 @@ const SecureLayout = ({ children }: { children: React.ReactNode }) => {
                                                             className="mr-2 w-100"
                                                         />
                                                     </span>
+                                                    </Link>
                                                 </div>
 
                                                 {/* Profile Photo */}
@@ -180,56 +183,73 @@ const SecureLayout = ({ children }: { children: React.ReactNode }) => {
                                                     <Image
                                                         src={agent?.image || "/assets/images/logo-simple.svg"}
                                                         alt="Profile"
-                                                        width={32}
-                                                        height={32}
-                                                        className="rounded-full bg-gray-700 sm-hidden"
+                                                        width={40}
+                                                        height={40}
+                                                        className="rounded-full sm-hidden border border-dashed border-primary p-1"
                                                     />
 
                                                     <div className="flex flex-col">
 
-                                                        <Link className="text-sm font-semibold font-kodemono w-full"
-                                                            href="/profile">{agent?.name || "Agent Name"}</Link>
+                                                        <NextUITooltip content="View your profile" placement="right">
+                                                            <Link className="text-sm font-semibold font-kodemono w-full"
+                                                                href="/profile">{agent?.name || "Agent Name"}</Link>
+                                                        </NextUITooltip>
 
-                                                        <Link className="text-gradient-red hover-white" href="/payment">
-                                                            <span className="icon-coin-red icon-text">
-                                                                {agent?.wallet_balance?.toLocaleString() || 0}
-                                                            </span>
-                                                        </Link>
+                                                        <NextUITooltip content="Check your wallet" placement="right">
+                                                            <Link className="text-gradient-red hover-white" href="/payment">
+                                                                <span className="icon-coin-red icon-text">
+                                                                    {agent?.wallet_balance?.toLocaleString() || 0}
+                                                                </span>
+                                                            </Link>
+                                                        </NextUITooltip>
                                                     </div>
                                                 </div>
 
-                                                <Link href="/" className={`flex items-center group md:gap-2 ${pathname === '/dashboard' ? 'text-white' : 'text-default-400 hover:text-white'}`}>
+                                                <Link
+                                                    href="/dashboard"
+                                                    className={`flex items-center group md:gap-2 ${pathname === '/dashboard' ? 'text-white' : 'text-default-400 hover:text-white'}`}
+                                                >
                                                     <span className={`icon-dashboard-active group-hover:block ${pathname === '/dashboard' ? 'block' : 'hidden'}`} />
                                                     <span className={`icon-dashboard group-hover:hidden ${pathname === '/dashboard' ? 'hidden' : 'block'}`} />
                                                     <span className="hidden font-kodemono md:inline-block">Overview</span>
                                                 </Link>
 
-                                                <Link href="/markets" className={`flex items-center group md:gap-2 ${pathname === '/markets' ? 'text-white' : 'text-default-400 hover:text-white'}`}>
+                                                <Link
+                                                    href="/markets"
+                                                    className={`flex items-center group md:gap-2 ${pathname === '/markets' ? 'text-white' : 'text-default-400 hover:text-white'}`}
+                                                >
                                                     <span className={`icon-markets-active group-hover:block ${pathname === '/markets' ? 'block' : 'hidden'}`} />
                                                     <span className={`icon-markets group-hover:hidden ${pathname === '/markets' ? 'hidden' : 'block'}`} />
                                                     <span className="hidden font-kodemono md:inline-block">Markets</span>
                                                 </Link>
 
-                                                <Link href="/strategy" className={`flex items-center group md:gap-2 ${pathname === '/strategy' ? 'text-white' : 'text-default-400 hover:text-white'}`}>
+                                                <Link
+                                                    href="/strategy"
+                                                    className={`flex items-center group md:gap-2 ${pathname === '/strategy' ? 'text-white' : 'text-default-400 hover:text-white'}`}
+                                                >
                                                     <span className={`icon-strategy-active group-hover:block ${pathname === '/strategy' ? 'block' : 'hidden'}`} />
                                                     <span className={`icon-strategy group-hover:hidden ${pathname === '/strategy' ? 'hidden' : 'block'}`} />
                                                     <span className="hidden font-kodemono md:inline-block">Strategy</span>
                                                 </Link>
+
                                                 <Link
                                                     href="#"
                                                     onClick={openPredictionDialog}
-                                                    className="flex items-center group md:gap-2 text-default-400 hover:text-white p-2 border border-white/10 rounded-lg"
+                                                    className="flex items-center group md:gap-2 text-default-400 hover:text-white p-2 border border-white/10 rounded-lg w-fit"
                                                 >
                                                     <span className="plus-circle-on group-hover:border-white hidden group-hover:block text-white" />
                                                     <span className="plus-circle-off block group-hover:hidden" />
-                                                    <span className="hidden font-kodemono md:inline-block">Add Prediction</span>
+                                                    <span className="hidden font-kodemono md:inline-block ">Predict</span>
                                                 </Link>
                                             </div>
 
                                             <div className="md:hidden min-w-40px min-h-40px max-w-40px max-h-40px center-logo"></div>
 
                                             <div className="flex flex-row md:flex-col justify-evenly w-full md:gap-4 ">
-                                                <Link href="/about" className={`flex items-center group md:gap-2 ${pathname === '/about' ? 'text-white' : 'text-default-400 hover:text-white'}`}>
+                                                <Link
+                                                    href="/about"
+                                                    className={`flex items-center group md:gap-2 ${pathname === '/about' ? 'text-white' : 'text-default-400 hover:text-white'}`}
+                                                >
                                                     <span className={`icon-about-active group-hover:block ${pathname === '/about' ? 'block' : 'hidden'}`} />
                                                     <span className={`icon-about group-hover:hidden ${pathname === '/about' ? 'hidden' : 'block'}`} />
                                                     <span className="hidden font-kodemono md:inline-block">About</span>
@@ -244,7 +264,10 @@ const SecureLayout = ({ children }: { children: React.ReactNode }) => {
                                                         <span className="hidden md:inline-block">Community</span>
                                                     </span>
                                                 </Link>
-                                                <Link href="/logout" className="flex items-center text-default-400 group md:gap-2">
+                                                <Link
+                                                    href="/logout"
+                                                    className="flex items-center text-default-400 group md:gap-2"
+                                                >
                                                     <span className="icon-logout block group-hover:hidden" />
                                                     <span className="icon-logout-active hidden group-hover:block" />
                                                     <span className="text-default-400 group-hover:text-white font-kodemono">

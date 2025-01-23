@@ -253,17 +253,23 @@ export default function StrategyPage() {
 
       <Card className="my-8 bg-content0 ">
         <CardHeader className="text-small font-regular flex justify-between">
-          <span className="message-circle ml-1">Talk strategy with your agent</span>
+        <Tooltip content="Begin an interactive session to train your agent" showArrow>
+          <span className="message-circle ml-1">Talk strategy with your agent</span>  
+          </Tooltip>
+          <Tooltip content="Begin an interactive session to train your agent" showArrow>
           <Button color="primary" variant="flat" className="text-small" href="/ask-agent" size="sm" as="a">
             Talk
           </Button>
+          </Tooltip>
         </CardHeader>
       </Card>
 
       <Card className="my-8 bg-content0">
         <CardHeader className="text-small font-regular flex justify-between ml-2">
-          Betting Basic
-          <Tooltip content="Adjust your agent's basic betting preferences" showArrow>
+        <Tooltip content="Choose the category of events your agent will focus on" showArrow>
+          Betting Category
+          </Tooltip>
+          <Tooltip content="Modify the category of events your agent will focus on" showArrow>
             <Button
               color="default"
               variant="flat"

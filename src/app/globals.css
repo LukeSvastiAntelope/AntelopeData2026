@@ -286,19 +286,16 @@ max-width: 80px;
   background-repeat: no-repeat;
   background-position: left center;
   padding-left: 16px;
- 
-
 }
 
 .icon-coin-bigger {
   background-image: url('/assets/images/coin.svg');
   background-size: 12px 12px;
   background-repeat: no-repeat;
-  background-position: center;
+  background-position: 8px center;
   padding-left: 16px;
   margin-right: 16px;
-  width: 12px;
-  height: 12px;
+  
 }
 
 .icon-text {
@@ -462,7 +459,7 @@ max-width: 80px;
   background-size: 16px 16px;
   background-repeat: no-repeat;
   background-position: 6px center;
-  padding-left: 22px;
+  padding-left: 24px;
   /* margin-right: 16px; */
 
 }   
@@ -472,7 +469,7 @@ max-width: 80px;
   background-size: 16px 16px;
   background-repeat: no-repeat;
   background-position: 6px center;
-  padding-left: 22px;
+  padding-left: 24px;
   /* margin-right: 16px; */
 
 }
@@ -492,9 +489,7 @@ max-width: 80px;
 
 .icon-profile:hover {
   background-image: url('/assets/images/profile.svg');
-
   transition: background-image 0.2s ease-in-out;
- 
 }
 
 .text-gradient {

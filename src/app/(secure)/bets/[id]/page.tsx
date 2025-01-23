@@ -3,7 +3,6 @@
 import { Chip } from "@nextui-org/chip";
 import { Image } from "@nextui-org/image";
 import { Button } from "@nextui-org/button";
-import { Tooltip } from "@nextui-org/tooltip";
 import { useState, useEffect } from "react";
 import { useFetch } from "@/app/utils/lib";
 import { IBet, PredictionDB } from "@/app/utils/interface";
@@ -16,14 +15,17 @@ import {
     CategoryScale,
     LinearScale,
     Title,
+    Tooltip,
     Legend,
 } from "chart.js";
+import { Tooltip as NextUITooltip } from "@nextui-org/tooltip";
 
 ChartJS.register(
     BarElement,
     CategoryScale,
     LinearScale,
     Title,
+    Tooltip,
     Legend
 );
 
@@ -75,24 +77,26 @@ interface MultiChoiceOddsBarProps {
     choices: ChoiceOdds[  ]; // e.g., an array of "Yes"/"No"/"Draw"
 }
 
-const MultiChoiceOddsBar = ({ choices }: MultiChoiceOddsBarProps) => {
-    // Accumulator to position each segment's left offset
+function MultiChoiceOddsBar({ choices }: { choices: ChoiceOdds[] }) {
+    const noObj = choices.find((c) => c.choice.toLowerCase() === "no");
+    const yesObj = choices.find((c) => c.choice.toLowerCase() === "yes");
+
     let accumulated = 0;
 
     return (
         <div className="w-full mb-4">
             <div className="relative w-full bg-white/5 rounded-lg overflow-hidden p-4">
-                {/* Single combined bar */}
+            <div className="text-sm text-white/60 w-full text-center mb-2">Combined Odds</div>
+                {/* Single combined bar segments */}
                 <div className="h-2 w-full bg-white/10 rounded-full mb-3 relative overflow-hidden">
-                    {choices.map(c => {
-                        // Decide a color style for each choice
+                    {choices.map((c) => {
                         let segmentColor = "bg-orange-400/90";
                         if (c.choice.toLowerCase() === "yes") {
-                            segmentColor = "bg-emerald-400/90";
+                            segmentColor = "bg-success";
                         } else if (c.choice.toLowerCase() === "no") {
-                            segmentColor = "bg-red-400/90";
+                            segmentColor = "bg-danger";
                         } else if (c.choice.toLowerCase() === "draw") {
-                            segmentColor = "bg-yellow-400/90";
+                            segmentColor = "bg-warning";
                         }
 
                         const widthFraction = parseFloat(c.percentage);
@@ -100,14 +104,15 @@ const MultiChoiceOddsBar = ({ choices }: MultiChoiceOddsBarProps) => {
                             left: `${accumulated}%`,
                             width: `${widthFraction}%`,
                         };
-
-                        // Update the accumulated offset for the next segment
                         accumulated += widthFraction;
 
-                        const tooltipContent = `${c.choice[0]?.toUpperCase() + c.choice.slice(1)}: ${c.percentage}% (${c.odds}) | Bets: ${c.count}`;
+                        // Define tooltip content
+                        const tooltipContent = `${
+                            c.choice[0]?.toUpperCase() + c.choice.slice(1)
+                        }: ${c.percentage}% (x${c.odds}) | Bets: ${c.count}`;
 
                         return (
-                            <Tooltip 
+                            <NextUITooltip
                                 key={c.choice}
                                 content={tooltipContent}
                                 showArrow
@@ -118,32 +123,35 @@ const MultiChoiceOddsBar = ({ choices }: MultiChoiceOddsBarProps) => {
                                     className={`absolute top-0 bottom-0 ${segmentColor} transition-all duration-300 cursor-pointer`}
                                     style={style}
                                 />
-                            </Tooltip>
+                            </NextUITooltip>
                         );
                     })}
                 </div>
 
-                {/* Below the progress bar, show details */}
+                {/* Below the bar — No (left), Combined Odds (center), Yes (right) */}
                 <div className="flex items-center justify-between">
-                    <div className="text-sm text-white/60">
-                        {/* Could show "Yes / No / Draw" or any other info */}
-                        Combined Odds
+                     
+                    {/* LEFT: No */}
+                    <div className="flex flex-col items-start text-white icon-thumbs-down">
+                        
+                        <span className="text-sm font-bold text-white pr-1 ">
+                            {noObj ? `${noObj.percentage}% (x${noObj.odds})` : "0% (x∞)"}
+                        </span>
                     </div>
-                    <div className="flex items-center gap-4">
-                        {choices.map((c) => (
-                            <div key={c.choice} className="flex flex-col items-end">
-                                <span className="text-xs text-white/60">{c.choice}</span>
-                                <span className="text-sm font-bold text-white">
-                                    {c.percentage}%
-                                </span>
-                            </div>
-                        ))}
+                    {/* MIDDLE: Combined Odds */}
+                  
+                    {/* RIGHT: Yes */}
+                    <div className="flex flex-col items-end text-white">
+                      
+                        <span className="text-sm font-bold text-white icon-thumbs-up">
+                            {yesObj ? `${yesObj.percentage}% (x${yesObj.odds})` : "0% (x∞)"}
+                        </span>
                     </div>
                 </div>
             </div>
         </div>
     );
-};
+}
 
 export default function BetDetailPage() {
     const params = useParams();
@@ -189,20 +197,15 @@ export default function BetDetailPage() {
                 // Parse the bets string and calculate totals
                 if (response.prediction?.bets) {
                     const betsArray: BetData[] = response.prediction.bets;
-                    
-                    // Filter or just calculate totals for yes and no 
                     const choiceTotals = betsArray.reduce((acc, b) => {
-                        // Only track yes/no (or yes/no/draw if you prefer)
-                        const lowered = b.choice.toLowerCase();
-                        if (lowered === "yes" || lowered === "no") {
-                            acc[lowered] = (acc[lowered] || 0) + b.amount;
-                        }
+                        acc[b.choice.toLowerCase()] = (acc[b.choice.toLowerCase()] || 0) + b.amount;
                         return acc;
-                    }, {} as Record<string, number>);
+                    }, {} as Record<string, number>) || {};
 
                     const totalAmount = Object.values(choiceTotals).reduce((sum, amount) => sum + amount, 0);
 
-                    const newChoiceOdds = Object.entries(choiceTotals).map(([choice, amount]) => {
+                    // Calculate odds for each choice
+                    const choiceOdds = Object.entries(choiceTotals).map(([choice, amount]) => {
                         const percentage = totalAmount > 0 ? (amount / totalAmount) * 100 : 0;
                         const odds = percentage > 0 ? (100 / percentage).toFixed(2) : "∞";
                         return {
@@ -210,12 +213,10 @@ export default function BetDetailPage() {
                             amount,
                             odds,
                             percentage: percentage.toFixed(1),
-                            count: betsArray.filter(bet => bet.choice.toLowerCase() === choice).length
+                            count: betsArray.filter(bet => bet.choice === choice).length
                         };
                     });
-
-                    // This newChoiceOdds will have two entries: one for 'yes', one for 'no'
-                    setChoiceOdds(newChoiceOdds);
+                    setChoiceOdds(choiceOdds);
                 }
             } else {
                 toast.error(response.message);
@@ -275,9 +276,9 @@ export default function BetDetailPage() {
                                 <div className="color-white">
                                     {
                                         bet.user_id === Number(localStorage.getItem("userId")) &&
-                                        <div className="p-4 border border-white/10 rounded-lg">
-                                            <h2 className="text-lg font-semibold mb-4">Reasoning</h2>
-                                            <p className="text-default-400 leading-relaxed ">{bet.reason}</p>
+                                        <div className="">
+                                            <h2 className="text-small font-semibold mb-4">Reasoning</h2>
+                                            <p className="text-default-400 text-small leading-relaxed ">{bet.reason}</p>
                                             {
                                                 pineconeData && pineconeData.metadata?.comment && (
                                                     <>
@@ -286,104 +287,71 @@ export default function BetDetailPage() {
                                                     </>
                                                 )
                                             }
+                                            <NextUITooltip content="Give your agent more context to improve its reasoning.">
                                             <Button
                                                 color="primary"
                                                 variant="light"
-                                                className="text-primary bg-primary/20 text-sm mt-2 hover:bg-primary hover:text-white"
+                                                className="text-primary bg-primary/20  text-sm mt-2 hover:bg-primary/40 w-full text-small"
                                                 onPress={() => setShowCommentModal(true)}
-                                            > Adjust Reasoning
+                                            >
+                                                Adjust Reasoning
                                             </Button>
+                                            </NextUITooltip>
                                         </div>
                                     }
                                     <div className="w-full mt-8">
-                                        <h2 className="text-lg font-semibold mb-4">Bet Details</h2>
+                                        <h2 className="text-small font-semibold mb-4">Bet Details</h2>
                                         <div className="grid grid-cols-2 grid-rows-4 md:grid-cols-4 md:grid-rows-2 gap-4">
                                             <div>
                                                 <h3 className="text-sm font-medium text-default-400 mb-1 ">Status</h3>
-                                                <Tooltip
-                                                    content={
-                                                        bet.status === "open"
-                                                            ? "Currently open for betting"
-                                                            : bet.outcome === bet.choice
-                                                            ? "You won this bet!"
-                                                            : "You lost this bet."
-                                                    }
-                                                    color="primary"
-                                                    showArrow
-                                                    placement="top-start"
-                                                >
-                                                    <Chip color={bet.status !== "open" ? (bet.outcome === bet.choice ? "success" : "danger") : "primary"} className="bg-primary/20">
+                                                <NextUITooltip content="Bet status can be 'open', 'won', or 'lost'.">
+                                                    <Chip color={bet.status !== "open" ? (bet.outcome === bet.choice ? "success" : "danger") : "primary"} className="bg-primary/20 capitalize">
                                                         {bet.status !== "open"
                                                             ? (bet.outcome === bet.choice ? "Won" : "Lost")
                                                             : bet.status
                                                         }
                                                     </Chip>
-                                                </Tooltip>
+                                                </NextUITooltip>
                                             </div>
                                             <div>
-                                                <h3 className="text-sm font-medium text-default-400 mb-1">Credits</h3>
-                                                <p className="text-sm font-semibold"><span className=" inline-block ">{bet.amount}</span></p>
+                                                <h3 className="text-sm font-medium text-default-400 mb-1 ">Credits</h3>
+                                                <NextUITooltip content="The number of credits staked on this bet.">
+                                                    <Chip className="bg-primary/20 ml-0 capitalize  icon-coin-bigger ">{bet.amount}</Chip>
+                                                </NextUITooltip>
                                             </div>
                                             <div>
                                                 <h3 className="text-sm font-medium text-default-400 mb-1">Your Choice</h3>
-                                                <Tooltip
-                                                    content={`This was your bet choice: "${bet.choice}"`}
-                                                    color="primary"
-                                                    showArrow
-                                                    placement="top-start"
-                                                >
+                                                <NextUITooltip content="The outcome you predicted.">
                                                     <Chip color="secondary" className="bg-primary/20 capitalize">{bet.choice}</Chip>
-                                                </Tooltip>
+                                                </NextUITooltip>
                                             </div>
                                             <div>
                                                 <h3 className="text-sm font-medium text-default-400 mb-1">Creator&apos;s Choice</h3>
-                                                <Tooltip
-                                                    content={`The creator predicted: "${
-                                                        prediction?.creator_choice
-                                                    }"`}
-                                                    color="primary"
-                                                    showArrow
-                                                    placement="top-start"
-                                                >
-                                                    <Chip color="secondary" className="bg-primary/20 capitalize">{prediction?.creator_choice}</Chip>
-                                                </Tooltip>
+                                                <NextUITooltip content="The original outcome predicted by the bet's creator.">
+                                                    <Chip color="secondary" className="bg-primary/20 capitalize">{bet.predicted_outcome || bet.creator_choice}</Chip>
+                                                </NextUITooltip>
                                             </div>
                                             <div>
                                                 <h3 className="text-sm font-medium text-default-400 mb-1">Validation Source</h3>
-                                                <Tooltip
-                                                    content={`The outcome is validated by: ${bet.source}`}
-                                                    color="primary"
-                                                    showArrow
-                                                    placement="top-start"
-                                                >
+                                                <NextUITooltip content="Where the final result is verified (e.g., official APIs or event outcomes).">
                                                     <p className="text-sm font-semibold">{bet.source}</p>
-                                                </Tooltip>
+                                                </NextUITooltip>
                                             </div>
 
                                             <div className="flex flex-col gap-1">
                                                 {bet.status === "open" ? (
                                                     <>
                                                         <h3 className="text-sm font-medium text-default-400">Created</h3>
-                                                        <Tooltip
-                                                            content="Bet created date"
-                                                            color="primary"
-                                                            showArrow
-                                                            placement="top-start"
-                                                        >
+                                                        <NextUITooltip content="Date when the bet was created.">
                                                             <p className="text-sm font-semibold">{new Date(bet.created_at).toLocaleDateString()}</p>
-                                                        </Tooltip>
+                                                        </NextUITooltip>
                                                     </>
                                                 ) : (
                                                     <>
                                                         <h3 className="text-sm font-medium text-default-400">Resolved</h3>
-                                                        <Tooltip
-                                                            content="Bet resolution date"
-                                                            color="primary"
-                                                            showArrow
-                                                            placement="top-start"
-                                                        >
+                                                        <NextUITooltip content="Date when the bet was resolved.">
                                                             <p className="text-sm font-semibold">{new Date(bet.resolution_date).toLocaleDateString()}</p>
-                                                        </Tooltip>
+                                                        </NextUITooltip>
                                                     </>
                                                 )}
                                             </div>
@@ -394,7 +362,7 @@ export default function BetDetailPage() {
                             {prediction?.log && (
                                 <div className="mt-8">
                                     <div className="bg-content0 rounded-lg p-8">
-                                        <h2 className="text-xl font-semibold mb-4">Resolution Log</h2>
+                                        <h2 className="text-small font-semibold mb-4">Resolution Log</h2>
                                         <div className="space-y-4">
                                             {parseLogEntries(prediction.log).map((entry, index) => (
                                                 <div key={index} className="flex flex-col gap-1">
@@ -415,7 +383,7 @@ export default function BetDetailPage() {
                                     <div className="mt-0">
                                         <div className="bg-content0 rounded-lg p-8 ">
                                             <div className="flex flex-col gap-4">
-                                                <h2 className="text-xl font-semibold mb-4">Reasoning Log</h2>
+                                                <h2 className="text-small font-semibold mb-4">Reasoning Log</h2>
                                                 {Object.entries(pineconeData.metadata || {}).map(([key, value]) => {
                                                     return (
                                                         (key != "agent_id" && key != "choice" && key != "amount" && key != "created_at" && key != "prediction_id" && key != "log" && key != "reasoning") ? (

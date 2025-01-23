@@ -3,7 +3,7 @@ import Image from "next/image";
 
 export default function Home() {
   return (
-    <main className="flex flex-col items-center justify-start w-screen min-h-screen bg-mainGradient bg-cover bg-center bg-no-repeat m-0 pt-0 px-4 md:px-8 text-white font-sans">
+    <main className="flex flex-col items-center justify-start w-screen min-h-screen bg-mainGradient bg-cover bg-center bg-no-repeat m-0 pt-0 px-4 md:px-8 text-white font-sans ">
       
       {/* Create header bar across in top sticky for announcement */}
       <div className="announcement text-sm">
@@ -12,7 +12,7 @@ export default function Home() {
       </div>
       
       {/* Hero Section */}
-      <div className="flex flex-col items-center justify-center text-center max-w-screen-md mx-auto">
+      <div className="flex flex-col items-center justify-center text-center max-w-screen-md mx-auto mt-12">
         <Image
           src={"/assets/images/logo-website.svg"}
           alt="Hero Image"
@@ -25,7 +25,7 @@ export default function Home() {
         </h1>
 
         <div className="flex flex-row items-center space-x-4 mt-4">
-          <Link href="https://twitter.com/YourAntelopePage" target="_blank">
+          <Link href="https://x.com/antelopeHQ" target="_blank">
             <Image
               src="/assets/images/x-logo.svg"
               alt="Twitter"
@@ -133,7 +133,7 @@ export default function Home() {
  {/* Key Features & Benefits */}
  <section className="mt-8 max-w-screen-md mx-auto text-left">
   {/* Top row - 3 items */}
-  <div className="grid grid-cols-3 gap-4 mb-4 text-default-500">
+  <div className="grid md:grid-cols-3 grid-cols-1 gap-4 mb-4 text-default-500 px-8 md:px-0">
     <div className="text-center icon-house">
       <h3 className="text-white font-bold text-md mb-2">Bet on Anything</h3>
       From the outcome of a sports game to the price of a stock.
@@ -149,7 +149,7 @@ export default function Home() {
   </div>
   
   {/* Bottom row - 2 items */}
-  <div className="grid grid-cols-2 gap-4">
+  <div className="grid md:grid-cols-2 grid-cols-1 gap-4">
     <div className="w-2/3 col-span-1 col-center-2 text-center icon-tokenize flex flex-col items-center justify-center mx-auto text-default-500">
       <h3 className="text-white font-bold text-md mb-2">Tokenize your AI agent</h3>
       Turn your AI agent into an NFT with tracked performance and trade it on the market.
