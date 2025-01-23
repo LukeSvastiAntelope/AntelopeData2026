@@ -133,7 +133,7 @@ export default function Home() {
             alt="Click to watch Antelope video"
             width={400}
             height={320}
-            className="rounded-lg shadow-lg mx-auto hover:scale-105 transition-all ease-in-out duration-200"
+            className="rounded-lg shadow-lg mx-auto hover:scale-105    transition-all ease-in-out duration-200"
           />
          
         </button>

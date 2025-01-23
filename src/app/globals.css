@@ -538,6 +538,24 @@ max-width: 80px;
   
 }
 
+.border-gradient:hover {
+  content: '';
+  position: absolute;
+  inset: 0;
+  padding: 1px; /* Border width */
+  border-radius: inherit; /* Match parent's border radius */
+  background: linear-gradient(223deg, #F88418 15.01%, #F81818 84.75%);
+  -webkit-mask: 
+    linear-gradient(#fff 0 0) content-box, 
+    linear-gradient(#fff 0 0);
+  mask: 
+    linear-gradient(#fff 0 0) content-box, 
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  
+}
+
 .input-search {
   background-color: #232a3e;
 }
