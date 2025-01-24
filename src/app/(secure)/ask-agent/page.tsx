@@ -708,7 +708,7 @@ export default function AskAgent() {
   }
 
   useEffect(() => {
-    if (isStrategy && agentProfile) {
+    if (isStrategy && agentProfile && strategy) {
       setMessages([{
         role: "agent",
         content: <StrategyMessageComponent
@@ -720,10 +720,10 @@ export default function AskAgent() {
         type: "strategy"
       }]);
     }
-    if (!isStrategy) {
+    if (!strategy) {
       setMessages(prevMessages => prevMessages.filter(msg => msg.type !== "strategy"));
     }
-  }, [agentProfile, isStrategy]);
+  }, [agentProfile, isStrategy, strategy]);
 
   return (
     <div className="h-[calc(100vh-65px)] flex flex-col">
