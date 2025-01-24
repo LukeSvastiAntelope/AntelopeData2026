@@ -31,6 +31,7 @@ interface StrategyMessageProps {
   agent: IAgentProfile;
   setAgent: Dispatch<SetStateAction<IAgentProfile | null>>;
   strategyFinish: () => Promise<void>;
+  isStrategyLoading: boolean;
 }
 
 const TrainingMessageComponent = ({ agent, setIsTraining, setAgent }: TrainingMessageProps) => {
@@ -167,12 +168,12 @@ const TrainingMessageComponent = ({ agent, setIsTraining, setAgent }: TrainingMe
                     }
                   </div>
                   <div className="space-y-2">
-                    <Input 
-                      type="number" 
-                      label="Bet Amount" 
-                      placeholder="Enter bet amount" 
-                      value={betAmount} 
-                      onChange={(e) => setBetAmount(e.target.value)} 
+                    <Input
+                      type="number"
+                      label="Bet Amount"
+                      placeholder="Enter bet amount"
+                      value={betAmount}
+                      onChange={(e) => setBetAmount(e.target.value)}
                       classNames={{
                         input: "bg-content1/20 dark:bg-content1/20",
                         inputWrapper: "bg-content1/20 dark:bg-content1/20"
@@ -181,12 +182,12 @@ const TrainingMessageComponent = ({ agent, setIsTraining, setAgent }: TrainingMe
                     />
                   </div>
                   <div className="space-y-2">
-                    <Textarea 
-                      type="text" 
-                      label="Reason" 
-                      placeholder="Enter reason" 
-                      value={reason || ''} 
-                      onChange={(e) => setReason(e.target.value)} 
+                    <Textarea
+                      type="text"
+                      label="Reason"
+                      placeholder="Enter reason"
+                      value={reason || ''}
+                      onChange={(e) => setReason(e.target.value)}
                       classNames={{
                         input: "bg-content1/20 dark:bg-content1/20",
                         inputWrapper: "bg-content1/20 dark:bg-content1/20"
@@ -224,7 +225,7 @@ const TrainStart = ({ setTrain }: { setTrain: () => void }) => {
   )
 }
 
-const StrategyMessageComponent = ({ agent, setAgent, strategyFinish }: StrategyMessageProps) => {
+const StrategyMessageComponent = ({ agent, setAgent, strategyFinish, isStrategyLoading }: StrategyMessageProps) => {
   const [strategyStep, setStrategyStep] = useState(0);
   const strategyList = ["Update Agent Category", "Update Agent Principles", "Update Agent Risk Level"];
 
@@ -475,7 +476,7 @@ const StrategyMessageComponent = ({ agent, setAgent, strategyFinish }: StrategyM
         {
           strategyStep < strategyList.length - 1 ?
             <Button className="w-fit bg-gray-800 text-white py-2 rounded" onPress={() => setStrategyStep(prev => prev + 1)}>Next</Button> :
-            <Button className="w-fit bg-gray-800 text-white py-2 rounded" onPress={strategyFinish}>Finish</Button>
+            <Button className="w-fit bg-gray-800 text-white py-2 rounded" isLoading={isStrategyLoading} onPress={() => strategyFinish()}>Finish</Button>
         }
       </div>
     </div>
@@ -502,6 +503,7 @@ export default function AskAgent() {
   const [isTraining, setIsTraining] = useState(false);
   const [strategy, setStrategy] = useState(false);
   const [isStrategy, setIsStrategy] = useState(false);
+  const [isStrategyLoading, setIsStrategyLoading] = useState(false);
 
   const fetch = useFetch();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -672,22 +674,29 @@ export default function AskAgent() {
   }
 
   const strategyFinish = async () => {
+    setIsStrategyLoading(true);
     try {
       if (agentProfile?.interests.length == 0 || agentProfile?.principles.length == 0 || Number(agentProfile?.maxBetSize) == 0 || Number(agentProfile?.conservativeBetSize) == 0 || Number(agentProfile?.moderateBetSize) == 0 || Number(agentProfile?.aggressiveBetSize) == 0) {
         toast.error("Agent is not ready yet. Please set the strategy first.");
-        setIsStrategy(false);
         return;
       }
-      await fetch.post("/api/updateAgentStrategy", { agent: agentProfile });
-      setStrategy(false);
+      const response = await fetch.post("/api/updateAgentStrategy", { agent: agentProfile });
+      if (response.status) {
+        setIsStrategy(false);
+        setStrategy(false);
+      } else {
+        toast.error(response.message || "Failed to update agent strategy");
+      }
     } catch (error) {
       console.error("Error updating agent strategy:", error);
       toast.error("Failed to update agent strategy");
+    } finally {
+      setIsStrategyLoading(false);
     }
   }
 
   const setStartStrategy = () => {
-    if (isStrategy || !agentProfile) return;
+    if (!agentProfile || isStrategy) return;
     setIsStrategy(true);
     setMessages([
       {
@@ -696,19 +705,25 @@ export default function AskAgent() {
         type: "strategy"
       }
     ]);
-    setTimeout(() => {
-      setMessages(prevMessages => [...prevMessages, {
+  }
+
+  useEffect(() => {
+    if (isStrategy && agentProfile) {
+      setMessages([{
         role: "agent",
         content: <StrategyMessageComponent
           agent={agentProfile}
           setAgent={setAgentProfile}
-          strategyFinish={() => strategyFinish()}
+          strategyFinish={strategyFinish}
+          isStrategyLoading={isStrategyLoading}
         />,
         type: "strategy"
-      }
-      ]);
-    }, 2000);
-  }
+      }]);
+    }
+    if (!isStrategy) {
+      setMessages(prevMessages => prevMessages.filter(msg => msg.type !== "strategy"));
+    }
+  }, [agentProfile, isStrategy]);
 
   return (
     <div className="h-[calc(100vh-65px)] flex flex-col">
