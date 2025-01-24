@@ -583,7 +583,7 @@ export default function AskAgent() {
     } else {
       setMessages(prevMessages => prevMessages.filter(msg => msg.type !== "training"));
     }
-  }, [mode]);
+  }, [mode, strategy]);
 
   const startStrategy = () => {
     setMessages([{
