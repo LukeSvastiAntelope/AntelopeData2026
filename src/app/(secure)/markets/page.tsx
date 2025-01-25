@@ -1,15 +1,15 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Image } from "@heroui/image";
-import { Button } from "@heroui/button";
-import { Spinner } from "@heroui/spinner";
+import { Image } from "@nextui-org/image";
+import { Button } from "@nextui-org/button";
+import { Spinner } from "@nextui-org/spinner";
 import { IPrediction, ILeaderboardData, IAgentProfile } from "@/app/utils/interface";
 import { useFetch } from "@/app/utils/lib";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import { PredictionItem } from "@/app/components/PredictionItem";
-import { Tooltip } from "@heroui/tooltip";
+import { Tooltip } from "@nextui-org/tooltip";
 
 export default function MarketsPage() {
   const [activeTab, setActiveTab] = useState<"predictions" | "sports" | "general" | "crypto" | "markets" | "leaderboard">("predictions");

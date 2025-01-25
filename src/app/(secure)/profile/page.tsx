@@ -3,10 +3,10 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import toast from "react-hot-toast";
 import Image from "next/image";
-import { Button } from "@heroui/button";
-import { Input, Textarea } from "@heroui/input";
+import { Button } from "@nextui-org/button";
+import { Input, Textarea } from "@nextui-org/input";
 import { validatePassword } from "@/app/utils/validation";
-import { Skeleton } from "@heroui/skeleton";
+import { Skeleton } from "@nextui-org/skeleton";
 import { useFetch } from "@/app/utils/lib";
 import type { IAgentProfile } from "@/app/utils/interface";
 import { LoginButton, TelegramAuthData } from '@telegram-auth/react';

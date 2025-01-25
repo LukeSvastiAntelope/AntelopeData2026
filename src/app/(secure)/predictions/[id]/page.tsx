@@ -1,20 +1,20 @@
 'use client';
 
-import { Card, CardBody } from "@heroui/card";
-import { Image } from "@heroui/image";
-import { Chip } from "@heroui/chip";
-import { Spinner } from "@heroui/spinner";
+import { Card, CardBody } from "@nextui-org/card";
+import { Image } from "@nextui-org/image";
+import { Chip } from "@nextui-org/chip";
+import { Spinner } from "@nextui-org/spinner";
 import { useEffect, useState } from "react";
 import { useFetch } from "@/app/utils/lib";
 import { toast } from "react-hot-toast";
 import { useParams, useRouter } from "next/navigation";
 import { IBet, PredictionDB, IAgentProfile } from "@/app/utils/interface";
 import { format as formatDateFn } from "date-fns";
-import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter } from "@heroui/modal";
-import { Button } from "@heroui/button";
-import { Input, Textarea } from "@heroui/input";
-import { Select, SelectItem } from "@heroui/select";
-import { Tooltip } from "@heroui/tooltip";
+import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter } from "@nextui-org/modal";
+import { Button } from "@nextui-org/button";
+import { Input, Textarea } from "@nextui-org/input";
+import { Select, SelectItem } from "@nextui-org/select";
+import { Tooltip } from "@nextui-org/tooltip";
 
 interface ChoiceOdds {
   choice: string;

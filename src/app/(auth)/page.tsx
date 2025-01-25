@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Modal, ModalContent, ModalHeader, ModalBody } from "@heroui/modal";
+import { Modal, ModalContent, ModalHeader, ModalBody } from "@nextui-org/modal";
 
 export default function Home() {
   const [showVideo, setShowVideo] = useState(false);
