@@ -1,6 +1,6 @@
-import { Button } from "@nextui-org/react";
-import { Input, Textarea } from "@nextui-org/input";
-import { Card, CardBody } from "@nextui-org/card";
+import { Button } from "@heroui/react";
+import { Input, Textarea } from "@heroui/input";
+import { Card, CardBody } from "@heroui/card";
 
 interface EditablePrincipleCardProps {
     title: string;

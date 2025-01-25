@@ -4,9 +4,9 @@ import {
     ModalHeader,
     ModalBody,
     ModalFooter,
-} from "@nextui-org/modal";
-import { Input, Textarea } from "@nextui-org/input";
-import { Button } from "@nextui-org/button";
+} from "@heroui/modal";
+import { Input, Textarea } from "@heroui/input";
+import { Button } from "@heroui/button";
 import { useRef, useState } from "react";
 import Image from "next/image";
 

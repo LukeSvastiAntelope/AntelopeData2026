@@ -1,9 +1,9 @@
 'use client';
 
-import { Card, CardBody, CardHeader } from "@nextui-org/card";
-import { Input } from "@nextui-org/input";
-import { Button } from "@nextui-org/button";
-import { Select, SelectItem } from "@nextui-org/select";
+import { Card, CardBody, CardHeader } from "@heroui/card";
+import { Input } from "@heroui/input";
+import { Button } from "@heroui/button";
+import { Select, SelectItem } from "@heroui/select";
 import { useState, useEffect } from "react";
 import { IoArrowBack, IoSave } from "react-icons/io5";
 import { IAgentProfile } from "@/app/utils/interface";

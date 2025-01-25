@@ -1,6 +1,6 @@
-import { Image } from "@nextui-org/image";
-import { Chip } from "@nextui-org/chip";
-import { Tooltip } from "@nextui-org/tooltip";
+import { Image } from "@heroui/image";
+import { Chip } from "@heroui/chip";
+import { Tooltip } from "@heroui/tooltip";
 import { IBet, IPrediction } from "@/app/utils/interface";
 import { useState, useEffect } from "react";
 

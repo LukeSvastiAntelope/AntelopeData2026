@@ -7,15 +7,15 @@ import {
     Card,
     CardBody,
     CardHeader,
-} from "@nextui-org/card";
-import { Input } from '@nextui-org/input';
-import { Button } from '@nextui-org/button';
-import { Select, SelectItem } from '@nextui-org/select';
+} from "@heroui/card";
+import { Input } from "@heroui/input";
+import { Button } from "@heroui/button";
+import { Select, SelectItem } from "@heroui/select";
 import { IconWallet, IconCreditCard, IconNft } from "@/app/components/icons";
 import { IAgentProfile } from '@/app/utils/interface';
 import { useFetch } from '@/app/utils/lib';
 import { toast } from 'react-hot-toast';
-import { Skeleton } from '@nextui-org/skeleton';
+import { Skeleton } from "@heroui/skeleton";
 import {
     Modal,
     ModalContent,
@@ -23,8 +23,8 @@ import {
     ModalBody,
     ModalFooter,
     useDisclosure
-} from "@nextui-org/modal";
-import { CircularProgress } from '@nextui-org/progress';
+} from "@heroui/modal";
+import { CircularProgress } from "@heroui/progress";
 import { buyTransaction } from '@/app/utils/buyTransaction';
 import { loadStripe } from '@stripe/stripe-js';
 import { mintNft } from '@/app/utils/mintNft';
@@ -35,7 +35,7 @@ import { walletAdapterIdentity } from '@metaplex-foundation/umi-signer-wallet-ad
 import {
     publicKey
 } from '@metaplex-foundation/umi'
-import { Image, Tooltip } from '@nextui-org/react';
+import { Image, Tooltip } from "@heroui/react";
 
 interface INftMetadata {
     name: string;

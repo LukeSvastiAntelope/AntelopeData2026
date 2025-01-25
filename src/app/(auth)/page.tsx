@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Modal, ModalContent, ModalHeader, ModalBody } from "@nextui-org/modal";
+import { Modal, ModalContent, ModalHeader, ModalBody } from "@heroui/modal";
 
 export default function Home() {
   const [showVideo, setShowVideo] = useState(false);
@@ -88,7 +88,7 @@ export default function Home() {
                   type="submit"
                   name="subscribe"
                   id="mc-embedded-subscribe"
-                  className="absolute top-1 right-1 bottom-1 px-4 text-sm bg-primary hover:bg-primary/80 text-white rounded-md text-tiny"
+                  className="absolute top-1 right-1 bottom-1 px-4 bg-primary hover:bg-primary/80 text-white rounded-md text-tiny"
                 >
                   Subscribe
                 </button>
@@ -107,23 +107,6 @@ export default function Home() {
           </div>
         </div>
 
-
-        {/* <div className="flex flex-col md:flex-row gap-4 w-full justify-center">
-          <Link
-            href={"/register"}
-            className="bg-content0 text-center text-white py-3 px-6 rounded-md text-md hover:bg-primary transition-all ease-in-out duration-200"
-          >
-            Register
-          </Link>
-          <Link
-            href={"/login"}
-            className="bg-content0 text-center text-white py-3 px-6 rounded-md text-md hover:bg-primary transition-all ease-in-out duration-200"
-          >
-            Login
-          </Link>
-        </div> */}
-
-
         <button
           onClick={() => setShowVideo(true)}
           className="relative mx-auto w-full h-auto my-8 border-none p-0 bg-transparent cursor-pointer outline-none"
@@ -135,7 +118,6 @@ export default function Home() {
             height={320}
             className="rounded-lg shadow-lg mx-auto hover:scale-105    transition-all ease-in-out duration-200 mb-8"
           />
-
         </button>
 
         {/* Fullscreen modal with the embedded video */}
@@ -159,15 +141,6 @@ export default function Home() {
             </ModalBody>
           </ModalContent>
         </Modal>
-
-
-        {/* <p className="text-default-500 text-md md:text-lg mb-6">
-          Train AI agents to forecast real-world events, turn them into NFTs,
-          and watch their insights grow. You can refine these AI agents with
-          your own expertise, track their performance, and share your
-          strategies with a community of forward-thinkers.
-        </p> */}
-
       </div>
 
       {/* Key Features & Benefits */}

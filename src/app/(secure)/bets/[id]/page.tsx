@@ -1,14 +1,14 @@
 'use client'
 
-import { Chip } from "@nextui-org/chip";
-import { Image } from "@nextui-org/image";
-import { Button } from "@nextui-org/button";
+import { Chip } from "@heroui/chip";
+import { Image } from "@heroui/image";
+import { Button } from "@heroui/button";
 import { useState, useEffect } from "react";
 import { useFetch } from "@/app/utils/lib";
 import { IBet, PredictionDB } from "@/app/utils/interface";
 import toast from "react-hot-toast";
 import { useParams, useRouter } from "next/navigation";
-import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter } from "@nextui-org/react";
+import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter } from "@heroui/react";
 import {
     Chart as ChartJS,
     BarElement,
@@ -18,7 +18,7 @@ import {
     Tooltip,
     Legend,
 } from "chart.js";
-import { Tooltip as NextUITooltip } from "@nextui-org/tooltip";
+import { Tooltip as NextUITooltip } from "@heroui/tooltip";
 
 ChartJS.register(
     BarElement,
@@ -233,237 +233,224 @@ export default function BetDetailPage() {
         return <div>Loading...</div>;
     }
 
-    return (
-        <>
-            <Button
-                color="default"
-                variant="light"
-                onPress={() => router.back()}
-                className="mb-4 text-small p-0 bg-content0"
-            >
-                ← Back
-            </Button>
+    return (<>
+        <Button
+            color="default"
+            variant="light"
+            onPress={() => router.back()}
+            className="mb-4 text-small p-0 bg-content0"
+        >
+            ← Back
+        </Button>
+        {
+            !bet ?
+                <div>Bet not found</div> :
+                <>
+                    <div className="px-0 max-w-[800px]">
+                        {/* Header Section */}
+                        <div className="flex gap-6 mb-8 flex-col w-full bg-content0 rounded-xl p-8">
+                            <Image
+                                src={bet.str_thumb}
+                                alt="Event"
+                                className="w-full object-cover rounded-xl "
+                                style={{ maxWidth: "100%", minWidth: "-webkit-fill-available;", height: "200px" }}
+                            />
 
-            {
-                !bet ?
-                    <div>Bet not found</div> :
-                    <>
-                        <div className="px-0 max-w-[800px]">
-                            {/* Header Section */}
-                            <div className="flex gap-6 mb-8 flex-col w-full bg-content0 rounded-xl p-8">
-                                <Image
-                                    src={bet.str_thumb}
-                                    alt="Event"
-                                    className="w-full object-cover rounded-xl "
-                                    style={{ maxWidth: "100%", minWidth: "-webkit-fill-available;", height: "200px" }}
-                                />
+                            <div>
+                                <h3 className="text-lg font-semibold mb-2">{bet.description}</h3>
+                            </div>
 
-                                <div>
-                                    <h3 className="text-lg font-semibold mb-2">{bet.description}</h3>
-                                </div>
+                            {choiceOdds.length > 0 && (
+                                
+                                    <MultiChoiceOddsBar choices={choiceOdds} />
+                           
+                            )}
 
-                                {choiceOdds.length > 0 && (
-                                    
-                                        <MultiChoiceOddsBar choices={choiceOdds} />
-                               
-                                )}
-
-                                {/* Bet Details */}
-                                <div className="color-white">
-                                    {
-                                        bet.user_id === Number(localStorage.getItem("userId")) &&
-                                        <div className="">
-                                            <h2 className="text-small font-semibold mb-4">Reasoning</h2>
-                                            <p className="text-default-400 text-small leading-relaxed ">{bet.reason}</p>
-                                            {
-                                                pineconeData && pineconeData.metadata?.comment && (
-                                                    <>
-                                                        <h2 className="text-lg font-semibold mb-4 mt-4">Comment</h2>
-                                                        <p className="text-default-400 leading-relaxed ">{pineconeData.metadata.comment as string}</p>
-                                                    </>
-                                                )
-                                            }
-                                            <NextUITooltip content="Give your agent more context to improve its reasoning.">
-                                            <Button
-                                                color="primary"
-                                                variant="light"
-                                                className="text-primary bg-primary/20  text-sm mt-2 hover:bg-primary/40 w-full text-small"
-                                                onPress={() => setShowCommentModal(true)}
-                                            >
-                                                Adjust Reasoning
-                                            </Button>
+                            {/* Bet Details */}
+                            <div className="color-white">
+                                {
+                                    bet.user_id === Number(localStorage.getItem("userId")) &&
+                                    <div className="">
+                                        <h2 className="text-small font-semibold mb-4">Reasoning</h2>
+                                        <p className="text-default-400 text-small leading-relaxed ">{bet.reason}</p>
+                                        {
+                                            pineconeData && pineconeData.metadata?.comment && (
+                                                <>
+                                                    <h2 className="text-lg font-semibold mb-4 mt-4">Comment</h2>
+                                                    <p className="text-default-400 leading-relaxed ">{pineconeData.metadata.comment as string}</p>
+                                                </>
+                                            )
+                                        }
+                                        <NextUITooltip content="Give your agent more context to improve its reasoning.">
+                                        <Button
+                                            color="primary"
+                                            variant="light"
+                                            className="text-primary bg-primary/20  text-sm mt-2 hover:bg-primary/40 w-full text-small"
+                                            onPress={() => setShowCommentModal(true)}
+                                        >
+                                            Adjust Reasoning
+                                        </Button>
+                                        </NextUITooltip>
+                                    </div>
+                                }
+                                <div className="w-full mt-8">
+                                    <h2 className="text-small font-semibold mb-4">Bet Details</h2>
+                                    <div className="grid grid-cols-2 grid-rows-4 md:grid-cols-4 md:grid-rows-2 gap-4">
+                                        <div>
+                                            <h3 className="text-sm font-medium text-default-400 mb-1 ">Status</h3>
+                                            <NextUITooltip content="Bet status can be 'open', 'won', or 'lost'.">
+                                                <Chip color={bet.status !== "open" ? (bet.outcome === bet.choice ? "success" : "danger") : "primary"} className="bg-primary/20 capitalize">
+                                                    {bet.status !== "open"
+                                                        ? (bet.outcome === bet.choice ? "Won" : "Lost")
+                                                        : bet.status
+                                                    }
+                                                </Chip>
                                             </NextUITooltip>
                                         </div>
-                                    }
-                                    <div className="w-full mt-8">
-                                        <h2 className="text-small font-semibold mb-4">Bet Details</h2>
-                                        <div className="grid grid-cols-2 grid-rows-4 md:grid-cols-4 md:grid-rows-2 gap-4">
-                                            <div>
-                                                <h3 className="text-sm font-medium text-default-400 mb-1 ">Status</h3>
-                                                <NextUITooltip content="Bet status can be 'open', 'won', or 'lost'.">
-                                                    <Chip color={bet.status !== "open" ? (bet.outcome === bet.choice ? "success" : "danger") : "primary"} className="bg-primary/20 capitalize">
-                                                        {bet.status !== "open"
-                                                            ? (bet.outcome === bet.choice ? "Won" : "Lost")
-                                                            : bet.status
-                                                        }
-                                                    </Chip>
-                                                </NextUITooltip>
-                                            </div>
-                                            <div>
-                                                <h3 className="text-sm font-medium text-default-400 mb-1 ">Credits</h3>
-                                                <NextUITooltip content="The number of credits staked on this bet.">
-                                                    <Chip className="bg-primary/20 ml-0 capitalize  icon-coin-bigger ">{bet.amount}</Chip>
-                                                </NextUITooltip>
-                                            </div>
-                                            <div>
-                                                <h3 className="text-sm font-medium text-default-400 mb-1">Your Choice</h3>
-                                                <NextUITooltip content="The outcome you predicted.">
-                                                    <Chip color="secondary" className="bg-primary/20 capitalize">{bet.choice}</Chip>
-                                                </NextUITooltip>
-                                            </div>
-                                            <div>
-                                                <h3 className="text-sm font-medium text-default-400 mb-1">Creator&apos;s Choice</h3>
-                                                <NextUITooltip content="The original outcome predicted by the bet's creator.">
-                                                    <Chip color="secondary" className="bg-primary/20 capitalize">{bet.predicted_outcome || bet.creator_choice}</Chip>
-                                                </NextUITooltip>
-                                            </div>
-                                            <div>
-                                                <h3 className="text-sm font-medium text-default-400 mb-1">Validation Source</h3>
-                                                <NextUITooltip content="Where the final result is verified (e.g., official APIs or event outcomes).">
-                                                    <p className="text-sm font-semibold">{bet.source}</p>
-                                                </NextUITooltip>
-                                            </div>
+                                        <div>
+                                            <h3 className="text-sm font-medium text-default-400 mb-1 ">Credits</h3>
+                                            <NextUITooltip content="The number of credits staked on this bet.">
+                                                <Chip className="bg-primary/20 ml-0 capitalize  icon-coin-bigger ">{bet.amount}</Chip>
+                                            </NextUITooltip>
+                                        </div>
+                                        <div>
+                                            <h3 className="text-sm font-medium text-default-400 mb-1">Your Choice</h3>
+                                            <NextUITooltip content="The outcome you predicted.">
+                                                <Chip color="secondary" className="bg-primary/20 capitalize">{bet.choice}</Chip>
+                                            </NextUITooltip>
+                                        </div>
+                                        <div>
+                                            <h3 className="text-sm font-medium text-default-400 mb-1">Creator&apos;s Choice</h3>
+                                            <NextUITooltip content="The original outcome predicted by the bet's creator.">
+                                                <Chip color="secondary" className="bg-primary/20 capitalize">{bet.predicted_outcome || bet.creator_choice}</Chip>
+                                            </NextUITooltip>
+                                        </div>
+                                        <div>
+                                            <h3 className="text-sm font-medium text-default-400 mb-1">Validation Source</h3>
+                                            <NextUITooltip content="Where the final result is verified (e.g., official APIs or event outcomes).">
+                                                <p className="text-sm font-semibold">{bet.source}</p>
+                                            </NextUITooltip>
+                                        </div>
 
-                                            <div className="flex flex-col gap-1">
-                                                {bet.status === "open" ? (
-                                                    <>
-                                                        <h3 className="text-sm font-medium text-default-400">Created</h3>
-                                                        <NextUITooltip content="Date when the bet was created.">
-                                                            <p className="text-sm font-semibold">{new Date(bet.created_at).toLocaleDateString()}</p>
-                                                        </NextUITooltip>
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <h3 className="text-sm font-medium text-default-400">Resolved</h3>
-                                                        <NextUITooltip content="Date when the bet was resolved.">
-                                                            <p className="text-sm font-semibold">{new Date(bet.resolution_date).toLocaleDateString()}</p>
-                                                        </NextUITooltip>
-                                                    </>
-                                                )}
-                                            </div>
+                                        <div className="flex flex-col gap-1">
+                                            {bet.status === "open" ? (
+                                                <>
+                                                    <h3 className="text-sm font-medium text-default-400">Created</h3>
+                                                    <NextUITooltip content="Date when the bet was created.">
+                                                        <p className="text-sm font-semibold">{new Date(bet.created_at).toLocaleDateString()}</p>
+                                                    </NextUITooltip>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <h3 className="text-sm font-medium text-default-400">Resolved</h3>
+                                                    <NextUITooltip content="Date when the bet was resolved.">
+                                                        <p className="text-sm font-semibold">{new Date(bet.resolution_date).toLocaleDateString()}</p>
+                                                    </NextUITooltip>
+                                                </>
+                                            )}
                                         </div>
                                     </div>
                                 </div>
                             </div>
-                            {prediction?.log && (
-                                <div className="mt-8">
-                                    <div className="bg-content0 rounded-lg p-8">
-                                        <h2 className="text-small font-semibold mb-4">Resolution Log</h2>
-                                        <div className="space-y-4">
-                                            {parseLogEntries(prediction.log).map((entry, index) => (
-                                                <div key={index} className="flex flex-col gap-1">
-                                                    <span className="text-primary text-sm">
-                                                        {new Date(entry?.timestamp || "").toLocaleString()}
-                                                    </span>
-                                                    <span className="text-default-600">
-                                                        {entry?.message}
-                                                    </span>
-                                                </div>
-                                            ))}
+                        </div>
+                        {prediction?.log && (
+                            <div className="mt-8">
+                                <div className="bg-content0 rounded-lg p-8">
+                                    <h2 className="text-small font-semibold mb-4">Resolution Log</h2>
+                                    <div className="space-y-4">
+                                        {parseLogEntries(prediction.log).map((entry, index) => (
+                                            <div key={index} className="flex flex-col gap-1">
+                                                <span className="text-primary text-sm">
+                                                    {new Date(entry?.timestamp || "").toLocaleString()}
+                                                </span>
+                                                <span className="text-default-600">
+                                                    {entry?.message}
+                                                </span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                        <div className="mt-8">
+                            {pineconeData && (
+                                <div className="mt-0">
+                                    <div className="bg-content0 rounded-lg p-8 ">
+                                        <div className="flex flex-col gap-4">
+                                            <h2 className="text-small font-semibold mb-4">Reasoning Log</h2>
+                                            {Object.entries(pineconeData.metadata || {}).map(([key, value]) => {
+                                                return ((key != "agent_id" && key != "choice" && key != "amount" && key != "created_at" && key != "prediction_id" && key != "log" && key != "reasoning") ? (<div key={key}>
+                                                    <h3 className="text-sm font-medium text-default-400 capitalize mb-1">
+                                                        {key.replace(/_/g, ' ')}
+                                                    </h3>
+                                                    <p className="text-sm text-default-600">
+                                                        {typeof value === 'string' ? value : JSON.stringify(value)}
+                                                    </p>
+                                                </div>) : (key === "log" ? (<div key={key} className="space-y-4">
+                                                    <div className="space-y-4">
+                                                        {JSON.parse(value as string).map((log: AnalysisLog, index: number) => (
+                                                            <div
+                                                                key={`${log.step}-${index}`}
+                                                                className=""
+                                                            >
+                                                                <div className="flex items-center gap-2 mb-2">
+                                                                    <span className="text-primary font-medium">
+                                                                        Step {index + 1}:
+                                                                    </span>
+                                                                    <span className="text-default-400 capitalize">
+                                                                        {log.step.replace(/_/g, ' ')}
+                                                                    </span>
+                                                                </div>
+                                                                {log.reasoning && (
+                                                                    <p className="text-default-600 text-sm leading-relaxed">
+                                                                        {log.reasoning}
+                                                                    </p>
+                                                                )}
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>) : ("")));
+                                            })}
                                         </div>
                                     </div>
                                 </div>
                             )}
-                            <div className="mt-8">
-                                {pineconeData && (
-                                    <div className="mt-0">
-                                        <div className="bg-content0 rounded-lg p-8 ">
-                                            <div className="flex flex-col gap-4">
-                                                <h2 className="text-small font-semibold mb-4">Reasoning Log</h2>
-                                                {Object.entries(pineconeData.metadata || {}).map(([key, value]) => {
-                                                    return (
-                                                        (key != "agent_id" && key != "choice" && key != "amount" && key != "created_at" && key != "prediction_id" && key != "log" && key != "reasoning") ? (
-                                                            <div key={key}>
-                                                                <h3 className="text-sm font-medium text-default-400 capitalize mb-1">
-                                                                    {key.replace(/_/g, ' ')}
-                                                                </h3>
-                                                                <p className="text-sm text-default-600">
-                                                                    {typeof value === 'string' ? value : JSON.stringify(value)}
-                                                                </p>
-                                                            </div>
-                                                        ) : (
-                                                            key === "log" ? (
-                                                                <div key={key} className="space-y-4">
-                                                                    <div className="space-y-4">
-                                                                        {JSON.parse(value as string).map((log: AnalysisLog, index: number) => (
-                                                                            <div
-                                                                                key={`${log.step}-${index}`}
-                                                                                className=""
-                                                                            >
-                                                                                <div className="flex items-center gap-2 mb-2">
-                                                                                    <span className="text-primary font-medium">
-                                                                                        Step {index + 1}:
-                                                                                    </span>
-                                                                                    <span className="text-default-400 capitalize">
-                                                                                        {log.step.replace(/_/g, ' ')}
-                                                                                    </span>
-                                                                                </div>
-                                                                                {log.reasoning && (
-                                                                                    <p className="text-default-600 text-sm leading-relaxed">
-                                                                                        {log.reasoning}
-                                                                                    </p>
-                                                                                )}
-                                                                            </div>
-                                                                        ))}
-                                                                    </div>
-                                                                </div>
-                                                            ) : (
-                                                                ""
-                                                            )
-                                                        )
-                                                    )
-                                                })}
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
                         </div>
-                        <Modal
-                            isOpen={showCommentModal}
-                            onOpenChange={(open) => setShowCommentModal(open)}
-                        >
-                            <ModalContent className="w-full max-w-[640px] min-h-[500px]">
-                                <ModalHeader>
-                                    <h3 className="font-bold">Add Comment to Agent Reasoning</h3>
-                                </ModalHeader>
-                                <ModalBody>
-                                    <p className="text-base text-gray-500 mb-2">
-                                        Original Reason: {bet.reason}
-                                    </p>
-                                    <p className="text-base text-gray-500 mb-2">
-                                        Comment: {pineconeData?.metadata?.comment as string}
-                                    </p>
-                                    <textarea
-                                        className="w-full border border-white/10 text-white rounded-md p-2"
-                                        placeholder="Enter more context here..."
-                                        value={newComment}
-                                        onChange={(e) => setNewComment(e.target.value)}
-                                        rows={4}
-                                    />
-                                </ModalBody>
-                                <ModalFooter>
-                                    <Button variant="light" onPress={() => setShowCommentModal(false)}>
-                                        Cancel
-                                    </Button>
-                                    <Button color="primary" onPress={handleSaveComment}>
-                                        Save Comment
-                                    </Button>
-                                </ModalFooter>
-                            </ModalContent>
-                        </Modal>
-                    </>
-            }
-        </>
-    );
+                    </div>
+                    <Modal
+                        isOpen={showCommentModal}
+                        onOpenChange={(open) => setShowCommentModal(open)}
+                    >
+                        <ModalContent className="w-full max-w-[640px] min-h-[500px]">
+                            <ModalHeader>
+                                <h3 className="font-bold">Add Comment to Agent Reasoning</h3>
+                            </ModalHeader>
+                            <ModalBody>
+                                <p className="text-base text-gray-500 mb-2">
+                                    Original Reason: {bet.reason}
+                                </p>
+                                <p className="text-base text-gray-500 mb-2">
+                                    Comment: {pineconeData?.metadata?.comment as string}
+                                </p>
+                                <textarea
+                                    className="w-full border border-white/10 text-white rounded-md p-2"
+                                    placeholder="Enter more context here..."
+                                    value={newComment}
+                                    onChange={(e) => setNewComment(e.target.value)}
+                                    rows={4}
+                                />
+                            </ModalBody>
+                            <ModalFooter>
+                                <Button variant="light" onPress={() => setShowCommentModal(false)}>
+                                    Cancel
+                                </Button>
+                                <Button color="primary" onPress={handleSaveComment}>
+                                    Save Comment
+                                </Button>
+                            </ModalFooter>
+                        </ModalContent>
+                    </Modal>
+                </>
+        }
+    </>);
 } 

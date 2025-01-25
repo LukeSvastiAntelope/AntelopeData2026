@@ -3,14 +3,14 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
-import { Spinner } from "@nextui-org/spinner";
-import { Chip } from "@nextui-org/chip";
-import { Button } from "@nextui-org/button";
-import { Image } from "@nextui-org/image";
+import { Spinner } from "@heroui/spinner";
+import { Chip } from "@heroui/chip";
+import { Button } from "@heroui/button";
+import { Image } from "@heroui/image";
 import { FaRocket, FaDatabase, FaChartLine, FaShieldAlt } from "react-icons/fa";
 import { useFetch } from "@/app/utils/lib";
 import { IAgentProfile } from "@/app/utils/interface";
-import { Tooltip } from "@nextui-org/tooltip";
+import { Tooltip } from "@heroui/tooltip";
 
 
 // ------------- ADDED: Chart.js imports -------------

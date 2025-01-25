@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Button, Card, Input, Select, SelectItem, Textarea } from '@nextui-org/react'
+import { Button, Card, Input, Select, SelectItem, Textarea } from "@heroui/react"
 import { useRouter } from 'next/navigation'
 import { useFetch } from '@/app/utils/lib'
 import { toast } from 'react-hot-toast'

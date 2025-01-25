@@ -2,14 +2,14 @@
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { IAgentProfile } from "@/app/utils/interface";
-import { Skeleton } from "@nextui-org/skeleton";
+import { Skeleton } from "@heroui/skeleton";
 import { toast } from "react-hot-toast";
 import { useFetch } from "../utils/lib";
 import Link from "next/link";
 import Image from "next/image";
 import PredictionDialog from "../components/PredictionDialog";
 import AgentProfileDialog from "../components/AgentProfileDialog";
-import { Tooltip as NextUITooltip } from "@nextui-org/tooltip";
+import { Tooltip as NextUITooltip } from "@heroui/tooltip";
 
 const AsideSkeleton = () => {
     return (

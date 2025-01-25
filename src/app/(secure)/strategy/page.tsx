@@ -1,19 +1,19 @@
 "use client";
 
-import { Card, CardBody, CardHeader } from "@nextui-org/card";
-import { Chip } from "@nextui-org/chip";
-import { Progress } from "@nextui-org/progress";
-import { Divider } from "@nextui-org/divider";
-import { Skeleton } from "@nextui-org/skeleton";
-import { Button } from "@nextui-org/button";
+import { Card, CardBody, CardHeader } from "@heroui/card";
+import { Chip } from "@heroui/chip";
+import { Progress } from "@heroui/progress";
+import { Divider } from "@heroui/divider";
+import { Skeleton } from "@heroui/skeleton";
+import { Button } from "@heroui/button";
 import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
 import { useFetch } from "@/app/utils/lib";
 import { IAgentProfile } from "@/app/utils/interface";
 import { convertDaysToYMD } from "@/app/utils/lib";
 import { CATEGORIES } from "@/app/utils/const";
-import { Switch } from "@nextui-org/switch";
-import { Tooltip } from "@nextui-org/tooltip";
+import { Switch } from "@heroui/switch";
+import { Tooltip } from "@heroui/tooltip";
 import { FaDownload, FaUpload } from "react-icons/fa";
 
 const StrategySkeleton = () => {

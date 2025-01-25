@@ -1,3 +1,7 @@
+import { SetStateAction } from "react";
+
+import { Dispatch } from "react";
+
 export interface IAgentProfile {
     id: number;
     name: string;
@@ -348,4 +352,15 @@ export interface CreatePredictionInput {
     source_type: string;
     bet_type: string;
     resolution_date: string;
+}
+
+export interface IAskAgentProps {
+    agentProfile: IAgentProfile | null;
+    setAgentProfile: Dispatch<SetStateAction<IAgentProfile | null>>;
+}
+
+export interface ChatMessage {
+    role: "user" | "agent";
+    content: string | JSX.Element;
+    type: "training" | "ask" | "strategy";
 }

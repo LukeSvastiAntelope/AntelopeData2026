@@ -4,11 +4,11 @@ import {
     ModalHeader,
     ModalBody,
     ModalFooter,
-} from "@nextui-org/modal";
-import { Select, SelectItem } from "@nextui-org/select";
-import { Input } from "@nextui-org/input";
-import { Radio, RadioGroup } from "@nextui-org/radio";
-import { Button } from "@nextui-org/button";
+} from "@heroui/modal";
+import { Select, SelectItem } from "@heroui/select";
+import { Input } from "@heroui/input";
+import { Radio, RadioGroup } from "@heroui/radio";
+import { Button } from "@heroui/button";
 import { useEffect, useState } from "react";
 import { useFetch } from "../utils/lib";
 import { toast } from "react-hot-toast";
