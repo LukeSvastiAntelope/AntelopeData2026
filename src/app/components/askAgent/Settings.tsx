@@ -1,7 +1,7 @@
 import { CATEGORIES, AGENT_RISK_LEVEL } from "@/app/utils/const";
 import { IAskAgentProps } from "@/app/utils/interface";
 import { convertDaysToYMD } from "@/app/utils/lib";
-import { Button, Chip, Divider, Input, Select, SelectItem } from "@heroui/react";
+import { Button, Chip, Input, Select, SelectItem } from "@heroui/react";
 import { useState } from "react";
 import { toast } from "react-hot-toast";
 import { useFetch } from "@/app/utils/lib";

@@ -3,7 +3,6 @@ import { toast } from "react-hot-toast";
 import { ChatMessage, IAskAgentProps } from "@/app/utils/interface";
 import { useEffect, useRef, useState } from "react";
 import { useFetch } from "@/app/utils/lib";
-import { Button } from "@heroui/react";
 import { Textarea } from "@heroui/react";
 
 const Research = ({ agentProfile }: IAskAgentProps) => {
