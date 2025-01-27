@@ -1,14 +1,14 @@
 'use client'
 
-import { Chip } from "@nextui-org/chip";
-import { Image } from "@nextui-org/image";
-import { Button } from "@nextui-org/button";
+import { Chip } from "@heroui/chip";
+import { Image } from "@heroui/image";
+import { Button } from "@heroui/button";
 import { useState, useEffect } from "react";
 import { useFetch } from "@/app/utils/lib";
 import { IBet, PredictionDB } from "@/app/utils/interface";
 import toast from "react-hot-toast";
 import { useParams, useRouter } from "next/navigation";
-import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter } from "@nextui-org/modal";
+import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter } from "@heroui/modal";
 import {
     Chart as ChartJS,
     BarElement,
@@ -18,7 +18,7 @@ import {
     Tooltip,
     Legend,
 } from "chart.js";
-import { Tooltip as NextUITooltip } from "@nextui-org/tooltip";
+import { Tooltip as NextUITooltip } from "@heroui/tooltip";
 
 ChartJS.register(
     BarElement,

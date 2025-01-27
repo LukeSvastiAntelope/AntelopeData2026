@@ -5,7 +5,7 @@ import { useFetch } from "@/app/utils/lib";
 import toast from "react-hot-toast";
 import { IAgentProfile } from "@/app/utils/interface";
 import { useSearchParams } from "next/navigation";
-import { Tabs, Tab } from "@nextui-org/tabs";
+import { Tabs, Tab } from "@heroui/tabs";
 import Research from "@/app/components/askAgent/Research";
 import Train from "@/app/components/askAgent/Train";
 import Principles from "@/app/components/askAgent/Principles";

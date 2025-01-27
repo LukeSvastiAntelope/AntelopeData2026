@@ -38,21 +38,25 @@ function enforceUserBetsOnly(rawSql: string, userId: number): string {
   return sql;
 }
 
+interface FilteredRow {
+  [key: string]: string | number | boolean | null; // Adjust types as necessary
+}
+
 /**
  * Filter out any "password"-like columns if they appear in query results,
  * so they are never exposed to the client.
  */
-function removeSensitiveColumns(rows: RowDataPacket[]): { columns: string[]; results: any[] } {
+function removeSensitiveColumns(rows: RowDataPacket[]): { columns: string[]; results: FilteredRow[] } {
   if (rows.length === 0) {
     return { columns: [], results: [] };
   }
   
   // Determine columns, excluding any that look like "password"
-  let columns = Object.keys(rows[0]).filter((col) => !col.toLowerCase().includes("password"));
+  const columns = Object.keys(rows[0]).filter((col) => !col.toLowerCase().includes("password"));
 
   // Filter the rows so the password columns are removed from each row
   const results = rows.map((row) => {
-    const copy = { ...row };
+    const copy: FilteredRow = { ...row };
     for (const col of Object.keys(copy)) {
       if (col.toLowerCase().includes("password")) {
         delete copy[col];
@@ -115,12 +119,12 @@ export async function POST(req: NextRequest) {
       columns,
       results,
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error("Error in nl-to-sql route:", error);
     return NextResponse.json({
       status: false,
       message: "Failed to convert or execute query",
-      error: error.message,
+      error: error instanceof Error ? error.message : 'Internal server error'
     });
   }
 } 

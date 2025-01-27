@@ -12,7 +12,6 @@ export async function POST(req: NextRequest) {
     // The actual shape depends on X's callback structure.
     const body = await req.json();
     const text: string = body?.tweet?.text || "";
-    const userId: string = body?.tweet?.user_id_str || "";
     const handle: string = body?.tweet?.user_screen_name || "";
 
     // Check if this mention references @antelopehq

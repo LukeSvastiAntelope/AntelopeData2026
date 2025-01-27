@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { AutomaticBettingAgent } from "@/app/utils/api/automaticBetting";
-import { IAgentProfile, IPrinciple } from "@/app/utils/interface";
+import { IPrinciple } from "@/app/utils/interface";
 import { UserRepo } from "@/app/utils/database/user-repo";
 
 export async function POST(request: NextRequest) {
