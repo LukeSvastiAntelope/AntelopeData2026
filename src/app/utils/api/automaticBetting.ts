@@ -1133,6 +1133,7 @@ ${p.metadata?.comment ? `- Agent Controller Comment: ${p.metadata.comment}` : ''
                     relevantSummaries = "No similar prior predictions or bets found.";
                 }
             }
+            console.log("relevantSummaries", relevantSummaries);
 
             const systemPrompt = `
                 You are a specialized betting agent with the following details:
