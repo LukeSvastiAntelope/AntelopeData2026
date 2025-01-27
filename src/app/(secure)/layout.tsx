@@ -224,18 +224,18 @@ const SecureLayout = ({ children }: { children: React.ReactNode }) => {
                                                 </Link>
 
                                                 <Link
-                                                    href="/strategy"
-                                                    className={`flex items-center group md:gap-2 ${pathname === '/strategy' ? 'text-white' : 'text-default-400 hover:text-white'}`}
+                                                    href="/ask-agent?mode=settings"
+                                                    className={`flex items-center group md:gap-2 ${pathname === '/ask-agent' ? 'text-white' : 'text-default-400 hover:text-white'}`}
                                                 >
-                                                    <span className={`icon-strategy-active group-hover:block ${pathname === '/strategy' ? 'block' : 'hidden'}`} />
-                                                    <span className={`icon-strategy group-hover:hidden ${pathname === '/strategy' ? 'hidden' : 'block'}`} />
+                                                    <span className={`icon-strategy-active group-hover:block ${pathname === '/ask-agent' ? 'block' : 'hidden'}`} />
+                                                    <span className={`icon-strategy group-hover:hidden ${pathname === '/ask-agent' ? 'hidden' : 'block'}`} />
                                                     <span className="hidden font-kodemono md:inline-block">Strategy</span>
                                                 </Link>
 
                                                 <Link
                                                     href="#"
                                                     onClick={openPredictionDialog}
-                                                    className="flex items-center group md:gap-2 text-default-400 hover:text-white p-2 border border-white/10 rounded-lg w-fit hidden md:flex"
+                                                    className="items-center group md:gap-2 text-default-400 hover:text-white p-2 border border-white/10 rounded-lg w-fit hidden md:flex"
                                                 >
                                                     <span className="plus-circle-on group-hover:border-white hidden group-hover:block text-white" />
                                                     <span className="plus-circle-off block group-hover:hidden" />

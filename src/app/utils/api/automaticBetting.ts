@@ -62,6 +62,7 @@ export class AutomaticBettingAgent {
     private agent: IAgentProfile;
     private openai: OpenAI;
     private pinecone: Pinecone;
+    private deepseek: OpenAI;
     private SERPAPI_API_KEY = process.env.SERPAPI_API_KEY!;
     private newsCache: Map<string, NewsItem[]> = new Map();
     private COINMARKETCAP_API_KEY = process.env.COINMARKETCAP_API_KEY!;
@@ -74,6 +75,10 @@ export class AutomaticBettingAgent {
         });
         this.pinecone = new Pinecone({
             apiKey: process.env.PINECONE_API_KEY!
+        });
+        this.deepseek = new OpenAI({
+            apiKey: process.env.DEEPSEEK_API_KEY!,
+            baseURL: 'https://api.deepseek.com'
         });
     }
 
@@ -404,7 +409,7 @@ ${p.metadata?.comment ? `- Agent Controller Comment: ${p.metadata.comment}` : ''
                     ? content
                         .replace(/```json\n?/g, '')  // Remove opening code block
                         .replace(/\n?```/g, '')      // Remove closing code block
-                    .trim()
+                        .trim()
                     : '';
 
                 const batchDecisions = this.parseAnalysisResponse(
@@ -434,11 +439,11 @@ ${p.metadata?.comment ? `- Agent Controller Comment: ${p.metadata.comment}` : ''
         if (indexList.length == 0) {
             return [];
         }
-        
+
         try {
             // Use fetch operation instead of query
             const response = await index.fetch(indexList);
-            
+
             // Transform the records into Predictions with metadata
             return Object.values(response.records).map(record => ({
                 id: parseInt(record.id),
@@ -952,13 +957,13 @@ ${p.metadata?.comment ? `- Agent Controller Comment: ${p.metadata.comment}` : ''
     private async getCryptoSymbols(description: string): Promise<string[]> {
         try {
             const prompt = `Extract the crypto symbols which can use to search in coinmarketcap from the following prediction: ${description}`;
-            
+
             const response = await this.openai.chat.completions.create({
                 model: "gpt-4o",
                 messages: [
-                    { 
-                        role: "system", 
-                        content: "You are a crypto expert. Extract only valid cryptocurrency symbols from the given prediction. Return them in a JSON object mapping symbols to their full names." 
+                    {
+                        role: "system",
+                        content: "You are a crypto expert. Extract only valid cryptocurrency symbols from the given prediction. Return them in a JSON object mapping symbols to their full names."
                     },
                     { role: "user", content: prompt }
                 ],
@@ -968,7 +973,7 @@ ${p.metadata?.comment ? `- Agent Controller Comment: ${p.metadata.comment}` : ''
 
             const content = response.choices[0].message.content;
             console.log("Crypto symbols response:", content);
-            
+
             if (!content) {
                 console.warn('No content received from OpenAI');
                 return [];
@@ -977,15 +982,15 @@ ${p.metadata?.comment ? `- Agent Controller Comment: ${p.metadata.comment}` : ''
             try {
                 // Parse the JSON response
                 const parsedResponse = JSON.parse(content);
-                
+
                 // Extract keys (symbols) from the object
                 const symbols = Object.keys(parsedResponse);
-                
+
                 // Validate and clean symbols
                 return symbols
-                    .filter(symbol => 
-                        typeof symbol === 'string' && 
-                        symbol.length > 0 && 
+                    .filter(symbol =>
+                        typeof symbol === 'string' &&
+                        symbol.length > 0 &&
                         symbol.length <= 10 &&
                         // Additional validation if needed
                         /^[A-Za-z0-9]+$/.test(symbol) // Only allow alphanumeric symbols
@@ -1082,37 +1087,50 @@ ${p.metadata?.comment ? `- Agent Controller Comment: ${p.metadata.comment}` : ''
 
     public async handleUserQuestion(question: string): Promise<string> {
         try {
-            // 1) Create embeddings for the question
-            const embeddingResponse = await this.openai.embeddings.create({
-                model: "text-embedding-ada-002",
-                input: question
-            });
-            const questionEmbedding = embeddingResponse.data[0].embedding;
-
-            // 2) Perform a real Pinecone query to find relevant prior predictions/bets
-            //    The actual filter or topK can be adjusted to suit your domain logic
-            const index = this.pinecone.Index('prediction-results');
-            const pineconeResponse = await index.query({
-                vector: questionEmbedding,
-                topK: 5,
-                includeMetadata: true,
-                filter: {
-                    agentId: { $eq: this.agent.id }
-                }
-            });
-
-            // 3) Summarize the relevant results
+            const intent = await this.detectQuestionIntent(question);
             let relevantSummaries = "";
-            if (pineconeResponse.matches && pineconeResponse.matches.length > 0) {
-                relevantSummaries = pineconeResponse.matches
-                    .map((match) => {
-                        const meta = match.metadata || {};
-                        // Feel free to refine these strings to be more descriptive
+            const index = this.pinecone.Index('prediction-results');
+            if (intent === 'training') {
+                const train_index = this.agent.train_index ? this.agent.train_index.split(',') : [];
+                const pineconeResponse = await index.fetch(train_index);
+                if (pineconeResponse.records) {
+                    relevantSummaries = Object.values(pineconeResponse.records).map(record => {
+                        const meta = record.metadata || {};
                         return `- Description: ${meta.description || "N/A"} | Choice: ${meta.choice} | Result: ${meta.result}`;
-                    })
-                    .join("\n");
+                    }).join("\n");
+                } else {
+                    relevantSummaries = "No training data found.";
+                }
+
             } else {
-                relevantSummaries = "No similar prior predictions or bets found.";
+                // 1) Create embeddings for the question
+                const embeddingResponse = await this.openai.embeddings.create({
+                    model: "text-embedding-ada-002",
+                    input: question
+                });
+                const questionEmbedding = embeddingResponse.data[0].embedding;
+
+                const pineconeResponse = await index.query({
+                    vector: questionEmbedding,
+                    topK: 5,
+                    includeMetadata: true,
+                    filter: {
+                        agentId: { $eq: this.agent.id }
+                    }
+                });
+
+                // 3) Summarize the relevant results
+                if (pineconeResponse.matches && pineconeResponse.matches.length > 0) {
+                    relevantSummaries = pineconeResponse.matches
+                        .map((match) => {
+                            const meta = match.metadata || {};
+                            // Feel free to refine these strings to be more descriptive
+                            return `- Description: ${meta.description || "N/A"} | Choice: ${meta.choice} | Result: ${meta.result}`;
+                        })
+                        .join("\n");
+                } else {
+                    relevantSummaries = "No similar prior predictions or bets found.";
+                }
             }
 
             const systemPrompt = `
@@ -1149,6 +1167,44 @@ ${p.metadata?.comment ? `- Agent Controller Comment: ${p.metadata.comment}` : ''
         } catch (error) {
             console.error("Error in handleUserQuestion:", error);
             return "An error occurred while processing your question. Please try again.";
+        }
+    }
+
+    private async detectQuestionIntent(question: string): Promise<'training' | 'general'> {
+        const prompt = `
+        Analyze if this question is asking about training data/examples or is a general question.
+        Question: "${question}"
+
+        Return ONLY one of these exact words:
+        - "training" - if asking about training data, training examples, learning process, or how the agent was trained
+        - "general" - for any other type of question
+
+        Examples:
+        "What did you learn from your training?" -> "training"
+        "Can you show me your training examples?" -> "training"
+        "How were you trained?" -> "training"
+        "What's your prediction for Bitcoin?" -> "general"
+        "Why did you make that bet?" -> "general"
+        `;
+
+        try {
+            // Hypothetical DeepSeek API call
+            const response = await this.deepseek.chat.completions.create({
+                model: "deepseek-chat",
+                messages: [
+                    { role: "system", content: "You are a classifier that only responds with one word: either 'training' or 'general'" },
+                    { role: "user", content: prompt }
+                ],
+                temperature: 0,
+                max_tokens: 10
+            });
+
+            const intent = response.choices[0].message.content?.toLowerCase();
+            console.log("intent", intent);
+            return intent === 'training' ? 'training' : 'general';
+        } catch (error) {
+            console.error('Error detecting question intent:', error);
+            return 'general'; // Default to general on error
         }
     }
 }

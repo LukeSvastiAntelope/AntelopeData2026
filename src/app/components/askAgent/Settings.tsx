@@ -43,7 +43,7 @@ const Settings = ({ agentProfile, setAgentProfile }: IAskAgentProps) => {
                         <Select
                             variant="bordered"
                             className="w-[200px]"
-                            defaultSelectedKeys={[agentProfile?.category || '']}
+                            defaultSelectedKeys={[agentProfile?.category?.toLowerCase() || '']}
                             onChange={(e) => setAgentProfile(prev => (prev ? { ...prev, category: e.target.value } : null))}
                         >
                             {CATEGORIES.map((category) => (

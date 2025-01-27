@@ -53,6 +53,7 @@ export async function POST(req: NextRequest) {
                 agent_id: agent.id,
                 confidence: confidence,
                 reasoning: reasoning,
+                is_training: true
             }
         }]);
 

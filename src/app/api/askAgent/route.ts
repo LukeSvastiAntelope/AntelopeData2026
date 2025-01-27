@@ -1,20 +1,41 @@
 import { NextRequest, NextResponse } from "next/server";
 import { AutomaticBettingAgent } from "@/app/utils/api/automaticBetting";
-import { IAgentProfile } from "@/app/utils/interface";
+import { IAgentProfile, IPrinciple } from "@/app/utils/interface";
 import { UserRepo } from "@/app/utils/database/user-repo";
 
 export async function POST(request: NextRequest) {
   try {
-    const { userQuestion, agentProfile } = (await request.json()) as {
+    const { userQuestion, agentProfileId } = (await request.json()) as {
       userQuestion: string;
-      agentProfile: IAgentProfile;
+      agentProfileId: string;
     };
 
-    if (!userQuestion || !agentProfile) {
-      throw new Error("Missing userQuestion or agentProfile in request body");
+    if (!userQuestion || !agentProfileId) {
+      throw new Error("Missing userQuestion or agentProfileId in request body");
     }
-    
+
+    const agentProfile = await UserRepo.getAgentById(Number(agentProfileId));
+    if (!agentProfile) {
+      throw new Error("Agent profile not found");
+    }
+
     await UserRepo.insertConversation(agentProfile.user_id, agentProfile.id, userQuestion, "user");
+
+    if (typeof agentProfile.interests === "string") {
+      agentProfile.interests = agentProfile.interests.split(",");
+    }
+
+    try {
+      if (typeof agentProfile.principles === 'string') {
+        agentProfile.principles = JSON.parse(agentProfile.principles);
+      }
+      if (!Array.isArray(agentProfile.principles)) {
+        agentProfile.principles = [];
+      }
+    } catch (e) {
+      console.log("Error in principles: ", e);
+      agentProfile.principles = [];
+    }
 
     // Create an Agent instance with the user-provided agentProfile
     const agent = new AutomaticBettingAgent({
@@ -24,7 +45,7 @@ export async function POST(request: NextRequest) {
       image: agentProfile.image,
       maxBetSize: agentProfile.maxBetSize,
       interests: agentProfile.interests,
-      principles: agentProfile.principles,
+      principles: agentProfile.principles as unknown as IPrinciple[],
       wallet_balance: agentProfile.wallet_balance,
       user_id: agentProfile.user_id,
       category: agentProfile.category,

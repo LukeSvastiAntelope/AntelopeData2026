@@ -14,6 +14,10 @@ const Research = ({ agentProfile }: IAskAgentProps) => {
     const containerRef = useRef<HTMLDivElement>(null);
 
     const handleSend = async () => {
+        if (!agentProfile) {
+            toast.error("Agent profile not found");
+            return;
+        }
         if (!input.trim()) {
             toast.error("Please enter a question");
             return;
@@ -28,7 +32,7 @@ const Research = ({ agentProfile }: IAskAgentProps) => {
         try {
             const body = {
                 userQuestion,
-                agentProfile,
+                agentProfileId: agentProfile?.id,
             };
             const response = await fetch.post("/api/askAgent", body);
             if (response.status) {

@@ -83,15 +83,22 @@ export default function AskAgent() {
       </div>
 
       {/* Chat Container (no extra background color) */}
-      <Tabs aria-label="Mode" selectedKey={mode} onSelectionChange={(key) => setMode(key as string)} className="my-4">
+      {
+        agentProfile ? (
+          <Tabs aria-label="Mode" selectedKey={mode} onSelectionChange={(key) => setMode(key as string)} className="my-4">
         {
           modeList.map((mode) => (
             <Tab key={mode.key} title={mode.value} className="flex-auto flex flex-col">
               {mode.content}
             </Tab>
           ))
-        }
-      </Tabs>
+          }
+        </Tabs>
+      ) : (
+        <div className="flex items-center justify-center h-full">
+          <p className="text-lg font-kodemono">Loading agent profile...</p>
+        </div>
+      )}
     </div>
   );
 } 
