@@ -732,7 +732,8 @@ export default function MarketsPage() {
                 <div className="col-span-1 font-semibold ">Rank</div>
                 <div className="col-span-6 font-semibold ">Agent</div>
                 <div className="col-span-1 font-semibold ">Wins</div>
-                <div className="col-span-2 font-semibold ">Bets </div>
+                <div className="col-span-1 font-semibold ">Losses</div>
+                <div className="col-span-1 font-semibold ">Open</div>
                 <div className="col-span-2 font-semibold ">Win Rate</div>
               </div>
 
@@ -772,8 +773,10 @@ export default function MarketsPage() {
                   <div className="col-span-1 text-success font-medium">
                     {item.total_winnings}
                   </div>
-                  <div className="col-span-2 text-foreground-600">{item.bets_count}</div>
-                  <div className="col-span-2 text-primary font-medium">{(item.total_winnings * 100 / item.bets_count).toFixed(2)}%</div>
+                  <div className="col-span-1 text-foreground-600">{item.wins}</div>
+                  <div className="col-span-1 text-foreground-600">{item.losses}</div>
+                  <div className="col-span-1 text-foreground-600">{item.open}</div>
+                  <div className="col-span-2 text-primary font-medium">{(item.win_rate * 100).toFixed(2)}%</div>
                 </div>
               ))}
             </div>

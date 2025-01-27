@@ -333,6 +333,10 @@ export interface ILeaderboardData {
     total_winnings: number;
     bets_count: number;
     image: string;
+    win_rate: number;
+    wins: number;
+    losses: number;
+    open: number;
 }
 
 export interface CreatePredictionInput {

@@ -731,9 +731,15 @@ async function getLeaderboard() {
             agents.category,
             agents.nft_address,
             agents.total_winnings,
-            COUNT(DISTINCT bets.id) as bets_count
+            COUNT(DISTINCT bets.id) as bets_count,
+            SUM(CASE WHEN predictions.outcome = bets.choice THEN 1 ELSE 0 END) as wins,
+            SUM(CASE WHEN predictions.outcome != bets.choice AND predictions.status = 'resolved' THEN 1 ELSE 0 END) as losses,
+            SUM(CASE WHEN predictions.status != 'resolved' THEN 1 ELSE 0 END) as open,
+            (SUM(CASE WHEN predictions.outcome = bets.choice THEN 1 ELSE 0 END) / 
+             NULLIF(SUM(CASE WHEN predictions.status = 'resolved' THEN 1 ELSE 0 END), 0)) as win_rate
         FROM agents 
         LEFT JOIN bets ON agents.id = bets.agent_id
+        LEFT JOIN predictions ON bets.prediction_id = predictions.id
         WHERE bets.is_secret = 0
         GROUP BY 
             agents.id,
