@@ -1,7 +1,7 @@
 import { CATEGORIES, AGENT_RISK_LEVEL } from "@/app/utils/const";
 import { IAskAgentProps } from "@/app/utils/interface";
 import { convertDaysToYMD } from "@/app/utils/lib";
-import { Button, Chip, Input, Select, SelectItem } from "@heroui/react";
+import { Button, Chip, Input, Select, SelectItem, Tooltip, Switch } from "@heroui/react";
 import { useState } from "react";
 import { toast } from "react-hot-toast";
 import { useFetch } from "@/app/utils/lib";
@@ -36,7 +36,33 @@ const Settings = ({ agentProfile, setAgentProfile }: IAskAgentProps) => {
     return (
         <div className="flex flex-col h-full w-full">
             <div className="flex flex-col gap-4 border border-white/10 rounded-xl p-4">
-                <div className="text-xl font-regular">Betting Category</div>
+                <div className="text-xl font-regular flex flex-row justify-between">
+                    <div className="text-sm font-regular">Betting Category</div>
+                    <div className="flex flex-row justify-between items-center gap-2">
+                        <Tooltip
+                            content={
+                                agentProfile?.is_bet
+                                    ? "Agent's automated betting is currently enabled"
+                                    : "Agent's automated betting is currently disabled"
+                            }
+                            showArrow
+                        >
+                            <div>
+                                <p className="text-default-500 text-small">
+                                    {agentProfile?.is_bet ? "Betting is currently enabled" : "Betting is currently disabled"}
+                                </p>
+                            </div>
+                        </Tooltip>
+                        <Switch
+                            isSelected={agentProfile?.is_bet}
+                            onValueChange={() => {
+                                setAgentProfile(prev => (prev ? { ...prev, is_bet: !prev.is_bet } : null));
+                            }}
+                            color="success"
+                            size="sm"
+                        />
+                    </div>
+                </div>
                 <div className="flex gap-4">
                     <div className="flex flex-col gap-2">
                         <div className="text-sm font-regular">Main Category</div>
@@ -51,7 +77,7 @@ const Settings = ({ agentProfile, setAgentProfile }: IAskAgentProps) => {
                             ))}
                         </Select>
                     </div>
-                   
+
                 </div>
                 <div className="flex flex-col gap-2">
                     <div className="text-sm font-regular">Category interests</div>
@@ -78,71 +104,71 @@ const Settings = ({ agentProfile, setAgentProfile }: IAskAgentProps) => {
                         aria-label="Add new interest"
                     />
                 </div>
-                
+
             </div>
 
             <div className="flex flex-col gap-2 border border-white/10 rounded-xl p-4 my-8">
                 <div className="text-xl font-regular">Preferred Bet Horizon</div>
-                    <div className="text-sm font-regular">Select</div>
-                    <div className="flex gap-4">
-                        <Input
-                            label="Years"
-                            type="number"
-                            variant="bordered"
-                            value={resolutionDate?.years?.toString() || '0'}
-                            onChange={(e) => {
-                                const years = parseInt(e.target.value);
-                                const totalDays = (years * 365) + (resolutionDate?.months || 0) * 30 + (resolutionDate?.days || 0);
-                                setAgentProfile(prev => (prev ? { ...prev, maxTimelineLimit: totalDays } : null));
-                                setResolutionDate(prev => ({ ...prev, years }));
-                            }}
-                            aria-label="Resolution timeline in years"
-                        />
-                        <Input
-                            label="Months"
-                            type="number"
-                            variant="bordered"
-                            value={resolutionDate?.months?.toString() || '0'}
-                            onChange={(e) => {
-                                const months = parseInt(e.target.value);
-                                const totalDays = ((resolutionDate?.years || 0) * 365) + (months * 30) + (resolutionDate?.days || 0);
-                                setAgentProfile(prev => (prev ? { ...prev, maxTimelineLimit: totalDays } : null));
-                                setResolutionDate(prev => ({ ...prev, months }));
-                            }}
-                            min={0}
-                            aria-label="Resolution timeline in months"
-                        />
-                        <Input
-                            label="Days"
-                            type="number"
-                            variant="bordered"
-                            value={resolutionDate?.days?.toString() || '0'}
-                            onChange={(e) => {
-                                const days = parseInt(e.target.value);
-                                const totalDays = ((resolutionDate?.years || 0) * 365) + ((resolutionDate?.months || 0) * 30) + days;
-                                setAgentProfile(prev => (prev ? { ...prev, maxTimelineLimit: totalDays } : null));
-                                setResolutionDate(prev => ({ ...prev, days }));
-                            }}
-                            min={0}
-                            aria-label="Resolution timeline in days"
-                        />
-                    </div>
+                <div className="text-sm font-regular">Select</div>
+                <div className="flex gap-4">
+                    <Input
+                        label="Years"
+                        type="number"
+                        variant="bordered"
+                        value={resolutionDate?.years?.toString() || '0'}
+                        onChange={(e) => {
+                            const years = parseInt(e.target.value);
+                            const totalDays = (years * 365) + (resolutionDate?.months || 0) * 30 + (resolutionDate?.days || 0);
+                            setAgentProfile(prev => (prev ? { ...prev, maxTimelineLimit: totalDays } : null));
+                            setResolutionDate(prev => ({ ...prev, years }));
+                        }}
+                        aria-label="Resolution timeline in years"
+                    />
+                    <Input
+                        label="Months"
+                        type="number"
+                        variant="bordered"
+                        value={resolutionDate?.months?.toString() || '0'}
+                        onChange={(e) => {
+                            const months = parseInt(e.target.value);
+                            const totalDays = ((resolutionDate?.years || 0) * 365) + (months * 30) + (resolutionDate?.days || 0);
+                            setAgentProfile(prev => (prev ? { ...prev, maxTimelineLimit: totalDays } : null));
+                            setResolutionDate(prev => ({ ...prev, months }));
+                        }}
+                        min={0}
+                        aria-label="Resolution timeline in months"
+                    />
+                    <Input
+                        label="Days"
+                        type="number"
+                        variant="bordered"
+                        value={resolutionDate?.days?.toString() || '0'}
+                        onChange={(e) => {
+                            const days = parseInt(e.target.value);
+                            const totalDays = ((resolutionDate?.years || 0) * 365) + ((resolutionDate?.months || 0) * 30) + days;
+                            setAgentProfile(prev => (prev ? { ...prev, maxTimelineLimit: totalDays } : null));
+                            setResolutionDate(prev => ({ ...prev, days }));
+                        }}
+                        min={0}
+                        aria-label="Resolution timeline in days"
+                    />
                 </div>
-            
+            </div>
+
             <div className="flex flex-col gap-4 border border-white/10 rounded-xl p-4">
                 <div className="text-xl font-regular">Risk Profile</div>
                 <div className="flex flex-col gap-2">
-                        <div className="text-sm font-regular">Max Betting Size</div>
-                        <Input
-                            type="number"
-                            endContent={<span className="text-default-400">credits</span>}
-                            variant="bordered"
-                            value={agentProfile?.maxBetSize?.toString() || '0'}
-                            onChange={(e) => setAgentProfile(prev => (prev ? { ...prev, maxBetSize: parseInt(e.target.value) } : null))}
-                            min={0}
-                            aria-label="Maximum bet size in credits"
-                        />
-                    </div>
+                    <div className="text-sm font-regular">Max Betting Size</div>
+                    <Input
+                        type="number"
+                        endContent={<span className="text-default-400">credits</span>}
+                        variant="bordered"
+                        value={agentProfile?.maxBetSize?.toString() || '0'}
+                        onChange={(e) => setAgentProfile(prev => (prev ? { ...prev, maxBetSize: parseInt(e.target.value) } : null))}
+                        min={0}
+                        aria-label="Maximum bet size in credits"
+                    />
+                </div>
                 <div className="flex flex-col gap-2">
                     <div className="text-sm font-regular">Default</div>
                     <Select
@@ -190,7 +216,7 @@ const Settings = ({ agentProfile, setAgentProfile }: IAskAgentProps) => {
                     />
                 </div>
             </div>
-           
+
             <Button className="mt-4" onPress={updateAgentProfile} isLoading={isSaving}>Save</Button>
         </div>
     );

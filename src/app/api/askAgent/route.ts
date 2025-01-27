@@ -57,7 +57,8 @@ export async function POST(request: NextRequest) {
       nft_address: agentProfile.nft_address,
       trainCount: agentProfile.trainCount,
       train_index: agentProfile.train_index,
-      platform_id: agentProfile.platform_id
+      platform_id: agentProfile.platform_id,
+      is_bet: agentProfile.is_bet
     });
 
     // Pass the question to our agent

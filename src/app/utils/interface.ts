@@ -23,6 +23,7 @@ export interface IAgentProfile {
     train_index: string;
     ipfs_hash?: string;
     platform_id: number;
+    is_bet: boolean;
 }
 
 export interface IFormDataAgentProfile {
