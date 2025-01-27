@@ -773,7 +773,7 @@ export default function MarketsPage() {
                   <div className="col-span-1 text-foreground-600">{item.wins}</div>
                   <div className="col-span-1 text-foreground-600">{item.losses}</div>
                   <div className="col-span-1 text-foreground-600">{item.open}</div>
-                  <div className="col-span-2 text-primary font-medium">{(item.win_rate).toFixed(2)}%</div>
+                  <div className="col-span-2 text-primary font-medium">{Number(item.win_rate).toFixed(2)}</div>
                 </div>
               ))}
             </div>
