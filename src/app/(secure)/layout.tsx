@@ -224,7 +224,7 @@ const SecureLayout = ({ children }: { children: React.ReactNode }) => {
                                                 </Link>
 
                                                 <Link
-                                                    href="/ask-agent?mode=settings"
+                                                    href="/ask-agent"
                                                     className={`flex items-center group md:gap-2 ${pathname === '/ask-agent' ? 'text-white' : 'text-default-400 hover:text-white'}`}
                                                 >
                                                     <span className={`icon-strategy-active group-hover:block ${pathname === '/ask-agent' ? 'block' : 'hidden'}`} />
