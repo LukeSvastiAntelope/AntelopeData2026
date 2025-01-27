@@ -1093,6 +1093,7 @@ ${p.metadata?.comment ? `- Agent Controller Comment: ${p.metadata.comment}` : ''
             if (intent === 'training') {
                 const train_index = this.agent.train_index ? this.agent.train_index.split(',') : [];
                 const pineconeResponse = await index.fetch(train_index);
+                console.log("pineconeResponse", pineconeResponse);
                 if (pineconeResponse.records) {
                     relevantSummaries = Object.values(pineconeResponse.records).map(record => {
                         const meta = record.metadata || {};
