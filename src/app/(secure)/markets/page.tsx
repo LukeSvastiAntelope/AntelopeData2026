@@ -154,10 +154,10 @@ export default function MarketsPage() {
 
   // Lazy-load data based on current tab
   useEffect(() => {
-    if (activeTab == "leaderboard" && leaderboardData.length === 0) {
-      fetchLeaderboardData()
+    if (activeTab === "leaderboard" && leaderboardData.length === 0 && !isLoadingLeaderboard) {
+      fetchLeaderboardData();
     }
-  }, [activeTab]);
+  }, [activeTab, leaderboardData.length, isLoadingLeaderboard]);
 
   useEffect(() => {
     fetchAgentProfile();
