@@ -83,9 +83,10 @@ export default function AskAgent() {
       </div>
 
       {/* Chat Container (no extra background color) */}
-      <Tabs 
-        aria-label="Mode" 
-        selectedKey={mode} 
+      {agentProfile && (
+        <Tabs 
+          aria-label="Mode" 
+          selectedKey={mode} 
         onSelectionChange={(key) => setMode(key as string)}
         disableCursorAnimation
         classNames={{
@@ -103,8 +104,9 @@ export default function AskAgent() {
           >
             {mode.content}
           </Tab>
-        ))}
-      </Tabs>
+          ))}
+        </Tabs>
+      )}
     </div>
   );
 } 
