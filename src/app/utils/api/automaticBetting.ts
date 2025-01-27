@@ -1190,14 +1190,13 @@ ${p.metadata?.comment ? `- Agent Controller Comment: ${p.metadata.comment}` : ''
 
         try {
             // Hypothetical DeepSeek API call
-            const response = await this.deepseek.chat.completions.create({
-                model: "deepseek-chat",
+            const response = await this.openai.chat.completions.create({
+                model: "gpt-4o",
                 messages: [
                     { role: "system", content: "You are a classifier that only responds with one word: either 'training' or 'general'" },
                     { role: "user", content: prompt }
                 ],
-                temperature: 0,
-                max_tokens: 10
+                temperature: 0.3
             });
 
             const intent = response.choices[0].message.content?.toLowerCase();
