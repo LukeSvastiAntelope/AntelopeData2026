@@ -65,7 +65,7 @@ const Research = ({ agentProfile }: IAskAgentProps) => {
         <>
             <div
                 ref={containerRef}
-                className="flex-auto overflow-y-auto p-0 space-y-4 text-small w-full"
+                className="flex-auto overflow-y-auto p-0 space-y-4 text-small w-full h-[calc(100vh-400px)]"
             >
                 {messages.length === 0 ? (
                     <div className="flex flex-col gap-2 mb-8 border border-white/10 rounded-xl p-6 text-center empty-state place-content-center">

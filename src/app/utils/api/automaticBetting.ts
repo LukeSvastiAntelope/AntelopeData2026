@@ -448,7 +448,7 @@ ${p.metadata?.comment ? `- Agent Controller Comment: ${p.metadata.comment}` : ''
             return Object.values(response.records).map(record => ({
                 id: parseInt(record.id),
                 user_id: this.agent.id,
-                description: record.metadata?.question as string || '',
+                description: record.metadata?.description as string || '',
                 source: '',
                 status: 'resolved',
                 bet_amount: record.metadata?.amount as number || 0,
@@ -456,7 +456,8 @@ ${p.metadata?.comment ? `- Agent Controller Comment: ${p.metadata.comment}` : ''
                 predicted_outcome: '',
                 created_at: record.metadata?.created_at as string || new Date().toISOString(),
                 resolution_date: '',
-                outcome: ''
+                outcome: '',
+                reasoning: record.metadata?.reasoning as string || ''
             } as Prediction));
 
         } catch (error) {
@@ -1097,7 +1098,7 @@ ${p.metadata?.comment ? `- Agent Controller Comment: ${p.metadata.comment}` : ''
                 if (pineconeResponse.records) {
                     relevantSummaries = Object.values(pineconeResponse.records).map(record => {
                         const meta = record.metadata || {};
-                        return `- Description: ${meta.description || "N/A"} | Choice: ${meta.choice} | Result: ${meta.result}`;
+                        return `- Description: ${meta.description || "N/A"} | Choice: ${meta.choice} | Reasoning: ${meta.reasoning}`;
                     }).join("\n");
                 } else {
                     relevantSummaries = "No training data found.";
@@ -1142,10 +1143,9 @@ ${p.metadata?.comment ? `- Agent Controller Comment: ${p.metadata.comment}` : ''
                 Risk Level: ${this.agent.riskLevel}
                 Principles: ${this.agent.principles.map((p) => p.title).join(", ")}
 
-                You job is to help the user understand your predictions and bets.
+                Your job is to help the user understand your predictions and bets.
 
-                Always look  in the Pinecone index for prior bets and predictions or any other relevant information.
-                
+                Always look in the Pinecone index for prior bets and predictions or any other relevant information.
                 
                 If referencing prior bets, highlight how risk strategy or prior results inform your answer.
 
@@ -1191,8 +1191,8 @@ ${p.metadata?.comment ? `- Agent Controller Comment: ${p.metadata.comment}` : ''
 
         try {
             // Hypothetical DeepSeek API call
-            const response = await this.openai.chat.completions.create({
-                model: "gpt-4o",
+            const response = await this.deepseek.chat.completions.create({
+                model: "deepseek-chat",
                 messages: [
                     { role: "system", content: "You are a classifier that only responds with one word: either 'training' or 'general'" },
                     { role: "user", content: prompt }
