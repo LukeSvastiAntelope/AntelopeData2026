@@ -35,7 +35,7 @@ const Settings = ({ agentProfile, setAgentProfile }: IAskAgentProps) => {
 
     return (
         <div className="flex flex-col h-full w-full">
-            <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-4 border border-white/10 rounded-xl p-4">
                 <div className="text-xl font-regular">Betting Category</div>
                 <div className="flex gap-4">
                     <div className="flex flex-col gap-2">
@@ -51,18 +51,7 @@ const Settings = ({ agentProfile, setAgentProfile }: IAskAgentProps) => {
                             ))}
                         </Select>
                     </div>
-                    <div className="flex flex-col gap-2">
-                        <div className="text-sm font-regular">Max Betting Size</div>
-                        <Input
-                            type="number"
-                            endContent={<span className="text-default-400">credits</span>}
-                            variant="bordered"
-                            value={agentProfile?.maxBetSize?.toString() || '0'}
-                            onChange={(e) => setAgentProfile(prev => (prev ? { ...prev, maxBetSize: parseInt(e.target.value) } : null))}
-                            min={0}
-                            aria-label="Maximum bet size in credits"
-                        />
-                    </div>
+                   
                 </div>
                 <div className="flex flex-col gap-2">
                     <div className="text-sm font-regular">Category interests</div>
@@ -89,8 +78,12 @@ const Settings = ({ agentProfile, setAgentProfile }: IAskAgentProps) => {
                         aria-label="Add new interest"
                     />
                 </div>
-                <div className="flex flex-col gap-2">
-                    <div className="text-sm font-regular">Resolution Reference</div>
+                
+            </div>
+
+            <div className="flex flex-col gap-2 border border-white/10 rounded-xl p-4 my-8">
+                <div className="text-xl font-regular">Preferred Bet Horizon</div>
+                    <div className="text-sm font-regular">Select</div>
                     <div className="flex gap-4">
                         <Input
                             label="Years"
@@ -135,10 +128,21 @@ const Settings = ({ agentProfile, setAgentProfile }: IAskAgentProps) => {
                         />
                     </div>
                 </div>
-            </div>
-            <Divider className="my-4" />
-            <div className="flex flex-col gap-4">
+            
+            <div className="flex flex-col gap-4 border border-white/10 rounded-xl p-4">
                 <div className="text-xl font-regular">Risk Profile</div>
+                <div className="flex flex-col gap-2">
+                        <div className="text-sm font-regular">Max Betting Size</div>
+                        <Input
+                            type="number"
+                            endContent={<span className="text-default-400">credits</span>}
+                            variant="bordered"
+                            value={agentProfile?.maxBetSize?.toString() || '0'}
+                            onChange={(e) => setAgentProfile(prev => (prev ? { ...prev, maxBetSize: parseInt(e.target.value) } : null))}
+                            min={0}
+                            aria-label="Maximum bet size in credits"
+                        />
+                    </div>
                 <div className="flex flex-col gap-2">
                     <div className="text-sm font-regular">Default</div>
                     <Select
@@ -152,7 +156,7 @@ const Settings = ({ agentProfile, setAgentProfile }: IAskAgentProps) => {
                         ))}
                     </Select>
                 </div>
-                <div className="text-xl font-regular">Betting Size</div>
+                <div className="text-sm font-regular">Betting Size</div>
                 <div className="flex gap-4">
                     <Input
                         label="Conservative Bet Size"
@@ -186,8 +190,8 @@ const Settings = ({ agentProfile, setAgentProfile }: IAskAgentProps) => {
                     />
                 </div>
             </div>
-            <Divider className="my-4" />
-            <Button onPress={updateAgentProfile} isLoading={isSaving}>Save</Button>
+           
+            <Button className="mt-4" onPress={updateAgentProfile} isLoading={isSaving}>Save</Button>
         </div>
     );
 }

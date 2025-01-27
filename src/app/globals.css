@@ -171,6 +171,15 @@ max-width: 80px;
   transition: background-image 0.2s ease-in-out;
 }
 
+.icon-send {
+  background-image: url('/assets/images/send.svg');
+  background-size: 32px 32px;
+  background-repeat: no-repeat;
+  background-position: center;
+  width: 32px;
+  height: 32px;
+}
+
 .image-cut {
   max-width: fit-content;
   min-width: fit-content;

@@ -144,8 +144,8 @@ const Train = ({ agentProfile, setAgentProfile }: IAskAgentProps) => {
     return (
         isTraining && agentProfile ?
             (
-                <div className="w-full space-y-4">
-                    <div className="text-white rounded-md py-2 px-4 bg-blue-900 w-fit">
+                <div className="w-full space-y-4 text-sm">
+                    <div className=" rounded-md py-2 px-4  bg-primary/20 text-primary-600 w-fit">
                         Fetching
                         {
                             (6 - agentProfile.trainCount - trainingPredictionsList.length) == 0 ?
@@ -171,11 +171,11 @@ const Train = ({ agentProfile, setAgentProfile }: IAskAgentProps) => {
                     }
                     {
                         isThinking ? (
-                            <div className="text-white">Thinking...</div>
+                            <div className="text-white bg-primary-600 rounded-md p-2">Thinking...</div>
                         ) : (
                             trainingPredictions &&
-                            <div className="space-y-2 px-3 py-2 rounded-md bg-[#2F344E]">
-                                <div className="text-white">{trainingPredictions?.question}</div>
+                            <div className="space-y-2 px-3 py-2 rounded-md bg-[#2F344E]/20">
+                                <div className="text-white text-xl">{trainingPredictions?.question}</div>
                                 {
                                     !isSubmitted ?
                                         <>
@@ -220,8 +220,8 @@ const Train = ({ agentProfile, setAgentProfile }: IAskAgentProps) => {
                                                     value={betAmount}
                                                     onChange={(e) => setBetAmount(e.target.value)}
                                                     classNames={{
-                                                        input: "bg-content1/20 dark:bg-content1/20",
-                                                        inputWrapper: "bg-content1/20 dark:bg-content1/20"
+                                                        input: "bg-content0 dark:bg-content0",
+                                                        inputWrapper: "bg-content0 dark:content0"
                                                     }}
                                                     aria-label="Enter bet amount for training prediction"
                                                 />
@@ -235,8 +235,8 @@ const Train = ({ agentProfile, setAgentProfile }: IAskAgentProps) => {
                                                     value={reason || ''}
                                                     onChange={(e) => setReason(e.target.value)}
                                                     classNames={{
-                                                        input: "bg-content1/20 dark:bg-content1/20",
-                                                        inputWrapper: "bg-content1/20 dark:bg-content1/20",
+                                                        input: "bg-content0 dark:bg-content0",
+                                                        inputWrapper: "bg-content0 dark:bg-content0",
                                                         mainWrapper: "w-full h-[200px]"
                                                     }}
                                                     aria-label="Enter reasoning for training prediction"
@@ -263,7 +263,7 @@ const Train = ({ agentProfile, setAgentProfile }: IAskAgentProps) => {
             ) : (
                 <div className="flex flex-col gap-2 mb-8 border border-white/10 rounded-xl p-6 text-center empty-state place-content-center">
                     <div className="training-center"></div >
-                    <div className="text-gray-400 pb-2">
+                    <div className="text-gray-400 pb-2 text-sm">
                         Teach your agent to reason about your subject of interest by breaking down your own reasoning based on relevants bets.
                     </div>
                     <Button className="w-fit mx-auto" color="primary" variant="flat" onPress={startTraining}>Begin Training</Button>

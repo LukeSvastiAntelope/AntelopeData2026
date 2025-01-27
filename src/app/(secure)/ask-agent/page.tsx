@@ -72,7 +72,7 @@ export default function AskAgent() {
   return (
     <div className="h-[calc(100vh-65px)] flex flex-col">
       {/* Header */}
-      <div className="p-2 shadow-sm flex items-center gap-4">
+      <div className="py-2 shadow-sm flex items-center gap-4">
         <div className="flex items-center w-full justify-between">
           <div className="flex items-center gap-4">
             <h1 className="text-xl font-kodemono">
@@ -83,22 +83,28 @@ export default function AskAgent() {
       </div>
 
       {/* Chat Container (no extra background color) */}
-      {
-        agentProfile ? (
-          <Tabs aria-label="Mode" selectedKey={mode} onSelectionChange={(key) => setMode(key as string)} className="my-4">
-        {
-          modeList.map((mode) => (
-            <Tab key={mode.key} title={mode.value} className="flex-auto flex flex-col">
-              {mode.content}
-            </Tab>
-          ))
-          }
-        </Tabs>
-      ) : (
-        <div className="flex items-center justify-center h-full">
-          <p className="text-lg font-kodemono">Loading agent profile...</p>
-        </div>
-      )}
+      <Tabs 
+        aria-label="Mode" 
+        selectedKey={mode} 
+        onSelectionChange={(key) => setMode(key as string)}
+        disableCursorAnimation
+        classNames={{
+          base: "my-4 font-kodemono",
+          tabList: "bg-transparent p-0 gap-4",
+          cursor: "bg-transparent shadow-none",
+          tab: "bg-transparent data-[selected=true]:bg-transparent"
+        }}
+      >
+        {modeList.map((mode) => (
+          <Tab 
+            key={mode.key} 
+            title={mode.value}
+            className="flex-auto flex flex-col px-0 mx-0"
+          >
+            {mode.content}
+          </Tab>
+        ))}
+      </Tabs>
     </div>
   );
 } 

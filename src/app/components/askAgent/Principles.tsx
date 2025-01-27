@@ -83,15 +83,15 @@ const Principles = ({ agentProfile, setAgentProfile }: IAskAgentProps) => {
     }
 
     return (
-        <div className="w-full h-full rounded-lg bg-gray-800 flex flex-col">
+        <div className="w-full h-full rounded-lg border border-white/10 flex flex-col text-sm">
             <div className="flex-auto">
                 {agentProfile && agentProfile.principles.map((principle, index) => (
                     <div
                         key={index}
                         className="p-4 hover:bg-gray-700 transition-colors"
                     >
-                        <div className="flex flex-col gap-3">
-                            <div className="text-blue-400 font-medium">#{(index + 1).toString().padStart(2, '0')} {principle.title}</div>
+                        <div className="flex flex-col gap-1">
+                            <div className="text-gray-200 font-medium">#{(index + 1).toString().padStart(2, '0')} {principle.title}</div>
                             <div className="text-gray-200">{principle.description}</div>
                         </div>
                     </div>

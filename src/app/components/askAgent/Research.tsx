@@ -66,7 +66,7 @@ const Research = ({ agentProfile }: IAskAgentProps) => {
         <>
             <div
                 ref={containerRef}
-                className="flex-auto overflow-y-auto p-2 space-y-4 text-small w-full"
+                className="flex-auto overflow-y-auto p-0 space-y-4 text-small w-full"
             >
                 {messages.length === 0 ? (
                     <div className="flex flex-col gap-2 mb-8 border border-white/10 rounded-xl p-6 text-center empty-state place-content-center">
@@ -81,7 +81,7 @@ const Research = ({ agentProfile }: IAskAgentProps) => {
                         return (
                             <div
                                 key={index}
-                                className={`px-2 py-2 rounded-md w-full ${isUser ? "bg-primary/20 self-end" : " self-start"
+                                className={`px-0 py-2 rounded-md w-full ${isUser ? "bg-primary/20 self-end" : " self-start"
                                     }`}
                                 style={{ whiteSpace: "pre-wrap" }}
                             >
@@ -115,7 +115,7 @@ const Research = ({ agentProfile }: IAskAgentProps) => {
             </div>
 
             {/* Fixed Bottom Input Area */}
-            <div className="p-2 flex items-end gap-2 bg-default-50 sticky bottom-0">
+            <div className="py-2 flex items-end bg-default-50 fixed bottom-0 w-full max-w-[768px] mr-2">
                 <Textarea
                     placeholder="Type your question..."
                     value={input}
@@ -125,14 +125,16 @@ const Research = ({ agentProfile }: IAskAgentProps) => {
                     minRows={1}
                     maxRows={4}
                     aria-label="Type your message to the agent"
+                    endContent={
+                        <button
+                            onClick={handleSend}
+                            disabled={isLoading}
+                            className="ml-2 px-4 py-2 icon-send disabled:opacity-50 transition-colors"
+                        >
+                           
+                        </button>
+                    }
                 />
-                <Button
-                    color="primary"
-                    onPress={handleSend}
-                    isDisabled={isLoading}
-                >
-                    Send
-                </Button>
             </div>
         </>
     );
