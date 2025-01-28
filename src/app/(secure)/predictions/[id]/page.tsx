@@ -319,7 +319,7 @@ export default function PredictionDetail() {
     <>
       <button
         onClick={() => router.back()}
-        className="mb-4 text-small p-0 border-none text-default-400 hover:text-white"
+        className="mb-4 text-small p-0 border-none text-gray-500 hover:text-white"
       >
         ← Back
       </button>
@@ -442,7 +442,7 @@ export default function PredictionDetail() {
               );
             })
           ) : (
-            <p className="text-default-400">
+            <p className="text-gray-500">
               No bets have been placed on this prediction.
             </p>
           )}

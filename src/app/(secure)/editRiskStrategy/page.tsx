@@ -99,7 +99,7 @@ const EditAgentProfile = () => {
                 <Input
                   label="Conservative Bet Size"
                   type="number"
-                  endContent={<span className="text-default-400">credits</span>}
+                  endContent={<span className="text-gray-500">credits</span>}
                   variant="bordered"
                   value={agent?.conservativeBetSize?.toString() || '0'}
                   onChange={(e) => setAgent({ ...agent, conservativeBetSize: parseInt(e.target.value) })}
@@ -108,7 +108,7 @@ const EditAgentProfile = () => {
                 <Input
                   label="Moderate Bet Size"
                   type="number"
-                  endContent={<span className="text-default-400">credits</span>}
+                  endContent={<span className="text-gray-500">credits</span>}
                   variant="bordered"
                   value={agent?.moderateBetSize?.toString() || '0'}
                   onChange={(e) => setAgent({ ...agent, moderateBetSize: parseInt(e.target.value) })}
@@ -117,7 +117,7 @@ const EditAgentProfile = () => {
                 <Input
                   label="Aggressive Bet Size"
                   type="number"
-                  endContent={<span className="text-default-400">credits</span>}
+                  endContent={<span className="text-gray-500">credits</span>}
                   variant="bordered"
                   value={agent?.aggressiveBetSize?.toString() || '0'}
                   onChange={(e) => setAgent({ ...agent, aggressiveBetSize: parseInt(e.target.value) })}

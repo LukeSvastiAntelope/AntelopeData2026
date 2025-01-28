@@ -333,7 +333,7 @@ const PaymentPage = () => {
 
                             startContent={
                                 <div className="pointer-events-none flex items-center">
-                                    <span className="text-default-400 text-small">$</span>
+                                    <span className="text-gray-500 text-small">$</span>
                                 </div>
                             }
                             description={amount ? `You will receive ${creditAmount.toLocaleString()} Credits` : ""}
@@ -397,7 +397,7 @@ const PaymentPage = () => {
                             isDisabled={!wallet.publicKey || availableBalance <= 0}
                             startContent={
                                 <div className="pointer-events-none flex items-center">
-                                    <span className="text-default-400 text-small">$</span>
+                                    <span className="text-gray-500 text-small">$</span>
                                 </div>
                             }
                             errorMessage={

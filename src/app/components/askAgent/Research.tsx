@@ -104,7 +104,7 @@ const Research = ({ agentProfile }: IAskAgentProps) => {
                 )}
 
                 {isLoading && (
-                    <div className="max-w-xl px-4 py-2 rounded-md bg-default-200 self-start">
+                    <div className="max-w-xl px-0wwwwsdxsX py-2 rounded-md bg-default-200 self-start">
                         <p className="text-default-600">
                             <strong>{agentProfile?.name || "Agent"}:</strong>
                             <span className="ml-2 animate-pulse">Thinking...</span>
@@ -114,7 +114,7 @@ const Research = ({ agentProfile }: IAskAgentProps) => {
             </div>
 
             {/* Fixed Bottom Input Area */}
-            <div className="py-2 flex items-end bg-default-50 fixed bottom-0 w-full max-w-[768px] mr-2">
+            <div className="py-2 flex items-end bg-default-50 fixed bottom-2 w-full max-w-[800px] ">
                 <Textarea
                     placeholder="Type your question..."
                     value={input}

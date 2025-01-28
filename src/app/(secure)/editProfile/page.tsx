@@ -163,7 +163,7 @@ const ImageUpload = ({ fileRef, avatar }: { fileRef: React.RefObject<HTMLInputEl
                 className="object-cover"
               />
             ) : (
-              <div className="w-full h-full flex items-center justify-center text-default-400 text-6xl">
+              <div className="w-full h-full flex items-center justify-center text-gray-500 text-6xl">
                 +
               </div>
             )}

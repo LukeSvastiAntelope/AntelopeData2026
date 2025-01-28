@@ -145,7 +145,7 @@ function StatCard({
       className={`rounded-lg border border-white/10  shadow-lg px-4 py-2 flex justify-between items-center ${className}`}
     >
       <div className="flex flex-row gap-1">
-        <p className="text-default-400 text-sm">{title}</p>
+        <p className="text-gray-500 text-sm">{title}</p>
         <p className="font-semibold text-sm">{value}</p>
       </div>
       <div className="text-primary text-1xl">{icon}</div>
@@ -434,7 +434,7 @@ export default function Dashboard() {
           {bets && bets.length > 0 ? (
             <Scatter data={scatterData} options={scatterOptions} />
           ) : (
-            <div className="flex items-center justify-center h-full text-default-400">
+            <div className="flex items-center justify-center h-full text-gray-500">
               No bets to display in graph
             </div>
           )}
@@ -446,7 +446,7 @@ export default function Dashboard() {
             <Button
               className={`py-2 px-0 rounded-lg ${activeTab === "activity"
                 ? "bg-transparent text-white"
-                : "bg-transparent text-default-400 hover:text-white"
+                : "bg-transparent text-gray-500 hover:text-white"
                 }`}
               onPress={() => setActiveTab("activity")}
             >
@@ -458,7 +458,7 @@ export default function Dashboard() {
             <Button
               className={`py-2 px-0 rounded-lg ${activeTab === "bets"
                 ? "bg-transparent text-white"
-                : "bg-transparent text-default-400 hover:text-white"
+                : "bg-transparent text-gray-500 hover:text-white"
                 }`}
               onPress={() => setActiveTab("bets")}
             >
@@ -470,7 +470,7 @@ export default function Dashboard() {
             <Button
               className={`py-2 px-0 rounded-lg ${activeTab === "predictions"
                 ? "bg-transparent text-white"
-                : "bg-transparent text-default-400 hover:text-white"
+                : "bg-transparent text-gray-500 hover:text-white"
                 }`}
               onPress={() => setActiveTab("predictions")}
             >

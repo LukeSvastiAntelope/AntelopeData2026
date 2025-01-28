@@ -207,7 +207,7 @@ const SecureLayout = ({ children }: { children: React.ReactNode }) => {
 
                                                 <Link
                                                     href="/dashboard"
-                                                    className={`flex items-center group md:gap-2 ${pathname === '/dashboard' ? 'text-white' : 'text-default-400 hover:text-white'}`}
+                                                    className={`flex items-center group md:gap-2 ${pathname === '/dashboard' ? 'text-white' : 'text-gray-500 hover:text-white'}`}
                                                 >
                                                     <span className={`icon-dashboard-active group-hover:block ${pathname === '/dashboard' ? 'block' : 'hidden'}`} />
                                                     <span className={`icon-dashboard group-hover:hidden ${pathname === '/dashboard' ? 'hidden' : 'block'}`} />
@@ -216,7 +216,7 @@ const SecureLayout = ({ children }: { children: React.ReactNode }) => {
 
                                                 <Link
                                                     href="/markets"
-                                                    className={`flex items-center group md:gap-2 ${pathname === '/markets' ? 'text-white' : 'text-default-400 hover:text-white'}`}
+                                                    className={`flex items-center group md:gap-2 ${pathname === '/markets' ? 'text-white' : 'text-gray-500 hover:text-white'}`}
                                                 >
                                                     <span className={`icon-markets-active group-hover:block ${pathname === '/markets' ? 'block' : 'hidden'}`} />
                                                     <span className={`icon-markets group-hover:hidden ${pathname === '/markets' ? 'hidden' : 'block'}`} />
@@ -225,7 +225,7 @@ const SecureLayout = ({ children }: { children: React.ReactNode }) => {
 
                                                 <Link
                                                     href="/strategy"
-                                                    className={`flex items-center group md:gap-2 ${pathname === '/strategy' ? 'text-white' : 'text-default-400 hover:text-white'}`}
+                                                    className={`flex items-center group md:gap-2 ${pathname === '/strategy' ? 'text-white' : 'text-gray-500 hover:text-white'}`}
                                                 >
                                                     <span className={`icon-strategy-active group-hover:block ${pathname === '/strategy' ? 'block' : 'hidden'}`} />
                                                     <span className={`icon-strategy group-hover:hidden ${pathname === '/strategy' ? 'hidden' : 'block'}`} />
@@ -235,7 +235,7 @@ const SecureLayout = ({ children }: { children: React.ReactNode }) => {
                                                 <Link
                                                     href="#"
                                                     onClick={openPredictionDialog}
-                                                    className="items-center group md:gap-2 text-default-400 hover:text-white p-2 border border-white/10 rounded-lg w-fit hidden md:flex"
+                                                    className="items-center group md:gap-2 text-gray-500 hover:text-white p-2 border border-white/10 rounded-lg w-fit hidden md:flex"
                                                 >
                                                     <span className="plus-circle-on group-hover:border-white hidden group-hover:block text-white" />
                                                     <span className="plus-circle-off block group-hover:hidden" />
@@ -248,7 +248,7 @@ const SecureLayout = ({ children }: { children: React.ReactNode }) => {
                                             <div className="flex flex-row md:flex-col justify-evenly w-full md:gap-4 ">
                                                 <Link
                                                     href="/about"
-                                                    className={`flex items-center group md:gap-2 ${pathname === '/about' ? 'text-white' : 'text-default-400 hover:text-white'}`}
+                                                    className={`flex items-center group md:gap-2 ${pathname === '/about' ? 'text-white' : 'text-gray-500 hover:text-white'}`}
                                                 >
                                                     <span className={`icon-about-active group-hover:block ${pathname === '/about' ? 'block' : 'hidden'}`} />
                                                     <span className={`icon-about group-hover:hidden ${pathname === '/about' ? 'hidden' : 'block'}`} />
@@ -256,21 +256,21 @@ const SecureLayout = ({ children }: { children: React.ReactNode }) => {
                                                 </Link>
                                                 <Link
                                                     href="https://web.telegram.org/k/#@antelopechannelhttps://t.me/+F5F2ah0bBzU0ZDAx"
-                                                    className="flex items-center md:gap-2 text-default-400 group"
+                                                    className="flex items-center md:gap-2 text-gray-500 group"
                                                 >
                                                     <span className="icon-support block group-hover:hidden" />
                                                     <span className="icon-support-active hidden group-hover:block" />
-                                                    <span className="text-default-400 group-hover:text-white font-kodemono">
+                                                    <span className="text-gray-500 group-hover:text-white font-kodemono">
                                                         <span className="hidden md:inline-block">Community</span>
                                                     </span>
                                                 </Link>
                                                 <Link
                                                     href="/logout"
-                                                    className="flex items-center text-default-400 group md:gap-2"
+                                                    className="flex items-center text-gray-500 group md:gap-2"
                                                 >
                                                     <span className="icon-logout block group-hover:hidden" />
                                                     <span className="icon-logout-active hidden group-hover:block" />
-                                                    <span className="text-default-400 group-hover:text-white font-kodemono">
+                                                    <span className="text-gray-500 group-hover:text-white font-kodemono">
                                                         <span className="hidden md:inline-block">Log out</span>
                                                     </span>
                                                 </Link>

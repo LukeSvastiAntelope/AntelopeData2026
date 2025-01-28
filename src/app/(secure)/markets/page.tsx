@@ -281,7 +281,7 @@ export default function MarketsPage() {
         >
           <button
             onClick={() => setActiveTab("predictions")}
-            className={`px-1 py-2 hover:text-white ${activeTab === "predictions" ? "text-white" : "text-default-400"
+            className={`px-1 py-2 hover:text-white ${activeTab === "predictions" ? "text-white" : "text-gray-500"
               }`}
           >
             Predictions
@@ -293,7 +293,7 @@ export default function MarketsPage() {
         >
           <button
             onClick={() => setActiveTab("sports")}
-            className={`px-1 py-2 hover:text-white ${activeTab === "sports" ? "text-white" : "text-default-400"
+            className={`px-1 py-2 hover:text-white ${activeTab === "sports" ? "text-white" : "text-gray-500"
               }`}
           >
             Sports
@@ -305,7 +305,7 @@ export default function MarketsPage() {
         >
           <button
             onClick={() => setActiveTab("general")}
-            className={`px-1 py-2 hover:text-white ${activeTab === "general" ? "text-white" : "text-default-400"
+            className={`px-1 py-2 hover:text-white ${activeTab === "general" ? "text-white" : "text-gray-500"
               }`}
           >
             General
@@ -317,7 +317,7 @@ export default function MarketsPage() {
         >
           <button
             onClick={() => setActiveTab("crypto")}
-            className={`px-1 py-2 hover:text-white ${activeTab === "crypto" ? "text-white" : "text-default-400"
+            className={`px-1 py-2 hover:text-white ${activeTab === "crypto" ? "text-white" : "text-gray-500"
               }`}
           >
             Crypto
@@ -329,7 +329,7 @@ export default function MarketsPage() {
         >
           <button
             onClick={() => setActiveTab("markets")}
-            className={`px-1 py-2 hover:text-white ${activeTab === "markets" ? "text-white" : "text-default-400"
+            className={`px-1 py-2 hover:text-white ${activeTab === "markets" ? "text-white" : "text-gray-500"
               }`}
           >
             Markets
@@ -341,7 +341,7 @@ export default function MarketsPage() {
         >
           <button
             onClick={() => setActiveTab("leaderboard")}
-            className={`px-1 py-2 hover:text-white ${activeTab === "leaderboard" ? "text-white" : "text-default-400"
+            className={`px-1 py-2 hover:text-white ${activeTab === "leaderboard" ? "text-white" : "text-gray-500"
               }`}
           >
             Leaderboard

@@ -201,17 +201,7 @@ export default function Home() {
         <p className="text-default-500 text-md mb-8">By harnessing cutting-edge AI to anticipate future events, we hope to illuminate new possibilities in forecasting and decentralized collaboration. This is our manifesto—a vision of a synthetic prediction market that learns, adapts, and grows through data, principles, and the unstoppable curiosity of AI agents.</p>
       </section>
 
-      <section className="mt-8 max-w-screen-md mx-auto text-left mb-12">
-        <h2 className="text-xl md:text-2xl font-semibold text-white mb-2">
-          Getting Started
-        </h2>
-        <p className="text-default-500 mb-6">
-          Kick things off by exploring your dashboard to discover available
-          markets or create your own. Need some inspiration? Head to our
-          Community section to see how other users are leveraging AI insights,
-          analyzing trends, and deploying groundbreaking strategies.
-        </p>
-      </section>
+      
     </main>
   );
 }

@@ -105,7 +105,7 @@ const EditAgentProfile = () => {
                 <Input
                   label="Maximum Bet Size"
                   type="number"
-                  endContent={<span className="text-default-400">credits</span>}
+                  endContent={<span className="text-gray-500">credits</span>}
                   variant="bordered"
                   value={agent?.maxBetSize?.toString() || '0'}
                   onChange={(e) => setAgent({ ...agent, maxBetSize: parseInt(e.target.value) })}

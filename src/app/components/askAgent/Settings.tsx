@@ -158,17 +158,17 @@ const Settings = ({ agentProfile, setAgentProfile }: IAskAgentProps) => {
             <div className="flex flex-col gap-4 border border-white/10 rounded-xl p-4">
                 <div className="text-xl font-regular">Risk Profile</div>
                 <div className="flex flex-col gap-2">
-                    <div className="text-sm font-regular">Max Betting Size</div>
-                    <Input
-                        type="number"
-                        endContent={<span className="text-default-400">credits</span>}
-                        variant="bordered"
-                        value={agentProfile?.maxBetSize?.toString() || '0'}
-                        onChange={(e) => setAgentProfile(prev => (prev ? { ...prev, maxBetSize: parseInt(e.target.value) } : null))}
-                        min={0}
-                        aria-label="Maximum bet size in credits"
-                    />
-                </div>
+                        <div className="text-sm font-regular">Max Betting Size</div>
+                        <Input
+                            type="number"
+                            endContent={<span className="text-gray-500">credits</span>}
+                            variant="bordered"
+                            value={agentProfile?.maxBetSize?.toString() || '0'}
+                            onChange={(e) => setAgentProfile(prev => (prev ? { ...prev, maxBetSize: parseInt(e.target.value) } : null))}
+                            min={0}
+                            aria-label="Maximum bet size in credits"
+                        />
+                    </div>
                 <div className="flex flex-col gap-2">
                     <div className="text-sm font-regular">Default</div>
                     <Select
@@ -187,7 +187,7 @@ const Settings = ({ agentProfile, setAgentProfile }: IAskAgentProps) => {
                     <Input
                         label="Conservative Bet Size"
                         type="number"
-                        endContent={<span className="text-default-400">credits</span>}
+                        endContent={<span className="text-gray-500">credits</span>}
                         variant="bordered"
                         value={agentProfile?.conservativeBetSize?.toString() || '0'}
                         onChange={(e) => setAgentProfile(prev => (prev ? { ...prev, conservativeBetSize: parseInt(e.target.value) } : null))}
@@ -197,7 +197,7 @@ const Settings = ({ agentProfile, setAgentProfile }: IAskAgentProps) => {
                     <Input
                         label="Moderate Bet Size"
                         type="number"
-                        endContent={<span className="text-default-400">credits</span>}
+                        endContent={<span className="text-gray-500">credits</span>}
                         variant="bordered"
                         value={agentProfile?.moderateBetSize?.toString() || '0'}
                         onChange={(e) => setAgentProfile(prev => (prev ? { ...prev, moderateBetSize: parseInt(e.target.value) } : null))}
@@ -207,7 +207,7 @@ const Settings = ({ agentProfile, setAgentProfile }: IAskAgentProps) => {
                     <Input
                         label="Aggressive Bet Size"
                         type="number"
-                        endContent={<span className="text-default-400">credits</span>}
+                        endContent={<span className="text-gray-500">credits</span>}
                         variant="bordered"
                         value={agentProfile?.aggressiveBetSize?.toString() || '0'}
                         onChange={(e) => setAgentProfile(prev => (prev ? { ...prev, aggressiveBetSize: parseInt(e.target.value) } : null))}

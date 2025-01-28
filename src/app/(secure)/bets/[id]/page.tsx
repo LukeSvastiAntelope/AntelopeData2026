@@ -272,12 +272,12 @@ export default function BetDetailPage() {
                                     bet.user_id === Number(localStorage.getItem("userId")) &&
                                     <div className="">
                                         <h2 className="text-small font-semibold mb-4">Reasoning</h2>
-                                        <p className="text-default-400 text-small leading-relaxed ">{bet.reason}</p>
+                                        <p className="text-gray-500 text-small leading-relaxed ">{bet.reason}</p>
                                         {
                                             pineconeData && pineconeData.metadata?.comment && (
                                                 <>
                                                     <h2 className="text-lg font-semibold mb-4 mt-4">Comment</h2>
-                                                    <p className="text-default-400 leading-relaxed ">{pineconeData.metadata.comment as string}</p>
+                                                    <p className="text-gray-500 leading-relaxed ">{pineconeData.metadata.comment as string}</p>
                                                 </>
                                             )
                                         }
@@ -297,7 +297,7 @@ export default function BetDetailPage() {
                                     <h2 className="text-small font-semibold mb-4">Bet Details</h2>
                                     <div className="grid grid-cols-2 grid-rows-4 md:grid-cols-4 md:grid-rows-2 gap-4">
                                         <div>
-                                            <h3 className="text-sm font-medium text-default-400 mb-1 ">Status</h3>
+                                            <h3 className="text-sm font-medium text-gray-500 mb-1 ">Status</h3>
                                             <NextUITooltip content="Bet status can be 'open', 'won', or 'lost'.">
                                                 <Chip color={bet.status !== "open" ? (bet.outcome === bet.choice ? "success" : "danger") : "primary"} className="bg-primary/20 capitalize">
                                                     {bet.status !== "open"
@@ -308,25 +308,25 @@ export default function BetDetailPage() {
                                             </NextUITooltip>
                                         </div>
                                         <div>
-                                            <h3 className="text-sm font-medium text-default-400 mb-1 ">Credits</h3>
+                                            <h3 className="text-sm font-medium text-gray-500 mb-1 ">Credits</h3>
                                             <NextUITooltip content="The number of credits staked on this bet.">
                                                 <Chip className="bg-primary/20 ml-0 capitalize  icon-coin-bigger ">{bet.amount}</Chip>
                                             </NextUITooltip>
                                         </div>
                                         <div>
-                                            <h3 className="text-sm font-medium text-default-400 mb-1">Your Choice</h3>
+                                            <h3 className="text-sm font-medium text-gray-500 mb-1">Your Choice</h3>
                                             <NextUITooltip content="The outcome you predicted.">
                                                 <Chip color="secondary" className="bg-primary/20 capitalize">{bet.choice}</Chip>
                                             </NextUITooltip>
                                         </div>
                                         <div>
-                                            <h3 className="text-sm font-medium text-default-400 mb-1">Creator&apos;s Choice</h3>
+                                            <h3 className="text-sm font-medium text-gray-500 mb-1">Creator&apos;s Choice</h3>
                                             <NextUITooltip content="The original outcome predicted by the bet's creator.">
                                                 <Chip color="secondary" className="bg-primary/20 capitalize">{bet.predicted_outcome || bet.creator_choice}</Chip>
                                             </NextUITooltip>
                                         </div>
                                         <div>
-                                            <h3 className="text-sm font-medium text-default-400 mb-1">Validation Source</h3>
+                                            <h3 className="text-sm font-medium text-gray-500 mb-1">Validation Source</h3>
                                             <NextUITooltip content="Where the final result is verified (e.g., official APIs or event outcomes).">
                                                 <p className="text-sm font-semibold">{bet.source}</p>
                                             </NextUITooltip>
@@ -335,14 +335,14 @@ export default function BetDetailPage() {
                                         <div className="flex flex-col gap-1">
                                             {bet.status === "open" ? (
                                                 <>
-                                                    <h3 className="text-sm font-medium text-default-400">Created</h3>
+                                                    <h3 className="text-sm font-medium text-gray-500">Created</h3>
                                                     <NextUITooltip content="Date when the bet was created.">
                                                         <p className="text-sm font-semibold">{new Date(bet.created_at).toLocaleDateString()}</p>
                                                     </NextUITooltip>
                                                 </>
                                             ) : (
                                                 <>
-                                                    <h3 className="text-sm font-medium text-default-400">Resolved</h3>
+                                                    <h3 className="text-sm font-medium text-gray-500">Resolved</h3>
                                                     <NextUITooltip content="Date when the bet was resolved.">
                                                         <p className="text-sm font-semibold">{new Date(bet.resolution_date).toLocaleDateString()}</p>
                                                     </NextUITooltip>
@@ -380,7 +380,7 @@ export default function BetDetailPage() {
                                             <h2 className="text-small font-semibold mb-4">Reasoning Log</h2>
                                             {Object.entries(pineconeData.metadata || {}).map(([key, value]) => {
                                                 return ((key != "agent_id" && key != "choice" && key != "amount" && key != "created_at" && key != "prediction_id" && key != "log" && key != "reasoning") ? (<div key={key}>
-                                                    <h3 className="text-sm font-medium text-default-400 capitalize mb-1">
+                                                    <h3 className="text-sm font-medium text-gray-500 capitalize mb-1">
                                                         {key.replace(/_/g, ' ')}
                                                     </h3>
                                                     <p className="text-sm text-default-600">
@@ -397,7 +397,7 @@ export default function BetDetailPage() {
                                                                     <span className="text-primary font-medium">
                                                                         Step {index + 1}:
                                                                     </span>
-                                                                    <span className="text-default-400 capitalize">
+                                                                    <span className="text-gray-500 capitalize">
                                                                         {log.step.replace(/_/g, ' ')}
                                                                     </span>
                                                                 </div>

@@ -240,7 +240,7 @@ export default function AgentProfile() {
                                 className="object-cover hover:scale-105 duration-200 transition-transform"
                             />
                         ) : (
-                            <div className="w-full h-full flex items-center justify-center text-default-400 text-6xl">
+                            <div className="w-full h-full flex items-center justify-center text-gray-500 text-6xl">
                                 +
                             </div>
                         )}
