@@ -368,6 +368,7 @@ export interface CreatePredictionInput {
     source_type: string;
     bet_type: string;
     resolution_date: string;
+    context?: string;
 }
 
 export interface IAskAgentProps {

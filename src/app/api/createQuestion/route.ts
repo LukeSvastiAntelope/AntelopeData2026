@@ -39,6 +39,7 @@ export async function POST(req: NextRequest) {
         resolution_date: prediction.resolutionDate
             ? format(new Date(prediction.resolutionDate), 'yyyy-MM-dd HH:mm:ss')
             : format(new Date(), 'yyyy-MM-dd HH:mm:ss'),
+        context: prediction.context || "",
     }
 
     if (prediction.choices.length < 2) {
