@@ -91,7 +91,6 @@ export async function POST(req: NextRequest) {
             telegramMessage =
                 `🔮 ✨ New Game Question\n\n` +
                 `🏟️ ${data.description}\n` +
-                `Predicted Outcome: ${data.creator_choice}\n` +
                 `Created by: ${user.username}\n` +
                 `Resolution Date: ${format(new Date(data.resolution_date), 'MMM dd, yyyy HH:mm')}`;
         } else {
