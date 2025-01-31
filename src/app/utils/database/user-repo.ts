@@ -184,7 +184,7 @@ async function createPrediction(data: CreatePredictionInput, choices: string[]) 
     const [result] = await db.execute<ResultSetHeader>(
         `INSERT INTO predictions 
         (user_id, description, source, source_url, created_at, status, bet_amount, creator_choice, event_id, league_id, team_a, team_b, str_thumb, predicted_outcome, agent_id, source_type, bet_type, resolution_date, choices, context) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
             data.user_id ?? 0,
             data.description ?? '',
