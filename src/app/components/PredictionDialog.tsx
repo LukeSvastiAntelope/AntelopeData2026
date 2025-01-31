@@ -31,7 +31,7 @@ interface IMatch {
 }
 
 // Add prediction types
-const predictionTypes: IPredictionType[] = [
+export const predictionTypes: IPredictionType[] = [
     { id: "custom", name: "General (News, Crypto, Markets)", leagueId: "" },
     { id: "soccer", name: "Soccer", leagueId: "" },
     { id: "premier", name: "Predict Premier League", leagueId: "4328" },

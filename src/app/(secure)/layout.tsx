@@ -7,9 +7,9 @@ import { toast } from "react-hot-toast";
 import { useFetch } from "../utils/lib";
 import Link from "next/link";
 import Image from "next/image";
-import PredictionDialog from "../components/PredictionDialog";
 import AgentProfileDialog from "../components/AgentProfileDialog";
 import { Tooltip as NextUITooltip } from "@heroui/react";
+import PredictionTypeDialog from "../components/PredictionTypeDialog";
 
 const AsideSkeleton = () => {
     return (
@@ -287,7 +287,8 @@ const SecureLayout = ({ children }: { children: React.ReactNode }) => {
 
                 }
             </div>
-            <PredictionDialog isOpen={isOpen} onClose={() => setIsOpen(false)} />
+            <PredictionTypeDialog isOpen={isOpen} onClose={() => setIsOpen(false)} />
+            {/* <PredictionDialog isOpen={isOpen} onClose={() => setIsOpen(false)} /> */}
             {
                 agent &&
                 <AgentProfileDialog

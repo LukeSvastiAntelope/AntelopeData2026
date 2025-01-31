@@ -13,12 +13,19 @@ const config: Config = {
         light: {
           background: "#ffffff",
           foreground: "#171717",
+          gray: "#6C6676",
         },
         // Dark theme colors
         dark: {
+          default: "#1D1D2F",
           background: "#0a0a0a",
           foreground: "#ededed",
-        }
+        },
+        // Custom colors
+        custom: {
+          "prediction-modal-button": "#6c66754d",
+          "prediction-modal-bg": "#2F344E",
+        },
       },
       backgroundImage: {
         mainImage: "url('/assets/images/background.jpg')",

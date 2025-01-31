@@ -179,10 +179,12 @@ async function createBet(predictionId: number, agentId: number, choice: string, 
     await db.execute('INSERT INTO bets (prediction_id, agent_id, choice, amount, reason, user_id, pinecone_id) VALUES (?, ?, ?, ?, ?, ?, ?)', [predictionId, agentId, choice, amount, reason, userId, pineconeId]);
 }
 
-async function createPrediction(data: CreatePredictionInput) {
+async function createPrediction(data: CreatePredictionInput, choices: string[]) {
     const db = await getMySQLConnection();
     const [result] = await db.execute<ResultSetHeader>(
-        'INSERT INTO predictions (user_id, description, source, source_url, created_at, status, bet_amount, creator_choice, event_id, league_id, team_a, team_b, str_thumb, predicted_outcome, agent_id, source_type, bet_type, resolution_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        `INSERT INTO predictions 
+        (user_id, description, source, source_url, created_at, status, bet_amount, creator_choice, event_id, league_id, team_a, team_b, str_thumb, predicted_outcome, agent_id, source_type, bet_type, resolution_date, choices) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
             data.user_id ?? 0,
             data.description ?? '',
@@ -201,7 +203,8 @@ async function createPrediction(data: CreatePredictionInput) {
             data.agent_id ?? 0,
             data.source_type ?? '',
             data.bet_type ?? '',
-            data.resolution_date ?? new Date().toISOString()
+            data.resolution_date ?? new Date().toISOString(),
+            choices.length > 0 ? JSON.stringify(choices) : ''
         ]
     );
     return result.insertId;

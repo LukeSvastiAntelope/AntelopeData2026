@@ -54,6 +54,16 @@ export interface ILeague {
     strSport: string;
 }
 
+export interface IMatch {
+    idEvent: string;
+    strEvent: string;
+    strHomeTeam: string;
+    strAwayTeam: string;
+    dateEvent: string;
+    strLeague: string;
+    strThumb: string;
+}
+
 export interface AutomatedPrediction {
     question: string;
     description: string;
