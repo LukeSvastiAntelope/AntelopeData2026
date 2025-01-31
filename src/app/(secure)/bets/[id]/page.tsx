@@ -67,7 +67,7 @@ const parseLogEntries = (logString: string) => {
 
 interface ChoiceOdds {
     choice: string;
-    percentage: string;  // e.g., "45.0" for 45.0%
+    percentage: string;
     amount: number;
     count: number;
     odds: string;
@@ -82,12 +82,13 @@ function MultiChoiceOddsBar({ choices }: { choices: ChoiceOdds[] }) {
     return (
         <div className="w-full mb-4">
             <div className="relative w-full bg-white/5 rounded-lg overflow-hidden p-4">
-            <div className="text-sm text-white/60 w-full text-center mb-2">Combined Odds</div>
+                <div className="text-sm text-white/60 w-full text-center mb-2">Combined Odds</div>
                 {/* Single combined bar segments */}
                 <div className="h-2 w-full bg-white/10 rounded-full mb-3 relative overflow-hidden">
                     {choices.map((c) => {
                         let segmentColor = "bg-orange-400/90";
                         if (c.choice.toLowerCase() === "yes") {
+
                             segmentColor = "bg-success";
                         } else if (c.choice.toLowerCase() === "no") {
                             segmentColor = "bg-danger";
@@ -103,9 +104,8 @@ function MultiChoiceOddsBar({ choices }: { choices: ChoiceOdds[] }) {
                         accumulated += widthFraction;
 
                         // Define tooltip content
-                        const tooltipContent = `${
-                            c.choice[0]?.toUpperCase() + c.choice.slice(1)
-                        }: ${c.percentage}% (x${c.odds}) | Bets: ${c.count}`;
+                        const tooltipContent = `${c.choice[0]?.toUpperCase() + c.choice.slice(1)
+                            }: ${c.percentage}% (x${c.odds}) | Bets: ${c.count}`;
 
                         return (
                             <NextUITooltip
@@ -126,19 +126,19 @@ function MultiChoiceOddsBar({ choices }: { choices: ChoiceOdds[] }) {
 
                 {/* Below the bar — No (left), Combined Odds (center), Yes (right) */}
                 <div className="flex items-center justify-between">
-                     
+
                     {/* LEFT: No */}
                     <div className="flex flex-col items-start text-white icon-thumbs-down">
-                        
+
                         <span className="text-sm font-bold text-white pr-1 ">
                             {noObj ? `${noObj.percentage}% (x${noObj.odds})` : "0% (x∞)"}
                         </span>
                     </div>
                     {/* MIDDLE: Combined Odds */}
-                  
+
                     {/* RIGHT: Yes */}
                     <div className="flex flex-col items-end text-white">
-                      
+
                         <span className="text-sm font-bold text-white icon-thumbs-up">
                             {yesObj ? `${yesObj.percentage}% (x${yesObj.odds})` : "0% (x∞)"}
                         </span>
@@ -261,9 +261,9 @@ export default function BetDetailPage() {
                             </div>
 
                             {choiceOdds.length > 0 && (
-                                
-                                    <MultiChoiceOddsBar choices={choiceOdds} />
-                           
+
+                                <MultiChoiceOddsBar choices={choiceOdds} />
+
                             )}
 
                             {/* Bet Details */}
@@ -282,14 +282,14 @@ export default function BetDetailPage() {
                                             )
                                         }
                                         <NextUITooltip content="Give your agent more context to improve its reasoning.">
-                                        <Button
-                                            color="primary"
-                                            variant="light"
-                                            className="text-primary bg-primary/20  text-sm mt-2 hover:bg-primary/40 w-full text-small"
-                                            onPress={() => setShowCommentModal(true)}
-                                        >
-                                            Adjust Reasoning
-                                        </Button>
+                                            <Button
+                                                color="primary"
+                                                variant="light"
+                                                className="text-primary bg-primary/20  text-sm mt-2 hover:bg-primary/40 w-full text-small"
+                                                onPress={() => setShowCommentModal(true)}
+                                            >
+                                                Adjust Reasoning
+                                            </Button>
                                         </NextUITooltip>
                                     </div>
                                 }
@@ -319,15 +319,21 @@ export default function BetDetailPage() {
                                                 <Chip color="secondary" className="bg-primary/20 capitalize">{bet.choice}</Chip>
                                             </NextUITooltip>
                                         </div>
-                                        <div>
-                                            <h3 className="text-sm font-medium text-gray-500 mb-1">Creator&apos;s Choice</h3>
-                                            <NextUITooltip content="The original outcome predicted by the bet's creator.">
-                                                <Chip color="secondary" className="bg-primary/20 capitalize">{bet.predicted_outcome || bet.creator_choice}</Chip>
-                                            </NextUITooltip>
-                                        </div>
+                                        {
+                                            (bet.predicted_outcome || bet.creator_choice) && (
+                                                <div>
+                                                    <h3 className="text-sm font-medium text-gray-500 mb-1">Creator&apos;s Choice</h3>
+
+                                                    <NextUITooltip content="The original outcome predicted by the bet's creator.">
+                                                        <Chip color="secondary" className="bg-primary/20 capitalize">{bet.predicted_outcome || bet.creator_choice}</Chip>
+                                                    </NextUITooltip>
+                                                </div>
+                                            )
+                                        }
                                         <div>
                                             <h3 className="text-sm font-medium text-gray-500 mb-1">Validation Source</h3>
                                             <NextUITooltip content="Where the final result is verified (e.g., official APIs or event outcomes).">
+
                                                 <p className="text-sm font-semibold">{bet.source}</p>
                                             </NextUITooltip>
                                         </div>

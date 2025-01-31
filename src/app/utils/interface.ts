@@ -171,6 +171,8 @@ export interface Prediction {
     betReason?: BetReasonStep[];
     marketData?: MarketData;
     reasoning?: string;
+    context?: string;
+    choices?: string;
 }
 
 export interface GroupAnalysis {

@@ -90,9 +90,8 @@ function MultiChoiceOddsBar({ choices }: { choices: ChoiceOdds[] }) {
 
           // Build a tooltip string with relevant stats
           // e.g.: "Choice: No | 45.0% | 2.22x | Bets: 12"
-          const tooltipContent = `${
-            c.choice[0]?.toUpperCase() + c.choice.slice(1)
-          }: ${c.percentage}% (${formatOdds(c.odds)}) | Bets: ${c.count}`;
+          const tooltipContent = `${c.choice[0]?.toUpperCase() + c.choice.slice(1)
+            }: ${c.percentage}% (${formatOdds(c.odds)}) | Bets: ${c.count}`;
 
           return (
             <Tooltip
@@ -362,20 +361,24 @@ export default function PredictionDetail() {
                           ? "Open"
                           : prediction.outcome.toLowerCase() ===
                             prediction.creator_choice.toLowerCase()
-                          ? "Win"
-                          : "Loss"}
+                            ? "Win"
+                            : "Loss"}
                       </Chip>
                     </Tooltip>
                   </div>
-                  <div>
-                    <p className="text-sm text-gray-500">Creator Choice</p>
-                    <p className="font-semibold capitalize">
-                      {prediction.creator_choice}
-                    </p>
-                  </div>
+                  {prediction.creator_choice && (
+                    <div>
+                      <p className="text-sm text-gray-500">Creator Choice</p>
+                      <p className="font-semibold capitalize">
+                        {prediction.creator_choice}
+
+                      </p>
+                    </div>
+                  )}
                   {choiceList.length > 0 && prediction.status === "open" && (
                     <Button
                       className="ml-auto block"
+
                       color="primary"
                       onPress={() => setIsModalOpen(true)}
                     >
@@ -387,25 +390,24 @@ export default function PredictionDetail() {
             </div>
 
 
-        {/* Single multi-segment bar with No on left, Combined label center, Yes on right */}
-        {choiceOdds.length > 0 && (
-          <div className="w-full mt-8 space-y-2">
-            <h2 className="text-lg font-semibold mb-4">Market Odds</h2>
-            <MultiChoiceOddsBar choices={choiceOdds} />
-          </div>
-        )}
+            {/* Single multi-segment bar with No on left, Combined label center, Yes on right */}
+            {choiceOdds.length > 0 && (
+              <div className="w-full mt-8 space-y-2">
+                <h2 className="text-lg font-semibold mb-4">Market Odds</h2>
+                <MultiChoiceOddsBar choices={choiceOdds} />
+              </div>
+            )}
 
-</CardBody>
-</Card>
+          </CardBody>
+        </Card>
 
         {/* Prediction Timeline */}
         <div className="space-y-4 mt-8">
           <h2 className="text-xl font-bold">Prediction Timeline</h2>
           {prediction.bets && prediction.bets.length > 0 ? (
             prediction.bets.map((bet, index) => {
-              const timelineTooltip = `Bet #${index + 1} | Amount: ${
-                bet.amount
-              } | Choice: ${bet.choice}`;
+              const timelineTooltip = `Bet #${index + 1} | Amount: ${bet.amount
+                } | Choice: ${bet.choice}`;
               return (
                 <Tooltip
                   key={index}
