@@ -40,8 +40,13 @@ const BinaryQuestion = () => {
     const [expirationDate, setExpirationDate] = useState<CalendarDate>(parseDate(new Date().toISOString().split('T')[0]));
     const [creditPool, setCreditPool] = useState("10");
     const [customCreditPool, setCustomCreditPool] = useState("0");
+    const [isSaving, setIsSaving] = useState(false);
 
     const handleCreateQuestion = async () => {
+        if (isSaving) {
+            return;
+        }
+        setIsSaving(true);
         const date = new Date();
         if (expiration == "day") {
             date.setDate(date.getDate() + 1);
@@ -64,11 +69,17 @@ const BinaryQuestion = () => {
             toast.error("Please fill all required fields");
             return;
         }
-        const response = await fetch.post("/api/createQuestion", payload);
-        if (response.status) {
-            toast.success("Question created successfully");
-        } else {
-            toast.error(response.message);
+        try {
+            const response = await fetch.post("/api/createQuestion", payload);
+            if (response.status) {
+                toast.success("Question created successfully");
+            } else {
+                toast.error(response.message);
+            }
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : "An unknown error occurred");
+        } finally {
+            setIsSaving(false);
         }
     }
 
@@ -178,6 +189,7 @@ const BinaryQuestion = () => {
                     style={{
                         background: "linear-gradient(to right top, #7A34E2, #1DA1F2)"
                     }}
+                    isLoading={isSaving}
                 >
                     Create a {creditPool !== "custom" ? creditPool : customCreditPool} Credit Question
                 </Button>

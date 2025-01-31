@@ -39,9 +39,13 @@ const SportsQuestion = () => {
     const [homeTeam, setHomeTeam] = useState<string>("");
     const [awayTeam, setAwayTeam] = useState<string>("");
     const [matchDate, setMatchDate] = useState<string>("");
+    const [isSaving, setIsSaving] = useState<boolean>(false);
 
     const handleCreateQuestion = async () => {
-
+        if (isSaving) {
+            return;
+        }
+        setIsSaving(true);
         const payload = {
             source: "sportDB",
             matchId: selectedMatch,
@@ -63,11 +67,17 @@ const SportsQuestion = () => {
             toast.error("Please add at least 2 options");
             return;
         }
-        const response = await fetchData.post("/api/createQuestion", payload);
-        if (response.status) {
-            toast.success("Question created successfully");
-        } else {
-            toast.error(response.message);
+        try {
+            const response = await fetchData.post("/api/createQuestion", payload);
+            if (response.status) {
+                toast.success("Question created successfully");
+            } else {
+                toast.error(response.message);
+            }
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : "An unknown error occurred");
+        } finally {
+            setIsSaving(false);
         }
     }
 
@@ -212,6 +222,7 @@ const SportsQuestion = () => {
                     style={{
                         background: "linear-gradient(to right top, #7A34E2, #1DA1F2)"
                     }}
+                    isLoading={isSaving}
                 >
                     Create a {creditPool !== "custom" ? creditPool : customCreditPool} Credit Question
                 </Button>

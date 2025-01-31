@@ -43,9 +43,14 @@ const Prediction = () => {
     const [matchDate, setMatchDate] = useState<string>("");
     const [isLoadingLeagues, setIsLoadingLeagues] = useState<boolean>(false);
     const [isLoadingMatches, setIsLoadingMatches] = useState<boolean>(false);
+    const [isSaving, setIsSaving] = useState<boolean>(false);
     const fetchData = useFetch();
 
     const handleCreatePrediction = async () => {
+        if (isSaving) {
+            return;
+        }
+        setIsSaving(true);
         try {
             const payload = predictionType === "custom"
                 ? {
@@ -90,6 +95,8 @@ const Prediction = () => {
         } catch (error) {
             console.log(error);
             toast.error("Failed to create prediction");
+        } finally {
+            setIsSaving(false);
         }
     };
 
@@ -267,6 +274,7 @@ const Prediction = () => {
                     style={{
                         background: "linear-gradient(to right top, #7A34E2, #1DA1F2)"
                     }}
+                    isLoading={isSaving}
                 >
                     Create Prediction
                 </Button>
