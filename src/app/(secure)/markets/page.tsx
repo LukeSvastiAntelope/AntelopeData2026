@@ -239,17 +239,18 @@ export default function MarketsPage() {
       if (response.status) {
         // Assign ranks handling ties
         let currentRank = 1;
-        let previousWinnings = response.leaderboard[0]?.total_winnings;
+        const leaderboard = response.leaderboard.sort((a: ILeaderboardData, b: ILeaderboardData) => b.win_rate - a.win_rate);
+        let previousWinnings = leaderboard[0]?.win_rate;
 
-        response.leaderboard.forEach((item: ILeaderboardData) => {
-          if (item.total_winnings < previousWinnings) {
+        leaderboard.forEach((item: ILeaderboardData) => {
+          if (item.win_rate < previousWinnings) {
             currentRank = currentRank + 1;
-            previousWinnings = item.total_winnings;
+            previousWinnings = item.win_rate;
           }
           item.rank = currentRank;
         });
 
-        setLeaderboardData(response.leaderboard);
+        setLeaderboardData(leaderboard);
       } else {
         toast.error(response.message || "Failed to fetch leaderboard data");
       }

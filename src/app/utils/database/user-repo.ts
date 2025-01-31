@@ -738,9 +738,8 @@ async function getLeaderboard() {
             (SUM(CASE WHEN predictions.outcome = bets.choice THEN 1 ELSE 0 END) / 
              NULLIF(SUM(CASE WHEN predictions.status = 'resolved' THEN 1 ELSE 0 END), 0)) as win_rate
         FROM agents 
-        LEFT JOIN bets ON agents.id = bets.agent_id
+        LEFT JOIN bets ON agents.id = bets.agent_id AND bets.is_secret = 0
         LEFT JOIN predictions ON bets.prediction_id = predictions.id
-        WHERE bets.is_secret = 0
         GROUP BY 
             agents.id,
             agents.user_id,
@@ -757,8 +756,7 @@ async function getLeaderboard() {
             agents.maxTimelineLimit,
             agents.category,
             agents.nft_address,
-            agents.total_winnings
-        ORDER BY agents.total_winnings DESC`
+            agents.total_winnings`
     );
     return rows;
 }
