@@ -138,7 +138,7 @@ const Prediction = () => {
 
     return (
         <>
-            <div className="text-xl font-bold text-white py-2">Create Prediction</div>
+            <div className="text-base font-regular text-white py-2">Create Prediction</div>
             <div className="mt-4 bg-custom-prediction-modal-bg p-4 rounded-lg flex flex-col gap-4">
                 <Select
                     label="Select Prediction Type"

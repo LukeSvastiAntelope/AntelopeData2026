@@ -1,5 +1,6 @@
 "use client"
 
+import Link from 'next/link';
 import { Input, Textarea } from "@heroui/input";
 import { Select, SelectItem } from "@heroui/select";
 import { Button, ButtonGroup } from "@heroui/button";
@@ -90,15 +91,19 @@ const MultipleQuestion = () => {
 
     return (
         <>
-            <div className="text-xl font-bold text-white py-2">Choose Question {">"} Multiple Choice</div>
+            <div className="text-base font-regular text-white/60 py-2"> Choose Question {" > "} Multiple Choice</div>
             <div className="mt-4 bg-custom-prediction-modal-bg px-4 py-6 rounded-lg flex flex-col gap-8">
                 <div className="flex flex-col gap-2">
                     <div className="text-sm font-bold">Select Category</div>
                     <Select
+                        className="gh-select"
                         label="Select Category"
                         value={predictionType}
                         onChange={(e) => {
                             setPredictionType(e.target.value);
+                        }}
+                        style={{
+                            backgroundColor: "#1D1D2F"
                         }}
                     >
                         {predictionTypes.map((type) => (
@@ -109,10 +114,10 @@ const MultipleQuestion = () => {
                     </Select>
                 </div>
                 <div className="flex flex-col gap-2">
-                    <div className="text-sm font-bold">Question</div>
+                    <div className="text-sm font-bold background-questions">Question</div>
                     <Textarea
                         placeholder="Will the US plant a flag on Mars by 2027?"
-                        className="h-16"
+                        className="gh-textarea h-16 text-white"
                         value={question}
                         onChange={(e) => {
                             setQuestion(e.target.value);
@@ -123,6 +128,10 @@ const MultipleQuestion = () => {
                             <div key={index} className="flex gap-2 items-center">
                                 <div className="text-sm font-bold w-[30px] text-center">{index + 1}</div>
                                 <Input
+                                    className="gh-input"
+                                    style={{
+                                        backgroundColor: "#1D1D2F"
+                                    }}
                                     placeholder={`Option ${index + 1}`}
                                     value={option}
                                     onChange={(e) => {
@@ -139,6 +148,7 @@ const MultipleQuestion = () => {
                             onPress={() => {
                                 setOptions([...options, ""]);
                             }}
+                            style={{ backgroundColor: "#1D1D2F" }}
                         >
                             Add Answer
                         </Button>
@@ -147,8 +157,8 @@ const MultipleQuestion = () => {
                 <div className="flex flex-col gap-2">
                     <div className="text-sm font-bold">Add Context(Optional)</div>
                     <Textarea
+                        className="gh-textarea"
                         placeholder="Provide any relevant information or context for agents to consider"
-                        className="h-16"
                         value={context}
                         onChange={(e) => {
                             setContext(e.target.value);
@@ -158,7 +168,8 @@ const MultipleQuestion = () => {
                 <div className="flex flex-col gap-2 w-full">
                     <div className="text-sm font-bold">Add Expiration</div>
                     <ButtonGroup
-                        className="flex flex-row w-full border-dark-default border-2 rounded-lg justify-between bg-inherit"
+                        className="flex flex-row w-full border-dark-default border-1 rounded-lg justify-between bg-inherit"
+                        
                     >
                         {expirationOptions.map((option) => (
                             option.key &&
@@ -177,6 +188,7 @@ const MultipleQuestion = () => {
                     <DatePicker
                         granularity="day"
                         className={`w-40 ${expiration == "" ? 'text-white' : 'text-light-gray'}`}
+                      
                         value={expirationDate}
                         onChange={(e: DateValue | null) => {
                             setExpiration("");
@@ -187,7 +199,8 @@ const MultipleQuestion = () => {
                 <div className="flex flex-col gap-2 w-full">
                     <div className="text-sm font-bold">Credit Pool</div>
                     <ButtonGroup
-                        className="flex flex-row w-full border-dark-default border-2 rounded-lg justify-between bg-inherit"
+                        className="flex flex-row w-full border-dark-default border-1 rounded-lg justify-between bg-inherit"
+                     
                     >
                         {creditPoolOptions.map((option) => (
                             option.key &&
@@ -206,6 +219,7 @@ const MultipleQuestion = () => {
                     <Input
                         placeholder="Enter Custom Credit Pool"
                         className={`w-full ${creditPool !== "custom" && "hidden"}`}
+                      
                         value={customCreditPool}
                         onChange={(e) => {
                             setCustomCreditPool(e.target.value);
@@ -215,6 +229,7 @@ const MultipleQuestion = () => {
                 </div>
                 <Button
                     color="primary"
+                    className="rounded-small"
                     onPress={handleCreateQuestion}
                     style={{
                         background: "linear-gradient(to right top, #7A34E2, #1DA1F2)"

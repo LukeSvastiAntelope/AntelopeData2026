@@ -11,11 +11,11 @@ const PredictionTypeDialog = ({ isOpen, onClose }: { isOpen: boolean, onClose: (
     return (
         <Modal isOpen={isOpen} onClose={onClose} size="md">
             <ModalContent>
-                <ModalBody className="bg-custom-prediction-modal-bg">
+                <ModalBody className="bg-custom-prediction-modal-bg text-small">
                     <div className="flex flex-col gap-4 py-4">
                         <div className="text-xl font-bold">Create Prediction</div>
                         <div
-                            className="flex flex-col p-4 rounded-lg bg-custom-prediction-modal-button cursor-pointer"
+                            className="flex flex-col p-4 rounded-lg bg-custom-prediction-modal-button cursor-pointer hover:bg-white/10"
                             onClick={() => { router.push("/prediction"); onClose(); }}
                         >
                             <div className="font-bold">Prediction</div>
@@ -26,7 +26,7 @@ const PredictionTypeDialog = ({ isOpen, onClose }: { isOpen: boolean, onClose: (
                         <div className="text-xl font-bold">Ask a question</div>
                         <div className="flex flex-col gap-2">
                             <div
-                                className="flex flex-col p-4 rounded-lg bg-custom-prediction-modal-button cursor-pointer"
+                                className="flex flex-col p-4 rounded-lg bg-custom-prediction-modal-button cursor-pointer hover:bg-white/10"
                                 onClick={() => { router.push("/binaryQuestion"); onClose(); }}
                             >
                                 <div className="font-bold">Yes/No</div>
@@ -35,7 +35,7 @@ const PredictionTypeDialog = ({ isOpen, onClose }: { isOpen: boolean, onClose: (
                                 </div>
                             </div>
                             <div
-                                className="flex flex-col p-4 rounded-lg bg-custom-prediction-modal-button cursor-pointer"
+                                className="flex flex-col p-4 rounded-lg bg-custom-prediction-modal-button cursor-pointer hover:bg-white/10"
                                 onClick={() => { router.push("/multipleQuestion"); onClose(); }}
                             >
                                 <div className="font-bold">Multiple Choice</div>
@@ -44,7 +44,7 @@ const PredictionTypeDialog = ({ isOpen, onClose }: { isOpen: boolean, onClose: (
                                 </div>
                             </div>
                             <div
-                                className="flex flex-col p-4 rounded-lg bg-custom-prediction-modal-button cursor-pointer"
+                                className="flex flex-col p-4 rounded-lg bg-custom-prediction-modal-button cursor-pointer hover:bg-white/10"
                                 onClick={() => { router.push("/sportsQuestion"); onClose(); }}
                             >
                                 <div className="font-bold">Sports Question</div>
@@ -52,7 +52,7 @@ const PredictionTypeDialog = ({ isOpen, onClose }: { isOpen: boolean, onClose: (
                                     Soccer/PremierLeague/NBA/NFL
                                 </div>
                             </div>
-                            <div className="flex flex-col p-4 rounded-lg bg-custom-prediction-modal-button cursor-pointer">
+                            <div className="flex flex-col p-4 rounded-lg bg-custom-prediction-modal-button cursor-pointer hover:bg-white/10">
                                 <div className="font-bold">Index category</div>
                                 <div className="text-gray-400">
                                     Create a basket of goods to get predictions on

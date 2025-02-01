@@ -85,7 +85,7 @@ const BinaryQuestion = () => {
 
     return (
         <>
-            <div className="text-xl font-bold text-white py-2">Choose Question {">"} Yes/No Questions</div>
+            <div className="text-base font-regular text-white py-2">Choose Question {">"} Yes/No Questions</div>
             <div className="mt-4 bg-custom-prediction-modal-bg px-4 py-6 rounded-lg flex flex-col gap-8">
                 <div className="flex flex-col gap-2">
                     <div className="text-sm font-bold">Select Category*</div>

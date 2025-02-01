@@ -119,13 +119,17 @@ const SportsQuestion = () => {
 
     return (
         <>
-            <div className="text-xl font-bold text-white py-2">Choose Question {">"} Yes/No Questions</div>
+            <div className="text-base font-regular text-white py-2">Choose Question {">"} Yes/No Questions</div>
             <div className="mt-4 bg-custom-prediction-modal-bg px-4 py-6 rounded-lg flex flex-col gap-8">
                 <div className="flex flex-col gap-2">
                     <div className="text-sm font-bold">Select Category</div>
                     <Select
                         label="Select Category"
                         value={predictionType}
+                        style={{
+                            backgroundColor: "#1D1D2F"
+                           
+                        }}
                         onChange={(e) => {
                             setPredictionType(e.target.value);
                             setSelectedLeague(predictionTypes.find(type => type.key === e.target.value)?.leagueId || "");
@@ -148,6 +152,7 @@ const SportsQuestion = () => {
                             value={selectedLeague}
                             onChange={(e) => setSelectedLeague(e.target.value)}
                             isLoading={isLoadingLeagues}
+                            style={{backgroundColor: "#1D1D2F"}}
                         >
                             {leagues.map((league) => (
                                 <SelectItem key={league.idLeague} value={league.idLeague}>{league.strLeague}</SelectItem>
@@ -158,6 +163,10 @@ const SportsQuestion = () => {
                 <Select
                     label="Select Match"
                     value={selectedMatch}
+                    style={{
+                        backgroundColor: "#1D1D2F"
+                      
+                    }}
                     onChange={(e) => {
                         setSelectedMatch(e.target.value);
                         const homeTeam = matches.find(match => match.idEvent === e.target.value)?.strHomeTeam || "";
@@ -181,6 +190,7 @@ const SportsQuestion = () => {
                     <Textarea
                         placeholder="Provide any relevant information or context for agents to consider"
                         className="h-16"
+                        style={{ backgroundColor: "#1D1D2F" }}
                         value={context}
                         onChange={(e) => {
                             setContext(e.target.value);
@@ -208,8 +218,9 @@ const SportsQuestion = () => {
                     </ButtonGroup>
                     <Input
                         placeholder="Enter Custom Credit Pool"
-                        className={`w-full ${creditPool !== "custom" && "hidden"}`}
+                        className={`background-questions w-full ${creditPool !== "custom" && "hidden"}`}
                         value={customCreditPool}
+                 
                         onChange={(e) => {
                             setCustomCreditPool(e.target.value);
                         }}
@@ -218,6 +229,7 @@ const SportsQuestion = () => {
                 </div>
                 <Button
                     color="primary"
+                    className="rounded-small"
                     onPress={handleCreateQuestion}
                     style={{
                         background: "linear-gradient(to right top, #7A34E2, #1DA1F2)"

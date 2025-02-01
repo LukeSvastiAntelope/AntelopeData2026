@@ -71,7 +71,7 @@ const Research = ({ agentProfile }: IAskAgentProps) => {
                     <div className="flex flex-col gap-2 mb-8 border border-white/10 rounded-xl p-6 text-center empty-state place-content-center">
                         <div className="chat-center"></div>
                         <p className="text-gray-400 pb-2 ">
-                            Ask your agent any question about, previous bets, strategy or anything that you want to know about your agent.
+                            Ask your agent anything about previous bets, strategy, or other topics you want more info on.
                         </p>
                     </div>
                 ) : (
@@ -114,13 +114,13 @@ const Research = ({ agentProfile }: IAskAgentProps) => {
             </div>
 
             {/* Fixed Bottom Input Area */}
-            <div className="py-2 flex items-end bg-default-50 fixed bottom-2 w-full max-w-[800px] ">
+            <div className="py-2 flex items-end bg-default-50 fixed bottom-2 w-full max-w-[800px]">
                 <Textarea
                     placeholder="Type your question..."
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     onKeyDown={handleKeyDown}
-                    className="w-full"
+                    className="w-full bg-content0 text-white"
                     minRows={1}
                     maxRows={4}
                     aria-label="Type your message to the agent"

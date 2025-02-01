@@ -2,6 +2,8 @@
 @tailwind components;
 @tailwind utilities;
 
+
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
@@ -169,6 +171,10 @@ max-width: 80px;
   width: 20px;
   height: 20px;
   transition: background-image 0.2s ease-in-out;
+}
+
+.background-questions textarea {
+  background-color: #1D1D2F;
 }
 
 .icon-send {
@@ -708,4 +714,45 @@ tbody {
     width: 75%;
   }
 
+}
+
+/* Target all form inputs, textareas, and their wrappers */
+.gh-textarea,
+.gh-textarea textarea,
+.gh-textarea div,
+input[type="text"],
+input[type="number"],
+textarea,
+select,
+.group[data-focus="true"],
+.group[data-focus="true"] input,
+.group[data-focus="true"] textarea,
+.group[data-focus="true"] div[role="textbox"],
+div[role="textbox"],
+div[role="combobox"],
+.group-data-\[focus\=true\]\:bg-default-100,
+.bg-default-100 {
+  background-color: #1D1D2F !important;
+  border-radius: 6px;
+}
+
+/* Target the Select dropdown background */
+div[role="listbox"] {
+  background-color: #1D1D2F !important;
+}
+
+/* Target any potential focus/hover states */
+input:focus,
+textarea:focus,
+select:focus,
+div[role="textbox"]:focus,
+div[role="combobox"]:focus {
+  background-color: #1D1D2F !important;
+}
+
+/* Override any NextUI specific background classes */
+.nextui-input-main-container,
+.nextui-input-wrapper,
+.nextui-input-container {
+  background-color: #1D1D2F !important;
 }
