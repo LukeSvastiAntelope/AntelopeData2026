@@ -215,7 +215,7 @@ export default function PredictionDetail() {
             outcome = "";
         }
 
-        const response = await fetchData.post(`/api/resolvePrediction/${params.id}`, {
+        const response = await fetchData.post(`/api/admin/resolvePrediction/${params.id}`, {
             outcome,
             type
         });

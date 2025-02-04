@@ -47,7 +47,19 @@ export const UserRepo = {
     connectTelegram,
     getPredictionsfromAdmin,
     resolvePrediction,
-    getBetsByPredictionId
+    getBetsByPredictionId,
+    updateUserPredictionBalance,
+    updatePlatformAccountBalance
+}
+
+async function updatePlatformAccountBalance(platformId: number, win: number, betAmount: number) {
+    const db = await getMySQLConnection();
+    await db.execute('UPDATE platform_accounts SET wallet_balance = wallet_balance + ?, escrow_balance = escrow_balance - ? WHERE id = ?', [win, betAmount, platformId]);
+}
+
+async function updateUserPredictionBalance(userId: number, win: number, betAmount: number) {
+    const db = await getMySQLConnection();
+    await db.execute('UPDATE users SET escrow_balance = escrow_balance - ?, wallet_balance = wallet_balance + ? WHERE id = ?', [betAmount, win, userId]);
 }
 
 async function getBetsByPredictionId(id: string) {
