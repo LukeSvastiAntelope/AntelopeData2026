@@ -16,7 +16,7 @@ export async function GET(
         }
 
         // Get prediction details
-        let prediction = await UserRepo.getPredictionById(params.id);
+        const prediction = await UserRepo.getPredictionById(params.id);
         if (prediction && prediction.choices && typeof prediction.choices === 'string') {
             prediction.choices = JSON.parse(prediction.choices);
         }

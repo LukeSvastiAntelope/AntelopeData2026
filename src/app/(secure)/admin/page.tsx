@@ -202,7 +202,7 @@ const AdminPage = () => {
                         )}
                         {
                             displayedPredictions.map((prediction: IPrediction) => (
-                                <div key={prediction.id} className="flex flex-row justify-between cursor-pointer" onClick={() => router.push(`/admin/${prediction.id}`)}>
+                                <div key={prediction.id} className="flex flex-row justify-between cursor-pointer gap-4" onClick={() => router.push(`/admin/${prediction.id}`)}>
                                     <div>{prediction.description}</div>
                                     <div>{formatDate(new Date(prediction.resolution_date), "MM/dd/yyyy")}</div>
                                 </div>
@@ -244,7 +244,7 @@ const AdminPage = () => {
                         )}
                         {
                             displayedOpenPredictions.map((prediction: IPrediction) => (
-                                <div key={prediction.id} className="flex flex-row justify-between cursor-pointer" onClick={() => router.push(`/admin/${prediction.id}`)}>
+                                <div key={prediction.id} className="flex flex-row justify-between cursor-pointer gap-4" onClick={() => router.push(`/admin/${prediction.id}`)}>
                                     <div>{prediction.description}</div>
                                     <div>{formatDate(new Date(prediction.resolution_date), "MM/dd/yyyy")}</div>
                                 </div>
@@ -286,7 +286,7 @@ const AdminPage = () => {
                         )}
                         {
                             displayedUpcomingPredictions.map((prediction: IPrediction) => (
-                                <div key={prediction.id} className="flex flex-row justify-between cursor-pointer" onClick={() => router.push(`/admin/${prediction.id}`)}>
+                                <div key={prediction.id} className="flex flex-row justify-between cursor-pointer gap-4" onClick={() => router.push(`/admin/${prediction.id}`)}>
                                     <div>{prediction.description}</div>
                                     <div>{formatDate(new Date(prediction.resolution_date), "MM/dd/yyyy")}</div>
                                 </div>
@@ -328,7 +328,7 @@ const AdminPage = () => {
                         )}
                         {
                             displayedResolvedPredictions.map((prediction: IPrediction) => (
-                                <div key={prediction.id} className="flex flex-row justify-between cursor-pointer" onClick={() => router.push(`/admin/${prediction.id}`)}>
+                                <div key={prediction.id} className="flex flex-row justify-between cursor-pointer gap-4" onClick={() => router.push(`/admin/${prediction.id}`)}>
                                     <div>{prediction.description}</div>
                                     <div>{formatDate(new Date(prediction.resolution_date), "MM/dd/yyyy")}</div>
                                 </div>

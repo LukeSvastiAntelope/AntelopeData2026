@@ -256,7 +256,7 @@ export default function PredictionDetail() {
             {/* Prediction Detail */}
             <div className="max-w-[800px]">
                 <Card className="mb-6">
-                    <CardBody className="gap-4">
+                    <CardBody className="gap-4 bg-[#2f344e] rounded-lg p-4">
                         <div className="flex items-start gap-4 flex-col md:flex-col object-cover">
                             <Image
                                 src={prediction.str_thumb}
@@ -282,9 +282,7 @@ export default function PredictionDetail() {
                                             showArrow
                                         >
                                             <Chip
-                                                color={
-                                                    prediction.status === "open" ? "primary" : "danger"
-                                                }
+                                                color="primary"
                                                 variant="flat"
                                             >
                                                 {prediction.status == "awaiting_confirmation" ? "Upcoming" : prediction.status}
@@ -302,9 +300,7 @@ export default function PredictionDetail() {
                                             showArrow
                                         >
                                             <Chip
-                                                color={
-                                                    prediction.status === "open" ? "primary" : "danger"
-                                                }
+                                                color="primary"
                                                 variant="flat"
                                             >
                                                 {betAmount}
@@ -322,9 +318,7 @@ export default function PredictionDetail() {
                                             showArrow
                                         >
                                             <Chip
-                                                color={
-                                                    prediction.status === "open" ? "primary" : "danger"
-                                                }
+                                                color="primary"
                                                 variant="flat"
                                             >
                                                 {betCount}
@@ -342,9 +336,7 @@ export default function PredictionDetail() {
                                             showArrow
                                         >
                                             <Chip
-                                                color={
-                                                    prediction.status === "open" ? "primary" : "danger"
-                                                }
+                                                color="primary"
                                                 variant="flat"
                                             >
                                                 {formatDate(new Date(prediction.resolution_date), "MM/dd/yyyy")}
@@ -363,8 +355,7 @@ export default function PredictionDetail() {
 
                         {/* Single multi-segment bar with No on left, Combined label center, Yes on right */}
                         {choiceOdds.length > 0 && (
-                            <div className="w-full mt-8 space-y-2">
-                                <h2 className="text-lg font-semibold mb-4">Market Odds</h2>
+                            <div className="w-full mt-8 space-y-2 bg-[#1d1d22] rounded-lg p-4">
                                 <MultiChoiceOddsBar choices={choiceOdds} />
                             </div>
                         )}
@@ -375,16 +366,16 @@ export default function PredictionDetail() {
                                 <>
                                     <div className="text-lg mt-4">Resolve Manually</div>
                                     <div className="flex flex-row justify-between gap-4 items-center">
-                                        <Select label="Choose a choice" className="w-full" onChange={(e) => setSelectedChoice(e.target.value)}>
+                                        <Select className="w-full" onChange={(e) => setSelectedChoice(e.target.value)}>
                                             {choiceList.length > 0 ? choiceList.map((choice) => (
                                                 <SelectItem key={choice} value={choice}>
                                                     {choice}
                                                 </SelectItem>
                                             )) : <SelectItem value="none">No choices available</SelectItem>}
                                         </Select>
-                                        <Button color="primary" isLoading={isResolving} variant="flat" className="w-fit" onPress={() => handleResolve("manual")}>Update</Button>
+                                        <Button color="primary" isLoading={isResolving} variant="flat" className="w-fit background-gradient text-white" onPress={() => handleResolve("manual")}>Update</Button>
                                     </div>
-                                    <Button color="danger" isLoading={isResolving} variant="flat" className="w-full" onPress={() => handleResolve("auto")}>Resolve Automatically</Button>
+                                    {/* <Button color="danger" isLoading={isResolving} variant="flat" className="w-full" onPress={() => handleResolve("auto")}>Resolve Automatically</Button> */}
                                 </>
                             ) : (
                                 <div className="text-lg mt-4">Result: {prediction?.outcome}</div>

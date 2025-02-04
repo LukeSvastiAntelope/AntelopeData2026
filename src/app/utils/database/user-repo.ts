@@ -54,12 +54,12 @@ export const UserRepo = {
 
 async function updatePlatformAccountBalance(platformId: number, win: number, betAmount: number) {
     const db = await getMySQLConnection();
-    await db.execute('UPDATE platform_accounts SET wallet_balance = wallet_balance + ?, escrow_balance = escrow_balance - ? WHERE id = ?', [win, betAmount, platformId]);
+    await db.execute('UPDATE platform_accounts SET wallet_balance = wallet_balance + ?, escrow_balance = escrow_balance - ?, total_winnings = total_winnings + ? WHERE id = ?', [win, betAmount, win > 0 ? 1 : 0, platformId]);
 }
 
 async function updateUserPredictionBalance(userId: number, win: number, betAmount: number) {
     const db = await getMySQLConnection();
-    await db.execute('UPDATE users SET escrow_balance = escrow_balance - ?, wallet_balance = wallet_balance + ? WHERE id = ?', [betAmount, win, userId]);
+    await db.execute('UPDATE users SET escrow_balance = escrow_balance - ?, wallet_balance = wallet_balance + ?, total_winnings = total_winnings + ? WHERE id = ?', [betAmount, win, win > 0 ? 1 : 0, userId]);
 }
 
 async function getBetsByPredictionId(id: string) {
