@@ -303,23 +303,10 @@ export class AutomaticBettingAgent {
     "predictions": [
         {
             "id": number,
-            "recommendedChoice": "string (e.g., 'draw', team name, or available choice)",
+            "recommendedChoice": "string (for sports: use 'draw' or exact team name from team_a or team_b, for others: 'Yes' or 'No')",
             "confidence": number (0-1),
             "reasoning": "detailed explanation",
             "riskAssessment": "Low/Medium/High"
-        }
-    ]
-}
-
-Example:
-{
-    "predictions": [
-        {
-            "id": 123,
-            "recommendedChoice": "Real Madrid",
-            "confidence": 0.85,
-            "reasoning": "Real Madrid has a strong track record against similar opponents.",
-            "riskAssessment": "Low"
         }
     ]
 }
@@ -331,8 +318,6 @@ ${batchPredictions.map(p => {
                     const [, , amount, choice] = bet.split(':');
                     return { amount: Number(amount), choice };
                 }) : [];
-
-                const choices = p.choices ? JSON.parse(p.choices) : [];
 
                 // Group and sum bets by choice
                 const betsByChoice = bets.reduce((acc, bet) => {
@@ -352,26 +337,28 @@ ${batchPredictions.map(p => {
                         .join(' vs ')
                     : p.source === "sportDB"
                         ? `${p.team_a}: 33.3% vs ${p.team_b}: 33.3% vs draw: 33.3%` // Default for sports
-                        : `${choices.join(' vs ')}`; // Default for binary
+                        : `${p.creator_choice}: 50.0% vs No: 50.0%`; // Default for binary
 
                 return `ID: ${p.id}
      Description: ${p.description}
-     ${p.source === "sportDB" ? `Team A: ${p.team_a} Team B: ${p.team_b} Predicted Winner: ${p.predicted_outcome}` : `Creator Choice: ${p.creator_choice}`}
+     ${p.source === "sportDB" ?
+                        `Team A: ${p.team_a}
+     Team B: ${p.team_b}
+     Predicted Winner: ${p.predicted_outcome}` :
+                        `Creator Choice: ${p.creator_choice}`}
      Creator Betting Amount: ${p.bet_amount}
-     Context: ${p.context || 'No context provided'}
      Market Odds: ${oddsDisplay}
-     Available Choices: ${choices.join(', ')}
      Total Bet Amount: ${totalAmount}
-     Existing Bets: ${p.agent_bets ? this.parseAgentBets(p.agent_bets)[this.agent.id] ?
+     You Are Already Bet: ${p.agent_bets ? this.parseAgentBets(p.agent_bets)[this.agent.id] ?
                         `${this.parseAgentBets(p.agent_bets)[this.agent.id].amount} to ${this.parseAgentBets(p.agent_bets)[this.agent.id].choice}` :
                         'No bets made yet' : 'No bets made yet'}`
             }).join('\n')}
 
-Key News:
-${relevantNews.map(n => `- ${n.title}`).join('\n')}
-
-Similar History with Agent Comments:
-${relevantSimilar.map(p => `
+    Key News:
+    ${relevantNews.map(n => `- ${n.title}`).join('\n')}
+    
+    Similar History with Agent Comments:
+    ${relevantSimilar.map(p => `
 - Description: ${p.metadata?.description?.substring(0, 100) || 'N/A'}
 - Choice: ${p.metadata?.choice || 'N/A'}
 - Amount: ${p.metadata?.amount || 'N/A'}
@@ -379,23 +366,23 @@ ${relevantSimilar.map(p => `
 ${p.metadata?.comment ? `- Agent Controller Comment: ${p.metadata.comment}` : ''}`
             ).join('\n')}
 
-Agent Training Predictions:
-${relevantTraining.map(p => `
+    Agent Training Predictions:
+    ${relevantTraining.map(p => `
 - Question: ${p.description}
 - Choice: ${p.creator_choice}
 - Amount: ${p.bet_amount}
-- Reasoning: ${p.betReason}`
-).join('\n')}
-
-Agent Principles:
-- Betting Strategy:
-  1. If no previous bet exists, make an initial bet with moderate confidence.
-  2. If a previous bet exists:
-     - Bet additional amounts only if odds are favorable.
-     - Consider adjusting choice if odds have significantly changed.
-- Consider risk/reward ratio based on current betting amounts.
-- Adjust bet size based on odds discrepancy.
-${this.agent.principles
+- Reasoning: ${p.betReason}
+`).join('\n')}
+    
+    Agent Principles:
+    - Betting Strategy:
+  1. If no your previous bet exists, make initial bet with a bit confidence for making odds
+  2. If your previous bet exists:
+     - Only bet additional amount if odds are favorable
+     - Consider adjusting choice if odds significantly changed
+- Consider risk/reward ratio based on current betting amounts
+- Adjust bet size based on odds discrepancy
+    ${this.agent.principles
                     .slice(0, 3)
                     .map(p => `- ${p.title}: ${p.description}`)
                     .join('\n')}`;

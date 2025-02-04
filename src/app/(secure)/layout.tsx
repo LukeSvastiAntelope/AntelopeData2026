@@ -270,7 +270,7 @@ const SecureLayout = ({ children }: { children: React.ReactNode }) => {
                                                     <span className="hidden font-kodemono md:inline-block">About</span>
                                                 </Link>
                                                 <Link
-                                                    href="https://web.telegram.org/k/#@antelopechannelhttps://t.me/+F5F2ah0bBzU0ZDAx"
+                                                    href="https://t.me/+PWP890TNaw8zZTI5"
                                                     className="flex items-center md:gap-2 text-gray-500 group"
                                                 >
                                                     <span className="icon-support block group-hover:hidden" />

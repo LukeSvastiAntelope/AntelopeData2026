@@ -182,12 +182,14 @@ export default function Dashboard() {
   const totalBets = bets.length;
   const totalPredictions = predictions.length;
 
-  // For success rate -- example approach
-  const closedBets = bets.filter((bet) => bet.status !== "open");
-  const wonBets = closedBets.filter((bet) => bet.outcome === bet.choice);
-  const successRate = closedBets.length > 0
-    ? (wonBets.length / closedBets.length) * 100
-    : 0;
+  // Recalculate success rate exactly as in markets:
+  // Only consider bets that are marked as "resolved" then compare outcome and choice case-insensitively.
+  const resolvedBets = bets.filter((bet) => bet.status === "resolved");
+  const wonBets = resolvedBets.filter((bet) =>
+    bet.outcome?.toLowerCase() === bet.choice?.toLowerCase()
+  );
+  const successRate =
+    resolvedBets.length > 0 ? (wonBets.length / resolvedBets.length) * 100 : 0;
 
   const fetch = useFetch();
   const router = useRouter();
@@ -421,7 +423,7 @@ export default function Dashboard() {
         <StatCard
           icon={<FaChartLine />}
           title="Success"
-          value={`${Number(successRate || 0).toFixed(2)}%`}
+          value={`${successRate.toFixed(2)}%`}
         />
         <StatCard
           icon={<FaShieldAlt />}
