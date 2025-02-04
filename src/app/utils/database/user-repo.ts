@@ -44,7 +44,31 @@ export const UserRepo = {
     createAgentJoinAction,
     updateAgentTraining,
     getPlatformAccountByUserId,
-    connectTelegram
+    connectTelegram,
+    getPredictionsfromAdmin,
+    resolvePrediction,
+    getBetsByPredictionId
+}
+
+async function getBetsByPredictionId(id: string) {
+    const db = await getMySQLConnection();
+    const [rows] = await db.execute<(RowDataPacket)[]>(`SELECT b.*, u.username, pa.platform_id as pa_platform_id
+      FROM bets as b
+      LEFT JOIN users as u ON b.user_id = u.id
+      LEFT JOIN platform_accounts as pa ON b.platform_id = pa.id AND pa.platform = 'telegram'
+      WHERE prediction_id = ? AND state <> 'canceled'`, [id]);
+    return rows;
+}
+
+async function resolvePrediction(id: string, outcome: string) {
+    const db = await getMySQLConnection();
+    await db.execute('UPDATE predictions SET outcome = ?, status = ? WHERE id = ?', [outcome, "resolved", id]);
+}
+
+async function getPredictionsfromAdmin() {
+    const db = await getMySQLConnection();
+    const [rows] = await db.execute<(RowDataPacket)[]>('SELECT * FROM predictions ORDER BY status ASC, resolution_date ASC');
+    return rows;
 }
 
 async function connectTelegram(userId: string, telegram_id: string, username: string, first_name: string, last_name: string) {
@@ -248,7 +272,7 @@ async function authenticate({ username, password }: { username: string, password
             throw new Error('User is not verified yet. Pls check your telegram for the confirmation link.');
         }
 
-        const token = await generateConfirmationToken(user.id.toString());
+        const token = await generateConfirmationToken(user.id.toString(), user.role);
 
         return {
             user: user,

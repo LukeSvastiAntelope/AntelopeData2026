@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { IAgentProfile } from "@/app/utils/interface";
+import { IAgentProfile, UserDB } from "@/app/utils/interface";
 import { Skeleton } from "@heroui/react";
 import { toast } from "react-hot-toast";
 import { useFetch } from "../utils/lib";
@@ -68,6 +68,7 @@ const SecureLayout = ({ children }: { children: React.ReactNode }) => {
     const route = useRouter();
     const pathname = usePathname();
     const [agent, setAgent] = useState<IAgentProfile | null>(null);
+    const [user, setUser] = useState<UserDB | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [isOpen, setIsOpen] = useState(false);
     const [isAgentProfileOpen, setIsAgentProfileOpen] = useState(false);
@@ -129,6 +130,7 @@ const SecureLayout = ({ children }: { children: React.ReactNode }) => {
             const response = await fetchData.get('/api/getAgentProfile');
             if (response.status) {
                 setAgent(response.agent);
+                setUser(response.user);
                 if (!response.agent.name || !response.agent.description) {
                     setIsAgentProfileOpen(true);
                 } else {
@@ -204,7 +206,6 @@ const SecureLayout = ({ children }: { children: React.ReactNode }) => {
                                                         </NextUITooltip>
                                                     </div>
                                                 </div>
-
                                                 <Link
                                                     href="/dashboard"
                                                     className={`flex items-center group md:gap-2 ${pathname === '/dashboard' ? 'text-white' : 'text-gray-500 hover:text-white'}`}
@@ -231,6 +232,20 @@ const SecureLayout = ({ children }: { children: React.ReactNode }) => {
                                                     <span className={`icon-strategy group-hover:hidden ${pathname === '/strategy' ? 'hidden' : 'block'}`} />
                                                     <span className="hidden font-kodemono md:inline-block">Strategy</span>
                                                 </Link>
+
+                                                {
+                                                    user?.role === "admin" &&
+                                                    <>
+                                                        <Link
+                                                            href="/admin"
+                                                            className={`flex items-center group md:gap-2 ${pathname === '/admin' ? 'text-white' : 'text-gray-500 hover:text-white'}`}
+                                                        >
+                                                            <span className={`icon-dashboard-active group-hover:block ${pathname === '/admin' ? 'block' : 'hidden'}`} />
+                                                            <span className={`icon-dashboard group-hover:hidden ${pathname === '/admin' ? 'hidden' : 'block'}`} />
+                                                            <span className="hidden font-kodemono md:inline-block">Admin</span>
+                                                        </Link>
+                                                    </>
+                                                }
 
                                                 <Link
                                                     href="#"

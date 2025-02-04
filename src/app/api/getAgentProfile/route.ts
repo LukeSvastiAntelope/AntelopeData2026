@@ -8,7 +8,8 @@ export async function GET(req: NextRequest) {
         const jwtPayload = await verifyConfirmationToken(token as string);
         if (!jwtPayload) {
             return Response.json({ error: 'Invalid token' }, { status: 401 });
-        }        
+        }
+        const user = await UserRepo.getUserById(jwtPayload.email as string);
         let agent = await UserRepo.getAgentByUserId(jwtPayload.email as string);
         if (!agent) {
             agent = await UserRepo.createAgent(jwtPayload.email as string);
@@ -31,7 +32,7 @@ export async function GET(req: NextRequest) {
         const bets = await UserRepo.getBetsByAgentId(agent.id);
         const totalBets = bets.length;
         const successRate = agent.total_winnings * 100 / totalBets;
-        return Response.json({status: true, agent: agent, totalBets: totalBets, successRate: successRate});
+        return Response.json({status: true, agent: agent, totalBets: totalBets, successRate: successRate, user: user});
     } catch (error) {
         console.error("Error in getAgentProfile: ", error);
         return Response.json({ 

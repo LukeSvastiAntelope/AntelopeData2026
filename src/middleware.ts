@@ -2,11 +2,11 @@ import { verifyConfirmationToken } from '@/app/utils/api/token';
 import { NextRequest, NextResponse } from 'next/server'
 
 const publicRoutes = [
-    '/api/signin', 
-    '/api/signup', 
-    '/api/verify', 
-    '/api/createAgentBet', 
-    '/api/stripeWebhookCheckout', 
+    '/api/signin',
+    '/api/signup',
+    '/api/verify',
+    '/api/createAgentBet',
+    '/api/stripeWebhookCheckout',
     '/api/forgotPassword',
     '/api/resetPassword',
     '/api/resetLink',
@@ -17,7 +17,7 @@ export default async function middleware(req: NextRequest) {
     const path = req.nextUrl.pathname;
     const isPublicRoute = publicRoutes.includes(path);
     const authHeader = req.headers.get('authorization');
-    
+
     if (isPublicRoute) {
         // If there's an authorization header, we can check if the user is authenticated
         if (authHeader) {
@@ -31,7 +31,7 @@ export default async function middleware(req: NextRequest) {
         // Allow access to public routes if no auth header is provided
         return NextResponse.next();
     }
-    
+
     if (!authHeader) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -41,6 +41,13 @@ export default async function middleware(req: NextRequest) {
 
     if (!isAuthenticated) {
         return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
+    }
+
+    if (path.startsWith('/api/admin')) {
+        const userData = isAuthenticated;
+        if (!userData || userData.role !== 'admin') {
+            return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+        }
     }
 
     return NextResponse.next()

@@ -84,26 +84,26 @@ export default function AskAgent() {
 
       {/* Chat Container (no extra background color) */}
       {agentProfile && (
-        <Tabs 
-          aria-label="Mode" 
-          selectedKey={mode} 
-        onSelectionChange={(key) => setMode(key as string)}
-        disableCursorAnimation
-        classNames={{
-          base: "my-4 font-kodemono",
-          tabList: "bg-transparent p-0 gap-4",
-          cursor: "bg-transparent shadow-none",
-          tab: "bg-transparent data-[selected=true]:bg-transparent"
-        }}
-      >
-        {modeList.map((mode) => (
-          <Tab 
-            key={mode.key} 
-            title={mode.value}
-            className="flex-auto flex flex-col px-0 mx-0"
-          >
-            {mode.content}
-          </Tab>
+        <Tabs
+          aria-label="Mode"
+          selectedKey={mode}
+          onSelectionChange={(key) => setMode(key as string)}
+          disableCursorAnimation
+          classNames={{
+            base: "my-4 font-kodemono",
+            tabList: "bg-transparent p-0 gap-4",
+            cursor: "bg-transparent shadow-none",
+            tab: "bg-transparent data-[selected=true]:bg-transparent"
+          }}
+        >
+          {modeList.map((mode) => (
+            <Tab
+              key={mode.key}
+              title={mode.value}
+              className="flex-auto flex flex-col px-0 mx-0"
+            >
+              {mode.content}
+            </Tab>
           ))}
         </Tabs>
       )}

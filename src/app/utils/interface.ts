@@ -24,6 +24,7 @@ export interface IAgentProfile {
     ipfs_hash?: string;
     platform_id: number;
     is_bet: boolean;
+    role?: "user" | "admin";
 }
 
 export interface IFormDataAgentProfile {
@@ -249,6 +250,7 @@ export interface UserDB {
     escrow_balance: number;
     password: string;
     is_verified: number;
+    role: "user" | "admin";
 }
 
 export interface AgentDB {
@@ -317,6 +319,7 @@ export interface PredictionDB {
     yes_count: number;
     no_count: number;
     log?: string;
+    choices?: string[] | string;
 }
 
 export interface IPrediction {
