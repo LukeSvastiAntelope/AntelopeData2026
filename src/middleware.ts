@@ -10,12 +10,12 @@ const publicRoutes = [
     '/api/forgotPassword',
     '/api/resetPassword',
     '/api/resetLink',
-    '/api/resetPassword'
+    '/api/resetPassword',
 ]
 
 export default async function middleware(req: NextRequest) {
     const path = req.nextUrl.pathname;
-    const isPublicRoute = publicRoutes.includes(path);
+    const isPublicRoute = publicRoutes.includes(path) || path.startsWith('/api/getPrediction/');
     const authHeader = req.headers.get('authorization');
 
     if (isPublicRoute) {

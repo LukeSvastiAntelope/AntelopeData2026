@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useFetch } from "@/app/utils/lib";
 import toast from "react-hot-toast";
 import { IAgentProfile } from "@/app/utils/interface";
@@ -11,7 +11,7 @@ import Train from "@/app/components/askAgent/Train";
 import Principles from "@/app/components/askAgent/Principles";
 import Settings from "@/app/components/askAgent/Settings";
 
-export default function AskAgent() {
+const AskAgent = () => {
   const fetch = useFetch();
   const searchParams = useSearchParams();
   const receiveMode = searchParams.get("mode") || "conversation";
@@ -109,4 +109,19 @@ export default function AskAgent() {
       )}
     </div>
   );
-} 
+}
+
+export default function Page() {
+  return (
+      <Suspense fallback={
+          <div className="min-h-screen flex items-center justify-center">
+              <div className="text-center">
+                  <h1 className="text-2xl mb-4 text-gray-600">Loading...</h1>
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto" />
+              </div>
+          </div>
+      }>
+          <AskAgent />
+      </Suspense>
+  );
+}
