@@ -144,11 +144,15 @@ export default function PredictionDetail() {
   const fetchAgentProfile = async () => {
     const response = await fetch("/api/getAgentProfile");
     if (!response.ok) {
-      toast.error("Failed to fetch agent profile");
+      if (response.status == 401) {
+        toast.error("Please login to place bets");
+      }
     }
     const data = await response.json();
     if (data.status) {
       setAgent(data.agent);
+    } else {
+      toast.error(data.message || "Failed to fetch agent profile");
     }
     fetchPredictionDetails(params.id as string, data?.agent?.category || "");
   };
