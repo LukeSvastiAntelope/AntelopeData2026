@@ -143,13 +143,14 @@ export default function PredictionDetail() {
   // Fetch agent profile
   const fetchAgentProfile = async () => {
     try {
-      const response = await fetchData.get("/api/getAgentProfile");
-      if (response.status) {
-        setAgent(response.agent);
+      const response = await fetch("/api/getAgentProfile");
+      const data = await response.json();
+      if (data.status) {
+        setAgent(data.agent);
       } else {
-        toast.error(response.message);
+        toast.error(data.message);
       }
-      fetchPredictionDetails(params.id as string, response.agent.category);
+      fetchPredictionDetails(params.id as string, data.agent.category);
     } catch (error) {
       console.log(error);
       toast.error("Failed to fetch agent profile");
@@ -159,11 +160,12 @@ export default function PredictionDetail() {
   // fetch prediction details
   const fetchPredictionDetails = async (id: string, category: string) => {
     try {
-      const response = await fetchData.get(`/api/getPrediction/${id}`);
-      if (response.status) {
-        setPrediction(response.prediction);
-        if (response.prediction?.bets) {
-          const betsArray: IBet[] = response.prediction.bets;
+      const response = await fetch(`/api/getPrediction/${id}`);
+      const data = await response.json();
+      if (data.status) {
+        setPrediction(data.prediction);
+        if (data.prediction?.bets) {
+          const betsArray: IBet[] = data.prediction.bets;
           const choiceTotals = betsArray.reduce((acc, b) => {
             const lowerChoice = b.choice.toLowerCase();
             acc[lowerChoice] = (acc[lowerChoice] || 0) + b.amount;
@@ -207,44 +209,44 @@ export default function PredictionDetail() {
         } else {
           source = "sportDB";
         }
-        let interest = response.prediction.source === source;
+        let interest = data.prediction.source === source;
         if (source === "sportDB" && interest) {
           if (category === "nba") {
-            interest = response.prediction.league_id === 4387;
+            interest = data.prediction.league_id === 4387;
           } else if (category === "nfl") {
-            interest = response.prediction.league_id === 4391;
+            interest = data.prediction.league_id === 4391;
           } else if (category === "english premier league") {
-            interest = response.prediction.league_id === 4328;
+            interest = data.prediction.league_id === 4328;
           } else if (category === "soccer") {
             interest =
-              response.prediction.league_id !== 4387 &&
-              response.prediction.league_id !== 4391;
+              data.prediction.league_id !== 4387 &&
+              data.prediction.league_id !== 4391;
           }
         }
         if (interest) {
-          if (response.prediction.source !== "sportDB") {
+          if (data.prediction.source !== "sportDB") {
             setChoiceList(["yes", "no"]);
           } else {
             // handle sports choices
             if (
-              response.prediction.league_id == "4391" ||
-              response.prediction.league_id == "4387"
+              data.prediction.league_id == "4391" ||
+              data.prediction.league_id == "4387"
             ) {
               setChoiceList([
-                response.prediction.team_a,
-                response.prediction.team_b,
+                data.prediction.team_a,
+                data.prediction.team_b,
               ]);
             } else {
               setChoiceList([
-                response.prediction.team_a,
-                response.prediction.team_b,
+                data.prediction.team_a,
+                data.prediction.team_b,
                 "Draw",
               ]);
             }
           }
         }
       } else {
-        toast.error(response.message);
+        toast.error(data.message);
       }
     } catch (error) {
       toast.error("Failed to fetch prediction details: " + error);
@@ -375,7 +377,7 @@ export default function PredictionDetail() {
                       </p>
                     </div>
                   )}
-                  {choiceList.length > 0 && prediction.status === "open" && (
+                  {agent && choiceList.length > 0 && prediction.status === "open" && (
                     <Button
                       className="ml-auto block"
 

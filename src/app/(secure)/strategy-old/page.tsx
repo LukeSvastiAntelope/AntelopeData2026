@@ -15,6 +15,7 @@ import { CATEGORIES } from "@/app/utils/const";
 import { Switch } from "@heroui/switch";
 import { Tooltip } from "@heroui/tooltip";
 import { FaDownload, FaUpload } from "react-icons/fa";
+// import XLSX from 'xlsx';
 
 const StrategySkeleton = () => {
   return (
@@ -254,6 +255,22 @@ export default function StrategyPage() {
       toast.error("Failed to upload principles");
     }
   };
+
+  // const handlePineconeDownload = async () => {
+  //   setIsDownloading(true);
+  //   try {
+  //     const response = await fetch.get('/api/pinecone');
+  //     const wb = XLSX.utils.book_new();
+  //     const ws = XLSX.utils.json_to_sheet(response);
+  //     XLSX.utils.book_append_sheet(wb, ws, "Predictions");
+  //     XLSX.writeFile(wb, "predictions.xlsx");
+  //   } catch (error) {
+  //     console.error("Error downloading excel:", error);
+  //     toast.error("Failed to download excel");
+  //   } finally {
+  //     setIsDownloading(false);
+  //   }
+  // };
 
   useEffect(() => {
     const fetchAgentProfile = async () => {
