@@ -142,19 +142,15 @@ export default function PredictionDetail() {
 
   // Fetch agent profile
   const fetchAgentProfile = async () => {
-    try {
-      const response = await fetch("/api/getAgentProfile");
-      const data = await response.json();
-      if (data.status) {
-        setAgent(data.agent);
-      } else {
-        toast.error(data.message);
-      }
-      fetchPredictionDetails(params.id as string, data.agent.category);
-    } catch (error) {
-      console.log(error);
+    const response = await fetch("/api/getAgentProfile");
+    if (!response.ok) {
       toast.error("Failed to fetch agent profile");
     }
+    const data = await response.json();
+    if (data.status) {
+      setAgent(data.agent);
+    }
+    fetchPredictionDetails(params.id as string, data?.agent?.category || "");
   };
 
   // fetch prediction details
@@ -200,48 +196,50 @@ export default function PredictionDetail() {
 
         // Logic to set the correct choiceList
         let source = "";
-        if (category === "general") {
-          source = "google_news";
-        } else if (category === "markets") {
-          source = "google_finance";
-        } else if (category === "crypto") {
-          source = "coinmarketcap";
-        } else {
-          source = "sportDB";
-        }
-        let interest = data.prediction.source === source;
-        if (source === "sportDB" && interest) {
-          if (category === "nba") {
-            interest = data.prediction.league_id === 4387;
-          } else if (category === "nfl") {
-            interest = data.prediction.league_id === 4391;
-          } else if (category === "english premier league") {
-            interest = data.prediction.league_id === 4328;
-          } else if (category === "soccer") {
-            interest =
-              data.prediction.league_id !== 4387 &&
-              data.prediction.league_id !== 4391;
-          }
-        }
-        if (interest) {
-          if (data.prediction.source !== "sportDB") {
-            setChoiceList(["yes", "no"]);
+        if (category) {
+          if (category === "general") {
+            source = "google_news";
+          } else if (category === "markets") {
+            source = "google_finance";
+          } else if (category === "crypto") {
+            source = "coinmarketcap";
           } else {
-            // handle sports choices
-            if (
-              data.prediction.league_id == "4391" ||
-              data.prediction.league_id == "4387"
-            ) {
-              setChoiceList([
-                data.prediction.team_a,
-                data.prediction.team_b,
-              ]);
+            source = "sportDB";
+          }
+          let interest = data.prediction.source === source;
+          if (source === "sportDB" && interest) {
+            if (category === "nba") {
+              interest = data.prediction.league_id === 4387;
+            } else if (category === "nfl") {
+              interest = data.prediction.league_id === 4391;
+            } else if (category === "english premier league") {
+              interest = data.prediction.league_id === 4328;
+            } else if (category === "soccer") {
+              interest =
+                data.prediction.league_id !== 4387 &&
+                data.prediction.league_id !== 4391;
+            }
+          }
+          if (interest) {
+            if (data.prediction.source !== "sportDB") {
+              setChoiceList(["yes", "no"]);
             } else {
-              setChoiceList([
-                data.prediction.team_a,
-                data.prediction.team_b,
-                "Draw",
-              ]);
+              // handle sports choices
+              if (
+                data.prediction.league_id == "4391" ||
+                data.prediction.league_id == "4387"
+              ) {
+                setChoiceList([
+                  data.prediction.team_a,
+                  data.prediction.team_b,
+                ]);
+              } else {
+                setChoiceList([
+                  data.prediction.team_a,
+                  data.prediction.team_b,
+                  "Draw",
+                ]);
+              }
             }
           }
         }
