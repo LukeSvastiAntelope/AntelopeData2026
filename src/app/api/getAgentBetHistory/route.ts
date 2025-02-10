@@ -23,11 +23,13 @@ export async function GET(req: NextRequest) {
         
         // Get paginated bets
         const bets = await UserRepo.getBetHistoryByAgentId(agent.id, limit, offset);
+        const bets_stats = await UserRepo.getBetsStatsByAgentId(agent.id);
 
         return Response.json({
             status: true, 
             agent: agent, 
-            bets: bets
+            bets: bets,
+            bets_stats: bets_stats
         });
     } catch (error) {
         console.error("Error in getAgentBetHistory: ", error);

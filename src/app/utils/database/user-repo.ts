@@ -49,7 +49,31 @@ export const UserRepo = {
     resolvePrediction,
     getBetsByPredictionId,
     updateUserPredictionBalance,
-    updatePlatformAccountBalance
+    updatePlatformAccountBalance,
+    getBetsStatsByAgentId
+}
+
+async function getBetsStatsByAgentId(agentId: number) {
+    const db = await getMySQLConnection();
+    const [rows] = await db.execute<(RowDataPacket)[]>(
+        `SELECT 
+            COUNT(*) AS total_bets,
+            COALESCE(SUM(CASE 
+                WHEN predictions.status = 'resolved' 
+                     AND predictions.outcome = bets.choice 
+                     AND bets.is_secret = 0 
+                THEN 1 ELSE 0 END), 0) AS win_count,
+            COALESCE(SUM(CASE 
+                WHEN predictions.status = 'resolved' 
+                     AND predictions.outcome <> bets.choice 
+                     AND bets.is_secret = 0 
+                THEN 1 ELSE 0 END), 0) AS lose_count
+         FROM bets
+         JOIN predictions ON bets.prediction_id = predictions.id AND bets.is_secret = 0
+         WHERE bets.agent_id = ?`,
+         [agentId]
+    );
+    return rows[0];
 }
 
 async function updatePlatformAccountBalance(platformId: number, win: number, betAmount: number) {
@@ -772,10 +796,10 @@ async function getLeaderboard() {
             agents.nft_address,
             agents.total_winnings,
             COUNT(DISTINCT bets.id) as bets_count,
-            SUM(CASE WHEN predictions.outcome = bets.choice THEN 1 ELSE 0 END) as wins,
-            SUM(CASE WHEN predictions.outcome != bets.choice AND predictions.status = 'resolved' THEN 1 ELSE 0 END) as losses,
+            SUM(CASE WHEN predictions.outcome = bets.choice AND bets.is_secret = 0 THEN 1 ELSE 0 END) as wins,
+            SUM(CASE WHEN predictions.outcome != bets.choice AND bets.is_secret = 0 AND predictions.status = 'resolved' THEN 1 ELSE 0 END) as losses,
             SUM(CASE WHEN predictions.status != 'resolved' THEN 1 ELSE 0 END) as open,
-            (SUM(CASE WHEN predictions.outcome = bets.choice THEN 1 ELSE 0 END) / 
+            (SUM(CASE WHEN predictions.outcome = bets.choice AND bets.is_secret = 0 THEN 1 ELSE 0 END) / 
              NULLIF(SUM(CASE WHEN predictions.status = 'resolved' THEN 1 ELSE 0 END), 0)) as win_rate
         FROM agents 
         LEFT JOIN bets ON agents.id = bets.agent_id AND bets.is_secret = 0
@@ -800,4 +824,3 @@ async function getLeaderboard() {
     );
     return rows;
 }
-

@@ -113,10 +113,10 @@ const filterBets = (bets: IBet[], searchTerm: string): IBet[] => {
 const filterPredictions = (predictions: IPrediction[], searchTerm: string): IPrediction[] => {
   const term = searchTerm.toLowerCase();
   return predictions.filter(prediction =>
-    prediction.description.toLowerCase().includes(term) ||
-    prediction.source.toLowerCase().includes(term) ||
-    prediction.status.toLowerCase().includes(term) ||
-    prediction.bets_count.toString().includes(term)
+    prediction.description?.toLowerCase().includes(term) ||
+    prediction.source?.toLowerCase().includes(term) ||
+    prediction.status?.toLowerCase().includes(term) ||
+    prediction.bets_count?.toString().includes(term)
   );
 };
 
@@ -178,18 +178,10 @@ export default function Dashboard() {
   // Activity state
   const [pageActivity, setPageActivity] = useState<number>(1);
   const [hasMoreActivity, setHasMoreActivity] = useState<boolean>(true);
+  const [totalBets, setTotalBets] = useState<number>(0);
+  const [successRate, setSuccessRate] = useState<number>(0);
 
-  const totalBets = bets.length;
   const totalPredictions = predictions.length;
-
-  // Recalculate success rate exactly as in markets:
-  // Only consider bets that are marked as "resolved" then compare outcome and choice case-insensitively.
-  const resolvedBets = bets.filter((bet) => bet.status === "resolved");
-  const wonBets = resolvedBets.filter((bet) =>
-    bet.outcome?.toLowerCase() === bet.choice?.toLowerCase()
-  );
-  const successRate =
-    resolvedBets.length > 0 ? (wonBets.length / resolvedBets.length) * 100 : 0;
 
   const fetch = useFetch();
   const router = useRouter();
@@ -208,6 +200,8 @@ export default function Dashboard() {
           setBets((prev) => [...prev, ...response.bets]);
         }
         setHasMoreBets(response.bets.length === ITEMS_PER_PAGE_BETS);
+        setTotalBets(response.bets_stats.total_bets);
+        setSuccessRate(response.bets_stats.win_count / (Number(response.bets_stats.win_count) + Number(response.bets_stats.lose_count)) * 100);
       } else {
         toast.error(response.message);
       }
