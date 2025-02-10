@@ -741,7 +741,7 @@ export default function Dashboard() {
               <div className="flex flex-col gap-2">
                 {displayedPredictions.map((prediction, index) => {
                   const choiceTotals = prediction.agent_bets?.reduce((acc, b) => {
-                    acc[b.choice.toLowerCase()] = (acc[b.choice.toLowerCase()] || 0) + b.amount;
+                    acc[b.choice?.toLowerCase()] = (acc[b.choice?.toLowerCase()] || 0) + b.amount;
                     return acc;
                   }, {} as Record<string, number>) || {};
 
@@ -785,7 +785,7 @@ export default function Dashboard() {
                           {choiceOdds.map(({ choice, percentage }, index) => (
                             <Tooltip
                               content={
-                                choice.toLowerCase() === prediction.creator_choice.toLowerCase()
+                                choice?.toLowerCase() === prediction.creator_choice?.toLowerCase()
                                   ? "Agents betting Yes"
                                   : "Agents betting No"
                               }
@@ -939,11 +939,11 @@ export default function Dashboard() {
                             <Tooltip content="User's Choice" showArrow>
                               <div
                                 className={(() => {
-                                  if (item.choice.toLowerCase() === "yes") {
+                                  if (item.choice?.toLowerCase() === "yes") {
                                     return "relative max-w-fit min-w-min inline-flex items-center justify-between box-border whitespace-nowrap h-6 text-tiny rounded-full bg-success/20 text-success-500 icon-thumbs-up px-2";
-                                  } else if (item.choice.toLowerCase() === "no") {
+                                  } else if (item.choice?.toLowerCase() === "no") {
                                     return "relative max-w-fit min-w-min inline-flex items-center justify-between box-border whitespace-nowrap h-6 text-tiny rounded-full bg-danger/20 text-danger-500 icon-thumbs-down px-2";
-                                  } else if (item.choice.toLowerCase() === "draw") {
+                                  } else if (item.choice?.toLowerCase() === "draw") {
                                     return "bg-warning/20 text-warning-500 relative max-w-fit min-w-min inline-flex items-center justify-between box-border whitespace-nowrap h-6 text-tiny rounded-full px-2";
                                   }
                                   return "bg-secondary/20 text-secondary-500 py-1 relative max-w-fit min-w-min inline-flex items-center justify-between box-border whitespace-nowrap h-6 text-tiny rounded-full px-2";

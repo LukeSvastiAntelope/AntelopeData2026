@@ -142,7 +142,12 @@ export default function PredictionDetail() {
 
   // Fetch agent profile
   const fetchAgentProfile = async () => {
-    const response = await fetch("/api/getAgentProfile");
+    const token = typeof window !== 'undefined' ? localStorage.getItem("token") ?? "" : "";
+    const response = await fetch("/api/getAgentProfile", {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      }
+    });
     if (!response.ok) {
       if (response.status == 401) {
         toast.error("Please login to place bets");

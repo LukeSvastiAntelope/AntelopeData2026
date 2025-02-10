@@ -126,7 +126,12 @@ const SecureLayout = ({ children }: { children: React.ReactNode }) => {
 
     const fetchAgentProfile = async () => {
         try {
-            const response = await fetch('/api/getAgentProfile');
+            const token = typeof window !== 'undefined' ? localStorage.getItem("token") ?? "" : "";
+            const response = await fetch('/api/getAgentProfile', {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                }
+            });
             const data = await response.json();
             if (data.status) {
                 setAgent(data.agent);
