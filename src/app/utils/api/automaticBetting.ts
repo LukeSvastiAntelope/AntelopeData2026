@@ -385,7 +385,7 @@ ${relevantTraining.map(p => `
 - Choice: ${p.creator_choice}
 - Amount: ${p.bet_amount}
 - Reasoning: ${p.betReason}`
-).join('\n')}
+            ).join('\n')}
 
 Agent Principles:
 - Betting Strategy:
@@ -1099,7 +1099,7 @@ ${this.agent.principles
         return null;
     }
 
-    public async handleUserQuestion(question: string): Promise<string> {
+    public async handleUserQuestion(question: string): Promise<ChatCompletionMessageParam[]> {
         try {
             const intent = await this.detectQuestionIntent(question);
             let relevantSummaries = "";
@@ -1171,17 +1171,10 @@ ${this.agent.principles
                 { role: "user" as const, content: `User question: ${question}` }
             ];
 
-            const response = await this.openai.chat.completions.create({
-                model: "gpt-4o",
-                messages: messages as ChatCompletionMessageParam[],
-                temperature: 0.4
-            });
-
-            return response.choices[0].message.content?.trim()
-                || "No detailed answer available.";
+            return messages as ChatCompletionMessageParam[];
         } catch (error) {
             console.error("Error in handleUserQuestion:", error);
-            return "An error occurred while processing your question. Please try again.";
+            throw new Error("Error in handleUserQuestion");
         }
     }
 

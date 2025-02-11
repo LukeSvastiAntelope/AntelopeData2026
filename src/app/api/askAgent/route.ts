@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { AutomaticBettingAgent } from "@/app/utils/api/automaticBetting";
 import { IPrinciple } from "@/app/utils/interface";
 import { UserRepo } from "@/app/utils/database/user-repo";
+import { OpenAI } from "openai";
+
+const deepseek = new OpenAI({
+  apiKey: process.env.DEEPSEEK_API_KEY!,
+  baseURL: 'https://api.deepseek.com'
+});
 
 export async function POST(request: NextRequest) {
   try {
@@ -62,15 +68,43 @@ export async function POST(request: NextRequest) {
     });
 
     // Pass the question to our agent
-    const answer = await agent.handleUserQuestion(userQuestion);
-    await UserRepo.insertConversation(agentProfile.user_id, agentProfile.id, answer, "agent");
+    const messages = await agent.handleUserQuestion(userQuestion);
 
-    return NextResponse.json({ status: true, answer }, { status: 200 });
+    const stream = await deepseek.chat.completions.create({
+      model: "deepseek-chat",
+      messages: messages,
+      temperature: 0.4,
+      stream: true
+    });
+
+    const encoder = new TextEncoder();
+    let fullResponse = "";
+
+    const streamResponse = new ReadableStream({
+      async start(controller) {
+        try {
+          // Iterate over each streamed chunk
+          for await (const chunk of stream) {
+            const data = chunk as { choices?: { delta?: { content?: string } }[] };
+            // Cerebras returns the text in data.choices[0]?.delta?.content
+            const content = data.choices?.[0]?.delta?.content || "";
+            if (content) {
+              fullResponse += content;
+              controller.enqueue(encoder.encode(content));
+              await new Promise(resolve => setTimeout(resolve, 5));
+            }
+          }
+        } catch (error) {
+          console.error("Streaming error: ", error);
+        }
+        controller.close();
+      },
+    });
+
+    await UserRepo.insertConversation(agentProfile.user_id, agentProfile.id, fullResponse, "agent");
+    return new NextResponse(streamResponse);
   } catch (error) {
     console.error("Error in askAgent API:", error);
-    return NextResponse.json(
-      { status: false, message: String(error) },
-      { status: 500 }
-    );
+    return new NextResponse(error instanceof Error ? error.message : "An error occurred", { status: 500 });
   }
 } 

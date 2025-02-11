@@ -2,14 +2,12 @@
 import { toast } from "react-hot-toast";
 import { ChatMessage, IAskAgentProps } from "@/app/utils/interface";
 import { useEffect, useRef, useState } from "react";
-import { useFetch } from "@/app/utils/lib";
 import { Textarea } from "@heroui/react";
 
 const Research = ({ agentProfile }: IAskAgentProps) => {
     const [input, setInput] = useState("");
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [isLoading, setIsLoading] = useState(false);
-    const fetch = useFetch();
     const containerRef = useRef<HTMLDivElement>(null);
 
     const handleSend = async () => {
@@ -33,18 +31,60 @@ const Research = ({ agentProfile }: IAskAgentProps) => {
                 userQuestion,
                 agentProfileId: agentProfile?.id,
             };
-            const response = await fetch.post("/api/askAgent", body);
-            if (response.status) {
-                // 4) Add agent's message to the chat
-                setMessages((prev) => [...prev, { role: "agent", content: response.answer, type: "ask" }]);
-            } else {
-                toast.error(response.message || "Failed to get answer");
+
+            const token = typeof window !== 'undefined' ? localStorage.getItem("token") ?? "" : "";
+            const response = await fetch("/api/askAgent", {
+                method: "POST",
+                body: JSON.stringify(body),
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`
+                }
+            });
+            setIsLoading(false);
+
+            if (!response.body) {
+                toast.error("Failed to get answer");
+                return;
+            }
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+
+            // After submitting the user's question, initialize an empty agent message
+            setMessages((prev) => [
+                ...prev,
+                { role: "agent", content: "", type: "ask" }
+            ]);
+
+            // Start streaming response data
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                const chunk = decoder.decode(value, { stream: true });
+
+                // Update the last agent message by appending the new chunk
+                setMessages((prev) => {
+                    const lastIndex = prev.length - 1;
+                    const lastMessage = prev[lastIndex];
+                    if (lastMessage && lastMessage.role === "agent" && lastMessage.type === "ask") {
+                        const updatedMessage = {
+                            ...lastMessage,
+                            content: lastMessage.content + chunk,
+                        };
+
+                        // Replace the last message with the updated one
+                        const updatedMessages = [...prev];
+                        updatedMessages[lastIndex] = updatedMessage;
+                        return updatedMessages;
+                    }
+                    return prev;
+                });
             }
         } catch (error) {
             console.error("Error asking agent:", error);
             toast.error("Failed to communicate with agent");
-        } finally {
-            setIsLoading(false);
         }
     };
 
@@ -65,7 +105,7 @@ const Research = ({ agentProfile }: IAskAgentProps) => {
         <>
             <div
                 ref={containerRef}
-                className="flex-auto overflow-y-auto p-0 space-y-4 text-small w-full h-[calc(100vh-400px)]"
+                className="flex-auto overflow-y-auto px-0 space-y-4 text-small w-full h-[calc(100vh-400px)] mb-5"
             >
                 {messages.length === 0 ? (
                     <div className="flex flex-col gap-2 mb-8 border border-white/10 rounded-xl p-6 text-center empty-state place-content-center">
