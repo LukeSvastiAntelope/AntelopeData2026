@@ -216,8 +216,8 @@ export class AutomaticBettingAgent {
         NO: [1-2 sentence explanation]
         `;
 
-        const response = await this.openai.chat.completions.create({
-            model: "gpt-4o",
+        const response = await this.deepseek.chat.completions.create({
+            model: "deepseek-chat",
             messages: [
                 {
                     role: "system",
@@ -401,8 +401,8 @@ ${this.agent.principles
                     .join('\n')}`;
 
             try {
-                const completion = await this.openai.chat.completions.create({
-                    model: "gpt-4o",
+                const completion = await this.deepseek.chat.completions.create({
+                    model: "deepseek-chat",
                     messages: [
                         {
                             role: "system",
@@ -711,8 +711,8 @@ ${this.agent.principles
         4. Keep terms between 2-4 words each`;
 
         try {
-            const completion = await this.openai.chat.completions.create({
-                model: "gpt-4o",
+            const completion = await this.deepseek.chat.completions.create({
+                model: "deepseek-chat",
                 messages: [
                     {
                         role: "system",
@@ -972,8 +972,8 @@ ${this.agent.principles
         try {
             const prompt = `Extract the crypto symbols which can use to search in coinmarketcap from the following prediction: ${description}`;
 
-            const response = await this.openai.chat.completions.create({
-                model: "gpt-4o",
+            const response = await this.deepseek.chat.completions.create({
+                model: "deepseek-chat",
                 messages: [
                     {
                         role: "system",
@@ -1124,6 +1124,7 @@ ${this.agent.principles
                     input: question
                 });
                 const questionEmbedding = embeddingResponse.data[0].embedding;
+                console.log("questionEmbedding", questionEmbedding);
 
                 const pineconeResponse = await index.query({
                     vector: questionEmbedding,
