@@ -395,10 +395,8 @@ Agent Principles:
      - Consider adjusting choice if odds have significantly changed.
 - Consider risk/reward ratio based on current betting amounts.
 - Adjust bet size based on odds discrepancy.
-${this.agent.principles
-                    .slice(0, 3)
-                    .map(p => `- ${p.title}: ${p.description}`)
-                    .join('\n')}`;
+- User-defined Betting Principles:
+${this.agent.principles}`;
 
             try {
                 const completion = await this.deepseek.chat.completions.create({
@@ -1155,7 +1153,7 @@ ${this.agent.principles
                 Name: ${this.agent.name}
                 Category: ${this.agent.category}
                 Risk Level: ${this.agent.riskLevel}
-                Principles: ${this.agent.principles.map((p) => p.title).join(", ")}
+                Principles: ${this.agent.principles}
 
                 Your job is to help the user understand your predictions and bets.
 

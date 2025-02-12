@@ -1,8 +1,9 @@
-import { IAskAgentProps, AutomatedPrediction } from "@/app/utils/interface";
+import { IAskAgentProps, AutomatedPrediction, IAgentProfile } from "@/app/utils/interface";
 import { useFetch } from "@/app/utils/lib";
 import { Button, Textarea, Input, RadioGroup, Radio } from "@heroui/react";
 import { useEffect, useState } from "react";
 import { toast } from "react-hot-toast";
+import { useAgent } from "@/app/context/AgentContext";
 
 const Train = ({ agentProfile, setAgentProfile }: IAskAgentProps) => {
 
@@ -15,6 +16,7 @@ const Train = ({ agentProfile, setAgentProfile }: IAskAgentProps) => {
     const [trainingPredictions, setTrainingPredictions] = useState<AutomatedPrediction | null>(null);
     const [trainingPredictionsList, setTrainingPredictionsList] = useState<AutomatedPrediction[]>([]);
     const [isTraining, setIsTraining] = useState(false);
+    const { agent, setAgent } = useAgent();
 
     const generatePrediction = async () => {
         if (!agentProfile) return;
@@ -105,6 +107,7 @@ const Train = ({ agentProfile, setAgentProfile }: IAskAgentProps) => {
         setTrainingPredictions(null);
         setIsSubmitted(false)
         setAgentProfile(prevAgent => prevAgent ? { ...prevAgent, trainCount: prevAgent.trainCount - 1 } : null);
+        setAgent(prevAgent => prevAgent ? { ...prevAgent, trainCount: prevAgent.trainCount - 1 } : null);
         generatePrediction();
     }
 
@@ -114,32 +117,29 @@ const Train = ({ agentProfile, setAgentProfile }: IAskAgentProps) => {
     }
 
     useEffect(() => {
-        const loadAgentProfile = async () => {
+        const loadAgentProfile = async (agent: IAgentProfile) => {
             try {
-                const response = await fetchData.get("/api/getAgentProfile");
-                if (response.status) {
-                    setAgentProfile(response.agent);
-                    if (
-                        response.agent.interests.length == 0 ||
-                        response.agent.principles.length == 0 ||
-                        Number(response.agent.maxBetSize) == 0 ||
-                        Number(response.agent.conservativeBetSize) == 0 ||
-                        Number(response.agent.moderateBetSize) == 0 ||
-                        Number(response.agent.aggressiveBetSize) == 0
-                    ) {
-                        toast.error("Agent is not ready yet. Please set the strategy first.");
-                        return;
-                    }
-                } else {
-                    toast.error(response.message || "Failed to get agent info.");
+                setAgentProfile(agent);
+                if (
+                    agent.interests.length == 0 ||
+                    agent.principles.length == 0 ||
+                    Number(agent.maxBetSize) == 0 ||
+                    Number(agent.conservativeBetSize) == 0 ||
+                    Number(agent.moderateBetSize) == 0 ||
+                    Number(agent.aggressiveBetSize) == 0
+                ) {
+                    toast.error("Agent is not ready yet. Please set the strategy first.");
+                    return;
                 }
             } catch (error) {
                 console.error("Error fetching agent profile:", error);
                 toast.error("Cannot load agent profile");
             }
         };
-        loadAgentProfile();
-    }, []);
+        if (agent) {
+            loadAgentProfile(agent);
+        }
+    }, [agent]);
 
     return (
         isTraining && agentProfile ?

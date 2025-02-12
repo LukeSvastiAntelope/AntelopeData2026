@@ -9,7 +9,7 @@ export interface IAgentProfile {
     image: string;
     maxBetSize: number;
     interests: string[];
-    principles: IPrinciple[];
+    principles: string;
     riskLevel: string;
     conservativeBetSize: number;
     moderateBetSize: number;
@@ -25,6 +25,9 @@ export interface IAgentProfile {
     platform_id: number;
     is_bet: boolean;
     role?: "user" | "admin";
+    model: string;
+    plugins: string[];
+    successRate?: number;
 }
 
 export interface IFormDataAgentProfile {
@@ -42,6 +45,8 @@ export interface IFormDataAgentProfile {
     image: string;
     maxTimelineLimit: number;
     category: string;
+    model: string;
+    plugins: string;
 }
 
 export interface IPrinciple {
@@ -260,7 +265,7 @@ export interface AgentDB {
     image: string;
     description: string;
     interests: string | string[];
-    principles: string | string[];
+    principles: string;
     maxBetSize: number;
     conservativeBetSize: number;
     moderateBetSize: number;
@@ -272,6 +277,8 @@ export interface AgentDB {
     escrow_balance: number;
     nft_address: string;
     platform_id: number;
+    model: string;
+    plugins: string | string[];
 }
 
 export interface PaymentIntentDB {
@@ -385,4 +392,13 @@ export interface ChatMessage {
     role: "user" | "agent";
     content: string | JSX.Element;
     type: "training" | "ask" | "strategy";
+}
+
+export interface IAgentContext {
+    agent: IAgentProfile | null;
+    setAgent: Dispatch<SetStateAction<IAgentProfile | null>>;
+    user: UserDB | null;
+    setUser: Dispatch<SetStateAction<UserDB | null>>;
+    isAgentProfileLoading: boolean;
+    setIsAgentProfileLoading: Dispatch<SetStateAction<boolean>>;
 }

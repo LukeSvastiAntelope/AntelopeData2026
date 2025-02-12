@@ -21,6 +21,18 @@ const config: Config = {
           background: "#0a0a0a",
           foreground: "#ededed",
         },
+        gray: {
+          default: "#6C6676",
+          white: "#A1A1AA",
+        },
+        input: {
+          default: "#303047",
+          enable: "#348EF7",
+        },
+        text: {
+          default: "#E3EDF5",
+          blue: "#016FEE",
+        },
         // Custom colors
         custom: {
           "prediction-modal-button": "#6c66754d",

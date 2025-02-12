@@ -5,7 +5,6 @@ export async function GET(
     req: NextRequest,
     { params }: { params: { id: string } }
 ) {
-    console.log("getPrediction", req);
     try {
         // Get prediction details
         const prediction = await UserRepo.getPredictionById(params.id);

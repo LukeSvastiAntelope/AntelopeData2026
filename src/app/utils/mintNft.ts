@@ -75,7 +75,7 @@ export const mintNft = async (
             },
             {
                 trait_type: 'principles',
-                value: encrypt(agent.principles.join(', ')),
+                value: encrypt(agent.principles),
             },
             {
                 trait_type: 'category',

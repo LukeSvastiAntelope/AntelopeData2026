@@ -1,23 +1,35 @@
 'use client';
 
 import { useState, useEffect, Suspense } from "react";
-import { useFetch } from "@/app/utils/lib";
 import toast from "react-hot-toast";
 import { IAgentProfile } from "@/app/utils/interface";
 import { useSearchParams } from "next/navigation";
 import { Tabs, Tab } from "@heroui/tabs";
 import Research from "@/app/components/askAgent/Research";
 import Train from "@/app/components/askAgent/Train";
-import Principles from "@/app/components/askAgent/Principles";
 import Settings from "@/app/components/askAgent/Settings";
+import { useAgent } from "@/app/context/AgentContext";
+import Profile from "@/app/components/askAgent/Profile";
+import Monitor from "@/app/components/askAgent/Monitor";
 
 const AskAgent = () => {
-  const fetch = useFetch();
   const searchParams = useSearchParams();
-  const receiveMode = searchParams.get("mode") || "conversation";
+  const receiveMode = searchParams.get("mode") || "profile";
   const [mode, setMode] = useState(receiveMode);
   const [agentProfile, setAgentProfile] = useState<IAgentProfile | null>(null);
+  const { agent } = useAgent();
+
   const modeList = [
+    {
+      key: "profile",
+      value: "Profile",
+      content: <Profile agentProfile={agentProfile} setAgentProfile={setAgentProfile} />
+    },
+    {
+      key: "monitor",
+      value: "Monitor",
+      content: <Monitor agentProfile={agentProfile} setAgentProfile={setAgentProfile} />
+    },
     {
       key: "conversation",
       value: "Research",
@@ -29,11 +41,6 @@ const AskAgent = () => {
       content: <Train agentProfile={agentProfile} setAgentProfile={setAgentProfile} />
     },
     {
-      key: "principles",
-      value: "Principles",
-      content: <Principles agentProfile={agentProfile} setAgentProfile={setAgentProfile} />
-    },
-    {
       key: "settings",
       value: "Settings",
       content: <Settings agentProfile={agentProfile} setAgentProfile={setAgentProfile} />
@@ -42,32 +49,29 @@ const AskAgent = () => {
 
   // Fetch Agent Profile on mount, so we have the agent's name, category, image, etc.
   useEffect(() => {
-    const loadAgentProfile = async () => {
+    const loadAgentProfile = async (agent: IAgentProfile) => {
       try {
-        const response = await fetch.get("/api/getAgentProfile");
-        if (response.status) {
-          setAgentProfile(response.agent);
-          if (
-            response.agent.interests.length == 0 ||
-            response.agent.principles.length == 0 ||
-            Number(response.agent.maxBetSize) == 0 ||
-            Number(response.agent.conservativeBetSize) == 0 ||
-            Number(response.agent.moderateBetSize) == 0 ||
-            Number(response.agent.aggressiveBetSize) == 0
-          ) {
-            toast.error("Agent is not ready yet. Please set the strategy first.");
-            return;
-          }
-        } else {
-          toast.error(response.message || "Failed to get agent info.");
+        setAgentProfile(agent);
+        if (
+          agent.interests.length == 0 ||
+          agent.principles.length == 0 ||
+          Number(agent.maxBetSize) == 0 ||
+          Number(agent.conservativeBetSize) == 0 ||
+          Number(agent.moderateBetSize) == 0 ||
+          Number(agent.aggressiveBetSize) == 0
+        ) {
+          toast.error("Agent is not ready yet. Please set the strategy first.");
+          return;
         }
       } catch (error) {
         console.error("Error fetching agent profile:", error);
         toast.error("Cannot load agent profile");
       }
     };
-    loadAgentProfile();
-  }, []);
+    if (agent) {
+      loadAgentProfile(agent);
+    }
+  }, [agent]);
 
   return (
     <div className="h-[calc(100vh-65px)] flex flex-col">
@@ -113,15 +117,15 @@ const AskAgent = () => {
 
 export default function Page() {
   return (
-      <Suspense fallback={
-          <div className="min-h-screen flex items-center justify-center">
-              <div className="text-center">
-                  <h1 className="text-2xl mb-4 text-gray-600">Loading...</h1>
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto" />
-              </div>
-          </div>
-      }>
-          <AskAgent />
-      </Suspense>
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl mb-4 text-gray-600">Loading...</h1>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto" />
+        </div>
+      </div>
+    }>
+      <AskAgent />
+    </Suspense>
   );
 }

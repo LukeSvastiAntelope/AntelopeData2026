@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { AutomaticBettingAgent } from "@/app/utils/api/automaticBetting";
-import { IPrinciple } from "@/app/utils/interface";
 import { UserRepo } from "@/app/utils/database/user-repo";
 import { OpenAI } from "openai";
 
@@ -31,16 +30,8 @@ export async function POST(request: NextRequest) {
       agentProfile.interests = agentProfile.interests.split(",");
     }
 
-    try {
-      if (typeof agentProfile.principles === 'string') {
-        agentProfile.principles = JSON.parse(agentProfile.principles);
-      }
-      if (!Array.isArray(agentProfile.principles)) {
-        agentProfile.principles = [];
-      }
-    } catch (e) {
-      console.log("Error in principles: ", e);
-      agentProfile.principles = [];
+    if (typeof agentProfile.plugins === "string") {
+      agentProfile.plugins = agentProfile.plugins.split(",");
     }
 
     // Create an Agent instance with the user-provided agentProfile
@@ -51,7 +42,7 @@ export async function POST(request: NextRequest) {
       image: agentProfile.image,
       maxBetSize: agentProfile.maxBetSize,
       interests: agentProfile.interests,
-      principles: agentProfile.principles as unknown as IPrinciple[],
+      principles: agentProfile.principles,
       wallet_balance: agentProfile.wallet_balance,
       user_id: agentProfile.user_id,
       category: agentProfile.category,
@@ -64,7 +55,9 @@ export async function POST(request: NextRequest) {
       trainCount: agentProfile.trainCount,
       train_index: agentProfile.train_index,
       platform_id: agentProfile.platform_id,
-      is_bet: agentProfile.is_bet
+      is_bet: agentProfile.is_bet,
+      model: agentProfile.model,
+      plugins: agentProfile.plugins
     });
 
     // Pass the question to our agent

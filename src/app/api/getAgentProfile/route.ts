@@ -18,21 +18,13 @@ export async function GET(req: NextRequest) {
         if (typeof agent.interests === 'string') {
             agent.interests = agent.interests.split(',');
         }
-        try {
-            if (typeof agent.principles === 'string') {
-                agent.principles = JSON.parse(agent.principles);
-            }
-            if (!Array.isArray(agent.principles)) {
-                agent.principles = [];
-            }
-        } catch (e) {
-            console.log("Error in principles: ", e);
-            agent.principles = [];
+        agent.plugins = agent.plugins ? agent.plugins : [];
+        if (typeof agent.plugins === 'string') {
+            agent.plugins = agent.plugins.split(',');
         }
-        const bets = await UserRepo.getBetsByAgentId(agent.id);
-        const totalBets = bets.length;
-        const successRate = agent.total_winnings * 100 / totalBets;
-        return Response.json({status: true, agent: agent, totalBets: totalBets, successRate: successRate, user: user});
+        const bets_stats = await UserRepo.getBetsStatsByAgentId(agent.id);
+        const successRate = bets_stats.win_count / (Number(bets_stats.win_count) + Number(bets_stats.lose_count)) * 100;
+        return Response.json({status: true, agent: agent, successRate: successRate, user: user});
     } catch (error) {
         console.error("Error in getAgentProfile: ", error);
         return Response.json({ 

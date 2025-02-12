@@ -23,17 +23,6 @@ export async function GET(req: NextRequest) {
         if (typeof agent.interests === 'string') {
             agent.interests = agent.interests.split(',');
         }
-        try {
-            if (typeof agent.principles === 'string') {
-                agent.principles = JSON.parse(agent.principles);
-            }
-            if (!Array.isArray(agent.principles)) {
-                agent.principles = [];
-            }
-        } catch (e) {
-            console.log("Error in principles: ", e);
-            agent.principles = [];
-        }
 
         const agentBets = await automaticBettingOnList(agent, predictions as Prediction[]);
         return Response.json({ status: true, bets: agentBets });

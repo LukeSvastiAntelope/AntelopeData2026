@@ -10,51 +10,26 @@ export async function POST(req: NextRequest) {
         return Response.json({ error: 'Invalid token' }, { status: 401 });
     }
 
+    const { agent } = await req.json();
+
     try {
-        const agent = await UserRepo.getAgentByUserId(jwtPayload.email as string);
-        const formData = await req.formData();
-        const file = formData.get("avatar") as File;
-        let imageUrl = "";
-        if (file) {
-            const arrayBuffer = await file.arrayBuffer();
-            const buffer = new Uint8Array(arrayBuffer);
-            
-            const formData = new FormData();
-            const fileName = `image_${Date.now()}.${file.name.split('.').pop()}`; // Use original file extension
-            formData.append("file", new Blob([buffer], { type: file.type }), fileName);
-
-            const response = await fetch("https://api.pinata.cloud/pinning/pinFileToIPFS", {
-                method: "POST",
-                headers: {
-                    Authorization: `Bearer ${process.env.PINATA_JWT}`,
-                },
-                body: formData,
-            });
-
-            if (!response.ok) {
-                throw new Error('Failed to upload image to Pinata');
-            }
-
-            const result = await response.json();
-            // Update the image URL to use the IPFS hash
-            imageUrl = `https://${process.env.PINATA_GATEWAY}/ipfs/${result.IpfsHash}`;
-        }
-
         const updateParams: Partial<IFormDataAgentProfile> = {
             id: agent.id,
             user_id: agent.user_id,
-            name: formData.get("name") ? formData.get("name") as string : agent.name,
-            description: formData.get("description") ? formData.get("description") as string : agent.description,
-            maxBetSize: formData.get("maxBetSize") ? parseInt(formData.get("maxBetSize") as string) : agent.maxBetSize,
-            interests: formData.get("interests") ? formData.get("interests") as string : agent.interests as string,
-            riskLevel: formData.get("riskLevel") ? formData.get("riskLevel") as string : agent.riskLevel,
-            conservativeBetSize: formData.get("conservativeBetSize") ? parseInt(formData.get("conservativeBetSize") as string) : agent.conservativeBetSize,
-            moderateBetSize: formData.get("moderateBetSize") ? parseInt(formData.get("moderateBetSize") as string) : agent.moderateBetSize,
-            aggressiveBetSize: formData.get("aggressiveBetSize") ? parseInt(formData.get("aggressiveBetSize") as string) : agent.aggressiveBetSize,
-            principles: formData.get("principles") ? formData.get("principles") as string : agent.principles as string,
-            image: file ? imageUrl : formData.get("image") ? formData.get("image") as string : agent.image,
-            maxTimelineLimit: formData.get("maxTimelineLimit") ? parseInt(formData.get("maxTimelineLimit") as string) : agent.maxTimelineLimit,
-            category: formData.get("category") ? formData.get("category") as string : agent.category
+            name: agent.name,
+            description: agent.description,
+            maxBetSize: agent.maxBetSize,
+            interests: agent.interests.join(','),
+            riskLevel: agent.riskLevel,
+            conservativeBetSize: agent.conservativeBetSize,
+            moderateBetSize: agent.moderateBetSize,
+            aggressiveBetSize: agent.aggressiveBetSize,
+            principles: agent.principles,
+            image: agent.image,
+            maxTimelineLimit: agent.maxTimelineLimit,
+            category: agent.category,
+            model: agent.model,
+            plugins: agent.plugins.join(',')
         };
 
         await UserRepo.updateAgent(jwtPayload.email as string, updateParams as IFormDataAgentProfile);

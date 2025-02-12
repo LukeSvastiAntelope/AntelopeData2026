@@ -4,12 +4,13 @@ import { useState, useEffect } from "react";
 import { Image } from "@heroui/image";
 import { Button } from "@heroui/button";
 import { Spinner } from "@heroui/spinner";
-import { IPrediction, ILeaderboardData, IAgentProfile } from "@/app/utils/interface";
+import { IPrediction, ILeaderboardData } from "@/app/utils/interface";
 import { useFetch } from "@/app/utils/lib";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import { PredictionItem } from "@/app/components/PredictionItem";
 import { Tooltip } from "@heroui/tooltip";
+import { useAgent } from "@/app/context/AgentContext";
 
 export default function MarketsPage() {
   const [activeTab, setActiveTab] = useState<"predictions" | "sports" | "general" | "crypto" | "markets" | "leaderboard">("predictions");
@@ -20,7 +21,6 @@ export default function MarketsPage() {
   const [searchMarkets, setSearchMarkets] = useState("");
 
   // Predictions
-  const [, setAgent] = useState<IAgentProfile | null>(null);
   const [predictions, setPredictions] = useState<IPrediction[]>([]);
   const [displayedPredictions, setDisplayedPredictions] = useState<IPrediction[]>([]);
   const [isLoadingPredictions, setIsLoadingPredictions] = useState<boolean>(false);
@@ -52,6 +52,8 @@ export default function MarketsPage() {
   // Add leaderboard states (after other state declarations)
   const [leaderboardData, setLeaderboardData] = useState<ILeaderboardData[]>([]);
   const [isLoadingLeaderboard, setIsLoadingLeaderboard] = useState<boolean>(false);
+
+  const { agent } = useAgent();
 
   const ITEMS_PER_PAGE_PREDICTIONS = 50;
 
@@ -135,23 +137,7 @@ export default function MarketsPage() {
       setPagePredictions(newPage);
     }
   };
-
-  const fetchAgentProfile = async () => {
-    try {
-      const response = await fetch.get('/api/getAgentProfile');
-      if (response.status) {
-        setAgent(response.agent);
-      } else {
-        toast.error(response.message);
-      }
-      fetchPredictions(response.agent.category);
-    } catch (error) {
-      console.log(error);
-      toast.error('Failed to fetch agent profile');
-    }
-  };
-
-
+  
   // Lazy-load data based on current tab
   useEffect(() => {
     if (activeTab === "leaderboard" && leaderboardData.length === 0 && !isLoadingLeaderboard) {
@@ -160,8 +146,10 @@ export default function MarketsPage() {
   }, [activeTab, leaderboardData.length, isLoadingLeaderboard]);
 
   useEffect(() => {
-    fetchAgentProfile();
-  }, []);
+    if (agent) {
+      fetchPredictions(agent.category);
+    }
+  }, [agent]);
 
   // Handle search
   const handlePredictionSearch = (e: React.ChangeEvent<HTMLInputElement>) => {

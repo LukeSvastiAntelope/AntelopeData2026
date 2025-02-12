@@ -9,9 +9,8 @@ import { Button } from "@heroui/button";
 import { Image } from "@heroui/image";
 import { FaRocket, FaDatabase, FaChartLine, FaShieldAlt } from "react-icons/fa";
 import { useFetch } from "@/app/utils/lib";
-import { IAgentProfile } from "@/app/utils/interface";
 import { Tooltip } from "@heroui/tooltip";
-
+import { useAgent } from "@/app/context/AgentContext";
 
 // ------------- ADDED: Chart.js imports -------------
 import {
@@ -158,7 +157,7 @@ export default function Dashboard() {
   const [searchTerm, setSearchTerm] = useState('');
   const [searchPredictions, setSearchPredictions] = useState('');
   // Agent
-  const [agent, setAgent] = useState<IAgentProfile | null>(null);
+  const { agent } = useAgent();
   // Bets state
   const [bets, setBets] = useState<IBet[]>([]);
   const [isLoadingBets, setIsLoadingBets] = useState<boolean>(true);
@@ -316,24 +315,12 @@ export default function Dashboard() {
 
   // Fetch Agent + Bets + Predictions
   useEffect(() => {
-    const fetchAgentProfile = async () => {
-      try {
-        const response = await fetch.get("/api/getAgentProfile");
-        if (response.status) {
-          setAgent(response.agent);
-        } else {
-          toast.error(response.message);
-        }
-      } catch (error) {
-        console.error("Failed to fetch agent profile:", error);
-        toast.error("Failed to fetch agent profile");
-      }
+    if (agent) {
       fetchBets(1);
       fetchPredictions();
       fetchActivity(1);
-    };
-    fetchAgentProfile();
-  }, []);
+    }
+  }, [agent]);
 
   const handleBetSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(e.target.value);

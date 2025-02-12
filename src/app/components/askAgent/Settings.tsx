@@ -5,12 +5,14 @@ import { Button, Chip, Input, Select, SelectItem, Tooltip, Switch } from "@herou
 import { useState } from "react";
 import { toast } from "react-hot-toast";
 import { useFetch } from "@/app/utils/lib";
+import { useAgent } from "@/app/context/AgentContext";
 
 const Settings = ({ agentProfile, setAgentProfile }: IAskAgentProps) => {
     const [newInterest, setNewInterest] = useState('');
     const [isSaving, setIsSaving] = useState(false);
     const [resolutionDate, setResolutionDate] = useState<{ years: number, months: number, days: number }>(convertDaysToYMD(agentProfile?.maxTimelineLimit || 0));
     const fetch = useFetch();
+    const { setAgent } = useAgent();
     const addInterest = () => {
         if (newInterest) {
             setAgentProfile(prev => (prev ? { ...prev, interests: [...prev.interests, newInterest] } : null));
@@ -21,10 +23,15 @@ const Settings = ({ agentProfile, setAgentProfile }: IAskAgentProps) => {
     const updateAgentProfile = async () => {
         setIsSaving(true);
         try {
-            await fetch.post(`/api/updateAgentStrategy`, {
+            const response = await fetch.post(`/api/updateAgentStrategy`, {
                 agent: agentProfile
             });
-            toast.success("Agent strategy updated");
+            if (response.status) {
+                setAgent(agentProfile);
+                toast.success("Agent strategy updated");
+            } else {
+                toast.error(response.message);
+            }
         } catch (error) {
             console.error("Error updating agent strategy:", error);
             toast.error("Error updating agent strategy");

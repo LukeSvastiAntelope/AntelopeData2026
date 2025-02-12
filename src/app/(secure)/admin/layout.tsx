@@ -2,23 +2,18 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useFetch } from "@/app/utils/lib";
+import { useAgent } from "@/app/context/AgentContext";
 
 const AdminLayout = ({ children }: { children: React.ReactNode }) => {
 
-    const fetch = useFetch();
+    const { user } = useAgent();
     const router = useRouter();
 
     useEffect(() => {
-        const getAgentProfile = async () => {
-            const response = await fetch.get('/api/getAgentProfile');
-            const user = response.user;
-            if (user.role !== 'admin') {
-                router.push('/');
-            }
+        if (!user || user.role !== 'admin') {
+            router.push('/');
         }
-        getAgentProfile();
-    }, [])
+    }, [user])
     return (
         <div>
             {children}

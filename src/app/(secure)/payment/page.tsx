@@ -12,7 +12,6 @@ import { Input } from "@heroui/input";
 import { Button } from "@heroui/button";
 import { Select, SelectItem } from "@heroui/select";
 import { IconWallet, IconCreditCard, IconNft } from "@/app/components/icons";
-import { IAgentProfile } from '@/app/utils/interface';
 import { useFetch } from '@/app/utils/lib';
 import { toast } from 'react-hot-toast';
 import { Skeleton } from "@heroui/skeleton";
@@ -36,6 +35,7 @@ import {
     publicKey
 } from '@metaplex-foundation/umi'
 import { Image, Tooltip } from "@heroui/react";
+import { useAgent } from "@/app/context/AgentContext";
 
 interface INftMetadata {
     name: string;
@@ -51,14 +51,12 @@ const PaymentPage = () => {
     const wallet = useWallet();
     const { connection } = useConnection();
     const [amount, setAmount] = useState('');
-    const [agent, setAgent] = useState<IAgentProfile | null>(null);
     const [agentBalance, setAgentBalance] = useState(0);
     const [solPrice, setSolPrice] = useState(0);
     const [paymentMethod, setPaymentMethod] = useState('sol');
     const [withdrawMethod, setWithdrawMethod] = useState('sol');
     const [availableBalance,] = useState(0);
     const [withdrawAmount, setWithdrawAmount] = useState('');
-    const [isLoading, setIsLoading] = useState(true);
     const [creditAmount, setCreditAmount] = useState(0);
     const [paymentAmount, setPaymentAmount] = useState('');
     const fetchData = useFetch();
@@ -67,6 +65,7 @@ const PaymentPage = () => {
     const [isMinting, setIsMinting] = useState(false);
     const [nftMetadata, setNftMetadata] = useState<INftMetadata | null>(null);
     const [agentSuccessRate, setAgentSuccessRate] = useState(0);
+    const { agent, setAgent, isAgentProfileLoading } = useAgent();
 
     const isWithdrawDisabled = () => {
         return true;
@@ -258,30 +257,17 @@ const PaymentPage = () => {
     };
 
     useEffect(() => {
-        const fetchAgentProfile = async () => {
-            try {
-                const response = await fetchData.get('/api/getAgentProfile');
-                if (response.status) {
-                    setAgent(response.agent);
-                    setAgentBalance(response.agent.wallet_balance);
-                    setAgentSuccessRate(response.successRate);
-                } else {
-                    toast.error(response.message);
-                }
-            } catch (error) {
-                console.log(error);
-                toast.error('Failed to fetch agent profile');
-            }
-            await getSolPrice();
-            setIsLoading(false);
-        };
         const getSolPrice = async () => {
             const response = await fetch('https://data-api.binance.vision/api/v3/ticker/price?symbol=SOLUSDT');
             const data = await response.json();
             setSolPrice(data.price);
         }
 
-        fetchAgentProfile();
+        if (agent) {
+            setAgentBalance(agent.wallet_balance);
+            setAgentSuccessRate(agent?.successRate || 0);
+            getSolPrice();
+        }
         const query = new URLSearchParams(window.location.search);
         if (query.get('success')) {
             toast.success('Order placed! You will receive an email confirmation.');
@@ -318,7 +304,7 @@ const PaymentPage = () => {
                         <div className="text-center bg-content0 p-4 rounded-lg">
                             <p className="text-lg mb-2">Current Balance</p>
                             {
-                                isLoading ?
+                                isAgentProfileLoading ?
                                     <Skeleton className="w-full h-10" /> :
                                     <p className="text-xl font-bold text-primary">{agentBalance?.toLocaleString() || 0} Credits</p>
                             }
@@ -329,7 +315,7 @@ const PaymentPage = () => {
                             placeholder="Enter amount"
                             value={amount}
                             onChange={handleAmountChange}
-                            isDisabled={isLoading}
+                            isDisabled={isAgentProfileLoading}
 
                             startContent={
                                 <div className="pointer-events-none flex items-center">
@@ -344,7 +330,7 @@ const PaymentPage = () => {
                             placeholder="Select payment method"
                             value={paymentMethod}
                             onChange={(e) => handlePaymentMethodChange(e.target.value)}
-                            isDisabled={isLoading}
+                            isDisabled={isAgentProfileLoading}
                             description={amount && paymentAmount ?
                                 `You will pay ${paymentAmount} ${paymentMethod.toUpperCase()}` :
                                 ""}
@@ -368,7 +354,7 @@ const PaymentPage = () => {
                             size="lg"
                             className="w-full"
                             onPress={handleBuyCredits}
-                            isDisabled={isLoading}
+                            isDisabled={isAgentProfileLoading}
                         >
                             Buy Credits
                         </Button>
