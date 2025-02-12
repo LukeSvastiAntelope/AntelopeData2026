@@ -1,5 +1,5 @@
 import { IAskAgentProps } from "@/app/utils/interface";
-import Image from "next/image";
+import { Image } from "@heroui/image";
 import { useState, useRef, useEffect } from "react";
 import { toast } from "react-hot-toast";
 import { Select, SelectItem, Button } from "@heroui/react";
@@ -119,13 +119,13 @@ const Profile = ({ agentProfile, setAgentProfile }: IAskAgentProps) => {
     useEffect(() => {
         const updateImage = async (imageUrl: string) => {
             try {
-                const file = await fetch(imageUrl).then(res => res.blob());
-                if (file.size > 5000000) { // 5MB
-                    toast.error("File too large");
-                    return;
-                }
-                const compressedBase64 = await compressImage(file);
-                setAgentProfile(agent => (agent ? { ...agent, image: 'data:image/jpeg;base64,' + compressedBase64 } : null)); // Add prefix back for display   
+                // const file = await fetch(imageUrl).then(res => res.blob());
+                // if (file.size > 5000000) { // 5MB
+                //     toast.error("File too large");
+                //     return;
+                // }
+                // const compressedBase64 = await compressImage(file);
+                setAgentProfile(agent => (agent ? { ...agent, image: imageUrl } : null)); // Add prefix back for display   
             } catch (error) {
                 console.error('Error updating image:', error);
                 toast.error("Error updating image");
@@ -161,15 +161,15 @@ const Profile = ({ agentProfile, setAgentProfile }: IAskAgentProps) => {
                     </div>
                     <div className="mt-5 flex flex-col gap-2">
                         <label className="text-gray-white text-sm" htmlFor="avatar">Avatar</label>
-                        <div className="flex gap-6 items-start">
+                        <div className="flex items-start gap-2">
                             <div onClick={() => fileRef.current?.click()} className="overflow-hidden object-cover cursor-pointer !w-20 !h-20 bg-input-default rounded-md relative">
                                 {agentProfile.image ? (
                                     <Image
                                         src={agentProfile.image}
                                         alt="Agent Avatar"
-                                        width={160}
-                                        height={160}
-                                        className="object-cover hover:scale-105 duration-200 transition-transform rounded-none absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-20 h-20"
+                                        width={80}
+                                        height={80}
+                                        className="object-cover rounded-none w-20 h-20"
                                     />
                                 ) : (
                                     <div className="w-20 h-20 flex items-center justify-center text-gray-500 text-6xl bg-input-default rounded-md">
@@ -181,7 +181,7 @@ const Profile = ({ agentProfile, setAgentProfile }: IAskAgentProps) => {
                                 type="text"
                                 name="avatar"
                                 id="avatar"
-                                className="bg-input-default rounded-md text-text-default pl-4 py-2"
+                                className="bg-input-default rounded-md text-text-default py-2 pl-4 flex-auto"
                                 placeholder="Path to profile image"
                                 value={imageUrl}
                                 onChange={(e) => setImageUrl(e.target.value)}
@@ -218,7 +218,7 @@ const Profile = ({ agentProfile, setAgentProfile }: IAskAgentProps) => {
                             Model
                         </div>
                         <Select
-                            defaultSelectedKeys={agentProfile.model}
+                            selectedKeys={[agentProfile.model]}
                             onChange={(e) => {
                                 setAgentProfile({ ...agentProfile, model: e.target.value });
                             }}
