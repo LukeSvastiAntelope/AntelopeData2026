@@ -23,7 +23,7 @@ export interface IAgentProfile {
     train_index: string;
     ipfs_hash?: string;
     platform_id: number;
-    is_bet: boolean;
+    is_bet: number;
     role?: "user" | "admin";
     model: string;
     plugins: string[];
@@ -47,6 +47,7 @@ export interface IFormDataAgentProfile {
     category: string;
     model: string;
     plugins: string;
+    is_bet: number;
 }
 
 export interface IPrinciple {

@@ -56,14 +56,14 @@ const Settings = ({ agentProfile, setAgentProfile }: IAskAgentProps) => {
                         >
                             <div>
                                 <p className="text-default-500 text-small">
-                                    {agentProfile?.is_bet ? "Betting is currently enabled" : "Betting is currently disabled"}
+                                    {agentProfile?.is_bet == 1 ? "Betting is currently enabled" : "Betting is currently disabled"}
                                 </p>
                             </div>
                         </Tooltip>
                         <Switch
-                            isSelected={agentProfile?.is_bet}
+                            isSelected={agentProfile?.is_bet == 1}
                             onValueChange={() => {
-                                setAgentProfile(prev => (prev ? { ...prev, is_bet: !prev.is_bet } : null));
+                                setAgentProfile(prev => (prev ? { ...prev, is_bet: prev.is_bet == 1 ? 0 : 1 } : null));
                             }}
                             color="success"
                             size="sm"

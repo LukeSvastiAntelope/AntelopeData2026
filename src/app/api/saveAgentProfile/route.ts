@@ -29,7 +29,8 @@ export async function POST(req: NextRequest) {
             maxTimelineLimit: agent.maxTimelineLimit,
             category: agent.category,
             model: agent.model,
-            plugins: agent.plugins.join(',')
+            plugins: agent.plugins.join(','),
+            is_bet: agent.is_bet
         };
 
         await UserRepo.updateAgent(jwtPayload.email as string, updateParams as IFormDataAgentProfile);
