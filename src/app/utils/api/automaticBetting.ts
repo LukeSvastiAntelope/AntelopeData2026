@@ -364,9 +364,14 @@ ${batchPredictions.map(p => {
      Total Bet Amount: ${totalAmount}
      Existing Bets: ${p.agent_bets ? this.parseAgentBets(p.agent_bets)[this.agent.id] ?
                         `${this.parseAgentBets(p.agent_bets)[this.agent.id].amount} to ${this.parseAgentBets(p.agent_bets)[this.agent.id].choice}` :
-                        'No bets made yet' : 'No bets made yet'}`
+                        'No bets made yet' : 'No bets made yet'}
+    ${p.marketData ? `
+        MARKET DATA:
+        - Current Price: ${p.marketData.price}
+        - 24h Change: ${p.marketData.change24h || p.marketData.change}%
+        - Volume: ${p.marketData.volume24h || p.marketData.volume}
+        ` : ''}`
             }).join('\n')}
-
 Key News:
 ${relevantNews.map(n => `- ${n.title}`).join('\n')}
 
