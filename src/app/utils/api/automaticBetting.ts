@@ -1027,6 +1027,8 @@ ${this.agent.principles}`;
     private async getStockMarketData(prediction: Prediction): Promise<MarketData | null> {
         try {
             const symbol = this.extractStockSymbol(prediction.description);
+            console.log("symbol", symbol);
+            
             if (!symbol) return null;
 
             const result = await getJson({
@@ -1039,6 +1041,9 @@ ${this.agent.principles}`;
             let price: number = 0;
             let change: number = 0;
             let volume: string = '';
+
+            console.log("knowledge", result.knowledge_graph);
+            console.log("financial", result.financial_results);
 
             if (result.knowledge_graph) {
                 price = parseFloat(result.knowledge_graph.stock_price?.replace(/[^0-9.-]/g, '') || '0');
