@@ -18,11 +18,31 @@ export const GPT_MODELS = [
     {
         key: "o3-mini",
         label: "o3-mini",
+        type: "openai",
+        model: "o3-mini"
     },
     {
-        key: "deepseek",
-        label: "deepseek",
+        key: 'o1',
+        label: 'o1',
+        type: "openai",
+        modle: 'o1'
     },
+    {
+        key: 'gpt-4o',
+        label: 'gpt-4o',
+        type: "openai",
+        model: 'gpt-4o'
+    },
+    {
+        key: "gemini-2",
+        label: "Gemini 2",
+        type: "gemini",
+        model: "Gemini 2.0 Flash"
+    },
+    // {
+    //     key: "deepseek",
+    //     label: "deepseek",
+    // },
 ];
 
 export const PLUGINS = [

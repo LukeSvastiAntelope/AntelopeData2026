@@ -5,6 +5,7 @@ import { IAgentProfile, BetDecision, NewsItem, GroupedPredictions, Prediction, M
 import { PineconeRecord } from '@pinecone-database/pinecone';
 import axios from 'axios';
 import { ChatCompletionMessageParam } from 'openai/resources/chat/completions.mjs';
+import { GPT_MODELS } from '@/app/utils/const';
 
 interface SimilarPredictionMetadata {
     description: string;
@@ -61,8 +62,9 @@ interface SerpFinanceResult {
 export class AutomaticBettingAgent {
     private agent: IAgentProfile;
     private openai: OpenAI;
-    private pinecone: Pinecone;
     private deepseek: OpenAI;
+    private gemini: OpenAI;
+    private pinecone: Pinecone;
     private SERPAPI_API_KEY = process.env.SERPAPI_API_KEY!;
     private newsCache: Map<string, NewsItem[]> = new Map();
     private COINMARKETCAP_API_KEY = process.env.COINMARKETCAP_API_KEY!;
@@ -79,6 +81,10 @@ export class AutomaticBettingAgent {
         this.deepseek = new OpenAI({
             apiKey: process.env.DEEPSEEK_API_KEY!,
             baseURL: 'https://api.deepseek.com'
+        });
+        this.gemini = new OpenAI({
+            apiKey: process.env.GEMINI_API_KEY!,
+            baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai/'
         });
     }
 
@@ -151,9 +157,7 @@ export class AutomaticBettingAgent {
             return [];
         }
 
-        console.log("interestingPredictions", interestingPredictions);
         const groupedPredictions = this.groupPredictionsByTopic(interestingPredictions);
-        console.log("groupedPredictions", groupedPredictions);
         const decisions = await Promise.all(
             Object.entries(groupedPredictions).map(async ([, topicPredictions]) => {
                 const news = await this.gatherRelevantNews(topicPredictions);
@@ -231,7 +235,6 @@ export class AutomaticBettingAgent {
         const content = response.choices[0].message.content || '';
         const shouldBet = content.trim().toUpperCase().startsWith('YES:');
         const reasoning = content.substring(content.indexOf(':') + 1).trim();
-        console.log("interesting ai:", prediction.id, ": bet:", shouldBet, ": reason:", reasoning);
 
         return {
             shouldBet,
@@ -404,23 +407,34 @@ Agent Principles:
 ${this.agent.principles}`;
 
             try {
-                const completion = await this.deepseek.chat.completions.create({
-                    model: "deepseek-chat",
-                    messages: [
-                        {
-                            role: "system",
-                            content: "You are a JSON-only response bot. Return only valid JSON."
-                        },
-                        {
-                            role: "user",
-                            content: prompt
-                        }
-                    ],
-                    temperature: 0.3
-                });
+                let completion;
+                const model = GPT_MODELS.find(m => m.key == this.agent.model);
+                if (model?.type == "openai") {
+                    completion = await this.openai.chat.completions.create({
+                        model: model.model ?? "o3-mini",
+                        messages: [
+                            {
+                                role: "system",
+                                content: "You are a JSON-only response bot. Return only valid JSON."
+                            },
+                            {
+                                role: "user",
+                                content: prompt
+                            }
+                        ],
+                        response_format: { type: 'json_object' }
+                    });
+                } else if (model?.type == "gemini") {
+                    completion = await this.gemini.chat.completions.create({
+                        model: model.model ?? "Gemini 2.0 Flash",
+                        messages: [
+                            { role: "user", content: prompt }
+                        ]
+                    });
+                }
                 console.log("prompt", prompt);
-                console.log("completion", completion.choices[0].message.content);
-                const content = completion.choices[0].message.content;
+                console.log("completion", completion?.choices[0].message.content);
+                const content = completion?.choices[0].message.content;
                 const cleanContent = content
                     ? content
                         .replace(/```json\n?/g, '')  // Remove opening code block
@@ -975,8 +989,8 @@ ${this.agent.principles}`;
         try {
             const prompt = `Extract the crypto symbols which can use to search in coinmarketcap from the following prediction: ${description}`;
 
-            const response = await this.deepseek.chat.completions.create({
-                model: "deepseek-chat",
+            const response = await this.openai.chat.completions.create({
+                model: "o3-mini",
                 messages: [
                     {
                         role: "system",
@@ -984,7 +998,6 @@ ${this.agent.principles}`;
                     },
                     { role: "user", content: prompt }
                 ],
-                temperature: 0.3,
                 response_format: { type: "json_object" }
             });
 
@@ -1028,7 +1041,7 @@ ${this.agent.principles}`;
         try {
             const symbol = this.extractStockSymbol(prediction.description);
             console.log("symbol", symbol);
-            
+
             if (!symbol) return null;
 
             const result = await getJson({
