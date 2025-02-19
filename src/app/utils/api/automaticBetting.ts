@@ -62,8 +62,8 @@ interface SerpFinanceResult {
 export class AutomaticBettingAgent {
     private agent: IAgentProfile;
     private openai: OpenAI;
-    private deepseek: OpenAI;
-    private gemini: OpenAI;
+    private agentai: OpenAI;
+    private model: string;
     private pinecone: Pinecone;
     private SERPAPI_API_KEY = process.env.SERPAPI_API_KEY!;
     private newsCache: Map<string, NewsItem[]> = new Map();
@@ -72,31 +72,37 @@ export class AutomaticBettingAgent {
 
     constructor(agent: IAgentProfile) {
         this.agent = agent;
-        this.openai = new OpenAI({
-            apiKey: process.env.OPENAI_API_KEY
-        });
         this.pinecone = new Pinecone({
             apiKey: process.env.PINECONE_API_KEY!
         });
-        this.deepseek = new OpenAI({
-            apiKey: process.env.DEEPSEEK_API_KEY!,
-            baseURL: 'https://api.deepseek.com'
+        this.openai = new OpenAI({
+            apiKey: process.env.OPENAI_API_KEY,
         });
-        this.gemini = new OpenAI({
-            apiKey: process.env.GEMINI_API_KEY!,
-            baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai/'
+        this.agentai = new OpenAI({
+            apiKey: process.env.AGENT_AI_API_KEY,
         });
+        this.model = "o3-mini";
     }
 
     async initialize() {
         // Initialize any necessary resources or configurations
-        console.log('AutomaticBettingAgent initialized');
-        // await this.pinecone.createIndex({
-        //     name: 'prediction-results',
-        //     dimension: 1536,
-        //     metric: 'cosine',
-        //     spec: { serverless: { cloud: 'aws', region: 'us-east-1' } }
-        // });
+        const model = GPT_MODELS.find(m => m.key == this.agent.model);
+        this.model = model?.model ?? "o3-mini";
+        if (model?.type == "openai") {
+            this.agentai = new OpenAI({
+                apiKey: process.env.OPENAI_API_KEY,
+            });
+        } else if (model?.type == "deepseek") {
+            this.agentai = new OpenAI({
+                apiKey: process.env.DEEPSEEK_API_KEY!,
+                baseURL: 'https://api.deepseek.com'
+            });
+        } else if (model?.type == "gemini") {
+            this.agentai = new OpenAI({
+                apiKey: process.env.GEMINI_API_KEY!,
+                baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai/'
+            });
+        }
     }
 
     async analyzePredictions(predictions: Prediction[]): Promise<BetDecision[]> {
@@ -167,8 +173,6 @@ export class AutomaticBettingAgent {
                     news,
                     similarPredictions
                 );
-
-                // Store each bet decision in Pinecone and update with pineconeId
                 const updatedDecisions = await Promise.all(decision.map(async bet => {
                     const prediction = topicPredictions.find(p => p.id === bet.predictionId);
                     if (prediction) {
@@ -194,52 +198,56 @@ export class AutomaticBettingAgent {
     }
 
     private async isInterestingPredictionWithAI(prediction: Prediction): Promise<{ shouldBet: boolean; reasoning: string | null }> {
-        const prompt = `
-        Analyze the prediction's relevance to the agent's interests:
+        try {
+            const prompt = `
+            Analyze the prediction's relevance to the agent's interests:
+    
+            AGENT INTERESTS: ${this.agent.interests.map(interest => interest.toLowerCase()).join(', ')}
+            AGENT CATEGORY: ${this.agent.category}
+            PREDICTION: ${prediction.description}
+            ${prediction.marketData ? `
+            MARKET DATA:
+            - Current Price: ${prediction.marketData.price}
+            - 24h Change: ${prediction.marketData.change24h || prediction.marketData.change}%
+            - Volume: ${prediction.marketData.volume24h || prediction.marketData.volume}
+            ` : ''}
+    
+            Rules:
+            - For markets/crypto predictions, consider current market data and trends
+            - For sports predictions, only consider if they match agent's category
+            - Consider both direct matches and indirect connections
+            - Include related industries, topics, and potential impacts
+            - ANY reasonable connection warrants a positive response
+    
+            Required format:
+            YES: [1-2 sentence explanation]
+            or
+            NO: [1-2 sentence explanation]
+            `;
 
-        AGENT INTERESTS: ${this.agent.interests.map(interest => interest.toLowerCase()).join(', ')}
-        AGENT CATEGORY: ${this.agent.category}
-        PREDICTION: ${prediction.description}
-        ${prediction.marketData ? `
-        MARKET DATA:
-        - Current Price: ${prediction.marketData.price}
-        - 24h Change: ${prediction.marketData.change24h || prediction.marketData.change}%
-        - Volume: ${prediction.marketData.volume24h || prediction.marketData.volume}
-        ` : ''}
+            const response = await this.agentai.chat.completions.create({
+                model: this.model,
+                messages: [
+                    {
+                        role: "system",
+                        content: "You are an inclusive analyst who looks for any possible connections between topics. Err on the side of finding relationships rather than dismissing them."
+                    },
+                    { role: "user", content: prompt }
+                ],
+            });
 
-        Rules:
-        - For markets/crypto predictions, consider current market data and trends
-        - For sports predictions, only consider if they match agent's category
-        - Consider both direct matches and indirect connections
-        - Include related industries, topics, and potential impacts
-        - ANY reasonable connection warrants a positive response
+            const content = response.choices[0].message.content || '';
+            const shouldBet = content.trim().toUpperCase().startsWith('YES:');
+            const reasoning = content.substring(content.indexOf(':') + 1).trim();
 
-        Required format:
-        YES: [1-2 sentence explanation]
-        or
-        NO: [1-2 sentence explanation]
-        `;
-
-        const response = await this.deepseek.chat.completions.create({
-            model: "deepseek-chat",
-            messages: [
-                {
-                    role: "system",
-                    content: "You are an inclusive analyst who looks for any possible connections between topics. Err on the side of finding relationships rather than dismissing them."
-                },
-                { role: "user", content: prompt }
-            ],
-            temperature: 0.4  // Slightly higher temperature to allow for more creative connections
-        });
-
-        const content = response.choices[0].message.content || '';
-        const shouldBet = content.trim().toUpperCase().startsWith('YES:');
-        const reasoning = content.substring(content.indexOf(':') + 1).trim();
-
-        return {
-            shouldBet,
-            reasoning: reasoning || null
-        };
+            return {
+                shouldBet,
+                reasoning: reasoning || null
+            };
+        } catch (error) {
+            console.error('Error in isInterestingPredictionWithAI:', error);
+            return { shouldBet: false, reasoning: null };
+        }
     }
 
     private groupPredictionsByTopic(predictions: Prediction[]): GroupedPredictions {
@@ -407,33 +415,20 @@ Agent Principles:
 ${this.agent.principles}`;
 
             try {
-                let completion;
-                const model = GPT_MODELS.find(m => m.key == this.agent.model);
-                if (model?.type == "openai") {
-                    completion = await this.openai.chat.completions.create({
-                        model: model.model ?? "o3-mini",
-                        messages: [
-                            {
-                                role: "system",
-                                content: "You are a JSON-only response bot. Return only valid JSON."
-                            },
-                            {
-                                role: "user",
-                                content: prompt
-                            }
-                        ],
-                        response_format: { type: 'json_object' }
-                    });
-                } else if (model?.type == "gemini") {
-                    completion = await this.gemini.chat.completions.create({
-                        model: model.model ?? "Gemini 2.0 Flash",
-                        messages: [
-                            { role: "user", content: prompt }
-                        ]
-                    });
-                }
-                console.log("prompt", prompt);
-                console.log("completion", completion?.choices[0].message.content);
+                const completion = await this.agentai.chat.completions.create({
+                    model: this.model,
+                    messages: [
+                        {
+                            role: "system",
+                            content: "You are specialized in analyzing predictions and making betting decisions. You are a JSON-only response bot. Return only valid JSON."
+                        },
+                        {
+                            role: "user",
+                            content: prompt
+                        }
+                    ],
+                    response_format: { type: 'json_object' }
+                });
                 const content = completion?.choices[0].message.content;
                 const cleanContent = content
                     ? content
@@ -453,8 +448,6 @@ ${this.agent.principles}`;
                 if (i + BATCH_SIZE < predictions.length) {
                     await new Promise(resolve => setTimeout(resolve, 1000));
                 }
-                console.log("predictions", predictions);
-                console.log("allDecisions", allDecisions);
             } catch (error) {
                 console.error(`Error analyzing batch ${i / BATCH_SIZE + 1}:`, error);
             }
@@ -553,12 +546,10 @@ ${this.agent.principles}`;
 
     private parseAnalysisResponse(content: string, predictions: Prediction[]): BetDecision[] {
         try {
-            console.log("content", content);
             const jsonStr = content.substring(
                 content.indexOf('{'),
                 content.lastIndexOf('}') + 1
             );
-            console.log("jsonStr", jsonStr);
             const analysis = JSON.parse(jsonStr);
 
             if (!analysis?.predictions || !Array.isArray(analysis.predictions)) {
@@ -574,28 +565,19 @@ ${this.agent.principles}`;
                         typeof p.confidence === 'number' &&
                         p.confidence >= 0 && p.confidence <= 1;
 
-                    console.log("isValid", isValid);
-
                     if (!isValid) {
                         console.error('Invalid prediction format:', p);
                         return false;
                     }
 
-                    console.log("filter prediction", p);
-
                     const existingBet = prediction?.agent_bets ?
                         this.parseAgentBets(prediction.agent_bets)[this.agent.id] :
                         null;
 
-                    console.log("existingBet", existingBet);
-
-                    // Check if agent has already bet twice
                     if (existingBet && existingBet.betCount && existingBet.betCount >= 2) {
-                        console.log(`Agent ${this.agent.id} has already bet twice on prediction ${p.id}`);
+                        console.error(`Agent ${this.agent.id} has already bet twice on prediction ${p.id}`);
                         return false;
                     }
-
-                    console.log("isValid", isValid);
 
                     return isValid && p.confidence > 0;
                 })
@@ -608,7 +590,6 @@ ${this.agent.principles}`;
                             reasoning: p.reasoning || 'No specific reasoning provided'
                         });
                     }
-                    console.log("parse prediction", p);
 
                     return {
                         predictionId: p.id,
@@ -728,19 +709,19 @@ ${this.agent.principles}`;
         4. Keep terms between 2-4 words each`;
 
         try {
-            const completion = await this.deepseek.chat.completions.create({
-                model: "deepseek-chat",
+            const completion = await this.agentai.chat.completions.create({
+                model: this.model,
                 messages: [
                     {
                         role: "system",
-                        content: "You are a JSON-only response bot. Return only a valid JSON array of strings without any explanation or additional text."
+                        content: "You are specialized in extracting key terms from predictions. You are a JSON-only response bot. Return only a valid JSON array of strings without any explanation or additional text."
                     },
                     {
                         role: "user",
                         content: prompt
                     }
                 ],
-                temperature: 0.3
+                response_format: { type: 'json_object' }
             });
 
             const content = completion.choices[0].message.content || '[]';
@@ -876,7 +857,6 @@ ${this.agent.principles}`;
             const embedding = await this.getEmbedding(description);
             const index = this.pinecone.Index('prediction-results');
             const id = `bet-${bet.predictionId}-${bet.agentId}-${Date.now()}`;
-            console.log("bet", prediction.betReason);
 
             await index.upsert([{
                 id: id,
@@ -989,8 +969,8 @@ ${this.agent.principles}`;
         try {
             const prompt = `Extract the crypto symbols which can use to search in coinmarketcap from the following prediction: ${description}`;
 
-            const response = await this.openai.chat.completions.create({
-                model: "o3-mini",
+            const response = await this.agentai.chat.completions.create({
+                model: this.model,
                 messages: [
                     {
                         role: "system",
@@ -1002,7 +982,6 @@ ${this.agent.principles}`;
             });
 
             const content = response.choices[0].message.content;
-            console.log("Crypto symbols response:", content);
 
             if (!content) {
                 console.warn('No content received from OpenAI');
@@ -1040,8 +1019,6 @@ ${this.agent.principles}`;
     private async getStockMarketData(prediction: Prediction): Promise<MarketData | null> {
         try {
             const symbol = this.extractStockSymbol(prediction.description);
-            console.log("symbol", symbol);
-
             if (!symbol) return null;
 
             const result = await getJson({
@@ -1054,9 +1031,6 @@ ${this.agent.principles}`;
             let price: number = 0;
             let change: number = 0;
             let volume: string = '';
-
-            console.log("knowledge", result.knowledge_graph);
-            console.log("financial", result.financial_results);
 
             if (result.knowledge_graph) {
                 price = parseFloat(result.knowledge_graph.stock_price?.replace(/[^0-9.-]/g, '') || '0');
@@ -1128,7 +1102,6 @@ ${this.agent.principles}`;
             if (intent === 'training') {
                 const train_index = this.agent.train_index ? this.agent.train_index.split(',') : [];
                 const pineconeResponse = await index.fetch(train_index);
-                console.log("pineconeResponse", pineconeResponse);
                 if (pineconeResponse.records) {
                     relevantSummaries = Object.values(pineconeResponse.records).map(record => {
                         const meta = record.metadata || {};
@@ -1145,7 +1118,6 @@ ${this.agent.principles}`;
                     input: question
                 });
                 const questionEmbedding = embeddingResponse.data[0].embedding;
-                console.log("questionEmbedding", questionEmbedding);
 
                 const pineconeResponse = await index.query({
                     vector: questionEmbedding,
@@ -1169,7 +1141,6 @@ ${this.agent.principles}`;
                     relevantSummaries = "No similar prior predictions or bets found.";
                 }
             }
-            console.log("relevantSummaries", relevantSummaries);
 
             const systemPrompt = `
                 You are a specialized betting agent with the following details:
@@ -1218,18 +1189,15 @@ ${this.agent.principles}`;
         `;
 
         try {
-            // Hypothetical DeepSeek API call
-            const response = await this.deepseek.chat.completions.create({
-                model: "deepseek-chat",
+            const response = await this.agentai.chat.completions.create({
+                model: this.model,
                 messages: [
                     { role: "system", content: "You are a classifier that only responds with one word: either 'training' or 'general'" },
                     { role: "user", content: prompt }
                 ],
-                temperature: 0.3
             });
 
             const intent = response.choices[0].message.content?.toLowerCase();
-            console.log("intent", intent);
             return intent === 'training' ? 'training' : 'general';
         } catch (error) {
             console.error('Error detecting question intent:', error);

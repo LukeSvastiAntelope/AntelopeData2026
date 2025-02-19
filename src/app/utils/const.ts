@@ -37,7 +37,7 @@ export const GPT_MODELS = [
         key: "gemini-2",
         label: "Gemini 2",
         type: "gemini",
-        model: "Gemini 2.0 Flash"
+        model: "gemini-2.0-flash"
     },
     // {
     //     key: "deepseek",
