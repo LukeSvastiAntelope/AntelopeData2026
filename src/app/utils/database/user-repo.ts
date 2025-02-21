@@ -2,7 +2,7 @@ import bcrypt from "bcryptjs";
 import { openSql as getMySQLConnection } from "./db";
 import { generateConfirmationToken } from "../api/token";
 import { AGENT_RISK_LEVEL } from "../const";
-import { IFormDataAgentProfile, PredictionDB } from "../interface";
+import { IFormDataAgentProfile, PredictionDB, NewsItem } from "../interface";
 import { UserDB, AgentDB, PaymentIntentDB, CreatePredictionInput, IBet } from "../interface";
 import { RowDataPacket, ResultSetHeader } from 'mysql2/promise';
 
@@ -50,7 +50,8 @@ export const UserRepo = {
     getBetsByPredictionId,
     updateUserPredictionBalance,
     updatePlatformAccountBalance,
-    getBetsStatsByAgentId
+    getBetsStatsByAgentId,
+    getNewsDataFromDB
 }
 
 async function getBetsStatsByAgentId(agentId: number) {
@@ -71,7 +72,7 @@ async function getBetsStatsByAgentId(agentId: number) {
          FROM bets
          JOIN predictions ON bets.prediction_id = predictions.id AND bets.is_secret = 0
          WHERE bets.agent_id = ?`,
-         [agentId]
+        [agentId]
     );
     return rows[0];
 }
@@ -822,5 +823,11 @@ async function getLeaderboard() {
             agents.nft_address,
             agents.total_winnings`
     );
+    return rows;
+}
+
+export async function getNewsDataFromDB(interest: string, limit = 5) {
+    const db = await getMySQLConnection();
+    const [rows] = await db.execute<(NewsItem & RowDataPacket)[]>(`SELECT * FROM google_search WHERE engine = ? AND date > ? AND title LIKE ? ORDER BY date DESC LIMIT ?`, ['google_news', new Date(Date.now() - 24 * 60 * 60 * 1000), `%${interest}%`, limit]);
     return rows;
 }

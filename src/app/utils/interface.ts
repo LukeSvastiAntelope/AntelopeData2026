@@ -127,8 +127,8 @@ export interface TeamStats {
 export interface NewsItem {
     title: string;
     link: string;
-    snippet: string;
     date: string;
+    source?: string;
 }
 
 export interface BetDecision {

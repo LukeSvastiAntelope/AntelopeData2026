@@ -6,6 +6,7 @@ import { PineconeRecord } from '@pinecone-database/pinecone';
 import axios from 'axios';
 import { ChatCompletionMessageParam } from 'openai/resources/chat/completions.mjs';
 import { GPT_MODELS } from '@/app/utils/const';
+import { getNewsDataFromDB } from '../database/user-repo';
 
 interface SimilarPredictionMetadata {
     description: string;
@@ -22,7 +23,6 @@ interface NewsSearchResult {
     news_results: {
         title: string;
         link: string;
-        snippet: string;
         source: string;
         date: string;
     }[];
@@ -31,7 +31,6 @@ interface NewsSearchResult {
 interface SerpApiNewsResult {
     title: string;
     link: string;
-    snippet: string;
     source: string;
     date: string;
 }
@@ -639,36 +638,37 @@ ${this.agent.principles}`;
 
             // Gather news for each unique search term
             for (const term of searchTerms) {
-                const result = await getJson({
-                    engine: "google_news",
-                    q: term,
-                    api_key: this.SERPAPI_API_KEY,
-                    time: "1d",
-                    num: 3
-                }) as NewsSearchResult;
+                const newsData = await getNewsDataFromDB(term, 3);
+                if (newsData.length > 0) {
+                    newsResults.push(...newsData);
+                } else {
+                    const result = await getJson({
+                        engine: "google_news",
+                        q: term,
+                        api_key: this.SERPAPI_API_KEY,
+                        time: "1d",
+                        num: 3
+                    }) as NewsSearchResult;
 
-                if (result.news_results) {
-                    const news: NewsItem[] = result.news_results.map((item: SerpApiNewsResult) => ({
-                        title: item.title,
-                        link: item.link,
-                        snippet: item.snippet,
-                        source: item.source,
-                        date: item.date
-                    }));
-                    newsResults.push(...news);
+                    if (result.news_results) {
+                        const news: NewsItem[] = result.news_results.map((item: SerpApiNewsResult) => ({
+                            title: item.title,
+                            link: item.link,
+                            source: item.source,
+                            date: item.date
+                        }));
+                        newsResults.push(...news);
+                    }
                 }
 
-                // Add delay to respect API rate limits
                 await new Promise(resolve => setTimeout(resolve, 200));
             }
 
             // Remove duplicates
             const uniqueNews = this.removeDuplicateNews(newsResults);
 
-            // Cache the results
             this.newsCache.set(cacheKey, uniqueNews);
 
-            // Set cache expiration (1 hour)
             setTimeout(() => {
                 this.newsCache.delete(cacheKey);
             }, 3600000);
@@ -724,6 +724,7 @@ ${this.agent.principles}`;
                 response_format: { type: 'json_object' }
             });
 
+            console.log(completion.choices[0].message.content);
             const content = completion.choices[0].message.content || '[]';
             // Extract JSON array if response contains any non-JSON text
             const jsonMatch = content.match(/\[.*\]/);
