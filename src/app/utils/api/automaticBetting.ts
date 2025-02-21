@@ -684,7 +684,7 @@ ${this.agent.principles}`;
         const seen = new Map<string, NewsItem>();
 
         news.forEach(item => {
-            const key = item.title.toLowerCase();
+            const key = item.title?.toLowerCase() || '';
             if (!seen.has(key) ||
                 new Date(item.date) > new Date(seen.get(key)!.date)) {
                 seen.set(key, item);
