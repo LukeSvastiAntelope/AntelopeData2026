@@ -1296,11 +1296,12 @@ ${this.agent.principles}`;
 
             // Generate a valid ASCII ID
             const id = this.generateValidId(title);
+            const timestamp = new Date(date).getTime();
 
             await index.upsert([{
                 id: id, // Use the generated ID
                 values: vector,
-                metadata: { title, link, date, image, engine }
+                metadata: { title, link, date: timestamp, image, engine }
             }]);
 
             console.log(`Title "${title}" inserted successfully into Pinecone.`);
@@ -1319,6 +1320,9 @@ ${this.agent.principles}`;
             const interestVector = await this.getEmbedding(interest);
             const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
+            // Convert the date to a timestamp
+            const twentyFourHoursAgoTimestamp = twentyFourHoursAgo.getTime();
+
             const queryResponse = await index.query({
                 vector: interestVector,
                 topK: limit,
@@ -1326,7 +1330,7 @@ ${this.agent.principles}`;
                 filter: {
                     engine: 'google_news',
                     date: {
-                        $gt: twentyFourHoursAgo
+                        $gt: twentyFourHoursAgoTimestamp // Use timestamp instead of date string
                     }
                 }
             });
