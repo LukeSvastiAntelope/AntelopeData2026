@@ -633,8 +633,6 @@ ${this.agent.principles}`;
                                     } catch (error) {
                                         console.log("error saving newData error:", error);
                                     }
-                                } else {
-                                    console.log("storyDate is before 24 hours ago", story.date);
                                 }
                             }
                         } else {
@@ -652,8 +650,6 @@ ${this.agent.principles}`;
                                 } catch (error) {
                                     console.log("error saving newData", error);
                                 }
-                            } else {
-                                console.log("date is before 24 hours ago", item.date);
                             }
                         }
                     }
