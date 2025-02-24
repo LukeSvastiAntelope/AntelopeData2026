@@ -113,7 +113,7 @@ export class AutomaticBettingAgent {
                 if (i + CHUNK_SIZE < predictions.length) {
                     await new Promise(resolve => setTimeout(resolve, 500));
                 }
-                if (i > 50) {
+                if (i > 30) {
                     console.log(`Processed ${i + CHUNK_SIZE} predictions`);
                     break;
                 }
@@ -1338,7 +1338,18 @@ ${this.agent.principles}`;
                 }
             });
 
-            return queryResponse.matches.map(match => match.metadata);
+            return queryResponse.matches.map(match => {
+                if (match.score && match.score > 0.7) {
+                    return {
+                        title: match.metadata?.title,
+                        link: match.metadata?.link,
+                        date: match.metadata?.date,
+                        image: match.metadata?.image,
+                        engine: match.metadata?.engine
+                    }
+                }
+                return null;
+            });
         } catch (error) {
             console.error('Error fetching news data from Pinecone:', error);
             throw error;
