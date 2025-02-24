@@ -829,8 +829,8 @@ async function getLeaderboard() {
 export async function getNewsDataFromDB(interest: string, limit = 5) {
     const db = await getMySQLConnection();
     const [rows] = await db.execute<(NewsItem & RowDataPacket)[]>(
-        `SELECT * FROM google_search WHERE engine = ? AND date > ? AND title LIKE ? ORDER BY date DESC LIMIT ?`, 
-        ['google_news', new Date(Date.now() - 24 * 60 * 60 * 1000), `%${interest}%`, parseInt(limit.toString(), 10)]
+        `SELECT * FROM google_search WHERE engine = ? AND date > ? AND title LIKE ? ORDER BY date DESC LIMIT ${parseInt(limit.toString(), 10)}`, 
+        ['google_news', new Date(Date.now() - 24 * 60 * 60 * 1000), `%${interest}%`]
     );
     return rows;
 }
