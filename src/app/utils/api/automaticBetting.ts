@@ -6,7 +6,6 @@ import { PineconeRecord } from '@pinecone-database/pinecone';
 import axios from 'axios';
 import { ChatCompletionMessageParam } from 'openai/resources/chat/completions.mjs';
 import { GPT_MODELS } from '@/app/utils/const';
-import { getNewsDataFromDB, insertUniqueTitle } from '../database/user-repo';
 import { isAfter, subDays } from 'date-fns';
 
 interface SimilarPredictionMetadata {
@@ -88,6 +87,13 @@ export class AutomaticBettingAgent {
                 baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai/'
             });
         }
+
+        await this.pinecone.createIndex({
+            name: "google_engine",
+            dimension: 1536,
+            metric: 'cosine',
+            spec: { serverless: { cloud: 'aws', region: 'us-east-1' } }
+        });
     }
 
     async analyzePredictions(predictions: Prediction[]): Promise<BetDecision[]> {
@@ -502,7 +508,6 @@ ${this.agent.principles}`;
             });
         });
 
-        // Consider recency if timestamp available
         if (similar.metadata?.created_at) {
             const daysAgo = (Date.now() - new Date(similar.metadata.created_at).getTime()) / (1000 * 60 * 60 * 24);
             score += Math.max(0, 10 - daysAgo) / 10; // Higher score for more recent predictions
@@ -629,7 +634,7 @@ ${this.agent.principles}`;
                                     }
                                     newsData.push(newData);
                                     try {
-                                        await insertUniqueTitle(newData.title, newData.link, newData.date, newData.image, 'google_news');
+                                        await this.insertUniqueTitle(newData.title, newData.link, newData.date, newData.image, 'google_news');
                                     } catch (error) {
                                         console.log("error saving newData error:", error);
                                     }
@@ -646,7 +651,7 @@ ${this.agent.principles}`;
                                 }
                                 newsData.push(newData);
                                 try {
-                                    await insertUniqueTitle(newData.title, newData.link, newData.date, newData.image, 'google_news');
+                                    await this.insertUniqueTitle(newData.title, newData.link, newData.date, newData.image, 'google_news');
                                 } catch (error) {
                                     console.log("error saving newData", error);
                                 }
@@ -714,9 +719,9 @@ ${this.agent.principles}`;
 
             // Gather news for each unique search term
             for (const term of searchTerms) {
-                const newsData = await getNewsDataFromDB(term, 3);
+                const newsData = await this.getNewsDataFromDB(term, 3);
                 if (newsData.length > 0) {
-                    newsResults.push(...newsData);
+                    newsResults.push(...newsData.map(item => item as unknown as NewsItem));
                 } else {
                     console.log("No news found from DB for term:", term);
                     await this.getNewsData([term]);
@@ -1265,6 +1270,64 @@ ${this.agent.principles}`;
         } catch (error) {
             console.error('Error detecting question intent:', error);
             return 'general'; // Default to general on error
+        }
+    }
+
+    private async insertUniqueTitle(title: string, link: string, date: string, image: string, engine: string) {
+        try {
+            const index = this.pinecone.Index('google_engine');
+            const existing = await index.query({
+                vector: await this.getEmbedding(title),
+                topK: 1,
+                includeMetadata: true
+            });
+
+            if (
+                existing.matches &&
+                existing.matches.length > 0 &&
+                existing.matches[0].score &&
+                existing.matches[0].score > 0.9
+            ) {
+                console.log(`Title "${title}" already exists in Pinecone. Skipping insertion.`);
+                return;
+            }
+
+            const vector = await this.getEmbedding(title);
+
+            await index.upsert([{
+                id: title, // Use a unique identifier
+                values: vector,
+                metadata: { title, link, date, image, engine }
+            }]);
+
+            console.log(`Title "${title}" inserted successfully into Pinecone.`);
+        } catch (error) {
+            console.error('Error inserting title into Pinecone:', error);
+        }
+    }
+
+    private async getNewsDataFromDB(interest: string, limit = 5) {
+        try {
+            const index = this.pinecone.Index('google_engine');
+            const interestVector = await this.getEmbedding(interest);
+            const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+            const queryResponse = await index.query({
+                vector: interestVector,
+                topK: limit,
+                includeMetadata: true,
+                filter: {
+                    engine: 'google_news',
+                    date: {
+                        $gt: twentyFourHoursAgo
+                    }
+                }
+            });
+
+            return queryResponse.matches.map(match => match.metadata);
+        } catch (error) {
+            console.error('Error fetching news data from Pinecone:', error);
+            throw error;
         }
     }
 }

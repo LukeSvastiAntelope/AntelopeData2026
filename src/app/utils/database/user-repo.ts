@@ -2,7 +2,7 @@ import bcrypt from "bcryptjs";
 import { openSql as getMySQLConnection } from "./db";
 import { generateConfirmationToken } from "../api/token";
 import { AGENT_RISK_LEVEL } from "../const";
-import { IFormDataAgentProfile, PredictionDB, NewsItem } from "../interface";
+import { IFormDataAgentProfile, PredictionDB } from "../interface";
 import { UserDB, AgentDB, PaymentIntentDB, CreatePredictionInput, IBet } from "../interface";
 import { RowDataPacket, ResultSetHeader } from 'mysql2/promise';
 
@@ -51,8 +51,6 @@ export const UserRepo = {
     updateUserPredictionBalance,
     updatePlatformAccountBalance,
     getBetsStatsByAgentId,
-    getNewsDataFromDB,
-    insertUniqueTitle
 }
 
 async function getBetsStatsByAgentId(agentId: number) {
@@ -825,36 +823,4 @@ async function getLeaderboard() {
             agents.total_winnings`
     );
     return rows;
-}
-
-export async function getNewsDataFromDB(interest: string, limit = 5) {
-    const db = await getMySQLConnection();
-    const [rows] = await db.execute<(NewsItem & RowDataPacket)[]>(
-        `SELECT * FROM google_search WHERE engine = ? AND date > ? AND title LIKE ? ORDER BY date DESC LIMIT ${parseInt(limit.toString(), 10)}`,
-        ['google_news', new Date(Date.now() - 24 * 60 * 60 * 1000), `%${interest}%`]
-    );
-    return rows;
-}
-
-export async function insertUniqueTitle(title: string, link: string, date: string, image: string, engine: string) {
-    const db = await getMySQLConnection();
-    try {
-        // Convert the date to a format that MySQL can accept if necessary
-        const formattedDate = new Date(date).toISOString().slice(0, 19).replace('T', ' ');
-
-        const [existing] = await db.execute<(NewsItem & RowDataPacket)[]>(`SELECT * FROM google_search WHERE title = ?`, [title]);
-
-        if (existing.length > 0) {
-            console.log(`Title "${title}" already exists. Skipping insertion.`);
-            return;
-        }
-
-        await db.execute(
-            'INSERT INTO google_search (title, link, date, image, engine) VALUES (?, ?, ?, ?, ?)',
-            [title, link, formattedDate, image, engine]
-        );
-        console.log(`Title "${title}" inserted successfully.`);
-    } catch (error) {
-        console.error('Error inserting title:', error);
-    }
 }
