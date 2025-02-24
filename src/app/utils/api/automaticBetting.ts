@@ -1294,8 +1294,11 @@ ${this.agent.principles}`;
 
             const vector = await this.getEmbedding(title);
 
+            // Generate a valid ASCII ID
+            const id = this.generateValidId(title);
+
             await index.upsert([{
-                id: title, // Use a unique identifier
+                id: id, // Use the generated ID
                 values: vector,
                 metadata: { title, link, date, image, engine }
             }]);
@@ -1304,6 +1307,10 @@ ${this.agent.principles}`;
         } catch (error) {
             console.error('Error inserting title into Pinecone:', error);
         }
+    }
+
+    private generateValidId(title: string): string {
+        return Buffer.from(title).toString('base64').replace(/[^a-zA-Z0-9]/g, '').substring(0, 20);
     }
 
     private async getNewsDataFromDB(interest: string, limit = 5) {
