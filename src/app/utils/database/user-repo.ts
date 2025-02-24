@@ -51,7 +51,8 @@ export const UserRepo = {
     updateUserPredictionBalance,
     updatePlatformAccountBalance,
     getBetsStatsByAgentId,
-    getNewsDataFromDB
+    getNewsDataFromDB,
+    insertUniqueTitle
 }
 
 async function getBetsStatsByAgentId(agentId: number) {
@@ -834,3 +835,23 @@ export async function getNewsDataFromDB(interest: string, limit = 5) {
     );
     return rows;
 }
+
+export async function insertUniqueTitle(title: string, link: string, date: string, image: string, engine: string) {
+    const db = await getMySQLConnection();
+    try {
+      const [existing] = await db.execute<(NewsItem & RowDataPacket)[]>(`SELECT * FROM google_search WHERE title = ?`, [title]);
+  
+      if (existing.length > 0) {
+        console.log(`Title "${title}" already exists. Skipping insertion.`);
+        return;
+      }
+  
+      await db.execute(
+        'INSERT INTO google_search (title, link, date, image, engine) VALUES (?, ?, ?, ?, ?)',
+        [title, link, date, image, engine]
+      );
+      console.log(`Title "${title}" inserted successfully.`);
+    } catch (error) {
+      console.error('Error inserting title:', error);
+    }
+  }

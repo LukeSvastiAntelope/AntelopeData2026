@@ -6,7 +6,8 @@ import { PineconeRecord } from '@pinecone-database/pinecone';
 import axios from 'axios';
 import { ChatCompletionMessageParam } from 'openai/resources/chat/completions.mjs';
 import { GPT_MODELS } from '@/app/utils/const';
-import { getNewsDataFromDB } from '../database/user-repo';
+import { getNewsDataFromDB, insertUniqueTitle } from '../database/user-repo';
+import { isAfter, subDays } from 'date-fns';
 
 interface SimilarPredictionMetadata {
     description: string;
@@ -19,21 +20,6 @@ interface SimilarPredictionMetadata {
 
 type PineconePredictionMatch = PineconeRecord<SimilarPredictionMetadata>;
 
-interface NewsSearchResult {
-    news_results: {
-        title: string;
-        link: string;
-        source: string;
-        date: string;
-    }[];
-}
-
-interface SerpApiNewsResult {
-    title: string;
-    link: string;
-    source: string;
-    date: string;
-}
 
 interface PredictionAnalysis {
     id: number;
@@ -616,6 +602,100 @@ ${this.agent.principles}`;
             .slice(0, 5);
     }
 
+    private async getNewsData(terms: string[]): Promise<NewsItem[]> {
+        const newsData: NewsItem[] = [];
+        const twentyFourHoursAgo = subDays(new Date(), 1);
+
+        for (const interest of terms) {
+            try {
+                const result = await getJson({
+                    engine: "google_news",
+                    q: interest,
+                    api_key: process.env.SERPAPI_API_KEY,
+                    hl: "en"
+                });
+
+                if (result.news_results) {
+                    for (const item of result.news_results) {
+                        if (item.stories) {
+                            for (const story of item.stories) {
+                                const storyDate = this.parseCustomDateString(story.date);
+                                if (storyDate && isAfter(storyDate, twentyFourHoursAgo)) {
+                                    const newData = {
+                                        title: story.title,
+                                        link: story.link,
+                                        date: storyDate.toISOString(),
+                                        image: story.thumbnail
+                                    }
+                                    newsData.push(newData);
+                                    try {
+                                        await insertUniqueTitle(newData.title, newData.link, newData.date, newData.image, 'google_news');
+                                    } catch (error) {
+                                        console.log("error saving newData error:", error);
+                                    }
+                                } else {
+                                    console.log("storyDate is before 24 hours ago", story.date);
+                                }
+                            }
+                        } else {
+                            const date = this.parseCustomDateString(item.date);
+                            if (date && isAfter(date, twentyFourHoursAgo)) {
+                                const newData = {
+                                    title: item.title,
+                                    link: item.link,
+                                    date: date.toISOString(),
+                                    image: item.thumbnail
+                                }
+                                newsData.push(newData);
+                                try {
+                                    await insertUniqueTitle(newData.title, newData.link, newData.date, newData.image, 'google_news');
+                                } catch (error) {
+                                    console.log("error saving newData", error);
+                                }
+                            } else {
+                                console.log("date is before 24 hours ago", item.date);
+                            }
+                        }
+                    }
+                } else {
+                    console.log("no news data found", result);
+                }
+            } catch (error) {
+                console.log("error getting news data", error);
+            }
+        }
+        return newsData;
+    }
+
+    private parseCustomDateString(dateString: string) {
+        try {
+            // Split the string into date and time components
+            const [datePart, timePart] = dateString.split(', ');
+
+            // Convert the date part to a format that the Date constructor can understand
+            const [month, day, year] = datePart.split('/');
+            const formattedDate = `${year}-${month}-${day}`;
+
+            // Convert 12-hour time format to 24-hour format
+            const [time, period] = timePart.split(' ');
+            const timer = time.split(':');
+            let hours = timer[0];
+            const minutes = timer[1];
+            if (period === 'PM' && hours !== '12') {
+                hours = (parseInt(hours, 10) + 12).toString();
+            } else if (period === 'AM' && hours === '12') {
+                hours = '00';
+            }
+
+            const dateTimeString = `${formattedDate}T${hours}:${minutes}:00Z`;
+
+            const date = new Date(dateTimeString);
+            return date;
+        } catch (error) {
+            console.log("error parsing custom date string", error);
+        }
+    }
+
     private async gatherRelevantNews(predictions: Prediction[]): Promise<NewsItem[]> {
         try {
             const newsResults: NewsItem[] = [];
@@ -642,23 +722,8 @@ ${this.agent.principles}`;
                 if (newsData.length > 0) {
                     newsResults.push(...newsData);
                 } else {
-                    const result = await getJson({
-                        engine: "google_news",
-                        q: term,
-                        api_key: this.SERPAPI_API_KEY,
-                        time: "1d",
-                        num: 3
-                    }) as NewsSearchResult;
-
-                    if (result.news_results) {
-                        const news: NewsItem[] = result.news_results.map((item: SerpApiNewsResult) => ({
-                            title: item.title,
-                            link: item.link,
-                            source: item.source,
-                            date: item.date
-                        }));
-                        newsResults.push(...news);
-                    }
+                    console.log("No news found from DB for term:", term);
+                    await this.getNewsData([term]);
                 }
 
                 await new Promise(resolve => setTimeout(resolve, 200));
@@ -714,17 +779,18 @@ ${this.agent.principles}`;
                 messages: [
                     {
                         role: "system",
-                        content: "You are specialized in extracting key terms from predictions. You are a JSON-only response bot. Return only a valid JSON array of strings without any explanation or additional text."
+                        content: `You are specialized in extracting key terms from predictions. 
+                        You are a JSON-only response bot. 
+                        Return only a valid JSON array of strings without any explanation or additional text.`
                     },
                     {
                         role: "user",
                         content: prompt
                     }
                 ],
-                response_format: { type: 'json_object' }
             });
 
-            console.log(completion.choices[0].message.content);
+            console.log("Key terms:", completion.choices[0].message.content);
             const content = completion.choices[0].message.content || '[]';
             // Extract JSON array if response contains any non-JSON text
             const jsonMatch = content.match(/\[.*\]/);
