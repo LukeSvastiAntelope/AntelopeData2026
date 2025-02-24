@@ -1340,7 +1340,7 @@ ${this.agent.principles}`;
             });
 
             return queryResponse.matches.map(match => {
-                if (match.score && match.score > 0.85) {
+                if (match.score && match.score > 0.8) {
                     return {
                         title: match.metadata?.title as string,
                         link: match.metadata?.link as string,
