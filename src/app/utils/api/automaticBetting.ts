@@ -42,7 +42,6 @@ interface SerpFinanceResult {
     }[];
 }
 
-
 export class AutomaticBettingAgent {
     private agent: IAgentProfile;
     private openai: OpenAI;
@@ -114,6 +113,7 @@ export class AutomaticBettingAgent {
                 if (i + CHUNK_SIZE < predictions.length) {
                     await new Promise(resolve => setTimeout(resolve, 500));
                 }
+                console.log(`Processed ${i + CHUNK_SIZE} predictions`);
             }
 
             return allDecisions;
