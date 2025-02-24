@@ -88,7 +88,7 @@ export class AutomaticBettingAgent {
         }
 
         await this.pinecone.createIndex({
-            name: "google_engine",
+            name: "google-engine",
             dimension: 1536,
             metric: 'cosine',
             spec: { serverless: { cloud: 'aws', region: 'us-east-1' } }
@@ -1275,7 +1275,7 @@ ${this.agent.principles}`;
 
     private async insertUniqueTitle(title: string, link: string, date: string, image: string, engine: string) {
         try {
-            const index = this.pinecone.Index('google_engine');
+            const index = this.pinecone.Index('google-engine');
             const existing = await index.query({
                 vector: await this.getEmbedding(title),
                 topK: 1,
@@ -1308,7 +1308,7 @@ ${this.agent.principles}`;
 
     private async getNewsDataFromDB(interest: string, limit = 5) {
         try {
-            const index = this.pinecone.Index('google_engine');
+            const index = this.pinecone.Index('google-engine');
             const interestVector = await this.getEmbedding(interest);
             const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
