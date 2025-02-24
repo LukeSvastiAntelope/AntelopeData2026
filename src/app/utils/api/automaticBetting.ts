@@ -723,6 +723,7 @@ ${this.agent.principles}`;
             // Gather news for each unique search term
             for (const term of searchTerms) {
                 const newsData = await this.getNewsDataFromDB(term, 3);
+                console.log("newsData", term, ":", newsData);
                 if (newsData.length > 0) {
                     newsResults.push(...newsData.map(item => item as unknown as NewsItem));
                 } else {
@@ -1317,7 +1318,7 @@ ${this.agent.principles}`;
         return Buffer.from(title).toString('base64').replace(/[^a-zA-Z0-9]/g, '').substring(0, 20);
     }
 
-    private async getNewsDataFromDB(interest: string, limit = 5) {
+    private async getNewsDataFromDB(interest: string, limit = 5): Promise<NewsItem[]> {
         try {
             const index = this.pinecone.Index('google-engine');
             const interestVector = await this.getEmbedding(interest);
@@ -1341,15 +1342,15 @@ ${this.agent.principles}`;
             return queryResponse.matches.map(match => {
                 if (match.score && match.score > 0.7) {
                     return {
-                        title: match.metadata?.title,
-                        link: match.metadata?.link,
-                        date: match.metadata?.date,
-                        image: match.metadata?.image,
-                        engine: match.metadata?.engine
+                        title: match.metadata?.title as string,
+                        link: match.metadata?.link as string,
+                        date: match.metadata?.date?.toString() || '', // Provide a default empty string
+                        image: match.metadata?.image as string,
+                        engine: match.metadata?.engine as string
                     }
                 }
                 return null;
-            });
+            }).filter(item => item !== null);
         } catch (error) {
             console.error('Error fetching news data from Pinecone:', error);
             throw error;
