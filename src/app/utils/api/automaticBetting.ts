@@ -87,12 +87,12 @@ export class AutomaticBettingAgent {
             });
         }
 
-        await this.pinecone.createIndex({
-            name: "google-engine",
-            dimension: 1536,
-            metric: 'cosine',
-            spec: { serverless: { cloud: 'aws', region: 'us-east-1' } }
-        });
+        // await this.pinecone.createIndex({
+        //     name: "google-engine",
+        //     dimension: 1536,
+        //     metric: 'cosine',
+        //     spec: { serverless: { cloud: 'aws', region: 'us-east-1' } }
+        // });
     }
 
     async analyzePredictions(predictions: Prediction[]): Promise<BetDecision[]> {
