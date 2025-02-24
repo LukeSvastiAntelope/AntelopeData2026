@@ -1290,7 +1290,7 @@ ${this.agent.principles}`;
                 existing.matches &&
                 existing.matches.length > 0 &&
                 existing.matches[0].score &&
-                existing.matches[0].score > 0.9
+                existing.matches[0].score > 0.95
             ) {
                 console.log(`Title "${title}" already exists in Pinecone. Skipping insertion.`);
                 return;
@@ -1340,7 +1340,7 @@ ${this.agent.principles}`;
             });
 
             return queryResponse.matches.map(match => {
-                if (match.score && match.score > 0.7) {
+                if (match.score && match.score > 0.9) {
                     return {
                         title: match.metadata?.title as string,
                         link: match.metadata?.link as string,
