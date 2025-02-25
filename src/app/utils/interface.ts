@@ -83,7 +83,7 @@ export interface AutomatedPrediction {
     event?: PredictionEvent;  // Optional for sports predictions
     images?: PredictionImage[];
     sources?: string[];
-    principlesApplied?: string[];
+    principlesApplied?: string;
     principleScore?: number;
     userId?: number;
     agentId?: number;

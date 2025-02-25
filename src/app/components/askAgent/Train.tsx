@@ -111,6 +111,17 @@ const Train = ({ agentProfile, setAgentProfile }: IAskAgentProps) => {
         generatePrediction();
     }
 
+    const regenerateQuestion = () => {
+        if (!agentProfile || agentProfile.trainCount == 1 || !trainingPredictions) {
+            toast.error('Agent training is finished')
+            return;
+        }
+        setTrainingPredictionsList(prevList => [...prevList, trainingPredictions]);
+        setTrainingPredictions(null);
+        setIsSubmitted(false)
+        generatePrediction();
+    }
+
     const startTraining = () => {
         setIsTraining(true);
         generatePrediction();
@@ -173,90 +184,92 @@ const Train = ({ agentProfile, setAgentProfile }: IAskAgentProps) => {
                         isThinking ? (
                             <div className="text-white bg-primary-600 rounded-md p-2">Thinking...</div>
                         ) : (
-                            trainingPredictions &&
-                            <div className="space-y-2 px-3 py-2 rounded-md bg-[#2F344E]/20">
-                                <div className="text-white text-xl">{trainingPredictions?.question}</div>
-                                {
-                                    !isSubmitted ?
-                                        <>
-                                            <div className="flex flex-col gap-2">
-                                                <div className="text-white">Choose your answer</div>
-                                                <RadioGroup
-                                                    value={choice || ''}
-                                                    onValueChange={setChoice}
-                                                    className="gap-2"
-                                                >
-                                                    {
-                                                        trainingPredictions.category == "sportDB" ? (
-                                                            <div className="flex gap-2">
-                                                                <Radio value={trainingPredictions.event?.home_team || ''}>
-                                                                    {trainingPredictions.event?.home_team}
-                                                                </Radio>
-                                                                <Radio value={trainingPredictions.event?.away_team || ''}>
-                                                                    {trainingPredictions.event?.away_team}
-                                                                </Radio>
-                                                                {trainingPredictions.event?.league_id != "4391" &&
-                                                                    trainingPredictions.event?.league_id != "4387" && (
-                                                                        <Radio value="Draw">
-                                                                            Draw
-                                                                        </Radio>
-                                                                    )}
-                                                            </div>
-                                                        ) : (
-                                                            <div className="flex gap-2">
-                                                                <Radio value="Yes">Yes</Radio>
-                                                                <Radio value="No">No</Radio>
-                                                            </div>
-                                                        )
-                                                    }
-                                                </RadioGroup>
+                            trainingPredictions ?
+                                <div className="space-y-2 px-3 py-2 rounded-md bg-[#2F344E]/20">
+                                    <div className="text-white text-xl">{trainingPredictions?.question}</div>
+                                    {
+                                        !isSubmitted ?
+                                            <>
+                                                <div className="flex flex-col gap-2">
+                                                    <div className="text-white">Choose your answer</div>
+                                                    <RadioGroup
+                                                        value={choice || ''}
+                                                        onValueChange={setChoice}
+                                                        className="gap-2"
+                                                    >
+                                                        {
+                                                            trainingPredictions.category == "sportDB" ? (
+                                                                <div className="flex gap-2">
+                                                                    <Radio value={trainingPredictions.event?.home_team || ''}>
+                                                                        {trainingPredictions.event?.home_team}
+                                                                    </Radio>
+                                                                    <Radio value={trainingPredictions.event?.away_team || ''}>
+                                                                        {trainingPredictions.event?.away_team}
+                                                                    </Radio>
+                                                                    {trainingPredictions.event?.league_id != "4391" &&
+                                                                        trainingPredictions.event?.league_id != "4387" && (
+                                                                            <Radio value="Draw">
+                                                                                Draw
+                                                                            </Radio>
+                                                                        )}
+                                                                </div>
+                                                            ) : (
+                                                                <div className="flex gap-2">
+                                                                    <Radio value="Yes">Yes</Radio>
+                                                                    <Radio value="No">No</Radio>
+                                                                </div>
+                                                            )
+                                                        }
+                                                    </RadioGroup>
+                                                </div>
+                                                <div className="flex flex-col gap-2">
+                                                    <div className="text-white">Choose amount you would bet</div>
+                                                    <Input
+                                                        type="number"
+                                                        label="Bet Amount"
+                                                        placeholder="Amount"
+                                                        value={betAmount}
+                                                        onChange={(e) => setBetAmount(e.target.value)}
+                                                        classNames={{
+                                                            input: "bg-content0 dark:bg-content0",
+                                                            inputWrapper: "bg-content0 dark:content0"
+                                                        }}
+                                                        aria-label="Enter bet amount for training prediction"
+                                                    />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <div className="text-white">Reason</div>
+                                                    <Textarea
+                                                        type="text"
+                                                        label="Reason"
+                                                        placeholder="Enter the reason for you bet so that the agent can learn how you think"
+                                                        value={reason || ''}
+                                                        onChange={(e) => setReason(e.target.value)}
+                                                        classNames={{
+                                                            input: "bg-content0 dark:bg-content0",
+                                                            inputWrapper: "bg-content0 dark:bg-content0",
+                                                            mainWrapper: "w-full h-[200px]"
+                                                        }}
+                                                        aria-label="Enter reasoning for training prediction"
+                                                    />
+                                                </div>
+                                            </> :
+                                            <div className="text-white bg-gray-800 p-2 rounded-md w-full">I&apos;ve saved your instructions for question {6 - agentProfile.trainCount}</div>
+                                    }
+                                    {
+                                        !isSubmitted ?
+                                            <div className="flex gap-2">
+                                                <Button className="w-full bg-gray-800 text-white py-2 rounded mt-4" onPress={() => setIsTraining(false)}>Cancel</Button>
+                                                <Button className="w-full bg-gray-800 text-white py-2 rounded mt-4" onPress={handleSubmit}>Submit</Button>
+                                            </div> :
+                                            <div className="flex gap-2">
+                                                <Button className="w-full bg-gray-800 text-white py-2 rounded mt-4" onPress={() => setIsTraining(false)}>Stop Training</Button>
+                                                <Button className="w-full bg-gray-800 text-white py-2 rounded mt-4" onPress={setHandleNewQuestion}>New Question</Button>
                                             </div>
-                                            <div className="flex flex-col gap-2">
-                                                <div className="text-white">Choose amount you would bet</div>
-                                                <Input
-                                                    type="number"
-                                                    label="Bet Amount"
-                                                    placeholder="Amount"
-                                                    value={betAmount}
-                                                    onChange={(e) => setBetAmount(e.target.value)}
-                                                    classNames={{
-                                                        input: "bg-content0 dark:bg-content0",
-                                                        inputWrapper: "bg-content0 dark:content0"
-                                                    }}
-                                                    aria-label="Enter bet amount for training prediction"
-                                                />
-                                            </div>
-                                            <div className="space-y-2">
-                                                <div className="text-white">Reason</div>
-                                                <Textarea
-                                                    type="text"
-                                                    label="Reason"
-                                                    placeholder="Enter the reason for you bet so that the agent can learn how you think"
-                                                    value={reason || ''}
-                                                    onChange={(e) => setReason(e.target.value)}
-                                                    classNames={{
-                                                        input: "bg-content0 dark:bg-content0",
-                                                        inputWrapper: "bg-content0 dark:bg-content0",
-                                                        mainWrapper: "w-full h-[200px]"
-                                                    }}
-                                                    aria-label="Enter reasoning for training prediction"
-                                                />
-                                            </div>
-                                        </> :
-                                        <div className="text-white bg-gray-800 p-2 rounded-md w-full">I&apos;ve saved your instructions for question {6 - agentProfile.trainCount}</div>
-                                }
-                                {
-                                    !isSubmitted ?
-                                        <div className="flex gap-2">
-                                            <Button className="w-full bg-gray-800 text-white py-2 rounded mt-4" onPress={() => setIsTraining(false)}>Cancel</Button>
-                                            <Button className="w-full bg-gray-800 text-white py-2 rounded mt-4" onPress={handleSubmit}>Submit</Button>
-                                        </div> :
-                                        <div className="flex gap-2">
-                                            <Button className="w-full bg-gray-800 text-white py-2 rounded mt-4" onPress={() => setIsTraining(false)}>Stop Training</Button>
-                                            <Button className="w-full bg-gray-800 text-white py-2 rounded mt-4" onPress={setHandleNewQuestion}>New Question</Button>
-                                        </div>
-                                }
-                            </div>
+                                    }
+                                </div> :
+                                <Button className="w-full bg-gray-800 text-white py-2 rounded mt-4" onPress={regenerateQuestion}>New Question</Button>
+
                         )
                     }
                 </div>
