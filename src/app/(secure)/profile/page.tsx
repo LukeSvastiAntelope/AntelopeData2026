@@ -10,6 +10,8 @@ import { Skeleton } from "@heroui/skeleton";
 import { useFetch } from "@/app/utils/lib";
 import type { IAgentProfile } from "@/app/utils/interface";
 import { LoginButton, TelegramAuthData } from '@telegram-auth/react';
+import { signIn } from "next-auth/react"
+import { useSession } from "next-auth/react"
 
 // Skeleton for loading state
 const ProfileSkeleton = () => {
@@ -18,7 +20,7 @@ const ProfileSkeleton = () => {
             {/* Profile Info Section Skeleton */}
             <div className="bg-content1/50 backdrop-blur-md rounded-2xl p-8 shadow-lg border border-white/10">
                 <Skeleton className="h-8 w-48 mb-4" /> {/* "Profile Information" heading */}
-                
+
                 {/* Avatar and Upload Button */}
                 <div className="flex flex-col md:flex-row items-center gap-8 mb-6">
                     <Skeleton className="w-[140px] h-[140px] rounded-full" />
@@ -58,8 +60,8 @@ const ProfileSkeleton = () => {
 export default function AgentProfile() {
     const [agent, setAgent] = useState<IAgentProfile | null>(null);
     const [isLoading, setIsLoading] = useState(true);
+    const { data: session } = useSession()
 
-    // For "Profile Info" section
     const [name, setName] = useState("");
     const [description, setDescription] = useState("");
     const [imageUrl, setImageUrl] = useState("");
@@ -75,6 +77,7 @@ export default function AgentProfile() {
 
     const [isSubmittingProfile, setIsSubmittingProfile] = useState(false);
     const [isSubmittingPassword, setIsSubmittingPassword] = useState(false);
+    const [isSubmittingDiscord, setIsSubmittingDiscord] = useState(false);
 
     const fetchData = useFetch();
 
@@ -208,15 +211,62 @@ export default function AgentProfile() {
             username: data.username,
             first_name: data.first_name,
             last_name: data.last_name,
+            type: 'telegram',
         });
         if (response.status) {
             toast.success(response.message || "Telegram connected successfully!");
             // Optionally you can refetch or update local state to show "Connected"
-            setAgent(prev => prev ? { ...prev, platform_id: data.id } : null);
+            setAgent(prev => prev ? { ...prev, platform_accounts: [...prev.platform_accounts, { platform_id: data.id, platform: 'telegram' }] } : null);
         } else {
             toast.error(response.message || "Failed to connect Telegram.");
         }
     }
+
+    const connectDiscord = async () => {
+        setIsSubmittingDiscord(true);
+        try {
+            await signIn("discord", {
+                callbackUrl: window.location.origin + "/profile",
+                redirect: true,
+            });
+        } catch (error) {
+            console.error("Discord connection failed:", error);
+            toast.error("Failed to connect Discord");
+        } finally {
+            setIsSubmittingDiscord(false);
+        }
+    }
+
+    useEffect(() => {
+        const importDiscord = async (name: string, email: string) => {
+            setIsSubmittingDiscord(true);
+            try {
+                const response = await fetchData.post("/api/connectTelegram", {
+                    telegram_id: name,
+                    username: email,
+                    first_name: "",
+                    last_name: "",
+                    type: 'discord',
+                });
+                if (response.status) {
+                    toast.success(response.message || "Discord connected successfully!");
+                    setAgent(prev => prev ? { ...prev, platform_accounts: [...prev.platform_accounts, { platform_id: parseInt(name), platform: 'discord' }] } : null);
+                } else {
+                    toast.error(response.message || "Failed to connect Discord.");
+                }
+            } catch (error) {
+                console.error("Discord connection failed:", error);
+                toast.error("Failed to connect Discord");
+            } finally {
+                setIsSubmittingDiscord(false);
+            }
+        }
+        if (session && agent) {
+            if (session.user?.name && session.user?.email && !agent?.platform_accounts.find(account => account.platform === 'discord')) {
+                importDiscord(session.user.name, session.user.email);
+            }
+        }
+    }, [session]);
 
     if (isLoading) return <ProfileSkeleton />;
 
@@ -290,36 +340,74 @@ export default function AgentProfile() {
                     >
                         Update Profile
                     </Button>
-                    
+
                 </div>
             </div>
 
             {/* Telegram Connection Status */}
             <div className="bg-content1/50 backdrop-blur-md rounded-2xl p-8 shadow-lg hover:shadow-xl transition-all duration-300 border border-white/10">
                 <h2 className="text-base font-bold mb-4">External Connections</h2>
-                {agent?.platform_id ? (
-                    <div className="flex items-center gap-2">
-                        <span className="bg-success-50 text-success-600 px-2 py-1 rounded-lg">
-                            Connected
-                        </span>
-                        {/* Optional: Show Telegram username if you store it */}
-                        {/* <span className="text-white">(@{agent?.telegramUsername})</span> */}
-                    </div>
-                ) : (
-                    <div className="space-y-2">
-                        <p className="text-default-500 text-md">
-                            No Telegram connection is active.
-                        </p>
-                        <LoginButton
-                            botUsername="AntelopeTerminal_Bot"
-                            buttonSize="large"
-                            cornerRadius={5}
-                            showAvatar={true}
-                            lang="en"
-                            onAuthCallback={(data) => connectTelegram(data)}
-                        />
-                    </div>
-                )}
+                <div className="flex max-md:flex-col gap-2">
+                    {
+                        agent?.platform_accounts &&
+                            agent?.platform_accounts.length > 0 &&
+                            agent?.platform_accounts.find(account => account.platform === 'telegram') ?
+                            (
+                                <div className="flex items-center gap-2">
+                                    <span className="bg-success-50 text-success-600 px-2 py-1 rounded-lg">
+                                        Telegram Connected
+                                    </span>
+                                    {/* Optional: Show Telegram username if you store it */}
+                                    {/* <span className="text-white">(@{agent?.telegramUsername})</span> */}
+                                </div>
+                            ) : (
+                                <div className="space-y-2">
+                                    {/* <p className="text-default-500 text-md">
+                                        No Telegram connection is active.
+                                    </p> */}
+                                    <LoginButton
+                                        botUsername="AntelopeTerminal_Bot"
+                                        buttonSize="large"
+                                        cornerRadius={5}
+                                        showAvatar={true}
+                                        lang="en"
+                                        onAuthCallback={(data) => connectTelegram(data)}
+                                    />
+                                </div>
+                            )
+                    }
+                    {
+                        agent?.platform_accounts &&
+                            agent?.platform_accounts.length > 0 &&
+                            agent?.platform_accounts.find(account => account.platform === 'discord') ?
+                            (
+                                <div className="flex items-center gap-2">
+                                    <span className="bg-success-50 text-success-600 px-2 py-1 rounded-lg">
+                                        Discord Connected
+                                    </span>
+                                    {/* Optional: Show Telegram username if you store it */}
+                                    {/* <span className="text-white">(@{agent?.telegramUsername})</span> */}
+                                </div>
+                            ) : (
+                                <div className="space-y-2">
+                                    {/* <p className="text-default-500 text-md">
+                                        No Discord connection is active.
+                                    </p> */}
+                                    <Button
+                                        color="secondary"
+                                        className="bg-[#5865F2] hover:bg-[#4752C4] transition-colors flex items-center gap-2 text-white"
+                                        onPress={connectDiscord}
+                                        isLoading={isSubmittingDiscord}
+                                    >
+                                        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                                            <path d="M19.27 5.33C17.94 4.71 16.5 4.26 15 4a.09.09 0 0 0-.07.03c-.18.33-.39.76-.53 1.09a16.09 16.09 0 0 0-4.8 0c-.14-.34-.35-.76-.54-1.09c-.01-.02-.04-.03-.07-.03c-1.5.26-2.93.71-4.27 1.33c-.01 0-.02.01-.03.02c-2.72 4.07-3.47 8.03-3.1 11.95c0 .02.01.04.03.05c1.8 1.32 3.53 2.12 5.24 2.65c.03.01.06 0 .07-.02c.4-.55.76-1.13 1.07-1.74c.02-.04 0-.08-.04-.09c-.57-.22-1.11-.48-1.64-.78c-.04-.02-.04-.08-.01-.11c.11-.08.22-.17.33-.25c.02-.02.05-.02.07-.01c3.44 1.57 7.15 1.57 10.55 0c.02-.01.05-.01.07.01c.11.09.22.17.33.26c.04.03.04.09-.01.11c-.52.31-1.07.56-1.64.78c-.04.01-.05.06-.04.09c.32.61.68 1.19 1.07 1.74c.03.01.06.02.09.01c1.72-.53 3.45-1.33 5.25-2.65c.02-.01.03-.03.03-.05c.44-4.53-.73-8.46-3.1-11.95c-.01-.01-.02-.02-.04-.02zM8.52 14.91c-1.03 0-1.89-.95-1.89-2.12s.84-2.12 1.89-2.12c1.06 0 1.9.96 1.89 2.12c0 1.17-.84 2.12-1.89 2.12zm6.97 0c-1.03 0-1.89-.95-1.89-2.12s.84-2.12 1.89-2.12c1.06 0 1.9.96 1.89 2.12c0 1.17-.83 2.12-1.89 2.12z" />
+                                        </svg>
+                                        Connect Discord
+                                    </Button>
+                                </div>
+                            )
+                    }
+                </div>
             </div>
 
             {/* Credentials Section */}

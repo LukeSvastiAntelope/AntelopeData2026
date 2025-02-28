@@ -2,6 +2,11 @@ import { SetStateAction } from "react";
 
 import { Dispatch } from "react";
 
+export interface IPlatformAccount {
+    platform_id: number;
+    platform: string;
+}
+
 export interface IAgentProfile {
     id: number;
     name: string;
@@ -22,7 +27,7 @@ export interface IAgentProfile {
     trainCount: number;
     train_index: string;
     ipfs_hash?: string;
-    platform_id: number;
+    platform_accounts: IPlatformAccount[];
     is_bet: number;
     role?: "user" | "admin";
     model: string;
@@ -31,7 +36,7 @@ export interface IAgentProfile {
 }
 
 export interface IFormDataAgentProfile {
-    id: number; 
+    id: number;
     user_id: number;
     name: string;
     description: string;
@@ -261,25 +266,30 @@ export interface UserDB {
 
 export interface AgentDB {
     id: number;
-    user_id: number;
     name: string;
-    image: string;
     description: string;
-    interests: string | string[];
-    principles: string;
+    image: string;
     maxBetSize: number;
+    interests: string |string[];
+    principles: string;
+    riskLevel: string;
     conservativeBetSize: number;
     moderateBetSize: number;
     aggressiveBetSize: number;
-    riskLevel: string;
-    maxTimelineLimit: number;
+    user_id: number;
     category: string;
+    maxTimelineLimit: number;
     wallet_balance: number;
-    escrow_balance: number;
     nft_address: string;
-    platform_id: number;
+    trainCount: number;
+    train_index: string;
+    ipfs_hash?: string;
+    platform_accounts: IPlatformAccount[];
+    is_bet: number;
+    role?: "user" | "admin";
     model: string;
     plugins: string | string[];
+    successRate?: number;
 }
 
 export interface PaymentIntentDB {

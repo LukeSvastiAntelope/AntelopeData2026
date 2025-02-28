@@ -107,21 +107,21 @@ async function getPredictionsfromAdmin() {
     return rows;
 }
 
-async function connectTelegram(userId: string, telegram_id: string, username: string, first_name: string, last_name: string) {
+async function connectTelegram(userId: string, telegram_id: string, username: string, first_name: string, last_name: string, type: string) {
     const db = await getMySQLConnection();
     const telegram_username = username ? username : first_name + ' ' + last_name;
-    const [rows] = await db.execute<(RowDataPacket)[]>('SELECT * FROM platform_accounts WHERE platform_id = ?', [telegram_id]);
+    const [rows] = await db.execute<(RowDataPacket)[]>('SELECT * FROM platform_accounts WHERE platform_id = ? AND platform = ?', [telegram_id, type]);
     if (rows.length > 0) {
         if (rows[0].user_id) {
-            throw new Error('This Telegram account is already connected to another account.');
+            throw new Error(`This ${type} account is already connected to another account.`);
         } else {
             const walletBalance = parseFloat(rows[0].wallet_balance) || 0;
             const escrowBalance = parseFloat(rows[0].escrow_balance) || 0;
 
             // Update platform account with numeric values
             await db.execute(
-                'UPDATE platform_accounts SET user_id = ?, username = ?, wallet_balance = ?, escrow_balance = ? WHERE platform_id = ?',
-                [userId, telegram_username, 0, 0, telegram_id]
+                'UPDATE platform_accounts SET user_id = ?, username = ?, wallet_balance = ?, escrow_balance = ? WHERE platform_id = ? AND platform = ?',
+                [userId, telegram_username, 0, 0, telegram_id, type]
             );
 
             await db.execute(
@@ -132,7 +132,7 @@ async function connectTelegram(userId: string, telegram_id: string, username: st
     } else {
         await db.execute(
             'INSERT INTO platform_accounts (platform_id, user_id, username, platform, wallet_balance, escrow_balance) VALUES (?, ?, ?, ?, ?, ?)',
-            [telegram_id, userId, telegram_username, 'telegram', 0, 0]
+            [telegram_id, userId, telegram_username, type, 0, 0]
         );
     }
 }
@@ -367,13 +367,58 @@ async function getUserByUsername(username: string) {
 async function getAgentByUserId(id: string) {
     const db = await getMySQLConnection();
     const [rows] = await db.execute<(AgentDB & RowDataPacket)[]>(
-        `SELECT agents.*, users.wallet_balance, users.escrow_balance, platform_accounts.platform_id 
-        FROM agents JOIN users ON agents.user_id = users.id
+        `SELECT 
+            agents.*,
+            users.wallet_balance,
+            users.escrow_balance,
+            JSON_ARRAYAGG(
+                IF(platform_accounts.id IS NOT NULL,
+                    JSON_OBJECT(
+                        'platform_id', platform_accounts.platform_id,
+                        'platform', platform_accounts.platform
+                    ),
+                    NULL
+                )
+            ) as platform_accounts
+        FROM agents 
+        JOIN users ON agents.user_id = users.id
         LEFT JOIN platform_accounts ON users.id = platform_accounts.user_id
-        WHERE users.id = ?`,
+        WHERE users.id = ?
+        GROUP BY 
+            agents.id,
+            agents.user_id,
+            agents.name,
+            agents.description,
+            agents.maxBetSize,
+            agents.interests,
+            agents.riskLevel,
+            agents.conservativeBetSize,
+            agents.moderateBetSize,
+            agents.aggressiveBetSize,
+            agents.principles,
+            agents.image,
+            agents.maxTimelineLimit,
+            agents.category,
+            agents.model,
+            agents.plugins,
+            agents.nft_address,
+            agents.ipfs_hash,
+            agents.trainCount,
+            agents.train_index,
+            agents.is_bet,
+            agents.total_winnings`,
         [id]
     );
-    return rows[0];
+
+    if (!rows[0]) return null;
+
+    // Clean up the platform_accounts array
+    return {
+        ...rows[0],
+        platform_accounts: Array.isArray(rows[0].platform_accounts) 
+            ? rows[0].platform_accounts.filter(Boolean)
+            : []
+    };
 }
 
 async function createAgent(id: string) {

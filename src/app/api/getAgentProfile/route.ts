@@ -14,22 +14,26 @@ export async function GET(req: NextRequest) {
         if (!agent) {
             agent = await UserRepo.createAgent(jwtPayload.email as string);
         }
-        agent.interests = agent.interests ? agent.interests : [];
-        if (typeof agent.interests === 'string') {
-            agent.interests = agent.interests.split(',');
+        if (agent) {
+            agent.interests = agent?.interests ? agent?.interests : [];
+            if (typeof agent.interests === 'string') {
+                agent.interests = agent.interests.split(',');
+            }
+            agent.plugins = agent.plugins ? agent.plugins : [];
+            if (typeof agent.plugins === 'string') {
+                agent.plugins = agent.plugins.split(',');
+            }
+            const bets_stats = await UserRepo.getBetsStatsByAgentId(agent.id);
+            const successRate = bets_stats.win_count / (Number(bets_stats.win_count) + Number(bets_stats.lose_count)) * 100;
+            return Response.json({ status: true, agent: agent, successRate: successRate, user: user });
+        } else {
+            return Response.json({ status: false, message: 'Agent not found' });
         }
-        agent.plugins = agent.plugins ? agent.plugins : [];
-        if (typeof agent.plugins === 'string') {
-            agent.plugins = agent.plugins.split(',');
-        }
-        const bets_stats = await UserRepo.getBetsStatsByAgentId(agent.id);
-        const successRate = bets_stats.win_count / (Number(bets_stats.win_count) + Number(bets_stats.lose_count)) * 100;
-        return Response.json({status: true, agent: agent, successRate: successRate, user: user});
     } catch (error) {
         console.error("Error in getAgentProfile: ", error);
-        return Response.json({ 
-            status: false, 
-            message: error instanceof Error ? error.message : 'Internal server error' 
+        return Response.json({
+            status: false,
+            message: error instanceof Error ? error.message : 'Internal server error'
         });
     }
 }

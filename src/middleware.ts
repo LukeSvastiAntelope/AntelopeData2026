@@ -11,6 +11,13 @@ const publicRoutes = [
     '/api/resetPassword',
     '/api/resetLink',
     '/api/resetPassword',
+    '/api/auth/providers',
+    '/api/auth/callback/discord',
+    '/api/auth/session',
+    '/api/auth/signin',
+    '/api/auth/signin/discord',
+    '/api/auth/csrf',
+    '/api/auth/providers',
 ]
 
 export default async function middleware(req: NextRequest) {

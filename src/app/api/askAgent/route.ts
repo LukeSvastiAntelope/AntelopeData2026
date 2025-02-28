@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
       nft_address: agentProfile.nft_address,
       trainCount: agentProfile.trainCount,
       train_index: agentProfile.train_index,
-      platform_id: agentProfile.platform_id,
+      platform_accounts: agentProfile.platform_accounts,
       is_bet: agentProfile.is_bet,
       model: agentProfile.model,
       plugins: agentProfile.plugins

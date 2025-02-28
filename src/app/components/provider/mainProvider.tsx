@@ -2,13 +2,23 @@
 
 import {HeroUIProvider} from "@heroui/react";
 import {ThemeProvider as NextThemesProvider} from "next-themes";
+import { SessionProvider } from "next-auth/react";
+import { Session } from "next-auth";
+import { ReactNode } from "react";
 
-export function Providers({children}: { children: React.ReactNode }) {
+interface ProviderProps {
+  children: ReactNode;
+  session?: Session;
+}
+
+export function Providers({children, session}: ProviderProps) {
   return (
-    <HeroUIProvider>
+    <SessionProvider session={session}>
+      <HeroUIProvider>
       <NextThemesProvider attribute="class" defaultTheme="dark">
         {children}
-      </NextThemesProvider>
-    </HeroUIProvider>
+        </NextThemesProvider>
+      </HeroUIProvider>
+    </SessionProvider>
   )
 }

@@ -46,9 +46,9 @@ export default function RootLayout({
         />
         <Providers>
           <SolProvider>
-            <main className="min-h-screen">
-              {children}
-            </main>
+              <main className="min-h-screen">
+                {children}
+              </main>
           </SolProvider>
         </Providers>
       </body>
