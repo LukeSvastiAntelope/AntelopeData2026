@@ -19,13 +19,12 @@ export const AgentProvider = ({ children }: { children: React.ReactNode }) => {
             return;
         }
         setIsAgentProfileLoading(true);
-        console.log("isPredictionPage", isPredictionPage);
         try {
             const token = typeof window !== 'undefined' ? localStorage.getItem("token") ?? "" : "";
-            console.log("token", token);
             const response = await fetch('/api/getAgentProfile', {
                 headers: {
                     'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json',
                 }
             });
             const data = await response.json();

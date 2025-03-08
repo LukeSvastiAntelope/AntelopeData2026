@@ -8,14 +8,13 @@ import { useEffect, useState } from "react";
 import { useFetch } from "@/app/utils/lib";
 import { toast } from "react-hot-toast";
 import { useParams, useRouter } from "next/navigation";
-import { IBet, PredictionDB } from "@/app/utils/interface";
+import { IBet, PredictionDB, IAgentProfile } from "@/app/utils/interface";
 import { format as formatDateFn } from "date-fns";
 import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter } from "@heroui/modal";
 import { Button } from "@heroui/button";
 import { Input, Textarea } from "@heroui/input";
 import { Select, SelectItem } from "@heroui/select";
 import { Tooltip } from "@heroui/tooltip";
-import { useAgent } from "@/app/context/AgentContext";
 
 interface ChoiceOdds {
   choice: string;
@@ -139,7 +138,7 @@ export default function PredictionDetail() {
   const [betAmount, setBetAmount] = useState("");
   const [betReason, setBetReason] = useState("");
   const [choiceList, setChoiceList] = useState<string[]>([]);
-  const { agent } = useAgent();
+  const [agent, setAgent] = useState<IAgentProfile | null>(null);
 
   // fetch prediction details
   const fetchPredictionDetails = async (id: string, category: string) => {
@@ -241,13 +240,30 @@ export default function PredictionDetail() {
     }
   };
 
+  const fetchAgentProfile = async () => {
+    try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem("token") ?? "" : "";
+      const response = await fetch('/api/getAgentProfile', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        }
+      });
+      const data = await response.json();
+      if (data.status) {
+        setAgent(data.agent);
+      }
+      fetchPredictionDetails(params.id as string, data?.agent?.category ?? "");  
+    } catch (error: unknown) {
+      toast.error("Failed to fetch agent profile: " + (error instanceof Error ? error.message : "Unknown error"));
+    }
+  };
+
   useEffect(() => {
     if (params.id) {
-      if (agent) {
-        fetchPredictionDetails(params.id as string, agent.category as string);
-      }
+      fetchAgentProfile();
     }
-  }, [params.id, agent]);
+  }, [params.id]);
 
   const handleBet = async () => {
     try {

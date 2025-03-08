@@ -9,8 +9,7 @@ import Image from "next/image";
 import AgentProfileDialog from "../components/AgentProfileDialog";
 import { Tooltip as NextUITooltip } from "@heroui/react";
 import PredictionTypeDialog from "../components/PredictionTypeDialog";
-import { AgentProvider } from "../context/AgentContext";
-import { useAgent } from "../context/AgentContext";
+import { IAgentProfile, UserDB } from "../utils/interface";
 
 const AsideSkeleton = () => {
     return (
@@ -71,7 +70,9 @@ const SecureLayout = ({ children }: { children: React.ReactNode }) => {
     const [isAgentProfileOpen, setIsAgentProfileOpen] = useState(false);
     const [isSubmittingProfile, setIsSubmittingProfile] = useState(false);
     const fetchData = useFetch();
-    const { agent, setAgent, isAgentProfileLoading, setIsAgentProfileLoading, user } = useAgent();
+    const [agent, setAgent] = useState<IAgentProfile | null>(null);
+    const [user, setUser] = useState<UserDB | null>(null);
+    const [isAgentProfileLoading, setIsAgentProfileLoading] = useState(false);
 
     const openPredictionDialog = () => {
         setIsOpen(true);
@@ -80,9 +81,21 @@ const SecureLayout = ({ children }: { children: React.ReactNode }) => {
     const fetchAgentProfile = async () => {
         setIsAgentProfileLoading(true);
         try {
-            const response = await fetchData.get('/api/getAgentProfile');
-            if (response.status) {
-                setAgent(response.agent);
+            const token = typeof window !== 'undefined' ? localStorage.getItem("token") ?? "" : "";
+            const response = await fetch('/api/getAgentProfile',
+                {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`,
+                    }
+
+                }
+            );
+            const data = await response.json();
+            if (data.status) {
+                setAgent(data.agent);
+                setUser(data.user);
             }
         } catch (error) {
             throw new Error(error instanceof Error ? error.message : "Failed to fetch agent profile.");
@@ -136,6 +149,9 @@ const SecureLayout = ({ children }: { children: React.ReactNode }) => {
     useEffect(() => {
         if (agent && (!agent.name || !agent.description)) {
             setIsAgentProfileOpen(true);
+        }
+        if (!agent) {
+            fetchAgentProfile();
         }
     }, [agent]);
 
@@ -295,10 +311,4 @@ const SecureLayout = ({ children }: { children: React.ReactNode }) => {
     )
 }
 
-export default function SecureLayoutWrapper({ children }: { children: React.ReactNode }) {
-    return (
-        <AgentProvider>
-            <SecureLayout>{children}</SecureLayout>
-        </AgentProvider>
-    )
-}
+export default SecureLayout;
