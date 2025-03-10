@@ -424,8 +424,8 @@ async function getAgentByUserId(id: string) {
 async function createAgent(id: string) {
     const db = await getMySQLConnection();
     await db.execute(
-        'INSERT INTO agents (user_id, riskLevel, conservativeBetSize, moderateBetSize, aggressiveBetSize) VALUES (?, ?, ?, ?, ?)',
-        [Number(id), AGENT_RISK_LEVEL[0], 0, 0, 0]
+        'INSERT INTO agents (user_id, riskLevel, conservativeBetSize, moderateBetSize, aggressiveBetSize, image) VALUES (?, ?, ?, ?, ?, ?)',
+        [Number(id), AGENT_RISK_LEVEL[0], 0, 0, 0, ""]
     );
     return await getAgentByUserId(id);
 }
