@@ -64,7 +64,7 @@ export default function AgentProfile() {
 
     const [name, setName] = useState("");
     const [description, setDescription] = useState("");
-    const [imageUrl, setImageUrl] = useState("");
+    const [, setImageUrl] = useState("");
 
     // For controlling image file input
     const fileRef = useRef<HTMLInputElement | null>(null);
