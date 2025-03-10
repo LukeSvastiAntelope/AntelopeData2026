@@ -104,6 +104,49 @@ const SecureLayout = ({ children }: { children: React.ReactNode }) => {
         }
     }
 
+    const compressImage = (file: File | Blob): Promise<string> => {
+        return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = new window.Image() as HTMLImageElement;
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    let width = img.width;
+                    let height = img.height;
+
+                    // Reduced maximum dimensions
+                    const MAX_SIZE = 200; // Reduced from 500 to 200
+                    if (width > height) {
+                        if (width > MAX_SIZE) {
+                            height = Math.round((height * MAX_SIZE) / width);
+                            width = MAX_SIZE;
+                        }
+                    } else {
+                        if (height > MAX_SIZE) {
+                            width = Math.round((width * MAX_SIZE) / height);
+                            height = MAX_SIZE;
+                        }
+                    }
+
+                    canvas.width = width;
+                    canvas.height = height;
+
+                    const ctx = canvas.getContext('2d');
+                    ctx?.drawImage(img, 0, 0, width, height);
+
+                    // More aggressive compression
+                    const compressedBase64 = canvas.toDataURL('image/jpeg', 0.3); // Reduced quality to 30%
+
+                    // Remove the data URL prefix to save some bytes
+                    const base64Data = compressedBase64.split(',')[1];
+                    resolve(base64Data);
+                };
+                img.src = e.target?.result as string;
+            };
+            reader.readAsDataURL(file);
+        });
+    };
+
     const handleSaveProfile = async (name: string, description: string, fileRef: React.RefObject<HTMLInputElement>) => {
         if (!name || !description) {
             toast.error("Please fill in all fields.");
@@ -112,20 +155,25 @@ const SecureLayout = ({ children }: { children: React.ReactNode }) => {
         setIsSubmittingProfile(true);
         try {
             // Create multipart form data
-            const formData = new FormData();
-            formData.append("name", name);
-            formData.append("description", description);
+            const agentProfile = {
+                ...agent,
+                name,
+                description,
+            }
 
             // Attach avatar file (if the user selected one)
             const avatarFile = fileRef?.current?.files?.[0];
             if (avatarFile) {
-                formData.append("avatar", avatarFile);
+                const compressedImage = await compressImage(avatarFile);
+                agentProfile.image = compressedImage;
             }
 
             const token = typeof window !== 'undefined' ? localStorage.getItem("token") ?? "" : "";
             const res = await fetch('/api/saveAgentProfile', {
                 method: 'POST',
-                body: formData,
+                body: JSON.stringify({
+                    agent: agentProfile
+                }),
                 headers: {
                     'Authorization': `Bearer ${token}`,
                 }

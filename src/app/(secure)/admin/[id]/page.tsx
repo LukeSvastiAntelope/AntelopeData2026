@@ -144,11 +144,12 @@ export default function PredictionDetail() {
         }
         setIsLoading(true);
         try {
-            const response = await fetchData.get(`/api/getPrediction/${id}`);
-            if (response.status) {
-                setPrediction(response.prediction);
-                if (response.prediction?.bets) {
-                    const betsArray: IBet[] = response.prediction.bets;
+            const response = await fetch(`/api/getPrediction/${id}`);
+            const data = await response.json();
+            if (data.status) {
+                setPrediction(data.prediction);
+                if (data.prediction?.bets) {
+                    const betsArray: IBet[] = data.prediction.bets;
                     const choiceTotals = betsArray.reduce((acc, b) => {
                         const lowerChoice = b.choice.toLowerCase();
                         acc[lowerChoice] = (acc[lowerChoice] || 0) + b.amount;
@@ -182,9 +183,9 @@ export default function PredictionDetail() {
                     );
                     setChoiceOdds(newChoiceOdds);
                 }
-                setChoiceList(response.prediction.choices);
+                setChoiceList(data.prediction.choices);
             } else {
-                toast.error(response.message);
+                toast.error(data.message);
             }
         } catch (error) {
             toast.error("Failed to fetch prediction details: " + error);
