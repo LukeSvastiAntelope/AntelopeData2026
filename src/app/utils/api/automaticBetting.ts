@@ -113,7 +113,7 @@ export class AutomaticBettingAgent {
                 if (i + CHUNK_SIZE < predictions.length) {
                     await new Promise(resolve => setTimeout(resolve, 500));
                 }
-                if (i > 15) {
+                if (i > 20) {
                     console.log(`Processed ${i + CHUNK_SIZE} predictions`);
                     break;
                 }
