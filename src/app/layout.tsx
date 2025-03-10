@@ -23,7 +23,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" style={{ backgroundColor: '#16181c' }}>
-      {/* <head>
+      <head>
         <Script
           src="https://www.googletagmanager.com/gtag/js?id=G-RE8DXNRE5W"
           strategy="afterInteractive"
@@ -36,7 +36,7 @@ export default function RootLayout({
             gtag('config', 'G-RE8DXNRE5W');
           `}
         </Script>
-      </head> */}
+      </head>
       <body
         className={`${rubik.className} antialiased dark text-foreground bg-mainGradient `}
       >
