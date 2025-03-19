@@ -62,7 +62,7 @@ export class AutomaticBettingAgent {
             apiKey: process.env.OPENAI_API_KEY,
         });
         this.agentai = new OpenAI({
-            apiKey: process.env.AGENT_AI_API_KEY,
+            apiKey: process.env.OPENAI_API_KEY,
         });
         this.model = "o3-mini";
     }

@@ -74,9 +74,9 @@ const SecureLayout = ({ children }: { children: React.ReactNode }) => {
     const [user, setUser] = useState<UserDB | null>(null);
     const [isAgentProfileLoading, setIsAgentProfileLoading] = useState(false);
 
-    const openPredictionDialog = () => {
-        setIsOpen(true);
-    }
+    // const openPredictionDialog = () => {
+    //     setIsOpen(true);
+    // }
 
     const fetchAgentProfile = async () => {
         setIsAgentProfileLoading(true);
@@ -203,6 +203,19 @@ const SecureLayout = ({ children }: { children: React.ReactNode }) => {
         }
     }, [agent]);
 
+    useEffect(() => {
+        toast("Please log in to get in on the action and place your bet.",
+            {
+                icon: '🥳',
+                style: {
+                    borderRadius: '10px',
+                    background: '#333',
+                    color: '#fff',
+                },
+            }
+        );
+    }, [])
+
     return (
         <div className='min-h-screen flex items-center justify-start flex-col'>
             <div className="flex text-white max-w-[1200px]">
@@ -291,7 +304,7 @@ const SecureLayout = ({ children }: { children: React.ReactNode }) => {
                                         </>
                                     }
 
-                                    <Link
+                                    {/* <Link
                                         href="#"
                                         onClick={openPredictionDialog}
                                         className="items-center group md:gap-2 text-gray-500 hover:text-white p-2 border border-white/10 rounded-lg w-fit hidden md:flex"
@@ -299,7 +312,7 @@ const SecureLayout = ({ children }: { children: React.ReactNode }) => {
                                         <span className="plus-circle-on group-hover:border-white hidden group-hover:block text-white" />
                                         <span className="plus-circle-off block group-hover:hidden" />
                                         <span className="hidden font-kodemono md:inline-block ">Predict</span>
-                                    </Link>
+                                    </Link> */}
                                 </div>
 
                                 <div className="md:hidden min-w-40px min-h-40px max-w-40px max-h-40px center-logo"></div>
@@ -324,13 +337,13 @@ const SecureLayout = ({ children }: { children: React.ReactNode }) => {
                                         </span>
                                     </Link>
                                     <Link
-                                        href="/logout"
+                                        href="/login"
                                         className="flex items-center text-gray-500 group md:gap-2"
                                     >
                                         <span className="icon-logout block group-hover:hidden" />
                                         <span className="icon-logout-active hidden group-hover:block" />
                                         <span className="text-gray-500 group-hover:text-white font-kodemono">
-                                            <span className="hidden md:inline-block">Log out</span>
+                                            <span className="hidden md:inline-block">Login</span>
                                         </span>
                                     </Link>
 
