@@ -25,7 +25,7 @@ export const GPT_MODELS = [
         key: 'o1',
         label: 'o1',
         type: "openai",
-        modle: 'o1'
+        model: 'o1'
     },
     {
         key: 'gpt-4o',
