@@ -190,8 +190,7 @@ export class AIEnhancedPredictionGenerator {
                         role: "user",
                         content: prompt
                     }
-                ],
-                temperature: 0.3
+                ]
             });
 
             const content = completion.choices[0].message.content?.trim() || "{}";
@@ -463,7 +462,6 @@ export class AIEnhancedPredictionGenerator {
                     },
                     { role: "user", content: prompt }
                 ],
-                temperature: 0.3,
                 response_format: { type: "json_object" }
             });
 
@@ -968,7 +966,6 @@ export class AIEnhancedPredictionGenerator {
                     content: prompt
                 }
             ],
-            temperature: 0.3, // Lower temperature for more consistent output
             max_tokens: 1000
         });
 
@@ -1068,7 +1065,6 @@ export class AIEnhancedPredictionGenerator {
                         content: prompt
                     }
                 ],
-                temperature: 0.7 // Increased temperature for more variety
             });
 
             const content = completion.choices[0].message.content?.trim() || "{}";
