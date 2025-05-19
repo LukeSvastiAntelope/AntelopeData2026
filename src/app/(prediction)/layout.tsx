@@ -180,7 +180,7 @@ const SecureLayout = ({ children }: { children: React.ReactNode }) => {
             });
             const response = await res.json();
             if (response.status) {
-                await fetchData.post('/api/saveAgentJoinAction', { name });
+                await fetchData.post('/api/saveAgentJoinAction', { name, description });
                 await fetchAgentProfile();
                 toast.success("Profile info updated successfully!");
             } else {

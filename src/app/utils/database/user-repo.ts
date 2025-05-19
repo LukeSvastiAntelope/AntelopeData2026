@@ -51,6 +51,9 @@ export const UserRepo = {
     updateUserPredictionBalance,
     updatePlatformAccountBalance,
     getBetsStatsByAgentId,
+    getPredictionTopicConfigs,
+    upsertPredictionTopicConfig,
+    deleteUserById,
 }
 
 async function getBetsStatsByAgentId(agentId: number) {
@@ -423,9 +426,14 @@ async function getAgentByUserId(id: string) {
 
 async function createAgent(id: string) {
     const db = await getMySQLConnection();
+    // Default placeholder avatar - a data URI for a simple avatar
+    const defaultAvatar = "https://api.dicebear.com/7.x/bottts/svg?seed=agent" + id;
+    // Default name
+    const defaultName = "My Agent";
+    
     await db.execute(
-        'INSERT INTO agents (user_id, riskLevel, conservativeBetSize, moderateBetSize, aggressiveBetSize, image) VALUES (?, ?, ?, ?, ?, ?)',
-        [Number(id), AGENT_RISK_LEVEL[0], 0, 0, 0, ""]
+        'INSERT INTO agents (user_id, riskLevel, conservativeBetSize, moderateBetSize, aggressiveBetSize, image, name) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        [Number(id), AGENT_RISK_LEVEL[0], 0, 0, 0, defaultAvatar, defaultName]
     );
     return await getAgentByUserId(id);
 }
@@ -440,7 +448,9 @@ async function updateAgent(id: string, params: IFormDataAgentProfile) {
 
 async function getAgents() {
     const db = await getMySQLConnection();
-    const [rows] = await db.execute<(AgentDB & RowDataPacket)[]>('SELECT * FROM agents');
+    const [rows] = await db.execute<(AgentDB & { username: string } & RowDataPacket)[]>(
+        "SELECT agents.*, users.username FROM agents JOIN users ON agents.user_id = users.id"
+    );
     return rows;
 }
 
@@ -868,4 +878,59 @@ async function getLeaderboard() {
             agents.total_winnings`
     );
     return rows;
+}
+
+async function getPredictionTopicConfigs() {
+    const db = await getMySQLConnection();
+    const [rows] = await db.execute<(RowDataPacket & { topic_type: 'category' | 'interest', topic_value: string, is_disabled: boolean })[]>(
+        "SELECT topic_type, topic_value, is_disabled FROM prediction_topic_configs"
+    );
+    return rows;
+}
+
+async function upsertPredictionTopicConfig(topic_type: 'category' | 'interest', topic_value: string, is_disabled: boolean) {
+    const db = await getMySQLConnection();
+    const [existing] = await db.execute<RowDataPacket[]>(
+        'SELECT * FROM prediction_topic_configs WHERE topic_type = ? AND topic_value = ?',
+        [topic_type, topic_value]
+    );
+
+    if (existing.length > 0) {
+        await db.execute(
+            'UPDATE prediction_topic_configs SET is_disabled = ? WHERE topic_type = ? AND topic_value = ?',
+            [is_disabled, topic_type, topic_value]
+        );
+    } else {
+        await db.execute(
+            'INSERT INTO prediction_topic_configs (topic_type, topic_value, is_disabled) VALUES (?, ?, ?)',
+            [topic_type, topic_value, is_disabled]
+        );
+    }
+}
+
+// New method to delete a user by ID
+async function deleteUserById(userId: number): Promise<{ success: boolean, message?: string }> {
+    const db = await getMySQLConnection();
+    try {
+        // Optional: Check if user exists before attempting delete if desired, though DELETE is idempotent
+        // const [userExists] = await db.execute<RowDataPacket[]>('SELECT id FROM users WHERE id = ?', [userId]);
+        // if (userExists.length === 0) {
+        //     await db.end();
+        //     return { success: false, message: "User not found." };
+        // }
+
+        // Attempt to delete the user
+        // Related records (agents, etc.) should ideally be handled here or by DB cascades
+        const [result] = await db.execute<ResultSetHeader>('DELETE FROM users WHERE id = ?', [userId]);
+        
+        if (result.affectedRows > 0) {
+            return { success: true };
+        } else {
+            return { success: false, message: "User not found or already deleted." };
+        }
+    } catch (error: any) {
+        console.error(`Error deleting user with ID ${userId}:`, error);
+        // Let the API route handle specific DB error messages (like foreign key constraints)
+        throw error; 
+    }
 }

@@ -21,6 +21,7 @@ export interface IAgentProfile {
     aggressiveBetSize: number;
     user_id: number;
     category: string;
+    sport_preference?: string;
     maxTimelineLimit: number;
     wallet_balance: number;
     nft_address: string;
@@ -33,6 +34,22 @@ export interface IAgentProfile {
     model: string;
     plugins: string[];
     successRate?: number;
+    username?: string;
+    created_at?: string;
+    updated_at?: string;
+    temperature?: number;
+    top_p?: number;
+    max_tokens?: number;
+    frequency_penalty?: number;
+    presence_penalty?: number;
+    system_prompt?: string;
+    telegram_chat_id?: string;
+    telegram_username?: string;
+    telegram_first_name?: string;
+    telegram_last_name?: string;
+    telegram_photo_url?: string;
+    is_telegram_connected?: boolean;
+    is_onboarded?: boolean;
 }
 
 export interface IFormDataAgentProfile {
@@ -53,6 +70,8 @@ export interface IFormDataAgentProfile {
     model: string;
     plugins: string;
     is_bet: number;
+    sport_preference?: string;
+    is_onboarded?: boolean;
 }
 
 export interface IPrinciple {
@@ -290,6 +309,7 @@ export interface AgentDB {
     model: string;
     plugins: string | string[];
     successRate?: number;
+    username?: string;
 }
 
 export interface PaymentIntentDB {

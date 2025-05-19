@@ -13,6 +13,10 @@ const Settings = ({ agentProfile, setAgentProfile }: IAskAgentProps) => {
     const [resolutionDate, setResolutionDate] = useState<{ years: number, months: number, days: number }>(convertDaysToYMD(agentProfile?.maxTimelineLimit || 0));
     const fetch = useFetch();
     const { setAgent } = useAgent();
+
+    // Define sports categories, consistent with ContentPreferencesDialog
+    const SPORTS_SUB_CATEGORIES = ["NFL", "NBA", "Soccer", "EPL", "MLB", "NHL", "Tennis", "Golf", "Racing", "Other"];
+
     const addInterest = () => {
         if (newInterest) {
             setAgentProfile(prev => (prev ? { ...prev, interests: [...prev.interests, newInterest] } : null));
@@ -21,6 +25,12 @@ const Settings = ({ agentProfile, setAgentProfile }: IAskAgentProps) => {
     }
 
     const updateAgentProfile = async () => {
+        // Client-side validation
+        if (!agentProfile?.name || agentProfile.name.trim() === '') {
+            toast.error("Agent name is required");
+            return;
+        }
+
         setIsSaving(true);
         try {
             const response = await fetch.post(`/api/updateAgentStrategy`, {
@@ -80,12 +90,30 @@ const Settings = ({ agentProfile, setAgentProfile }: IAskAgentProps) => {
                             onChange={(e) => setAgentProfile(prev => (prev ? { ...prev, category: e.target.value } : null))}
                         >
                             {CATEGORIES.map((category) => (
-                                <SelectItem key={category.toLowerCase()}>{category}</SelectItem>
+                                <SelectItem key={category.toLowerCase()} value={category}>{category}</SelectItem>
                             ))}
                         </Select>
                     </div>
 
                 </div>
+                {/* Conditional Sport Preference Dropdown */}
+                {agentProfile?.category === 'Sports' && (
+                    <div className="flex flex-col gap-2 mt-4">
+                        <div className="text-sm font-regular">Specific Sport (Optional)</div>
+                        <Select
+                            variant="bordered"
+                            className="w-[200px]"
+                            selectedKeys={agentProfile?.sport_preference ? [agentProfile.sport_preference] : []}
+                            onChange={(e) => setAgentProfile(prev => (prev ? { ...prev, sport_preference: e.target.value } : null))}
+                            placeholder="Select a sport"
+                            aria-label="Specific Sport Select"
+                        >
+                            {SPORTS_SUB_CATEGORIES.map((sport) => (
+                                <SelectItem key={sport} value={sport}>{sport}</SelectItem>
+                            ))}
+                        </Select>
+                    </div>
+                )}
                 <div className="flex flex-col gap-2">
                     <div className="text-sm font-regular">Category interests</div>
                     <div className="flex flex-wrap gap-2 mb-4">
@@ -181,45 +209,45 @@ const Settings = ({ agentProfile, setAgentProfile }: IAskAgentProps) => {
                     <Select
                         variant="bordered"
                         className="w-[200px]"
-                        defaultSelectedKeys={[agentProfile?.riskLevel || '']}
+                        selectedKeys={agentProfile?.riskLevel ? [agentProfile.riskLevel] : []}
                         onChange={(e) => setAgentProfile(prev => (prev ? { ...prev, riskLevel: e.target.value } : null))}
                     >
                         {AGENT_RISK_LEVEL.map((level: string) => (
-                            <SelectItem key={level}>{level}</SelectItem>
+                            <SelectItem key={level} value={level}>{level}</SelectItem>
                         ))}
                     </Select>
                 </div>
                 <div className="text-sm font-regular">Betting Size</div>
                 <div className="flex gap-4">
                     <Input
-                        label="Conservative Bet Size"
+                        label="Small Bet Size"
                         type="number"
                         endContent={<span className="text-gray-500">credits</span>}
                         variant="bordered"
                         value={agentProfile?.conservativeBetSize?.toString() || '0'}
                         onChange={(e) => setAgentProfile(prev => (prev ? { ...prev, conservativeBetSize: parseInt(e.target.value) } : null))}
                         min={0}
-                        aria-label="Conservative bet size in credits"
+                        aria-label="Small bet size in credits"
                     />
                     <Input
-                        label="Moderate Bet Size"
+                        label="Medium Bet Size"
                         type="number"
                         endContent={<span className="text-gray-500">credits</span>}
                         variant="bordered"
                         value={agentProfile?.moderateBetSize?.toString() || '0'}
                         onChange={(e) => setAgentProfile(prev => (prev ? { ...prev, moderateBetSize: parseInt(e.target.value) } : null))}
                         min={0}
-                        aria-label="Moderate bet size in credits"
+                        aria-label="Medium bet size in credits"
                     />
                     <Input
-                        label="Aggressive Bet Size"
+                        label="Large Bet Size"
                         type="number"
                         endContent={<span className="text-gray-500">credits</span>}
                         variant="bordered"
                         value={agentProfile?.aggressiveBetSize?.toString() || '0'}
                         onChange={(e) => setAgentProfile(prev => (prev ? { ...prev, aggressiveBetSize: parseInt(e.target.value) } : null))}
                         min={0}
-                        aria-label="Aggressive bet size in credits"
+                        aria-label="Large bet size in credits"
                     />
                 </div>
             </div>

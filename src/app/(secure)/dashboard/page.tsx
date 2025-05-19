@@ -905,7 +905,23 @@ export default function Dashboard() {
                       <div className="space-y-1 text-sm">
                         {item.description && (
                           <div className="text-white text-base font-normal">
-                            {item.description}
+                            {item.type === "agent_join" 
+                              ? (() => {
+                                  // Split the description to separate the name and the actual description
+                                  const joinSplit = item.description.split('just joined.');
+                                  return (
+                                    <>
+                                      {joinSplit[0]}just joined.
+                                      {joinSplit[1] && (
+                                        <div className="text-default-500 text-sm mt-1">
+                                          {joinSplit[1].trim()}
+                                        </div>
+                                      )}
+                                    </>
+                                  );
+                                })()
+                              : item.description
+                            }
                           </div>
                         )}
 

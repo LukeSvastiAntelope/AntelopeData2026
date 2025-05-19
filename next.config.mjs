@@ -9,7 +9,27 @@ const nextConfig = {
         CREDIT_BALANCE: process.env.CREDIT_BALANCE,
     },
     images: {
-        domains: ['www.thesportsdb.com', 'gateway.pinata.cloud'],
+        remotePatterns: [
+            {
+                protocol: 'https',
+                hostname: 'www.thesportsdb.com',
+            },
+            {
+                protocol: 'https',
+                hostname: 'gateway.pinata.cloud',
+            },
+            {
+                protocol: 'https',
+                hostname: 'api.dicebear.com',
+            },
+            {
+                protocol: 'https',
+                hostname: 'oaidalleapiprodscus.blob.core.windows.net',
+            }
+        ],
+        dangerouslyAllowSVG: true,
+        contentDispositionType: 'attachment',
+        contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
     },
 };
 
