@@ -3,9 +3,9 @@ import { UserRepo } from "@/app/utils/database/user-repo";
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const betId = params.id;
+  const betId = (await params).id;
 
   if (!betId) {
     return NextResponse.json({ status: false, message: "Bet ID is required" }, { status: 400 });

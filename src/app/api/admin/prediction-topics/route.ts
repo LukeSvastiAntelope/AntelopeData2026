@@ -29,7 +29,7 @@ function normalizeString(str: string): string {
     return str.toLowerCase().trim();
 }
 
-export async function GET(req: NextRequest) {
+export async function GET() {
     try {
         const agents: (AgentDB & { username?: string })[] = await UserRepo.getAgents();
         const topicConfigs = await UserRepo.getPredictionTopicConfigs();

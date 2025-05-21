@@ -10,24 +10,23 @@ import { Button } from "@heroui/button";
 import { useRef, useState, useEffect } from "react";
 import Image from "next/image";
 import { Spinner } from "@heroui/spinner";
-import { Tooltip } from "@heroui/tooltip";
 import toast from "react-hot-toast";
 
 // Helper function to get available categories
-const getCategories = () => {
-    try {
-        // Check if we can access the categories from window (client-side)
-        return typeof window !== 'undefined' && window?.__NEXT_DATA__?.props?.pageProps?.categories || [];
-    } catch (error) {
-        return [];
-    }
-};
+// const getCategories = () => {
+//     try {
+//         // Check if we can access the categories from window (client-side)
+//         return typeof window !== 'undefined' && window?.__NEXT_DATA__?.props?.pageProps?.categories || [];
+//     } catch (error) {
+//         return [];
+//     }
+// };
 
 const AgentProfileDialog = (
     { isOpen, onClose, name, description, image, isSubmittingProfile, handleSaveProfile }:
         {
             isOpen: boolean, onClose: () => void, name: string, description: string, image: string,
-            isSubmittingProfile: boolean, handleSaveProfile: (name: string, description: string, fileRef: React.RefObject<HTMLInputElement>, imagePreview: string) => void
+            isSubmittingProfile: boolean, handleSaveProfile: (name: string, description: string, fileRef: React.RefObject<HTMLInputElement | null>, imagePreview: string) => Promise<void>
         }
 ) => {
     const [agentName, setAgentName] = useState(name);

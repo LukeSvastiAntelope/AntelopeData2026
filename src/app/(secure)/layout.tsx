@@ -141,7 +141,7 @@ const SecureLayout = ({ children }: { children: React.ReactNode }) => {
         });
     };
 
-    const handleSaveProfile = async (name: string, description: string, fileRef: React.RefObject<HTMLInputElement>, imagePreview: string) => {
+    const handleSaveProfile = async (name: string, description: string, fileRef: React.RefObject<HTMLInputElement | null>, imagePreview: string) => {
         if (!name || !description) {
             toast.error("Please fill in all fields.");
             return;
@@ -234,6 +234,7 @@ const SecureLayout = ({ children }: { children: React.ReactNode }) => {
                 setGeneratedPrinciples("1. Make data-driven decisions.\n2. Diversify bets across different opportunities.\n3. Review and refine betting approach regularly.");
             }
         } catch (error) {
+            console.log(error);
             toast.error("Error calling principles generation API. Using defaults.");
             setGeneratedPrinciples("1. Analyze market trends thoroughly.\n2. Manage bankroll effectively.\n3. Adapt strategies based on performance.");
         } finally {
@@ -257,7 +258,7 @@ const SecureLayout = ({ children }: { children: React.ReactNode }) => {
         }
         setIsSubmittingProfile(true);
         try {
-            const agentPrefsData: any = {
+            const agentPrefsData = {
                 id: agent.id,
                 user_id: agent.user_id,
                 name: agent.name,

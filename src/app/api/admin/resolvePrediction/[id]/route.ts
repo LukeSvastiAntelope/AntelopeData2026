@@ -4,12 +4,12 @@ import { PredictionDB } from "@/app/utils/interface";
 
 export async function POST(
     req: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     const { outcome, type } = await req.json();
     try {
         if (type === "manual" && outcome) {
-            const prediction = await UserRepo.getPredictionById(params.id);
+            const prediction = await UserRepo.getPredictionById((await params).id);
             if (prediction) {
                 await resolvePrediction(prediction, outcome);
             } else {
@@ -19,7 +19,7 @@ export async function POST(
                 });
             }
         } else {
-            const prediction = await UserRepo.getPredictionById(params.id);
+            const prediction = await UserRepo.getPredictionById((await params).id);
             if (prediction) {
                 const result = await verifyPrediction(prediction);
                 if (result) {

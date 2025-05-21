@@ -421,7 +421,7 @@ export interface IAskAgentProps {
 
 export interface ChatMessage {
     role: "user" | "agent";
-    content: string | JSX.Element;
+    content: string | React.ReactNode;
     type: "training" | "ask" | "strategy";
 }
 

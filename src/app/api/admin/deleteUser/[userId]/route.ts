@@ -34,7 +34,7 @@ async function isAdmin(req: NextRequest): Promise<boolean> {
 }
 
 
-export async function DELETE(req: NextRequest, { params }: { params: { userId: string } }) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ userId: string }> }) {
     try {
         // 1. Authenticate and Authorize: Check if the user is an admin
         const isAdminUser = await isAdmin(req);
@@ -42,7 +42,7 @@ export async function DELETE(req: NextRequest, { params }: { params: { userId: s
             return NextResponse.json({ status: false, message: 'Unauthorized: Admin access required.' }, { status: 403 });
         }
 
-        const userIdString = params.userId;
+        const userIdString = (await params).userId;
         if (!userIdString) {
             return NextResponse.json({ status: false, message: 'User ID is required.' }, { status: 400 });
         }

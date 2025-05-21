@@ -1,4 +1,3 @@
-
 import NextAuth, { Session } from "next-auth"
 import Discord from "next-auth/providers/discord"
 import { JWT } from 'next-auth/jwt';
@@ -10,7 +9,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     strategy: "jwt",
   },
   callbacks: {
-    async jwt({ token, account }: { token: JWT, account: Account | null }) {
+    async jwt({ token, account, user }: { token: JWT, account?: Account | null, user?: any }) {
       if (account) {
           token.accessToken = account.access_token
           token.name = account.providerAccountId.toString();

@@ -3,11 +3,11 @@ import { UserRepo } from "@/app/utils/database/user-repo";
 
 export async function GET(
     req: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
         // Get prediction details
-        const prediction = await UserRepo.getPredictionById(params.id);
+        const prediction = await UserRepo.getPredictionById((await params).id);
         if (prediction && prediction.choices && typeof prediction.choices === 'string') {
             prediction.choices = JSON.parse(prediction.choices);
         }

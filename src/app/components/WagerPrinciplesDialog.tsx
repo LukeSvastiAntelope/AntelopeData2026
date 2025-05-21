@@ -52,16 +52,16 @@ const WagerPrinciplesDialog = ({
             }}
         >
             <ModalContent>
-                <ModalHeader className="text-white">Define Your Agent's Wager Principles</ModalHeader>
+                <ModalHeader className="text-white">Define Your Agent&apos;s Wager Principles</ModalHeader>
                 <ModalBody className="space-y-4">
                     <div>
                         <p className="text-sm text-gray-400 mb-1">
-                            Based on your agent's profile, we've drafted some initial wager principles.
-                            These principles will guide your agent's betting decisions. 
+                            Based on your agent&apos;s profile, we&apos;ve drafted some initial wager principles.
+                            These principles will guide your agent&apos;s betting decisions. 
                             Review and edit them as you see fit, or skip this step for now.
                         </p>
                         <p className="text-xs text-gray-500 mb-2">
-                            You can always update these later in your agent's profile settings.
+                            You can always update these later in your agent&apos;s profile settings.
                         </p>
                     </div>
                     {isLoadingExternally ? (

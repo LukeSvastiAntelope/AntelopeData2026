@@ -3,13 +3,13 @@
 import { PublicLayout } from "@/app/components/PublicLayout";
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from "react";
-import { Button } from "@nextui-org/button";
-import { Spinner } from "@nextui-org/spinner"; // Assuming NextUI for Spinner
-import { Card, CardHeader, CardBody, CardFooter } from "@nextui-org/card";
-import { Chip } from "@nextui-org/chip";
+import { Button } from "@heroui/button";
+import { Spinner } from "@heroui/spinner"; // Assuming NextUI for Spinner
+import { Card, CardHeader, CardBody, CardFooter } from "@heroui/card";
+import { Chip } from "@heroui/chip";
 import NextLink from "next/link";
-import { Image as NextUIImage } from "@nextui-org/image"; // Import NextUI Image
-import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter as NextUIModalFooter, useDisclosure } from "@nextui-org/modal"; // Corrected Modal imports
+import { Image as NextUIImage } from "@heroui/image"; // Import NextUI Image
+import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter as NextUIModalFooter, useDisclosure } from "@heroui/modal"; // Corrected Modal imports
 
 // Define a type for the bet details we expect
 interface PublicBetDetails {

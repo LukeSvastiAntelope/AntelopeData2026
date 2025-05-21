@@ -3,9 +3,9 @@ import { UserRepo } from "@/app/utils/database/user-repo";
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const predictionId = params.id;
+  const predictionId = (await params).id;
 
   if (!predictionId) {
     return NextResponse.json({ status: false, message: "Prediction ID is required" }, { status: 400 });

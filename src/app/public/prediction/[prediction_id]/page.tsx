@@ -3,11 +3,11 @@
 import { PublicLayout } from "@/app/components/PublicLayout";
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from "react";
-import { Button } from "@nextui-org/button";
-import { Spinner } from "@nextui-org/spinner";
-import { Card, CardHeader, CardBody, CardFooter, CardProps } from "@nextui-org/card";
-import { Chip } from "@nextui-org/chip";
-import { Image } from "@nextui-org/image";
+import { Button } from "@heroui/button";
+import { Spinner } from "@heroui/spinner";
+import { Card, CardHeader, CardBody, CardFooter, CardProps } from "@heroui/card";
+import { Chip } from "@heroui/chip";
+import { Image } from "@heroui/image";
 import NextLink from "next/link";
 
 // Define a type for individual bets within a prediction
@@ -131,7 +131,7 @@ export default function PublicPredictionDetailPage() {
                     {predictionDetails.status}
                 </Chip>
             </p>
-            {predictionDetails.creator_choice && <p><strong>Creator's Choice:</strong> {predictionDetails.creator_choice}</p>}
+            {predictionDetails.creator_choice && <p><strong>Creator&apos;s Choice:</strong> {predictionDetails.creator_choice}</p>}
             {predictionDetails.predicted_outcome && <p><strong>Agent Predicted Outcome:</strong> {predictionDetails.predicted_outcome}</p>}
             {predictionDetails.choices && predictionDetails.choices.length > 0 && (
               <p><strong>Possible Choices:</strong> {predictionDetails.choices.join(", " )}</p>

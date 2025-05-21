@@ -4,11 +4,9 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
 import { Spinner } from "@heroui/spinner";
-import { Chip } from "@heroui/chip";
 import { Button } from "@heroui/button";
 import { Image } from "@heroui/image";
 import { Tooltip } from "@heroui/tooltip";
-import { Link } from "@heroui/link";
 import { PublicLayout } from "./components/PublicLayout";
 
 interface IActivity {
@@ -45,7 +43,7 @@ const filterActivity = (activity: IActivity[], searchTerm: string): IActivity[] 
 
 function PublicDashboard() {
   const [activeTab, setActiveTab] = useState<"bets" | "predictions" | "activity">("activity");
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, ] = useState('');
   
   // Activity state
   const [isLoadingActivity, setIsLoadingActivity] = useState<boolean>(true);

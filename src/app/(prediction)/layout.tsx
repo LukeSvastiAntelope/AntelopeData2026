@@ -147,7 +147,7 @@ const SecureLayout = ({ children }: { children: React.ReactNode }) => {
         });
     };
 
-    const handleSaveProfile = async (name: string, description: string, fileRef: React.RefObject<HTMLInputElement>) => {
+    const handleSaveProfile = async (name: string, description: string, fileRef: React.RefObject<HTMLInputElement | null>, imagePreview: string) => {
         if (!name || !description) {
             toast.error("Please fill in all fields.");
             return;

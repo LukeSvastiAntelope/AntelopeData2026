@@ -936,7 +936,7 @@ async function deleteUserById(userId: number): Promise<{ success: boolean, messa
             await db.rollback();
             throw error;
         }
-    } catch (error: any) {
+    } catch (error) {
         console.error(`Error deleting user with ID ${userId}:`, error);
         throw error;
     }
