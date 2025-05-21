@@ -16,7 +16,6 @@ import {
 import "@solana/wallet-adapter-react-ui/styles.css";
 
 export function SolProvider({ children }: { children: React.ReactNode }) {
-
     const network = WalletAdapterNetwork.Devnet;
     const endpoint = useMemo(() => clusterApiUrl(network), [network]);
 
@@ -26,12 +25,12 @@ export function SolProvider({ children }: { children: React.ReactNode }) {
             new LedgerWalletAdapter(),
             new MathWalletAdapter(),
         ],
-        [network]
+        []
     );
 
     return (
         <ConnectionProvider endpoint={endpoint}>
-            <WalletProvider wallets={wallets}>
+            <WalletProvider wallets={wallets} autoConnect>
                 <WalletModalProvider>
                     {children}
                 </WalletModalProvider>

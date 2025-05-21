@@ -10,6 +10,7 @@ import {
 import { Select, SelectItem } from "@heroui/select";
 import { Input } from "@heroui/input";
 import { Button } from "@heroui/button";
+import { Chip } from "@heroui/chip";
 import { useState, useEffect } from "react";
 import { IAgentProfile } from "@/app/utils/interface"; // Assuming IAgentProfile is here
 
@@ -23,6 +24,7 @@ interface ContentPreferencesDialogProps {
         moderateBetSize: number;
         aggressiveBetSize: number;
         sportPreference?: string;
+        interests?: string[];
     }) => void;
     onSkip: () => void;
     agent: IAgentProfile | null; // To pre-fill if values already exist, though defaults are for first-time
@@ -45,6 +47,8 @@ const ContentPreferencesDialog = ({
     const [moderateBetSize, setModerateBetSize] = useState(30);
     const [aggressiveBetSize, setAggressiveBetSize] = useState(90);
     const [sportPreference, setSportPreference] = useState("");
+    const [interests, setInterests] = useState<string[]>([]);
+    const [newInterest, setNewInterest] = useState("");
 
     useEffect(() => {
         if (isOpen && agent) {
@@ -54,6 +58,7 @@ const ContentPreferencesDialog = ({
             setConservativeBetSize(agent.conservativeBetSize || 10);
             setModerateBetSize(agent.moderateBetSize || 30);
             setAggressiveBetSize(agent.aggressiveBetSize || 90);
+            setInterests(agent.interests || []);
             if (currentCategory === "Sports") {
                 setSportPreference(agent.sport_preference || "");
             } else {
@@ -66,6 +71,7 @@ const ContentPreferencesDialog = ({
             setModerateBetSize(30);
             setAggressiveBetSize(90);
             setSportPreference("");
+            setInterests([]);
         }
     }, [isOpen, agent]);
 
@@ -75,6 +81,17 @@ const ContentPreferencesDialog = ({
         }
     }, [category]);
 
+    const addInterest = () => {
+        if (newInterest && !interests.includes(newInterest)) {
+            setInterests([...interests, newInterest]);
+            setNewInterest("");
+        }
+    };
+
+    const removeInterest = (interest: string) => {
+        setInterests(interests.filter(i => i !== interest));
+    };
+
     const handleSaveClick = () => {
         const prefsToSave: any = {
             category,
@@ -82,6 +99,7 @@ const ContentPreferencesDialog = ({
             conservativeBetSize,
             moderateBetSize,
             aggressiveBetSize,
+            interests: category !== "Sports" ? interests : [],
         };
         if (category === "Sports" && sportPreference) {
             prefsToSave.sportPreference = sportPreference;
@@ -104,7 +122,7 @@ const ContentPreferencesDialog = ({
                 <ModalBody className="space-y-4">
                     <div>
                         <p className="text-sm text-gray-400 mb-2">
-                            Help us tailor your experience by setting your preferred content category, risk appetite, and default betting sizes. You can change these later in your profile.
+                            Help us tailor your experience by setting your preferred content category, interests, risk appetite, and default betting sizes. You can change these later in your profile.
                         </p>
                     </div>
                     <Select
@@ -125,7 +143,7 @@ const ContentPreferencesDialog = ({
                         ))}
                     </Select>
 
-                    {category === "Sports" && (
+                    {category === "Sports" ? (
                         <Select
                             label="Specific Sport (Optional)"
                             selectedKeys={sportPreference ? [sportPreference] : []}
@@ -143,6 +161,40 @@ const ContentPreferencesDialog = ({
                                 </SelectItem>
                             ))}
                         </Select>
+                    ) : (
+                        <div className="space-y-2">
+                            <div className="text-white/60 text-sm">Category Interests</div>
+                            <div className="flex flex-wrap gap-2 mb-2">
+                                {interests.map((interest) => (
+                                    <Chip
+                                        key={interest}
+                                        onClose={() => removeInterest(interest)}
+                                        variant="flat"
+                                        className="bg-[#2c2c2c] text-white"
+                                    >
+                                        {interest}
+                                    </Chip>
+                                ))}
+                            </div>
+                            <div className="flex gap-2">
+                                <Input
+                                    placeholder="Enter an interest"
+                                    value={newInterest}
+                                    onChange={(e) => setNewInterest(e.target.value)}
+                                    onKeyPress={(e) => e.key === 'Enter' && addInterest()}
+                                    classNames={{
+                                        input: "bg-[#2c2c2c] text-white",
+                                    }}
+                                />
+                                <Button
+                                    color="primary"
+                                    onPress={addInterest}
+                                    className="bg-blue-500"
+                                >
+                                    Add
+                                </Button>
+                            </div>
+                        </div>
                     )}
 
                     <Select

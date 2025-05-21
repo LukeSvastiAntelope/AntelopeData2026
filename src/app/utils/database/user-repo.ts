@@ -432,8 +432,8 @@ async function createAgent(id: string) {
     const defaultName = "My Agent";
     
     await db.execute(
-        'INSERT INTO agents (user_id, riskLevel, conservativeBetSize, moderateBetSize, aggressiveBetSize, image, name) VALUES (?, ?, ?, ?, ?, ?, ?)',
-        [Number(id), AGENT_RISK_LEVEL[0], 0, 0, 0, defaultAvatar, defaultName]
+        'INSERT INTO agents (user_id, riskLevel, conservativeBetSize, moderateBetSize, aggressiveBetSize, image, name, is_onboarded) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        [Number(id), AGENT_RISK_LEVEL[0], 0, 0, 0, defaultAvatar, defaultName, 0]
     );
     return await getAgentByUserId(id);
 }
@@ -857,6 +857,7 @@ async function getLeaderboard() {
             (SUM(CASE WHEN predictions.outcome = bets.choice AND bets.is_secret = 0 THEN 1 ELSE 0 END) / 
              NULLIF(SUM(CASE WHEN predictions.status = 'resolved' THEN 1 ELSE 0 END), 0)) as win_rate
         FROM agents 
+        JOIN users ON agents.user_id = users.id
         LEFT JOIN bets ON agents.id = bets.agent_id AND bets.is_secret = 0
         LEFT JOIN predictions ON bets.prediction_id = predictions.id
         GROUP BY 
@@ -912,25 +913,31 @@ async function upsertPredictionTopicConfig(topic_type: 'category' | 'interest', 
 async function deleteUserById(userId: number): Promise<{ success: boolean, message?: string }> {
     const db = await getMySQLConnection();
     try {
-        // Optional: Check if user exists before attempting delete if desired, though DELETE is idempotent
-        // const [userExists] = await db.execute<RowDataPacket[]>('SELECT id FROM users WHERE id = ?', [userId]);
-        // if (userExists.length === 0) {
-        //     await db.end();
-        //     return { success: false, message: "User not found." };
-        // }
+        // Start a transaction to ensure data consistency
+        await db.beginTransaction();
 
-        // Attempt to delete the user
-        // Related records (agents, etc.) should ideally be handled here or by DB cascades
-        const [result] = await db.execute<ResultSetHeader>('DELETE FROM users WHERE id = ?', [userId]);
-        
-        if (result.affectedRows > 0) {
-            return { success: true };
-        } else {
-            return { success: false, message: "User not found or already deleted." };
+        try {
+            // Delete associated agents first
+            await db.execute('DELETE FROM agents WHERE user_id = ?', [userId]);
+            
+            // Delete the user
+            const [result] = await db.execute<ResultSetHeader>('DELETE FROM users WHERE id = ?', [userId]);
+            
+            // Commit the transaction
+            await db.commit();
+
+            if (result.affectedRows > 0) {
+                return { success: true };
+            } else {
+                return { success: false, message: "User not found or already deleted." };
+            }
+        } catch (error) {
+            // If anything goes wrong, roll back the transaction
+            await db.rollback();
+            throw error;
         }
     } catch (error: any) {
         console.error(`Error deleting user with ID ${userId}:`, error);
-        // Let the API route handle specific DB error messages (like foreign key constraints)
-        throw error; 
+        throw error;
     }
 }

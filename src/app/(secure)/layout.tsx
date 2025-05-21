@@ -195,7 +195,9 @@ const SecureLayout = ({ children }: { children: React.ReactNode }) => {
             setIsSubmittingProfile(false);
             if (profileUpdatedSuccessfully) {
                 setIsAgentProfileOpen(false);
-                setIsContentPrefsOpen(true);
+                setTimeout(() => {
+                    setIsContentPrefsOpen(true);
+                }, 100);
             }
         }
     };
@@ -247,6 +249,7 @@ const SecureLayout = ({ children }: { children: React.ReactNode }) => {
         moderateBetSize: number;
         aggressiveBetSize: number;
         sportPreference?: string;
+        interests?: string[];
     }) => {
         if (!agent) {
             toast.error("Agent data not available. Cannot save preferences.");
@@ -267,7 +270,7 @@ const SecureLayout = ({ children }: { children: React.ReactNode }) => {
                 aggressiveBetSize: preferences.aggressiveBetSize,
                 sport_preference: preferences.sportPreference,
                 maxBetSize: agent.maxBetSize,
-                interests: agent.interests,
+                interests: preferences.interests || [],
                 principles: agent.principles,
                 maxTimelineLimit: agent.maxTimelineLimit,
                 model: agent.model,
@@ -294,7 +297,9 @@ const SecureLayout = ({ children }: { children: React.ReactNode }) => {
                 toast.success("Content preferences saved!");
                 await fetchAgentProfile();
                 setIsContentPrefsOpen(false);
-                triggerGenerateAndShowPrinciplesDialog();
+                setTimeout(() => {
+                    triggerGenerateAndShowPrinciplesDialog();
+                }, 100);
             } else {
                 toast.error(response.message || "Failed to save preferences.");
             }
@@ -390,15 +395,24 @@ const SecureLayout = ({ children }: { children: React.ReactNode }) => {
     };
 
     useEffect(() => {
-        if (agent && (agent.is_onboarded === false || typeof agent.is_onboarded === 'undefined')) {
-            if (!agent.description) {
-                setIsAgentProfileOpen(true);
+        if (agent && !isAgentProfileLoading) {
+            // Check if agent needs onboarding
+            const needsOnboarding = typeof agent.is_onboarded === 'undefined' || 
+                                  agent.is_onboarded === false ||
+                                  (typeof agent.is_onboarded === 'number' && agent.is_onboarded === 0);
+            const hasIncompleteProfile = !agent.description || agent.description.trim() === '';
+
+            if (needsOnboarding) {
+                if (hasIncompleteProfile) {
+                    setIsAgentProfileOpen(true);
+                } else if (!agent.category || !agent.riskLevel) {
+                    setIsContentPrefsOpen(true);
+                } else if (!agent.principles || agent.principles.trim() === '') {
+                    setIsWagerPrinciplesOpen(true);
+                }
             }
-        } else if (agent && agent.is_onboarded === true) {
-            setIsAgentProfileOpen(false);
-            setIsContentPrefsOpen(false);
         }
-    }, [agent]);
+    }, [agent, isAgentProfileLoading]);
 
     return (
         <div className='min-h-screen flex items-center justify-start flex-col'>
@@ -491,7 +505,7 @@ const SecureLayout = ({ children }: { children: React.ReactNode }) => {
                                     <Link
                                         href="#"
                                         onClick={openPredictionDialog}
-                                        className="items-center group md:gap-2 text-gray-500 hover:text-white p-2 border border-white/10 rounded-lg w-fit hidden md:flex"
+                                        className="items-center group md:gap-2 text-gray-500 hover:text-white w-fit hidden md:flex"
                                     >
                                         <span className="plus-circle-on group-hover:border-white hidden group-hover:block text-white" />
                                         <span className="plus-circle-off block group-hover:hidden" />
