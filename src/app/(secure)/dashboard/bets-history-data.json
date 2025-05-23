@@ -1,0 +1,51 @@
+[
+  {
+    "id": 1,
+    "market": "Will ETH hit $4000 by June 2023?",
+    "position": "YES",
+    "amount": "250 ANML",
+    "probability": "72%",
+    "status": "Active",
+    "timestamp": "2023-05-10T14:23:45Z"
+  },
+  {
+    "id": 2,
+    "market": "Will BTC surpass $100k in 2023?",
+    "position": "NO",
+    "amount": "500 ANML",
+    "probability": "28%",
+    "status": "Active",
+    "timestamp": "2023-05-12T09:15:32Z"
+  },
+  {
+    "id": 3,
+    "market": "Will SOL reach $150 by July 2023?",
+    "position": "YES",
+    "amount": "150 ANML",
+    "probability": "65%",
+    "status": "Completed",
+    "result": "Won",
+    "payout": "230 ANML",
+    "timestamp": "2023-04-25T11:45:22Z"
+  },
+  {
+    "id": 4,
+    "market": "Will DOGE hit $1 in Q2 2023?",
+    "position": "NO",
+    "amount": "300 ANML",
+    "probability": "18%",
+    "status": "Completed",
+    "result": "Lost",
+    "payout": "0 ANML",
+    "timestamp": "2023-04-02T16:30:18Z"
+  },
+  {
+    "id": 5,
+    "market": "Will Fed raise interest rates in June 2023?",
+    "position": "YES",
+    "amount": "400 ANML",
+    "probability": "82%",
+    "status": "Active",
+    "timestamp": "2023-05-16T13:22:41Z"
+  }
+] 
