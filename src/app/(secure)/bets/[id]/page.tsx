@@ -371,7 +371,7 @@ export default function BetDetailPage() {
                                         </div>
                                     </div>
                                     <div>
-                                        <p className="text-sm text-zinc-400">Creator's Choice</p>
+                                        <p className="text-sm text-zinc-400">Creator&apos;s Choice</p>
                                         <div className="mt-1">
                                             <Chip 
                                                 color={prediction?.creator_choice?.toLowerCase() === "yes" ? "success" : "danger"}
@@ -454,7 +454,7 @@ export default function BetDetailPage() {
                         {bet.agent_id && pineconeData?.metadata?.log && (
                             <div className="mt-8 p-6 border rounded-lg">
                                 <div className="flex items-center justify-between mb-4">
-                                    <h2 className="text-lg font-semibold">Agent's Decision Process</h2>
+                                    <h2 className="text-lg font-semibold">Agent&apos;s Decision Process</h2>
                                 </div>
                                 <div className="space-y-4">
                                     {JSON.parse(pineconeData.metadata.log as string).map((step: { step: string; reasoning: string }, index: number) => (
@@ -506,7 +506,7 @@ export default function BetDetailPage() {
                                             );
                                         }
                                         return null;
-                                    }).filter((item): item is JSX.Element => item !== null)}
+                                    }).filter((item): item is React.ReactElement => item !== null)}
                                 </div>
                             </div>
                         )}

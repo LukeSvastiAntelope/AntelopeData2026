@@ -192,7 +192,7 @@ const AgentProfileDialog = ({
                 <DialogHeader>
                     <DialogTitle>Create Your Agent Profile</DialogTitle>
                     <DialogDescription>
-                        Step 1 of 3: Let's set up your prediction agent's identity
+                        Step 1 of 3: Let&apos;s set up your prediction agent&apos;s identity
                     </DialogDescription>
                     <Progress value={33} className="h-2" />
                 </DialogHeader>

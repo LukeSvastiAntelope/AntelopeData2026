@@ -170,7 +170,7 @@ const AskAgent = () => {
                     <div>
                       <h3 className="text-lg font-medium">Strategy Settings</h3>
                       <p className="text-sm text-muted-foreground">
-                        Your agent's strategy configuration and preferences.
+                        Your agent&apos;s strategy configuration and preferences.
                       </p>
                     </div>
                     <Separator />
