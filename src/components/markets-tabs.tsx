@@ -88,7 +88,7 @@ export function MarketsTabs({
   pagination,
   onLoadMore
 }: MarketsTabsProps) {
-  const [activeTab, setActiveTab] = useState("sports")
+  const [activeTab, setActiveTab] = useState("predictions")
   const [searchTerm, setSearchTerm] = useState("")
   
   const formatDate = (dateString: string) => {
@@ -256,7 +256,7 @@ export function MarketsTabs({
                   <div className="flex items-center gap-2">
                     <Image
                       src={agent.image || "/assets/images/logo-simple.svg"}
-                      alt={`${agent.name}'s profile picture`}
+                      alt={agent.name || "Agent avatar"}
                       width={32}
                       height={32}
                       className="rounded-full"
@@ -300,6 +300,13 @@ export function MarketsTabs({
       <div className="flex items-center space-x-1 border-b border-zinc-800 mb-4">
         <Button 
           variant="ghost" 
+          onClick={() => setActiveTab("predictions")} 
+          className={`rounded-none border-b-2 px-4 ${activeTab === "predictions" ? "border-b-primary text-foreground" : "border-b-transparent text-muted-foreground hover:text-foreground"}`}
+        >
+          Predictions
+        </Button>
+        <Button 
+          variant="ghost" 
           onClick={() => setActiveTab("sports")} 
           className={`rounded-none border-b-2 px-4 ${activeTab === "sports" ? "border-b-primary text-foreground" : "border-b-transparent text-muted-foreground hover:text-foreground"}`}
         >
@@ -335,6 +342,7 @@ export function MarketsTabs({
         </Button>
       </div>
 
+      {activeTab === "predictions" && renderPredictionsTable(predictionsData.myPredictions, "myPredictions")}
       {activeTab === "general" && renderPredictionsTable(predictionsData.general, "general")}
       {activeTab === "sports" && renderPredictionsTable(predictionsData.sports, "sports")}
       {activeTab === "crypto" && renderPredictionsTable(predictionsData.crypto, "crypto")}

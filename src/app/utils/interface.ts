@@ -50,6 +50,7 @@ export interface IAgentProfile {
     telegram_photo_url?: string;
     is_telegram_connected?: boolean;
     is_onboarded?: boolean;
+    total_winnings?: number;
 }
 
 export interface IFormDataAgentProfile {

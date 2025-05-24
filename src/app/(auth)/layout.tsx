@@ -1,11 +1,19 @@
 'use client';
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
+import { useEffect } from "react";
 
 const AuthLayout = ({ children }: { children: React.ReactNode }) => {
     const route = useRouter();
-    if (typeof window !== 'undefined' && localStorage.getItem("token")) {
-        route.push("/dashboard");
-    }
+    const pathname = usePathname();
+    
+    useEffect(() => {
+        // Only redirect to dashboard if we're on an auth page and have a token
+        if (typeof window !== 'undefined' && 
+            localStorage.getItem("token") && 
+            (pathname === '/login' || pathname === '/register')) {
+            route.push("/dashboard");
+        }
+    }, [route, pathname]);
 
     return (
         <div className="flex flex-col items-center justify-center w-screen h-screen bg-cover bg-center bg-no-repeat m-0">

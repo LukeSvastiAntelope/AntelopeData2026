@@ -54,29 +54,53 @@ export const UserRepo = {
     getPredictionTopicConfigs,
     upsertPredictionTopicConfig,
     deleteUserById,
+    getAllPredictions,
 }
 
 async function getBetsStatsByAgentId(agentId: number) {
     const db = await getMySQLConnection();
-    const [rows] = await db.execute<(RowDataPacket)[]>(
-        `SELECT 
-            COUNT(*) AS total_bets,
-            COALESCE(SUM(CASE 
-                WHEN predictions.status = 'resolved' 
-                     AND predictions.outcome = bets.choice 
-                     AND bets.is_secret = 0 
-                THEN 1 ELSE 0 END), 0) AS win_count,
-            COALESCE(SUM(CASE 
-                WHEN predictions.status = 'resolved' 
-                     AND predictions.outcome <> bets.choice 
-                     AND bets.is_secret = 0 
-                THEN 1 ELSE 0 END), 0) AS lose_count
-         FROM bets
-         JOIN predictions ON bets.prediction_id = predictions.id AND bets.is_secret = 0
-         WHERE bets.agent_id = ?`,
-        [agentId]
-    );
-    return rows[0];
+    try {
+        const query = `
+            SELECT 
+                COUNT(*) AS total_bets,
+                COALESCE(SUM(CASE 
+                    WHEN predictions.status = 'resolved' 
+                         AND predictions.outcome = bets.choice 
+                         AND bets.is_secret = 0 
+                    THEN 1 ELSE 0 END), 0) AS win_count,
+                COALESCE(SUM(CASE 
+                    WHEN predictions.status = 'resolved' 
+                         AND predictions.outcome <> bets.choice 
+                         AND predictions.outcome IS NOT NULL
+                         AND bets.is_secret = 0 
+                    THEN 1 ELSE 0 END), 0) AS lose_count,
+                COALESCE(SUM(CASE 
+                    WHEN predictions.status = 'open' 
+                         AND bets.is_secret = 0 
+                    THEN 1 ELSE 0 END), 0) AS open_bets,
+                COALESCE(ROUND(AVG(CASE 
+                    WHEN bets.is_secret = 0 
+                    THEN CAST(bets.amount AS DECIMAL(10,2))
+                    ELSE NULL END), 2), 0) AS avg_bet_size,
+                COUNT(DISTINCT CASE WHEN bets.is_secret = 0 THEN bets.id END) as non_secret_bets_count,
+                SUM(CASE WHEN bets.is_secret = 0 THEN bets.amount ELSE 0 END) as total_amount
+            FROM bets
+            JOIN predictions ON bets.prediction_id = predictions.id
+            WHERE bets.agent_id = ? AND bets.is_secret = 0`;
+
+        console.log('Executing query for agent:', agentId);
+        const [rows] = await db.execute<(RowDataPacket)[]>(query, [agentId]);
+        console.log('Query results:', rows[0]);
+        
+        // Add validation to ensure we're returning a number
+        const result = rows[0];
+        result.avg_bet_size = parseFloat(result.avg_bet_size) || 0;
+        
+        return result;
+    } catch (error) {
+        console.error('Error in getBetsStatsByAgentId:', error);
+        throw error;
+    }
 }
 
 async function updatePlatformAccountBalance(platformId: number, win: number, betAmount: number) {
@@ -503,40 +527,76 @@ async function getBetsByAgentId(id: number) {
 
 async function getBetHistoryByAgentId(id: number, limit: number, offset: number) {
     const db = await getMySQLConnection();
-    const [rows] = await db.execute<(RowDataPacket)[]>(
-        `SELECT 
-            b.*, p.*,
-            b.id as bet_id,
-            (
-                SELECT GROUP_CONCAT(
-                    JSON_OBJECT(
-                        'id', id,
-                        'agent_id', agent_id,
-                        'amount', amount,
-                        'choice', choice,
-                        'created_at', created_at
-                    )
+    const query = `SELECT 
+        b.*, 
+        p.*,
+        b.id as bet_id,
+        b.created_at as bet_created_at,
+        p.id as prediction_id,
+        p.description as prediction_description,
+        p.outcome as prediction_outcome,
+        p.status as prediction_status,
+        p.predicted_outcome as prediction_predicted_outcome,
+        p.str_thumb as prediction_str_thumb,
+        (
+            SELECT GROUP_CONCAT(
+                JSON_OBJECT(
+                    'id', id,
+                    'agent_id', agent_id,
+                    'amount', amount,
+                    'choice', choice,
+                    'created_at', created_at
                 )
-                FROM bets 
-                WHERE prediction_id = p.id 
-                    AND agent_id != 0
-                    AND is_secret = 0
-            ) as agent_bets
-        FROM bets b 
-        JOIN predictions p ON b.prediction_id = p.id 
-        WHERE b.agent_id = ? AND b.is_secret = 0
-        ORDER BY b.created_at DESC 
-        LIMIT ${limit} OFFSET ${offset}`,
-        [id]
-    );
+            )
+            FROM bets 
+            WHERE prediction_id = p.id 
+                AND agent_id != 0
+                AND is_secret = 0
+        ) as agent_bets
+    FROM bets b 
+    JOIN predictions p ON b.prediction_id = p.id 
+    WHERE b.agent_id = ${id} AND b.is_secret = 0
+    ORDER BY b.created_at DESC 
+    LIMIT ${limit} OFFSET ${offset}`;
 
-    // Parse the JSON strings into arrays
+    const [rows] = await db.execute<(RowDataPacket)[]>(query);
+
+    // Transform the data to match the expected format
     return rows.map(row => ({
-        ...row,
+        id: row.bet_id,
+        user_id: row.user_id,
+        prediction_id: row.prediction_id,
+        choice: row.choice,
+        amount: row.amount,
+        created_at: row.bet_created_at,
+        reason: row.reason,
+        state: row.state,
+        winnings: row.winnings,
+        pinecone_id: row.pinecone_id,
+        prediction: {
+            id: row.prediction_id,
+            description: row.prediction_description,
+            outcome: row.prediction_outcome,
+            status: row.prediction_status,
+            predicted_outcome: row.prediction_predicted_outcome,
+            probability: calculateProbability(row),
+            str_thumb: row.prediction_str_thumb
+        },
         agent_bets: row.agent_bets ? JSON.parse(`[${row.agent_bets}]`) : []
     }));
 }
 
+// Helper function to calculate probability
+function calculateProbability(prediction: any): string {
+    if (!prediction || (!prediction.yes_amount && !prediction.no_amount)) return '50%';
+    
+    const yesAmount = prediction.yes_amount || 0;
+    const noAmount = prediction.no_amount || 0;
+    const total = yesAmount + noAmount;
+    
+    if (total === 0) return '50%';
+    return `${Math.round((yesAmount / total) * 100)}%`;
+}
 
 async function getPredictionsByUserId(id: string) {
     const db = await getMySQLConnection();
@@ -712,77 +772,171 @@ async function getBetById(id: string) {
     }
 }
 
-async function getPredictionsWithoutAgentId(id: number) {
+async function getPredictionsWithoutAgentId(id: number, page = 1, limit = 50) {
     const db = await getMySQLConnection();
+    const offset = (page - 1) * limit;
+    
     try {
+        // First, get basic predictions with pagination - MUCH faster
         const [rows] = await db.execute<(RowDataPacket)[]>(`
             SELECT 
-                predictions.*, 
-                COUNT(DISTINCT CASE WHEN bets.is_secret = 0 THEN bets.id END) as bets_count,
-                JSON_ARRAYAGG(
-                    IF(bets.is_secret = 0,
-                        JSON_OBJECT(
-                            'id', bets.id,
-                            'amount', COALESCE(bets.amount, 0),
-                            'choice', COALESCE(bets.choice, ''),
-                            'reason', COALESCE(bets.reason, ''),
-                            'pinecone_id', COALESCE(bets.pinecone_id, ''),
-                            'created_at', DATE_FORMAT(bets.created_at, '%Y-%m-%dT%H:%i:%s.000Z')
-                        ),
-                        NULL
-                    )
-                ) as agent_bets
+                predictions.id,
+                predictions.description,
+                predictions.source,
+                predictions.predicted_outcome,
+                predictions.creator_choice,
+                predictions.status,
+                predictions.outcome,
+                predictions.resolution_date,
+                predictions.str_thumb,
+                predictions.created_at,
+                predictions.league_id,
+                predictions.bet_amount,
+                (SELECT COUNT(DISTINCT bets.id) 
+                 FROM bets 
+                 WHERE bets.prediction_id = predictions.id AND bets.is_secret = 0) as bets_count
             FROM predictions 
-            LEFT JOIN bets ON predictions.id = bets.prediction_id
             WHERE predictions.agent_id <> ? 
-            GROUP BY predictions.id 
-            ORDER BY predictions.created_at DESC`,
-            [id]
+            ORDER BY predictions.created_at DESC
+            LIMIT ? OFFSET ?`,
+            [id, limit, offset]
         );
 
-        // Clean up the results by removing null values from agent_bets
-        return rows.map(row => ({
+        // If no predictions found, return empty array
+        if (!rows.length) {
+            return { 
+                predictions: [], 
+                hasMore: false, 
+                total: 0, 
+                page, 
+                limit 
+            };
+        }
+
+        // Get prediction IDs for batch fetching bets
+        const predictionIds = rows.map(row => row.id);
+        let betsRows: any[] = [];
+        
+        // Only fetch bets if we have prediction IDs
+        if (predictionIds.length > 0) {
+            const placeholders = predictionIds.map(() => '?').join(',');
+            const [betsResult] = await db.execute<(RowDataPacket)[]>(`
+                SELECT 
+                    prediction_id,
+                    id,
+                    amount,
+                    choice,
+                    reason,
+                    pinecone_id,
+                    DATE_FORMAT(created_at, '%Y-%m-%dT%H:%i:%s.000Z') as created_at
+                FROM bets 
+                WHERE prediction_id IN (${placeholders}) 
+                AND is_secret = 0
+                ORDER BY created_at DESC`,
+                predictionIds
+            );
+            betsRows = betsResult;
+        }
+
+        // Group bets by prediction_id and calculate yes/no amounts
+        const betsByPrediction: Record<number, any[]> = {};
+        const yesNoAmountsByPrediction: Record<number, { yes_amount: number; no_amount: number }> = {};
+        
+        betsRows.forEach((bet: any) => {
+            if (!betsByPrediction[bet.prediction_id]) {
+                betsByPrediction[bet.prediction_id] = [];
+                yesNoAmountsByPrediction[bet.prediction_id] = { yes_amount: 0, no_amount: 0 };
+            }
+            
+            betsByPrediction[bet.prediction_id].push({
+                id: bet.id,
+                amount: bet.amount,
+                choice: bet.choice,
+                reason: bet.reason,
+                pinecone_id: bet.pinecone_id,
+                created_at: bet.created_at
+            });
+            
+            // Calculate yes/no amounts from bet data
+            if (bet.choice?.toLowerCase() === 'yes') {
+                yesNoAmountsByPrediction[bet.prediction_id].yes_amount += parseFloat(bet.amount) || 0;
+            } else if (bet.choice?.toLowerCase() === 'no') {
+                yesNoAmountsByPrediction[bet.prediction_id].no_amount += parseFloat(bet.amount) || 0;
+            }
+        });
+
+        // Combine predictions with their bets and calculated amounts
+        const enrichedPredictions = rows.map(row => ({
             ...row,
-            agent_bets: Array.isArray(row.agent_bets)
-                ? row.agent_bets.filter(Boolean)
-                : []
+            agent_bets: betsByPrediction[row.id] || [],
+            yes_amount: yesNoAmountsByPrediction[row.id]?.yes_amount || 0,
+            no_amount: yesNoAmountsByPrediction[row.id]?.no_amount || 0
         }));
+
+        // Check if there are more pages
+        const [countResult] = await db.execute<(RowDataPacket)[]>(`
+            SELECT COUNT(*) as total 
+            FROM predictions 
+            WHERE agent_id <> ?`,
+            [id]
+        );
+        
+        const total = countResult[0].total;
+        const hasMore = offset + limit < total;
+
+        return {
+            predictions: enrichedPredictions,
+            hasMore,
+            total,
+            page,
+            limit
+        };
     } catch (error) {
-        console.log(error);
-        const [rows] = await db.execute<(RowDataPacket)[]>(`
-            SELECT 
-                predictions.*, 
-                COUNT(DISTINCT CASE WHEN bets.is_secret = 0 THEN bets.id END) as bets_count,
-                CONCAT('[', 
-                    GROUP_CONCAT(
-                        IF(bets.is_secret = 0,
-                            JSON_OBJECT(
-                                'id', bets.id,
-                                'amount', COALESCE(bets.amount, 0),
-                                'choice', COALESCE(bets.choice, ''),
-                                'reason', COALESCE(bets.reason, ''),
-                                'pinecone_id', COALESCE(bets.pinecone_id, ''),
-                                'created_at', DATE_FORMAT(bets.created_at, '%Y-%m-%dT%H:%i:%s.000Z')
-                            ),
-                            NULL
-                        )
-                    ),
-                ']') as agent_bets
-            FROM predictions 
-            LEFT JOIN bets ON predictions.id = bets.prediction_id
-            WHERE predictions.agent_id <> ? 
-            GROUP BY predictions.id 
-            ORDER BY predictions.created_at DESC`,
-            [id]
-        );
+        console.error('Error in getPredictionsWithoutAgentId:', error);
+        // Fallback to simplified query without bets
+        try {
+            const [rows] = await db.execute<(RowDataPacket)[]>(`
+                SELECT 
+                    id,
+                    description,
+                    source,
+                    predicted_outcome,
+                    creator_choice,
+                    status,
+                    outcome,
+                    resolution_date,
+                    str_thumb,
+                    created_at,
+                    league_id,
+                    bet_amount,
+                    0 as bets_count
+                FROM predictions 
+                ORDER BY created_at DESC
+                LIMIT ${limit} OFFSET ${offset}`
+            );
 
-        // Simplified parsing since we're now getting a proper JSON array string
-        return rows.map(row => ({
-            ...row,
-            agent_bets: row.agent_bets && row.agent_bets !== '[null]'
-                ? JSON.parse(row.agent_bets).filter(Boolean)
-                : []
-        }));
+            return {
+                predictions: rows.map(row => ({ 
+                    ...row, 
+                    agent_bets: [], 
+                    yes_amount: 0, 
+                    no_amount: 0 
+                })),
+                hasMore: rows.length === limit,
+                total: 0,
+                page,
+                limit
+            };
+        } catch (fallbackError) {
+            console.error('Error in fallback query:', fallbackError);
+            return {
+                predictions: [],
+                hasMore: false,
+                total: 0,
+                page,
+                limit
+            };
+        }
     }
 }
 
@@ -936,8 +1090,219 @@ async function deleteUserById(userId: number): Promise<{ success: boolean, messa
             await db.rollback();
             throw error;
         }
-    } catch (error) {
+    } catch (error: any) {
         console.error(`Error deleting user with ID ${userId}:`, error);
         throw error;
+    }
+}
+
+async function getAllPredictions(page = 1, limit = 50, source?: string) {
+    const db = await getMySQLConnection();
+    const offset = (page - 1) * limit;
+    
+    try {
+        // First, let's check the distribution of sources in the database
+        const [sourceDistribution] = await db.execute<(RowDataPacket)[]>(`
+            SELECT source, COUNT(*) as count
+            FROM predictions 
+            GROUP BY source
+            ORDER BY count DESC`
+        );
+        
+        console.log('📊 Source distribution in database:', sourceDistribution);
+        
+        // Build WHERE clause for source filtering
+        const whereClause = source ? `WHERE source = '${source}'` : '';
+        const sourceInfo = source ? `for source: ${source}` : 'for all sources';
+        
+        console.log(`🎯 Fetching predictions ${sourceInfo}`);
+        
+        // Get predictions, optionally filtered by source
+        const [rows] = await db.execute<(RowDataPacket)[]>(`
+            SELECT 
+                predictions.id,
+                predictions.description,
+                predictions.source,
+                predictions.predicted_outcome,
+                predictions.creator_choice,
+                predictions.status,
+                predictions.outcome,
+                predictions.resolution_date,
+                predictions.str_thumb,
+                predictions.created_at,
+                predictions.league_id,
+                predictions.bet_amount,
+                (SELECT COUNT(DISTINCT bets.id) 
+                 FROM bets 
+                 WHERE bets.prediction_id = predictions.id AND bets.is_secret = 0) as bets_count
+            FROM predictions 
+            ${whereClause}
+            ORDER BY predictions.created_at DESC
+            LIMIT ${limit} OFFSET ${offset}`
+        );
+
+        console.log('🔍 Retrieved predictions by source:', {
+            total: rows.length,
+            requestedSource: source || 'all',
+            sources: rows.reduce((acc: any, row: any) => {
+                acc[row.source] = (acc[row.source] || 0) + 1;
+                return acc;
+            }, {}),
+            sampleData: rows.slice(0, 5).map((row: any) => ({
+                id: row.id,
+                source: row.source,
+                description: row.description?.substring(0, 50) + '...'
+            }))
+        });
+
+        // If no predictions found, return empty array
+        if (!rows.length) {
+            return { 
+                predictions: [], 
+                hasMore: false, 
+                total: 0, 
+                page, 
+                limit 
+            };
+        }
+
+        // Get prediction IDs for batch fetching bets
+        const predictionIds = rows.map(row => row.id);
+        let betsRows: any[] = [];
+        
+        // Only fetch bets if we have prediction IDs
+        if (predictionIds.length > 0) {
+            const placeholders = predictionIds.map(() => '?').join(',');
+            const [betsResult] = await db.execute<(RowDataPacket)[]>(`
+                SELECT 
+                    prediction_id,
+                    id,
+                    amount,
+                    choice,
+                    reason,
+                    pinecone_id,
+                    DATE_FORMAT(created_at, '%Y-%m-%dT%H:%i:%s.000Z') as created_at
+                FROM bets 
+                WHERE prediction_id IN (${placeholders}) 
+                AND is_secret = 0
+                ORDER BY created_at DESC`,
+                predictionIds
+            );
+            betsRows = betsResult;
+        }
+
+        // Group bets by prediction_id and calculate yes/no amounts
+        const betsByPrediction: Record<number, any[]> = {};
+        const yesNoAmountsByPrediction: Record<number, { yes_amount: number; no_amount: number }> = {};
+        
+        betsRows.forEach((bet: any) => {
+            if (!betsByPrediction[bet.prediction_id]) {
+                betsByPrediction[bet.prediction_id] = [];
+                yesNoAmountsByPrediction[bet.prediction_id] = { yes_amount: 0, no_amount: 0 };
+            }
+            
+            betsByPrediction[bet.prediction_id].push({
+                id: bet.id,
+                amount: bet.amount,
+                choice: bet.choice,
+                reason: bet.reason,
+                pinecone_id: bet.pinecone_id,
+                created_at: bet.created_at
+            });
+            
+            // Calculate yes/no amounts from bet data
+            if (bet.choice?.toLowerCase() === 'yes') {
+                yesNoAmountsByPrediction[bet.prediction_id].yes_amount += parseFloat(bet.amount) || 0;
+            } else if (bet.choice?.toLowerCase() === 'no') {
+                yesNoAmountsByPrediction[bet.prediction_id].no_amount += parseFloat(bet.amount) || 0;
+            }
+        });
+
+        // Combine predictions with their bets and calculated amounts
+        const enrichedPredictions = rows.map(row => ({
+            ...row,
+            agent_bets: betsByPrediction[row.id] || [],
+            yes_amount: yesNoAmountsByPrediction[row.id]?.yes_amount || 0,
+            no_amount: yesNoAmountsByPrediction[row.id]?.no_amount || 0
+        }));
+
+        // Check if there are more pages - count predictions with same source filter
+        const countWhereClause = source ? `WHERE source = '${source}'` : '';
+        const [countResult] = await db.execute<(RowDataPacket)[]>(`
+            SELECT COUNT(*) as total 
+            FROM predictions 
+            ${countWhereClause}`
+        );
+        
+        const total = countResult[0].total;
+        const hasMore = offset + limit < total;
+
+        console.log('📋 Final getAllPredictions result:', {
+            predictionsCount: enrichedPredictions.length,
+            requestedSource: source || 'all',
+            sourceBreakdown: enrichedPredictions.reduce((acc: any, p: any) => {
+                acc[p.source] = (acc[p.source] || 0) + 1;
+                return acc;
+            }, {}),
+            total,
+            hasMore,
+            page
+        });
+
+        return {
+            predictions: enrichedPredictions,
+            hasMore,
+            total,
+            page,
+            limit
+        };
+    } catch (error) {
+        console.error('Error in getAllPredictions:', error);
+        // Fallback to simplified query without bets
+        try {
+            const whereClause = source ? `WHERE source = '${source}'` : '';
+            const [rows] = await db.execute<(RowDataPacket)[]>(`
+                SELECT 
+                    id,
+                    description,
+                    source,
+                    predicted_outcome,
+                    creator_choice,
+                    status,
+                    outcome,
+                    resolution_date,
+                    str_thumb,
+                    created_at,
+                    league_id,
+                    bet_amount,
+                    0 as bets_count
+                FROM predictions 
+                ${whereClause}
+                ORDER BY created_at DESC
+                LIMIT ${limit} OFFSET ${offset}`
+            );
+
+            return {
+                predictions: rows.map(row => ({ 
+                    ...row, 
+                    agent_bets: [], 
+                    yes_amount: 0, 
+                    no_amount: 0 
+                })),
+                hasMore: rows.length === limit,
+                total: 0,
+                page,
+                limit
+            };
+        } catch (fallbackError) {
+            console.error('Error in fallback query:', fallbackError);
+            return {
+                predictions: [],
+                hasMore: false,
+                total: 0,
+                page,
+                limit
+            };
+        }
     }
 }

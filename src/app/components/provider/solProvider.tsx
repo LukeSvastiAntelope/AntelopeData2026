@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useEffect } from "react";
 import {
     ConnectionProvider,
     WalletProvider,
@@ -13,7 +13,7 @@ import {
     SolflareWalletAdapter,
     MathWalletAdapter,
 } from "@solana/wallet-adapter-wallets";
-import "@solana/wallet-adapter-react-ui/styles.css";
+import { applySolanaWalletStyles } from "./solana-wallet-styles";
 
 export function SolProvider({ children }: { children: React.ReactNode }) {
     const network = WalletAdapterNetwork.Devnet;
@@ -27,6 +27,10 @@ export function SolProvider({ children }: { children: React.ReactNode }) {
         ],
         []
     );
+
+    useEffect(() => {
+        applySolanaWalletStyles();
+    }, []);
 
     return (
         <ConnectionProvider endpoint={endpoint}>

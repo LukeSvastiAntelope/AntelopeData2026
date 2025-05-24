@@ -15,9 +15,7 @@ export function Providers({children, session}: ProviderProps) {
   return (
     <SessionProvider session={session}>
       <HeroUIProvider>
-      <NextThemesProvider attribute="class" defaultTheme="dark">
         {children}
-        </NextThemesProvider>
       </HeroUIProvider>
     </SessionProvider>
   )

@@ -1,16 +1,18 @@
 'use client';
 
 import "./globals.css";
-import { Rubik } from 'next/font/google';
+import { Noto_Sans } from 'next/font/google';
 import { Toaster } from "react-hot-toast";
 import { Providers } from "./components/provider/mainProvider";
 import { SolProvider } from "./components/provider/solProvider";
 import Script from "next/script";
 import { Analytics } from '@vercel/analytics/react';
+import { ThemeProvider } from "@/components/theme-provider";
+import Head from 'next/head';
 
-const rubik = Rubik({
+const notoSans = Noto_Sans({
     subsets: ['latin'],
-    variable: '--font-rubik',
+    variable: '--font-noto-sans',
 });
 
 export default function RootLayout({
@@ -19,8 +21,9 @@ export default function RootLayout({
     children: React.ReactNode
 }) {
     return (
-        <html lang="en" className="dark bg-[#16181c]">
+        <html lang="en" suppressHydrationWarning className="dark [color-scheme:dark]">
             <head>
+                <link rel="icon" href="/favicon.ico" />
                 <Script
                     src="https://www.googletagmanager.com/gtag/js?id=G-RE8DXNRE5W"
                     strategy="afterInteractive"
@@ -34,19 +37,21 @@ export default function RootLayout({
                     `}
                 </Script>
             </head>
-            <body className={`${rubik.className} antialiased dark text-foreground bg-mainGradient`}>
-                <Toaster
-                    position="top-right"
-                    reverseOrder={true}
-                />
-                <Providers>
-                    <SolProvider>
-                        <main className="min-h-screen">
-                            {children}
-                        </main>
-                        <Analytics />
-                    </SolProvider>
-                </Providers>
+            <body className={`${notoSans.className} antialiased bg-background text-foreground dark [color-scheme:dark]`}>
+                <ThemeProvider>
+                    <Toaster
+                        position="top-right"
+                        reverseOrder={true}
+                    />
+                    <Providers>
+                        <SolProvider>
+                            <main className="min-h-screen">
+                                {children}
+                            </main>
+                            <Analytics />
+                        </SolProvider>
+                    </Providers>
+                </ThemeProvider>
             </body>
         </html>
     );

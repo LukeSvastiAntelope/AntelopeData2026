@@ -1,16 +1,18 @@
 'use client';
 
-import {
-    Modal,
-    ModalContent,
-    ModalHeader,
-    ModalBody,
-    ModalFooter,
-} from "@heroui/modal";
-import { Textarea } from "@heroui/input";
-import { Button } from "@heroui/button";
 import { useState, useEffect } from "react";
-import { Spinner } from "@heroui/spinner"; // For loading state
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    DialogFooter,
+} from "@/components/ui/dialog";
+import { Button } from "@heroui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Progress } from "@/components/ui/progress";
+import { Loader2 } from "lucide-react";
 
 interface WagerPrinciplesDialogProps {
     isOpen: boolean;
@@ -18,7 +20,7 @@ interface WagerPrinciplesDialogProps {
     onSave: (principles: string) => void;
     onSkip: () => void;
     initialPrinciples: string;
-    isLoadingExternally?: boolean; // To show spinner while principles are being generated
+    isLoadingExternally?: boolean;
 }
 
 const WagerPrinciplesDialog = ({
@@ -30,6 +32,7 @@ const WagerPrinciplesDialog = ({
     isLoadingExternally = false,
 }: WagerPrinciplesDialogProps) => {
     const [principles, setPrinciples] = useState("");
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     useEffect(() => {
         if (isOpen) {
@@ -37,71 +40,83 @@ const WagerPrinciplesDialog = ({
         }
     }, [isOpen, initialPrinciples]);
 
-    const handleSaveClick = () => {
-        onSave(principles);
+    const handleSaveClick = async () => {
+        setIsSubmitting(true);
+        try {
+            await onSave(principles);
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     return (
-        <Modal
-            isOpen={isOpen}
-            onClose={onClose}
-            size="xl" // Larger for textarea
-            isDismissable={false}
-            classNames={{
-                base: "bg-[#1c1c1c] dark",
-            }}
-        >
-            <ModalContent>
-                <ModalHeader className="text-white">Define Your Agent&apos;s Wager Principles</ModalHeader>
-                <ModalBody className="space-y-4">
-                    <div>
-                        <p className="text-sm text-gray-400 mb-1">
-                            Based on your agent&apos;s profile, we&apos;ve drafted some initial wager principles.
-                            These principles will guide your agent&apos;s betting decisions. 
+        <Dialog open={isOpen} onOpenChange={(open: boolean) => !open && onClose()}>
+            <DialogContent className="sm:max-w-[525px] bg-background border-border">
+                <DialogHeader>
+                    <DialogTitle>Wager Principles</DialogTitle>
+                    <DialogDescription>
+                        Step 3 of 3: Define your agent's betting strategy
+                    </DialogDescription>
+                    <Progress value={100} className="h-2" />
+                </DialogHeader>
+
+                <div className="space-y-6 py-4">
+                    <div className="text-sm text-muted-foreground space-y-2">
+                        <p>
+                            Based on your agent's profile, we've drafted some initial wager principles.
+                            These principles will guide your agent's betting decisions. 
                             Review and edit them as you see fit, or skip this step for now.
                         </p>
-                        <p className="text-xs text-gray-500 mb-2">
-                            You can always update these later in your agent&apos;s profile settings.
+                        <p className="text-xs opacity-70">
+                            You can always update these later in your agent's profile settings.
                         </p>
                     </div>
+
                     {isLoadingExternally ? (
-                        <div className="flex justify-center items-center h-40">
-                            <Spinner label="Generating initial principles..." color="primary" labelColor="primary"/>
+                        <div className="flex flex-col items-center justify-center h-[200px] gap-4">
+                            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                            <p className="text-sm text-muted-foreground">Generating initial principles...</p>
                         </div>
                     ) : (
                         <Textarea
-                            label="Wager Principles"
                             value={principles}
-                            onValueChange={setPrinciples} // Or onChange if onValueChange is not available for HeroUI Textarea
-                            placeholder="e.g.,\n1. Only bet on underdogs with high potential.\n2. Never risk more than 10% of bankroll on a single bet.\n3. Prioritize long-term value over short-term gains."
-                            classNames={{
-                                input: "bg-[#2c2c2c] text-white min-h-[150px]", // Ensure enough height
-                                label: "text-white/60",
-                            }}
-                            minRows={5} // Suggestion for textarea height
+                            onChange={(e) => setPrinciples(e.target.value)}
+                            placeholder={
+                                "e.g.,\n" +
+                                "1. Only bet on underdogs with high potential.\n" +
+                                "2. Never risk more than 10% of bankroll on a single bet.\n" +
+                                "3. Prioritize long-term value over short-term gains."
+                            }
+                            className="min-h-[200px] bg-muted resize-none"
+                            disabled={isLoadingExternally}
                         />
                     )}
-                </ModalBody>
-                <ModalFooter>
+                </div>
+
+                <DialogFooter className="gap-2">
                     <Button
-                        variant="light"
+                        variant="ghost"
                         onPress={onSkip}
-                        className="text-gray-400 hover:text-white"
-                        isDisabled={isLoadingExternally}
+                        disabled={isLoadingExternally || isSubmitting}
                     >
                         Skip for Now
                     </Button>
                     <Button
-                        color="primary"
                         onPress={handleSaveClick}
-                        className="bg-blue-500"
-                        isDisabled={isLoadingExternally}
+                        disabled={isLoadingExternally || isSubmitting}
                     >
-                        Save Principles & Finish
+                        {isSubmitting ? (
+                            <div className="flex items-center gap-2">
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                                <span>Saving...</span>
+                            </div>
+                        ) : (
+                            "Complete Setup"
+                        )}
                     </Button>
-                </ModalFooter>
-            </ModalContent>
-        </Modal>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
     );
 };
 

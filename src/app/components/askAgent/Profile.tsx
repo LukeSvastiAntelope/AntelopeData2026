@@ -3,7 +3,8 @@ import { Image } from "@heroui/image";
 import { useState, useRef, useEffect } from "react";
 import { toast } from "react-hot-toast";
 import { Select, SelectItem, Button } from "@heroui/react";
-import { Switch } from "@heroui/switch";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { GPT_MODELS as models, PLUGINS as plugins } from "@/app/utils/const";
 import * as XLSX from "xlsx";
 import { useFetch } from "@/app/utils/lib";
@@ -143,7 +144,7 @@ const Profile = ({ agentProfile, setAgentProfile }: IAskAgentProps) => {
                         <label className="text-gray-white text-sm" htmlFor="name">Name</label>
                         <input
                             type="text"
-                            className="w-full bg-input-default rounded-md p-2 text-text-default pl-4"
+                            className="w-full border border-zinc-700 bg-transparent rounded-md p-2 text-text-default pl-4 focus:border-zinc-500 focus:outline-none"
                             name="name"
                             value={agentProfile?.name}
                             onChange={(e) => setAgentProfile({ ...agentProfile, name: e.target.value })}
@@ -153,7 +154,7 @@ const Profile = ({ agentProfile, setAgentProfile }: IAskAgentProps) => {
                         <label className="text-gray-white text-sm" htmlFor="description">Short Description</label>
                         <input
                             type="text"
-                            className="w-full bg-input-default rounded-md p-2 text-text-default pl-4"
+                            className="w-full border border-zinc-700 bg-transparent rounded-md p-2 text-text-default pl-4 focus:border-zinc-500 focus:outline-none"
                             name="description"
                             value={agentProfile?.description}
                             onChange={(e) => setAgentProfile({ ...agentProfile, description: e.target.value })}
@@ -162,7 +163,7 @@ const Profile = ({ agentProfile, setAgentProfile }: IAskAgentProps) => {
                     <div className="mt-5 flex flex-col gap-2">
                         <label className="text-gray-white text-sm" htmlFor="avatar">Avatar</label>
                         <div className="flex items-start gap-2">
-                            <div onClick={() => fileRef.current?.click()} className="overflow-hidden object-cover cursor-pointer !w-20 !h-20 bg-input-default rounded-md relative">
+                            <div onClick={() => fileRef.current?.click()} className="overflow-hidden object-cover cursor-pointer !w-20 !h-20 border border-zinc-700 bg-transparent rounded-md relative">
                                 {agentProfile.image ? (
                                     <Image
                                         src={agentProfile.image}
@@ -172,7 +173,7 @@ const Profile = ({ agentProfile, setAgentProfile }: IAskAgentProps) => {
                                         className="object-cover rounded-none w-20 h-20"
                                     />
                                 ) : (
-                                    <div className="w-20 h-20 flex items-center justify-center text-gray-500 text-6xl bg-input-default rounded-md">
+                                    <div className="w-20 h-20 flex items-center justify-center text-gray-500 text-6xl border border-zinc-700 bg-transparent rounded-md">
                                         +
                                     </div>
                                 )}
@@ -181,7 +182,7 @@ const Profile = ({ agentProfile, setAgentProfile }: IAskAgentProps) => {
                                 type="text"
                                 name="avatar"
                                 id="avatar"
-                                className="bg-input-default rounded-md text-text-default py-2 pl-4 flex-auto"
+                                className="border border-zinc-700 bg-transparent rounded-md text-text-default py-2 pl-4 flex-auto focus:border-zinc-500 focus:outline-none"
                                 placeholder="Path to profile image"
                                 value={imageUrl}
                                 onChange={(e) => setImageUrl(e.target.value)}
@@ -198,7 +199,7 @@ const Profile = ({ agentProfile, setAgentProfile }: IAskAgentProps) => {
                     <div className="mt-6 flex flex-col gap-2">
                         <label className="text-gray-white text-sm" htmlFor="principles">Wager Principles</label>
                         <textarea
-                            className="w-full bg-input-default rounded-md p-2 text-text-default pl-4 h-[300px]"
+                            className="w-full border border-zinc-700 bg-transparent rounded-md p-2 text-text-default pl-4 h-[300px] focus:border-zinc-500 focus:outline-none"
                             name="principles"
                             value={agentProfile.principles}
                             placeholder="Enter the reason for you bet so that the agent can learn how you think"
@@ -244,26 +245,27 @@ const Profile = ({ agentProfile, setAgentProfile }: IAskAgentProps) => {
                         <div className="flex flex-col gap-3">
                             {
                                 plugins.map((plugin) => (
-                                    <Switch
-                                        key={plugin.key}
-                                        value={plugin.key}
-                                        isSelected={agentProfile.plugins.includes(plugin.key)}
-                                        onChange={(e) => {
-                                            const updatedPlugins = [...agentProfile.plugins];
-                                            if (e.target.checked) {
-                                                updatedPlugins.push(e.target.value);
-                                            } else {
-                                                const index = updatedPlugins.indexOf(e.target.value);
-                                                if (index > -1) {
-                                                    updatedPlugins.splice(index, 1);
+                                    <div key={plugin.key} className="flex items-center space-x-2">
+                                        <Switch
+                                            id={plugin.key}
+                                            checked={agentProfile.plugins.includes(plugin.key)}
+                                            onCheckedChange={(checked) => {
+                                                const updatedPlugins = [...agentProfile.plugins];
+                                                if (checked) {
+                                                    updatedPlugins.push(plugin.key);
+                                                } else {
+                                                    const index = updatedPlugins.indexOf(plugin.key);
+                                                    if (index > -1) {
+                                                        updatedPlugins.splice(index, 1);
+                                                    }
                                                 }
-                                            }
-                                            setAgentProfile({ ...agentProfile, plugins: updatedPlugins });
-                                        }}
-                                        aria-label={plugin.label}
-                                    >
-                                        {plugin.label}
-                                    </Switch>
+                                                setAgentProfile({ ...agentProfile, plugins: updatedPlugins });
+                                            }}
+                                        />
+                                        <Label htmlFor={plugin.key} className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                                            {plugin.label}
+                                        </Label>
+                                    </div>
                                 ))
                             }
                         </div>
@@ -278,7 +280,7 @@ const Profile = ({ agentProfile, setAgentProfile }: IAskAgentProps) => {
                             />
                             Training Files
                         </div>
-                        <input type="text" className="w-full bg-input-default rounded-md p-2 text-text-default pl-4" />
+                        <input type="text" className="w-full border border-zinc-700 bg-transparent rounded-md p-2 text-text-default pl-4 focus:border-zinc-500 focus:outline-none" />
                     </div>
                     <div className="mt-4 flex flex-col gap-2">
                         <div className="text-text-default text-lg flex items-center gap-2">

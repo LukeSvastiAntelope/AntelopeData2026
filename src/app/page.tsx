@@ -8,6 +8,12 @@ import { Button } from "@heroui/button";
 import { Image } from "@heroui/image";
 import { Tooltip } from "@heroui/tooltip";
 import { PublicLayout } from "./components/PublicLayout";
+import { PublicSectionCards } from "@/components/public-section-cards"
+import { SidebarTrigger } from "@/components/ui/sidebar";
+import { Card, CardContent } from "@/components/ui/card"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Badge } from "@/components/ui/badge"
+import { formatDistanceToNow } from "date-fns"
 
 interface IActivity {
   id: number;
@@ -93,253 +99,214 @@ function PublicDashboard() {
     fetchActivity(1);
   }, []);
 
+  const formatDate = (dateString: string) => {
+    try {
+      return formatDistanceToNow(new Date(dateString), { addSuffix: true })
+    } catch (e) {
+      return dateString
+    }
+  }
+
   return (
-    <>
-      <div className="flex flex-col mt-2 gap-0 mb-6">
-        <h1 className="font-bold mb-2 font-kodemono">Antelope Activity</h1>
-        <p className="h1paragraph text-gray-500">
-          Track the latest market predictions and agent activity
-        </p>
-      </div>
-
-      <div className="flex gap-4 mb-2 w-full justify-between">
-        <div className="flex gap-4 font-kodemono items-center">
-          <Tooltip content="View recent activity" showArrow>
-            <Button
-              className={`py-2 px-0 rounded-lg ${activeTab === "activity"
-                ? "bg-transparent text-white"
-                : "bg-transparent text-gray-500 hover:text-white"
-                }`}
-              onPress={() => setActiveTab("activity")}
-            >
-              Activity
-            </Button>
-          </Tooltip>
-
-          <Tooltip content="Login to view your bets" showArrow>
-            <Button
-              className={`py-2 px-0 rounded-lg ${activeTab === "bets"
-                ? "bg-transparent text-white"
-                : "bg-transparent text-gray-500 hover:text-white"
-                }`}
-              onPress={() => setActiveTab("bets")}
-            >
-              Bets History
-            </Button>
-          </Tooltip>
-
-          <Tooltip content="Login to view predictions" showArrow>
-            <Button
-              className={`py-2 px-0 rounded-lg ${activeTab === "predictions"
-                ? "bg-transparent text-white"
-                : "bg-transparent text-gray-500 hover:text-white"
-                }`}
-              onPress={() => setActiveTab("predictions")}
-            >
-              Predictions
-            </Button>
-          </Tooltip>
-        </div>
-      </div>
-
-      {(activeTab === "bets" || activeTab === "predictions") && (
-        <div className="flex flex-col gap-2 mb-8 border border-white/10 rounded-xl p-6 text-center empty-state place-content-center">
-          <div className="map-center"></div>
-          <h1 className="font-bold mb-1 font-kodemono">Login to access {activeTab}</h1>
-          <p className="text-gray-400 pb-2">
-            Create an account or login to view your {activeTab === "bets" ? "bet history" : "predictions"}.
-          </p>
-          <div className="flex justify-center gap-4 mt-2">
-            <Button 
-              onPress={() => router.push('/login')} 
-              className="bg-blue-600 hover:bg-blue-700"
-              color="primary"
-            >
-              Login
-            </Button>
-            <Button 
-              onPress={() => router.push('/register')} 
-              className=""
-              variant="bordered"
-            >
-              Register
-            </Button>
+    <div className="flex-1 p-2 w-full">
+      <div className="mx-auto rounded-lg bg-black text-card-foreground shadow-lg">
+        {/* Header */}
+        <div className="px-6 py-4">
+          <div className="flex items-center">
+            <SidebarTrigger className="-ml-0.5 h-5 w-5 text-zinc-400 hover:text-zinc-100" />
+            <div className="h-4 border-l border-zinc-800 mx-4" />
+            <h1 className="text-base font-medium">Dashboard</h1>
           </div>
         </div>
-      )}
+        
+        <div className="border-b border-zinc-800" />
 
-      {activeTab === "activity" && (
-        <section className="rounded-lg overflow-x-auto mb-8">
-          {isLoadingActivity && activity.length === 0 ? (
-            <div className="flex justify-center items-center py-8">
-              <Spinner size="lg" />
+        <div className="p-6">
+          {/* Top metrics cards */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <PublicSectionCards />
+          </div>
+
+          {/* Tabs section */}
+          <div className="mt-6">
+            <div className="flex items-center space-x-1 border-b mb-4">
+              <Button 
+                variant="ghost" 
+                onClick={() => setActiveTab("activity")} 
+                className={`rounded-none border-b-2 px-4 ${activeTab === "activity" ? "border-b-primary text-foreground" : "border-b-transparent text-muted-foreground hover:text-foreground"}`}
+              >
+                Activity
+              </Button>
+              <Button 
+                variant="ghost" 
+                onClick={() => setActiveTab("bets")} 
+                className={`rounded-none border-b-2 px-4 ${activeTab === "bets" ? "border-b-primary text-foreground" : "border-b-transparent text-muted-foreground hover:text-foreground"}`}
+              >
+                Bets History
+              </Button>
+              <Button 
+                variant="ghost" 
+                onClick={() => setActiveTab("predictions")} 
+                className={`rounded-none border-b-2 px-4 ${activeTab === "predictions" ? "border-b-primary text-foreground" : "border-b-transparent text-muted-foreground hover:text-foreground"}`}
+              >
+                Predictions
+              </Button>
             </div>
-          ) : activity.length === 0 && !isLoadingActivity ? (
-            <div className="text-center text-gray-500 py-8">
-              No activity found
-            </div>
-          ) : (
-            <div className="flex flex-col gap-2">
-              {filterActivity(activity, searchTerm).map((item: IActivity, index: number) => (
-                <div
-                  key={index}
-                  className="flex items-start gap-4 p-4 rounded-xl select-item transition-colors cursor-pointer"
-                  onClick={() => {
-                    if (item.type === "bet" && item.bet_id && item.bet_id.toString() !== '0') {
-                      router.push(`/public/bet/${item.bet_id}`);
-                    } else if (item.type === "prediction" && item.prediction_id && item.prediction_id.toString() !== '0') {
-                      router.push(`/public/prediction/${item.prediction_id}`);
-                    } else if (item.type === "bet" || item.type === "prediction") {
-                      toast.error("Details for this item are currently unavailable.", {
-                        icon: '⚠️',
-                        duration: 3000,
-                      });
-                    }
-                  }}
-                >
-                  {/* Thumbnail if available (e.g., prediction/bet image) */}
-                  {item.str_thumb || item.type === "agent_join" ? (
-                    <Image
-                      src={item.str_thumb || 'https://ui-avatars.com/api/?name=' + item.agent_name + '&length=1&background=f31260&color=fff'}
-                      alt=""
-                      width={40}
-                      height={40}
-                      className="w-10 h-10 rounded-full"
-                    />
-                  ) : (
-                    <div className="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center">
-                      <svg
-                        className="w-6 h-6 text-gray-400"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
-                        />
-                      </svg>
-                    </div>
-                  )}
 
-                  {/* Right column: details */}
-                  <div className="flex-1 space-y-1">
-                    {item.type !== "agent_join" && (
-                      <div className="flex items-center gap-2">
-                        {/* Agent avatar or fallback */}
-                        {item.agent_image || item.type === "bet" ? (
-                          <Image
-                            src={item.agent_image || 'https://ui-avatars.com/api/?name=' + item.agent_name + '&length=1&background=f31260&color=fff'}
-                            alt={item.agent_name || "Agent avatar"}
-                            width={18}
-                            height={18}
-                            className="rounded-full object-cover"
-                          />
-                        ) : (
-                          <div className="min-w-24px min-h-24px max-w-24px max-h-24px center-logo">
-                          </div>
-                        )}
-
-                        <span className="font-normal text-small text-default-500">
-                          {item.type === "bet"
-                            ? `${item.agent_name ?? "Agent Name"} wagered on:`
-                            : `${item.source === "sportDB" ? "Game " : ""}Predicted!`}
-                        </span>
-                      </div>
-                    )}
-
-                    <div className="space-y-1 text-sm">
-                      {item.description && (
-                        <div className="text-white text-base font-normal">
-                          {item.type === "agent_join" 
-                            ? (() => {
-                                // Log for debugging
-                                console.log("Agent join description:", item.description);
-                                
-                                // Split the description to separate the "Agent X just joined" part 
-                                // from the actual agent description that follows
-                                const joinSplit = item.description.split('just joined.');
-                                
-                                return (
-                                  <>
-                                    {joinSplit[0]}just joined.
-                                    {joinSplit.length > 1 && joinSplit[1].trim() && (
-                                      <div className="text-default-500 text-sm mt-2 bg-gray-800/50 p-2 rounded-md border-l-2 border-primary">
-                                        {joinSplit[1].trim()}
-                                      </div>
-                                    )}
-                                  </>
-                                );
-                              })()
-                            : item.description
-                          }
-                        </div>
-                      )}
-
-                      <span className="flex flex-wrap gap-0 items-center">
-                        {item.amount > 0 && (
-                          <Tooltip content="Bet amount" showArrow>
-                            <div className="icon-coin text-default-500">{item.amount}</div>
-                          </Tooltip>
-                        )}
-
-                        {item.choice && item.type !== "agent_join" && (
-                          <Tooltip content="User's Choice" showArrow>
-                            <div
-                              className={(() => {
-                                if (item.choice?.toLowerCase() === "yes") {
-                                  return "relative max-w-fit min-w-min inline-flex items-center justify-between box-border whitespace-nowrap h-6 text-tiny rounded-full bg-success/20 text-success-500 icon-thumbs-up px-2";
-                                } else if (item.choice?.toLowerCase() === "no") {
-                                  return "relative max-w-fit min-w-min inline-flex items-center justify-between box-border whitespace-nowrap h-6 text-tiny rounded-full bg-danger/20 text-danger-500 icon-thumbs-down px-2";
-                                } else if (item.choice?.toLowerCase() === "draw") {
-                                  return "bg-warning/20 text-warning-500 relative max-w-fit min-w-min inline-flex items-center justify-between box-border whitespace-nowrap h-6 text-tiny rounded-full px-2";
-                                }
-                                return "bg-secondary/20 text-secondary-500 py-1 relative max-w-fit min-w-min inline-flex items-center justify-between box-border whitespace-nowrap h-6 text-tiny rounded-full px-2";
-                              })()}
-                            >
-                              <span className="flex-1 text-inherit font-normal px-1">
-                                {item.choice.charAt(0).toUpperCase() + item.choice.slice(1)}
-                              </span>
-                            </div>
-                          </Tooltip>
-                        )}
-                      </span>
-                    </div>
-                  </div>
+            {/* Content based on active tab */}
+            {(activeTab === "bets" || activeTab === "predictions") && (
+              <div className="flex flex-col gap-2 mb-8 border border-white/10 rounded-xl p-6 text-center empty-state place-content-center">
+                <div className="map-center"></div>
+                <h1 className="font-bold mb-1 font-kodemono">Login to access {activeTab}</h1>
+                <p className="text-gray-400 pb-2">
+                  Create an account or login to view your {activeTab === "bets" ? "bet history" : "predictions"}.
+                </p>
+                <div className="flex justify-center gap-4 mt-2">
+                  <Button 
+                    onPress={() => router.push('/login')} 
+                    className="bg-blue-600 hover:bg-blue-700"
+                    color="primary"
+                  >
+                    Login
+                  </Button>
+                  <Button 
+                    onPress={() => router.push('/register')} 
+                    className=""
+                    variant="bordered"
+                  >
+                    Register
+                  </Button>
                 </div>
-              ))}
-            </div>
-          )}
-          {hasMoreActivity && !isLoadingActivity && activity.length > 0 && (
-            <div className="flex justify-center mt-4">
-              <Tooltip content="Load more recent activity" showArrow>
-                <Button
-                  color="primary"
-                  variant="flat"
-                  onPress={loadMoreActivity}
-                  isLoading={isLoadingActivity}
-                  className="min-w-[200px]"
-                >
-                  {isLoadingActivity ? "Loading..." : "Show More"}
-                </Button>
-              </Tooltip>
-            </div>
-          )}
-          {isLoadingActivity && activity.length > 0 && (
-            <div className="flex justify-center items-center py-4">
-              <Spinner size="sm" />
-            </div>
-          )}
-          {!hasMoreActivity && activity.length > 0 && (
-            <div className="text-center text-gray-500 py-4">
-              No more activity to load
-            </div>
-          )}
-        </section>
-      )}
-    </>
+              </div>
+            )}
+
+            {activeTab === "activity" && (
+              <div className="space-y-4 overflow-x-auto">
+                {isLoadingActivity && activity.length === 0 ? (
+                  Array(5).fill(0).map((_, i) => (
+                    <Card key={i} className="bg-zinc-950/50 border border-zinc-800/50 shadow-[0_0_1px_1px_rgba(0,0,0,0.2)]">
+                      <CardContent className="p-4">
+                        <div className="flex items-start gap-4">
+                          <div className="h-10 w-10 rounded-full bg-zinc-800 animate-pulse" />
+                          <div className="flex-1 space-y-2">
+                            <div className="h-4 bg-zinc-800 rounded animate-pulse w-3/4" />
+                            <div className="h-4 bg-zinc-800 rounded animate-pulse w-full" />
+                            <div className="h-4 bg-zinc-800 rounded animate-pulse w-1/3" />
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))
+                ) : activity.length === 0 && !isLoadingActivity ? (
+                  <Card className="bg-zinc-950/50 border border-zinc-800/50 shadow-[0_0_1px_1px_rgba(0,0,0,0.2)]">
+                    <CardContent className="p-6 flex flex-col items-center justify-center">
+                      <div className="text-zinc-400 mb-2">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <circle cx="12" cy="12" r="10" />
+                          <line x1="12" y1="8" x2="12" y2="12" />
+                          <line x1="12" y1="16" x2="12.01" y2="16" />
+                        </svg>
+                      </div>
+                      <p className="text-zinc-400 text-center">No activity found</p>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  filterActivity(activity, searchTerm).map((item, index) => (
+                    <Card key={`${item.type}_${item.prediction_id}_${index}`} className="bg-zinc-950/50 border border-zinc-800/50 shadow-[0_0_1px_1px_rgba(0,0,0,0.2)]">
+                      <CardContent className="p-4">
+                        <div className="flex items-start gap-4">
+                          <Avatar>
+                            {item.agent_image ? (
+                              <AvatarImage src={item.agent_image} alt={item.agent_name} />
+                            ) : (
+                              <AvatarFallback>
+                                {item.agent_name?.charAt(0) || 'A'}
+                              </AvatarFallback>
+                            )}
+                          </Avatar>
+                          
+                          <div className="flex-1 space-y-1">
+                            <div className="flex flex-col">
+                              <div className="flex items-center">
+                                <span className="font-medium text-zinc-100">
+                                  {item.type === 'bet' ? item.username : item.agent_name}
+                                </span>
+                                <span className="ml-2 text-zinc-400">
+                                  {item.type === 'bet' ? 'wagered on:' : 'created prediction:'}
+                                </span>
+                              </div>
+                              <div 
+                                className="mt-1 text-zinc-300 hover:text-white transition-colors cursor-pointer"
+                                onClick={() => {
+                                  if (item.type === "bet" && item.bet_id) {
+                                    router.push(`/public/bet/${item.bet_id}`);
+                                  } else if (item.prediction_id) {
+                                    router.push(`/public/prediction/${item.prediction_id}`);
+                                  }
+                                }}
+                              >
+                                {item.description}
+                              </div>
+                              
+                              {item.type === 'bet' && (
+                                <div className="flex items-center mt-2 space-x-2">
+                                  <Badge variant="secondary" className="bg-zinc-900 text-zinc-100">
+                                    {item.amount} ANML
+                                  </Badge>
+                                  <Badge variant="outline" className={item.choice === 'YES' ? 'border-emerald-500 text-emerald-500' : 'border-red-500 text-red-500'}>
+                                    {item.choice}
+                                  </Badge>
+                                </div>
+                              )}
+                              
+                              <div className="text-xs text-zinc-500 mt-2">
+                                {formatDate(item.created_at)}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))
+                )}
+                
+                {hasMoreActivity && !isLoadingActivity && activity.length > 0 && (
+                  <div className="flex justify-center mt-6">
+                    <Button
+                      variant="bordered"
+                      onClick={loadMoreActivity}
+                      disabled={isLoadingActivity}
+                      className="border-zinc-700 hover:bg-zinc-800 min-w-[200px]"
+                    >
+                      {isLoadingActivity ? (
+                        <span className="flex items-center gap-2">
+                          <div className="h-4 w-4 rounded-full border-2 border-current border-r-transparent animate-spin" />
+                          Loading...
+                        </span>
+                      ) : (
+                        "Load More"
+                      )}
+                    </Button>
+                  </div>
+                )}
+                
+                {isLoadingActivity && activity.length > 0 && (
+                  <div className="flex justify-center items-center py-4">
+                    <div className="h-4 w-4 rounded-full border-2 border-current border-r-transparent animate-spin" />
+                  </div>
+                )}
+                
+                {!hasMoreActivity && activity.length > 0 && (
+                  <div className="text-center text-zinc-500 py-4">
+                    No more activity to load
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 

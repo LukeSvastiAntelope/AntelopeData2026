@@ -1,81 +1,116 @@
 import type { Config } from "tailwindcss";
-import { heroui } from "@heroui/theme";
 
 const config: Config = {
   content: [
-    "./src/**/*.{js,ts,jsx,tsx,mdx}",
-    "./node_modules/@heroui/theme/dist/**/*.{js,ts,jsx,tsx}"
+    "./src/**/*.{js,ts,jsx,tsx,mdx}"
   ],
   theme: {
+    fontSize: {
+      'xs': '0.75rem',     // 12px
+      'sm': '0.8125rem',   // 13px
+      'base': '0.875rem',  // 14px
+      'lg': '0.9375rem',   // 15px
+      'xl': '1rem',        // 16px
+      '2xl': '1.125rem',   // 18px
+      '3xl': '1.25rem',    // 20px
+      '4xl': '1.5rem',     // 24px
+      '5xl': '1.875rem',   // 30px
+      '6xl': '2.25rem',    // 36px
+      '7xl': '3rem',       // 48px
+      '8xl': '3.75rem',    // 60px
+      '9xl': '4.5rem',     // 72px
+      'base-sm': '0.8125rem',
+      'base-md': '0.875rem',
+      'base-lg': '0.9375rem'
+    },
+    container: {
+      center: true,
+      padding: "2rem",
+      screens: {
+        "2xl": "1400px",
+      },
+    },
     extend: {
       colors: {
-        // Light theme colors
-        light: {
-          background: "#ffffff",
-          foreground: "#171717",
-          gray: "#6C6676",
+        border: "hsl(var(--border))",
+        input: "hsl(var(--input))",
+        ring: "hsl(var(--ring))",
+        background: "hsl(var(--background))",
+        foreground: "hsl(var(--foreground))",
+        primary: {
+          DEFAULT: "hsl(var(--primary))",
+          foreground: "hsl(var(--primary-foreground))",
         },
-        // Dark theme colors
-        dark: {
-          default: "#1D1D2F",
-          background: "#0a0a0a",
-          foreground: "#ededed",
+        secondary: {
+          DEFAULT: "hsl(var(--secondary))",
+          foreground: "hsl(var(--secondary-foreground))",
         },
-        gray: {
-          default: "#6C6676",
-          white: "#A1A1AA",
+        destructive: {
+          DEFAULT: "hsl(var(--destructive))",
+          foreground: "hsl(var(--destructive-foreground))",
         },
-        input: {
-          default: "#303047",
-          enable: "#348EF7",
+        muted: {
+          DEFAULT: "hsl(var(--muted))",
+          foreground: "hsl(var(--muted-foreground))",
         },
-        text: {
-          default: "#E3EDF5",
-          blue: "#016FEE",
+        accent: {
+          DEFAULT: "hsl(var(--accent))",
+          foreground: "hsl(var(--accent-foreground))",
         },
-        // Custom colors
-        custom: {
-          "prediction-modal-button": "#6c66754d",
-          "prediction-modal-bg": "#2F344E",
+        popover: {
+          DEFAULT: "hsl(var(--popover))",
+          foreground: "hsl(var(--popover-foreground))",
         },
+        card: {
+          DEFAULT: "hsl(var(--card))",
+          foreground: "hsl(var(--card-foreground))",
+        },
+        chart: {
+          '1': 'hsl(var(--chart-1))',
+          '2': 'hsl(var(--chart-2))',
+          '3': 'hsl(var(--chart-3))',
+          '4': 'hsl(var(--chart-4))',
+          '5': 'hsl(var(--chart-5))'
+        },
+        sidebar: {
+          DEFAULT: "hsl(var(--sidebar))",
+          foreground: "hsl(var(--sidebar-foreground))",
+          primary: "hsl(var(--sidebar-primary))",
+          "primary-foreground": "hsl(var(--sidebar-primary-foreground))",
+          accent: "hsl(var(--sidebar-accent))",
+          "accent-foreground": "hsl(var(--sidebar-accent-foreground))",
+          border: "hsl(var(--sidebar-border))",
+          ring: "hsl(var(--sidebar-ring))"
+        }
       },
-      backgroundImage: {
-        mainImage: "url('/assets/images/background.jpg')",
+      borderRadius: {
+        lg: "var(--radius)",
+        md: "calc(var(--radius) - 2px)",
+        sm: "calc(var(--radius) - 4px)",
+        xl: "calc(var(--radius) + 4px)"
       },
       fontFamily: {
-        kodemono: ['Kode Mono', 'serif'],
+        sans: ['var(--font-noto-sans)'],
+        kodemono: ['Kode Mono', 'serif']
       },
-      fontSize: {
-        'base-sm': '0.9375rem',    // 15px
-        'base-md': '1rem',         // 16px
-        'base-lg': '1.0625rem',    // 17px
+      keyframes: {
+        "accordion-down": {
+          from: { height: "0" },
+          to: { height: "var(--radix-accordion-content-height)" },
+        },
+        "accordion-up": {
+          from: { height: "var(--radix-accordion-content-height)" },
+          to: { height: "0" },
+        },
+      },
+      animation: {
+        "accordion-down": "accordion-down 0.2s ease-out",
+        "accordion-up": "accordion-up 0.2s ease-out",
       },
     },
   },
-  darkMode: "class",
-  plugins: [heroui({
-    themes: {
-      light: {
-        colors: {
-          background: "#ffffff",
-          foreground: "#171717",
-          primary: {
-            DEFAULT: "#006FEE",
-            foreground: "#ffffff",
-          },
-        },
-      },
-      dark: {
-        colors: {
-          background: "#0a0a0a",
-          foreground: "#ededed",
-          primary: {
-            DEFAULT: "#006FEE",
-            foreground: "#ffffff",
-          },
-        },
-      },
-    },
-  })],
+  darkMode: ["class"],
+  plugins: [require("tailwindcss-animate"), require("@tailwindcss/typography")],
 };
+
 export default config;

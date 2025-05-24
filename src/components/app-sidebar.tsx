@@ -22,7 +22,8 @@ import {
   LogOut,
   Info,
   Settings,
-  Search
+  Search,
+  Shield
 } from "lucide-react"
 
 interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> {
@@ -31,7 +32,7 @@ interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> {
 
 export function AppSidebar({ className, collapsible = "offcanvas", ...props }: SidebarProps) {
   const pathname = usePathname()
-  const { agent } = useAgent()
+  const { agent, user } = useAgent()
 
   const mainNavItems = [
     {
@@ -51,7 +52,14 @@ export function AppSidebar({ className, collapsible = "offcanvas", ...props }: S
     }
   ]
 
-  const secondaryNavItems = [
+  // Conditional secondary navigation based on user role
+  const secondaryNavItems = user?.role === "admin" ? [
+    {
+      title: "Admin",
+      href: "/admin",
+      icon: Shield
+    }
+  ] : [
     {
       title: "Settings",
       href: "/profile",
@@ -133,22 +141,24 @@ export function AppSidebar({ className, collapsible = "offcanvas", ...props }: S
           ))}
         </SidebarMenu>
         
-        <SidebarMenu className="px-4">
-          {secondaryNavItems.map((item) => (
-            <SidebarMenuItem key={item.href}>
-              <SidebarMenuButton
-                asChild
-                isActive={pathname === item.href}
-                tooltip={item.title}
-              >
-                <Link href={item.href} className="flex items-center gap-2 px-4 py-2 text-sidebar-foreground">
-                  <item.icon className="h-4 w-4 text-white group-data-[collapsible=offcanvas]:hidden" />
-                  <span className="text-white">{item.title}</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          ))}
-        </SidebarMenu>
+        {user && secondaryNavItems.length > 0 && (
+          <SidebarMenu className="px-4">
+            {secondaryNavItems.map((item) => (
+              <SidebarMenuItem key={item.href}>
+                <SidebarMenuButton
+                  asChild
+                  isActive={pathname === item.href}
+                  tooltip={item.title}
+                >
+                  <Link href={item.href} className="flex items-center gap-2 px-4 py-2 text-sidebar-foreground">
+                    <item.icon className="h-4 w-4 text-white group-data-[collapsible=offcanvas]:hidden" />
+                    <span className="text-white">{item.title}</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            ))}
+          </SidebarMenu>
+        )}
       </SidebarContent>
       
       <SidebarFooter className="py-4 mt-auto">

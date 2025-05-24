@@ -1,774 +1,459 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Image } from "@heroui/image";
 import { Button } from "@heroui/button";
-import { Spinner } from "@heroui/spinner";
 import { IPrediction, ILeaderboardData } from "@/app/utils/interface";
 import { useFetch } from "@/app/utils/lib";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
-import { PredictionItem } from "@/app/components/PredictionItem";
-import { Tooltip } from "@heroui/tooltip";
+import { SidebarTrigger } from "@/components/ui/sidebar";
+import { MarketsTabs } from "@/components/markets-tabs";
+import { MarketSectionCards } from "@/components/market-section-cards";
+// import { ChartAreaInteractive } from "@/components/chart-area-interactive";
 import { useAgent } from "@/app/context/AgentContext";
 
+const ITEMS_PER_PAGE = 50;
+
 export default function MarketsPage() {
-  const [activeTab, setActiveTab] = useState<"predictions" | "sports" | "general" | "crypto" | "markets" | "leaderboard">("predictions");
-  const [searchPredictions, setSearchPredictions] = useState("");
-  const [searchSports, setSearchSports] = useState("");
-  const [searchGeneral, setSearchGeneral] = useState("");
-  const [searchCrypto, setSearchCrypto] = useState("");
-  const [searchMarkets, setSearchMarkets] = useState("");
-
-  // Predictions
-  const [predictions, setPredictions] = useState<IPrediction[]>([]);
-  const [displayedPredictions, setDisplayedPredictions] = useState<IPrediction[]>([]);
-  const [isLoadingPredictions, setIsLoadingPredictions] = useState<boolean>(false);
-  const [pagePredictions, setPagePredictions] = useState<number>(1);
-  const [hasMorePredictions, setHasMorePredictions] = useState<boolean>(true);
-
-  // Additional data placeholders
-  const [sportsData, setSportsData] = useState<IPrediction[]>([]);
-  const [cryptoData, setCryptoData] = useState<IPrediction[]>([]);
-  const [generalData, setGeneralData] = useState<IPrediction[]>([]);
-  const [marketsData, setMarketsData] = useState<IPrediction[]>([]);
-  const [isLoadingSports, setIsLoadingSports] = useState<boolean>(false);
-  const [isLoadingCrypto, setIsLoadingCrypto] = useState<boolean>(false);
-  const [isLoadingGeneral, setIsLoadingGeneral] = useState<boolean>(false);
-  const [isLoadingMarkets, setIsLoadingMarkets] = useState<boolean>(false);
-
-  const [pageSports, setPageSports] = useState<number>(1);
-  const [pageGeneral, setPageGeneral] = useState<number>(1);
-  const [pageMarkets, setPageMarkets] = useState<number>(1);
-  const [pageCrypto, setPageCrypto] = useState<number>(1);
-  const [hasMoreSports, setHasMoreSports] = useState<boolean>(true);
-  const [hasMoreGeneral, setHasMoreGeneral] = useState<boolean>(true);
-  const [hasMoreMarkets, setHasMoreMarkets] = useState<boolean>(true);
-  const [hasMoreCrypto, setHasMoreCrypto] = useState<boolean>(true);
-  const [displayedSports, setDisplayedSports] = useState<IPrediction[]>([]);
-  const [displayedGeneral, setDisplayedGeneral] = useState<IPrediction[]>([]);
-  const [displayedMarkets, setDisplayedMarkets] = useState<IPrediction[]>([]);
-  const [displayedCrypto, setDisplayedCrypto] = useState<IPrediction[]>([]);
-  // Add leaderboard states (after other state declarations)
-  const [leaderboardData, setLeaderboardData] = useState<ILeaderboardData[]>([]);
-  const [isLoadingLeaderboard, setIsLoadingLeaderboard] = useState<boolean>(false);
-
-  const { agent } = useAgent();
-
-  const ITEMS_PER_PAGE_PREDICTIONS = 50;
-
   const router = useRouter();
   const fetch = useFetch();
+  const { agent } = useAgent();
 
-  // Fetch Predictions
-  const fetchPredictions = async (category: string) => {
-    if (isLoadingPredictions) return;
-    setIsLoadingPredictions(true);
-    setIsLoadingSports(true);
-    setIsLoadingGeneral(true);
-    setIsLoadingCrypto(true);
-    setIsLoadingMarkets(true);
+  // Data states
+  const [predictionsData, setPredictionsData] = useState<{
+    myPredictions: IPrediction[];
+    general: IPrediction[];
+    sports: IPrediction[];
+    crypto: IPrediction[];
+    markets: IPrediction[];
+  }>({
+    myPredictions: [],
+    general: [],
+    sports: [],
+    crypto: [],
+    markets: []
+  });
 
+  // Store full predictions for pagination
+  const [fullPredictions, setFullPredictions] = useState<{
+    myPredictions: IPrediction[];
+    general: IPrediction[];
+    sports: IPrediction[];
+    crypto: IPrediction[];
+    markets: IPrediction[];
+  }>({
+    myPredictions: [],
+    general: [],
+    sports: [],
+    crypto: [],
+    markets: []
+  });
+
+  // Leaderboard data
+  const [leaderboardData, setLeaderboardData] = useState<ILeaderboardData[]>([]);
+  const [fullLeaderboardData, setFullLeaderboardData] = useState<ILeaderboardData[]>([]);
+
+  // Loading states
+  const [isLoading, setIsLoading] = useState({
+    myPredictions: false,
+    general: false,
+    sports: false,
+    crypto: false,
+    markets: false,
+    leaderboard: false,
+    loadingMore: {
+      myPredictions: false,
+      general: false,
+      sports: false,
+      crypto: false,
+      markets: false,
+      leaderboard: false
+    }
+  });
+
+  // Pagination states
+  const [pagination, setPagination] = useState({
+    myPredictions: { page: 1, hasMore: true },
+    general: { page: 1, hasMore: true },
+    sports: { page: 1, hasMore: true },
+    crypto: { page: 1, hasMore: true },
+    markets: { page: 1, hasMore: true },
+    leaderboard: { page: 1, hasMore: true }
+  });
+
+  useEffect(() => {
+    fetchData();
+    fetchLeaderboard();
+  }, []);
+
+  const fetchData = async () => {
     try {
-      const response = await fetch.get("/api/getPredictions");
-      if (response.status) {
-        let source = "";
-        if (category == "general") {
-          source = "google_news";
-        } else if (category == "markets") {
-          source = "google_finance";
-        } else if (category == "crypto") {
-          source = "coinmarketcap";
+      setIsLoading(prev => ({
+        ...prev,
+        myPredictions: true,
+        general: true,
+        sports: true,
+        crypto: true,
+        markets: true
+      }));
+
+      console.log('🚀 Markets page: Starting to fetch predictions data...')
+      console.log('🔍 Agent context:', { agentId: agent?.id, agentExists: !!agent })
+
+      // Get predictions created by the user
+      console.log('📡 Calling /api/getPredictionHistory...')
+      const myPredictionsResponse = await fetch.get("/api/getPredictionHistory");
+      console.log('📊 MyPredictions API response:', {
+        status: myPredictionsResponse?.status,
+        count: myPredictionsResponse?.predictions?.length,
+        error: myPredictionsResponse?.error,
+        message: myPredictionsResponse?.message,
+        fullResponse: myPredictionsResponse
+      })
+      
+      // Get predictions by source - make separate calls for each category
+      console.log('📡 Calling APIs for each source...')
+      
+      const [generalResponse, sportsResponse, cryptoResponse, marketsResponse] = await Promise.all([
+        fetch.get("/api/getPredictions?type=marketplace&source=google_news"),
+        fetch.get("/api/getPredictions?type=marketplace&source=sportDB"),
+        fetch.get("/api/getPredictions?type=marketplace&source=coinmarketcap"),
+        fetch.get("/api/getPredictions?type=marketplace&source=google_finance")
+      ]);
+
+      console.log('📊 Source-specific API responses:', {
+        general: { status: generalResponse?.status, count: generalResponse?.predictions?.length, total: generalResponse?.pagination?.total },
+        sports: { status: sportsResponse?.status, count: sportsResponse?.predictions?.length, total: sportsResponse?.pagination?.total },
+        crypto: { status: cryptoResponse?.status, count: cryptoResponse?.predictions?.length, total: cryptoResponse?.pagination?.total },
+        markets: { status: marketsResponse?.status, count: marketsResponse?.predictions?.length, total: marketsResponse?.pagination?.total }
+      })
+
+      if (generalResponse.status && sportsResponse.status && cryptoResponse.status && marketsResponse.status && myPredictionsResponse.status) {
+        const myPredictionsData = myPredictionsResponse.predictions || [];
+        const general = generalResponse.predictions || [];
+        const sports = sportsResponse.predictions || [];
+        const crypto = cryptoResponse.predictions || [];
+        const markets = marketsResponse.predictions || [];
+        
+        console.log('🔍 Processing predictions data:', {
+          myPredictions: myPredictionsData.length,
+          general: general.length,
+          sports: sports.length,
+          crypto: crypto.length,
+          markets: markets.length
+        })
+
+        // Store full predictions for pagination
+        setFullPredictions({
+          myPredictions: myPredictionsData,
+          general,
+          sports,
+          crypto,
+          markets
+        });
+
+        setPredictionsData({
+          myPredictions: myPredictionsData.slice(0, ITEMS_PER_PAGE),
+          general: general.slice(0, ITEMS_PER_PAGE),
+          sports: sports.slice(0, ITEMS_PER_PAGE),
+          crypto: crypto.slice(0, ITEMS_PER_PAGE),
+          markets: markets.slice(0, ITEMS_PER_PAGE)
+        });
+
+        console.log('📋 Final predictions data set:', {
+          myPredictions: myPredictionsData.slice(0, ITEMS_PER_PAGE).length,
+          general: general.slice(0, ITEMS_PER_PAGE).length,
+          sports: sports.slice(0, ITEMS_PER_PAGE).length,
+          crypto: crypto.slice(0, ITEMS_PER_PAGE).length,
+          markets: markets.slice(0, ITEMS_PER_PAGE).length
+        })
+
+        // Update pagination based on API responses
+        setPagination({
+          myPredictions: { page: 1, hasMore: myPredictionsData.length > ITEMS_PER_PAGE },
+          general: { page: 1, hasMore: generalResponse.pagination?.hasMore || false },
+          sports: { page: 1, hasMore: sportsResponse.pagination?.hasMore || false },
+          crypto: { page: 1, hasMore: cryptoResponse.pagination?.hasMore || false },
+          markets: { page: 1, hasMore: marketsResponse.pagination?.hasMore || false },
+          leaderboard: { page: 1, hasMore: false }
+        });
+
+        console.log('📄 Pagination state set:', {
+          general: { total: generalResponse.pagination?.total, hasMore: generalResponse.pagination?.hasMore },
+          sports: { total: sportsResponse.pagination?.total, hasMore: sportsResponse.pagination?.hasMore },
+          crypto: { total: cryptoResponse.pagination?.total, hasMore: cryptoResponse.pagination?.hasMore },
+          markets: { total: marketsResponse.pagination?.total, hasMore: marketsResponse.pagination?.hasMore }
+        })
+      } else {
+        console.warn('⚠️ API calls failed:', {
+          generalApiStatus: generalResponse?.status,
+          sportsApiStatus: sportsResponse?.status,
+          cryptoApiStatus: cryptoResponse?.status,
+          marketsApiStatus: marketsResponse?.status,
+          myPredictionsApiStatus: myPredictionsResponse?.status
+        })
+        
+        // Set empty data but don't show toast if it's just empty data
+        setPredictionsData({
+          myPredictions: [],
+          general: [],
+          sports: [],
+          crypto: [],
+          markets: []
+        });
+        
+        setFullPredictions({
+          myPredictions: [],
+          general: [],
+          sports: [],
+          crypto: [],
+          markets: []
+        });
+        
+        // Only show error toast for actual errors, not empty data
+        if (generalResponse?.error || sportsResponse?.error || cryptoResponse?.error || marketsResponse?.error || myPredictionsResponse?.error) {
+          toast.error('Failed to fetch predictions');
         } else {
-          source = "sportDB";
+          console.log('ℹ️ No error message, likely just empty data or authentication issue')
         }
-        let interest = response.predictions.filter((prediction: IPrediction) => prediction.source == source);
-        if (source == "sportDB") {
-          if (category == "nba") {
-            interest = interest.filter((prediction: IPrediction) => prediction.league_id == 4387);
-          } else if (category == "nfl") {
-            interest = interest.filter((prediction: IPrediction) => prediction.league_id == 4391);
-          } else if (category == "english premier league") {
-            interest = interest.filter((prediction: IPrediction) => prediction.league_id == 4328);
-          } else {
-            interest = interest.filter((prediction: IPrediction) => prediction.league_id != 4387 && prediction.league_id != 4391);
+      }
+    } catch (error) {
+      console.error("❌ Error in fetchData:", error);
+      toast.error("Failed to fetch predictions: " + String(error));
+      
+      // Set empty data on error
+      setPredictionsData({
+        myPredictions: [],
+        general: [],
+        sports: [],
+        crypto: [],
+        markets: []
+      });
+      
+      setFullPredictions({
+        myPredictions: [],
+        general: [],
+        sports: [],
+        crypto: [],
+        markets: []
+      });
+    } finally {
+      setIsLoading(prev => ({
+        ...prev,
+        myPredictions: false,
+        general: false,
+        sports: false,
+        crypto: false,
+        markets: false
+      }));
+    }
+  };
+
+  const fetchLeaderboard = async () => {
+    try {
+      setIsLoading(prev => ({
+        ...prev,
+        leaderboard: true
+      }));
+
+      const response = await fetch.get("/api/getLeaderboard");
+
+      if (response.status) {
+        const leaderboard = response.leaderboard || [];
+        
+        // Store full leaderboard data for pagination
+        setFullLeaderboardData(leaderboard);
+        
+        // Set initial leaderboard data
+        setLeaderboardData(leaderboard.slice(0, ITEMS_PER_PAGE));
+        
+        // Update pagination
+        setPagination(prev => ({
+          ...prev,
+          leaderboard: { 
+            page: 1, 
+            hasMore: leaderboard.length > ITEMS_PER_PAGE 
           }
-        }
-        setPredictions(interest);
-        setDisplayedPredictions(interest.slice(0, ITEMS_PER_PAGE_PREDICTIONS));
-        setHasMorePredictions(interest.length > ITEMS_PER_PAGE_PREDICTIONS);
-        const sports = response.predictions.filter((prediction: IPrediction) => prediction.source === "sportDB");
-        setSportsData(sports || []);
-        setDisplayedSports(sports.slice(0, ITEMS_PER_PAGE_PREDICTIONS));
-        setHasMoreSports(sports.length > ITEMS_PER_PAGE_PREDICTIONS);
-        const general = response.predictions.filter((prediction: IPrediction) => prediction.source === "google_news");
-        setGeneralData(general || []);
-        setDisplayedGeneral(general.slice(0, ITEMS_PER_PAGE_PREDICTIONS));
-        setHasMoreGeneral(general.length > ITEMS_PER_PAGE_PREDICTIONS);
-        const crypto = response.predictions.filter((prediction: IPrediction) => prediction.source === "coinmarketcap");
-        setCryptoData(crypto || []);
-        setDisplayedCrypto(crypto.slice(0, ITEMS_PER_PAGE_PREDICTIONS));
-        setHasMoreCrypto(crypto.length > ITEMS_PER_PAGE_PREDICTIONS);
-        const markets = response.predictions.filter((prediction: IPrediction) => prediction.source === "google_finance");
-        setMarketsData(markets || []);
-        setDisplayedMarkets(markets.slice(0, ITEMS_PER_PAGE_PREDICTIONS));
-        setHasMoreMarkets(markets.length > ITEMS_PER_PAGE_PREDICTIONS);
+        }));
       } else {
         toast.error(response.message);
       }
     } catch (error) {
-      toast.error("Failed to fetch predictions: " + String(error));
-      setHasMorePredictions(false);
+      toast.error("Failed to fetch leaderboard: " + String(error));
     } finally {
-      setIsLoadingPredictions(false);
-      setIsLoadingSports(false);
-      setIsLoadingGeneral(false);
-      setIsLoadingCrypto(false);
-      setIsLoadingMarkets(false);
+      setIsLoading(prev => ({
+        ...prev,
+        leaderboard: false
+      }));
     }
   };
 
-  const loadMorePredictions = () => {
-    if (!isLoadingPredictions && hasMorePredictions) {
-      const newPage = pagePredictions + 1;
-      const nextItems = predictions.slice(0, newPage * ITEMS_PER_PAGE_PREDICTIONS);
-      setDisplayedPredictions(nextItems);
-      setHasMorePredictions(nextItems.length < predictions.length);
-      setPagePredictions(newPage);
-    }
-  };
-  
-  // Lazy-load data based on current tab
-  useEffect(() => {
-    if (activeTab === "leaderboard" && leaderboardData.length === 0 && !isLoadingLeaderboard) {
-      fetchLeaderboardData();
-    }
-  }, [activeTab, leaderboardData.length, isLoadingLeaderboard]);
+  const handleLoadMore = async (category: keyof typeof predictionsData) => {
+    setIsLoading(prev => ({
+      ...prev,
+      loadingMore: {
+        ...prev.loadingMore,
+        [category]: true
+      }
+    }));
 
-  useEffect(() => {
-    if (agent) {
-      fetchPredictions(agent.category);
-    }
-  }, [agent]);
-
-  // Handle search
-  const handlePredictionSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchPredictions(e.target.value);
-    setPagePredictions(1); // reset pagination or infinite scroll
-  };
-
-  const handleSportsSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchSports(e.target.value);
-    setPageSports(1);
-  };
-
-  const handleGeneralSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchGeneral(e.target.value);
-    setPageGeneral(1);
-  };
-
-  const handleCryptoSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchCrypto(e.target.value);
-    setPageCrypto(1);
-  };
-
-  const handleMarketsSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchMarkets(e.target.value);
-    setPageMarkets(1);
-  };
-
-  const loadMoreSports = () => {
-    if (!isLoadingSports && hasMoreSports) {
-      const newPage = pageSports + 1;
-      const nextItems = sportsData.slice(0, newPage * ITEMS_PER_PAGE_PREDICTIONS);
-      setDisplayedSports(nextItems);
-      setHasMoreSports(nextItems.length < sportsData.length);
-      setPageSports(newPage);
-    }
-  };
-
-  const loadMoreGeneral = () => {
-    if (!isLoadingGeneral && hasMoreGeneral) {
-      const newPage = pageGeneral + 1;
-      const nextItems = generalData.slice(0, newPage * ITEMS_PER_PAGE_PREDICTIONS);
-      setDisplayedGeneral(nextItems);
-      setHasMoreGeneral(nextItems.length < generalData.length);
-      setPageGeneral(newPage);
-    }
-  };
-
-  const loadMoreCrypto = () => {
-    if (!isLoadingCrypto && hasMoreCrypto) {
-      const newPage = pageCrypto + 1;
-      const nextItems = cryptoData.slice(0, newPage * ITEMS_PER_PAGE_PREDICTIONS);
-      setDisplayedCrypto(nextItems);
-      setHasMoreCrypto(nextItems.length < cryptoData.length);
-      setPageCrypto(newPage);
-    }
-  };
-
-  const loadMoreMarkets = () => {
-    if (!isLoadingMarkets && hasMoreMarkets) {
-      const newPage = pageMarkets + 1;
-      const nextItems = marketsData.slice(0, newPage * ITEMS_PER_PAGE_PREDICTIONS);
-      setDisplayedMarkets(nextItems);
-      setHasMoreMarkets(nextItems.length < marketsData.length);
-      setPageMarkets(newPage);
-    }
-  };
-
-  // Add fetchLeaderboardData function (after other fetch functions)
-  const fetchLeaderboardData = async () => {
-    if (isLoadingLeaderboard) return;
-    setIsLoadingLeaderboard(true);
-
+    const nextPage = pagination[category].page + 1;
+    
     try {
-      const response = await fetch.get("/api/getLeaderboard");
-      if (response.status) {
-        // Assign ranks handling ties
-        let currentRank = 1;
-        const leaderboard = response.leaderboard.sort((a: ILeaderboardData, b: ILeaderboardData) => b.win_rate - a.win_rate);
-        let previousWinnings = leaderboard[0]?.win_rate;
+      let response;
+      
+      // Make API call based on category
+      switch (category) {
+        case 'myPredictions':
+          // For user's own predictions, we'll keep using the existing approach
+          const start = (nextPage - 1) * ITEMS_PER_PAGE;
+          const end = start + ITEMS_PER_PAGE;
+          const newItems = fullPredictions[category].slice(0, end);
+          
+          setPredictionsData(prev => ({
+            ...prev,
+            [category]: newItems
+          }));
 
-        leaderboard.forEach((item: ILeaderboardData) => {
-          if (item.win_rate < previousWinnings) {
-            currentRank = currentRank + 1;
-            previousWinnings = item.win_rate;
+          setPagination(prev => ({
+            ...prev,
+            [category]: { 
+              page: nextPage,
+              hasMore: fullPredictions[category].length > end
+            }
+          }));
+          break;
+          
+        case 'general':
+          response = await fetch.get(`/api/getPredictions?type=marketplace&source=google_news&page=${nextPage}&limit=${ITEMS_PER_PAGE}`);
+          break;
+        case 'sports':
+          response = await fetch.get(`/api/getPredictions?type=marketplace&source=sportDB&page=${nextPage}&limit=${ITEMS_PER_PAGE}`);
+          break;
+        case 'crypto':
+          response = await fetch.get(`/api/getPredictions?type=marketplace&source=coinmarketcap&page=${nextPage}&limit=${ITEMS_PER_PAGE}`);
+          break;
+        case 'markets':
+          response = await fetch.get(`/api/getPredictions?type=marketplace&source=google_finance&page=${nextPage}&limit=${ITEMS_PER_PAGE}`);
+          break;
+      }
+      
+      // Handle API response for marketplace categories
+      if (response && response.status && category !== 'myPredictions') {
+        const newPredictions = response.predictions || [];
+        
+        setPredictionsData(prev => ({
+          ...prev,
+          [category]: [...prev[category], ...newPredictions]
+        }));
+
+        setPagination(prev => ({
+          ...prev,
+          [category]: { 
+            page: nextPage,
+            hasMore: response.pagination?.hasMore || false
           }
-          item.rank = currentRank;
+        }));
+        
+        console.log(`📄 Loaded more for ${category}:`, {
+          newCount: newPredictions.length,
+          totalNow: predictionsData[category].length + newPredictions.length,
+          hasMore: response.pagination?.hasMore
         });
-
-        setLeaderboardData(leaderboard);
-      } else {
-        toast.error(response.message || "Failed to fetch leaderboard data");
       }
     } catch (error) {
-      console.error("Failed to fetch leaderboard data:", error);
-      toast.error("Failed to fetch leaderboard data");
+      console.error(`Error loading more ${category}:`, error);
+      toast.error(`Failed to load more ${category}`);
     } finally {
-      setIsLoadingLeaderboard(false);
+      setIsLoading(prev => ({
+        ...prev,
+        loadingMore: {
+          ...prev.loadingMore,
+          [category]: false
+        }
+      }));
     }
+  };
+
+  const handleLoadMoreLeaderboard = () => {
+    setIsLoading(prev => ({
+      ...prev,
+      loadingMore: {
+        ...prev.loadingMore,
+        leaderboard: true
+      }
+    }));
+
+    const nextPage = pagination.leaderboard.page + 1;
+    const start = (nextPage - 1) * ITEMS_PER_PAGE;
+    const end = start + ITEMS_PER_PAGE;
+    
+    // Get more items from the full leaderboard data
+    const newItems = fullLeaderboardData.slice(0, end);
+    
+    setLeaderboardData(newItems);
+
+    setPagination(prev => ({
+      ...prev,
+      leaderboard: { 
+        page: nextPage,
+        hasMore: fullLeaderboardData.length > end
+      }
+    }));
+
+    setIsLoading(prev => ({
+      ...prev,
+      loadingMore: {
+        ...prev.loadingMore,
+        leaderboard: false
+      }
+    }));
   };
 
   return (
-    <>
-      <div className="flex flex-row justify-between h-32">
-        <div className="pr-8 pt-2">
-          <h1 className="font-bold mb-2 font-kodemono ">
-            Markets
-          </h1>
-          <p className="text-gray-500 h1paragraph">
-            Explore other categories, find interesting predictions, refine your approach, and see how top bettors fare.
-          </p>
+    <div className="flex-1 p-2 w-full">
+      <div className="mx-auto rounded-lg bg-black text-card-foreground shadow-lg">
+        {/* Header */}
+        <div className="px-6 py-4">
+          <div className="flex items-center">
+            <SidebarTrigger className="-ml-0.5 h-5 w-5 text-zinc-400 hover:text-zinc-100" />
+            <div className="h-4 border-l border-zinc-800 mx-4" />
+            <h1 className="text-base font-medium">Markets</h1>
+          </div>
+        </div>
+        
+        <div className="border-b border-zinc-800" />
+
+        <div className="p-6">
+          {/* Top metrics cards */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <MarketSectionCards />
+          </div>
+          
+          {/* Chart area - temporarily disabled */}
+          {/* <div className="mt-6">
+            <ChartAreaInteractive />
+          </div> */}
+
+          {/* Markets tabs section */}
+          <div className="mt-6">
+            <MarketsTabs
+              predictionsData={predictionsData}
+              leaderboardData={leaderboardData}
+              isLoading={isLoading}
+              pagination={pagination}
+              onLoadMore={{
+                myPredictions: () => handleLoadMore('myPredictions'),
+                general: () => handleLoadMore('general'),
+                sports: () => handleLoadMore('sports'),
+                crypto: () => handleLoadMore('crypto'),
+                markets: () => handleLoadMore('markets'),
+                leaderboard: handleLoadMoreLeaderboard
+              }}
+            />
+          </div>
         </div>
       </div>
-      {/* Tabs */}
-      <div className="flex gap-2 font-kodemono mb-2 text-small">
-        <Tooltip
-          content="View overall predictions."
-          showArrow
-        >
-          <button
-            onClick={() => setActiveTab("predictions")}
-            className={`px-1 py-2 hover:text-white ${activeTab === "predictions" ? "text-white" : "text-gray-500"
-              }`}
-          >
-            Predictions
-          </button>
-        </Tooltip>
-        <Tooltip
-          content="Bet on sports events."
-          showArrow
-        >
-          <button
-            onClick={() => setActiveTab("sports")}
-            className={`px-1 py-2 hover:text-white ${activeTab === "sports" ? "text-white" : "text-gray-500"
-              }`}
-          >
-            Sports
-          </button>
-        </Tooltip>
-        <Tooltip
-          content="Broader topics and forecasts."
-          showArrow
-        >
-          <button
-            onClick={() => setActiveTab("general")}
-            className={`px-1 py-2 hover:text-white ${activeTab === "general" ? "text-white" : "text-gray-500"
-              }`}
-          >
-            General
-          </button>
-        </Tooltip>
-        <Tooltip
-          content="Cryptocurrency predictions."
-          showArrow
-        >
-          <button
-            onClick={() => setActiveTab("crypto")}
-            className={`px-1 py-2 hover:text-white ${activeTab === "crypto" ? "text-white" : "text-gray-500"
-              }`}
-          >
-            Crypto
-          </button>
-        </Tooltip>
-        <Tooltip
-          content="Market predictions (stocks, etc)."
-          showArrow
-        >
-          <button
-            onClick={() => setActiveTab("markets")}
-            className={`px-1 py-2 hover:text-white ${activeTab === "markets" ? "text-white" : "text-gray-500"
-              }`}
-          >
-            Markets
-          </button>
-        </Tooltip>
-        <Tooltip
-          content="View the leaderboards."
-          showArrow
-        >
-          <button
-            onClick={() => setActiveTab("leaderboard")}
-            className={`px-1 py-2 hover:text-white ${activeTab === "leaderboard" ? "text-white" : "text-gray-500"
-              }`}
-          >
-            Leaderboard
-          </button>
-        </Tooltip>
-      </div>
-
-      {/* Search Field for Predictions */}
-      {activeTab === "predictions" && (
-        <div className="relative mb-6 group">
-          <span className="absolute inset-y-0 left-0 flex items-center pl-2 pointer-events-none">
-            {/* Search Icon */}
-            <svg
-              aria-hidden="true"
-              className="w-5 h-5 text-gray-700 group-focus-within:text-white transition-colors duration-200"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              viewBox="0 0 24 24"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <circle cx="10" cy="10" r="7"></circle>
-              <path d="M21 21l-4.35-4.35"></path>
-            </svg>
-          </span>
-          <input
-            type="text"
-            value={searchPredictions}
-            onChange={handlePredictionSearch}
-            placeholder="Search predictions..."
-            className="w-full p-2 pl-9 rounded-md text-gray-700 focus:outline-none text-small input-search bg-gray-800 placeholder-gray-700"
-          />
-        </div>
-      )}
-
-      {/* Search Field for Sports */}
-      {activeTab === "sports" && (
-        <div className="relative mb-6 group">
-          <span className="absolute inset-y-0 left-0 flex items-center pl-2 pointer-events-none">
-            {/* Search Icon */}
-            <svg
-              aria-hidden="true"
-              className="w-5 h-5 text-gray-700"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              viewBox="0 0 24 24"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <circle cx="10" cy="10" r="7"></circle>
-              <path d="M21 21l-4.35-4.35"></path>
-            </svg>
-          </span>
-          <input
-            type="text"
-            value={searchSports}
-            onChange={handleSportsSearch}
-            placeholder="Search sports..."
-            className="w-full p-2 pl-9 rounded-md text-gray-700 focus:outline-none text-small input-search bg-gray-800 placeholder-gray-700"
-          />
-        </div>
-      )}
-
-      {/* Search Field for General */}
-      {activeTab === "general" && (
-        <div className="relative mb-6 group">
-          <span className="absolute inset-y-0 left-0 flex items-center pl-2 pointer-events-none">
-            {/* Search Icon */}
-            <svg
-              aria-hidden="true"
-              className="w-5 h-5 text-gray-700"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              viewBox="0 0 24 24"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <circle cx="10" cy="10" r="7"></circle>
-              <path d="M21 21l-4.35-4.35"></path>
-            </svg>
-          </span>
-          <input
-            type="text"
-            value={searchGeneral}
-            onChange={handleGeneralSearch}
-            placeholder="Search general..."
-            className="w-full p-2 pl-9 rounded-md text-gray-700 focus:outline-none text-small input-search bg-gray-800 placeholder-gray-700"
-          />
-        </div>
-      )}
-
-      {/* Search Field for General */}
-      {activeTab === "crypto" && (
-        <div className="relative mb-6 group">
-          <span className="absolute inset-y-0 left-0 flex items-center pl-2 pointer-events-none">
-            {/* Search Icon */}
-            <svg
-              aria-hidden="true"
-              className="w-5 h-5 text-gray-700"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              viewBox="0 0 24 24"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <circle cx="10" cy="10" r="7"></circle>
-              <path d="M21 21l-4.35-4.35"></path>
-            </svg>
-          </span>
-          <input
-            type="text"
-            value={searchCrypto}
-            onChange={handleCryptoSearch}
-            placeholder="Search crypto..."
-            className="w-full p-2 pl-9 rounded-md text-gray-700 focus:outline-none text-small input-search bg-gray-800 placeholder-gray-700"
-          />
-        </div>
-      )}
-
-      {activeTab === "markets" && (
-        <div className="relative mb-6 group">
-          <span className="absolute inset-y-0 left-0 flex items-center pl-2 pointer-events-none">
-            {/* Search Icon */}
-            <svg
-              aria-hidden="true"
-              className="w-5 h-5 text-gray-700"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              viewBox="0 0 24 24"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <circle cx="10" cy="10" r="7"></circle>
-              <path d="M21 21l-4.35-4.35"></path>
-            </svg>
-          </span>
-          <input
-            type="text"
-            value={searchMarkets}
-            onChange={handleMarketsSearch}
-            placeholder="Search markets..."
-            className="w-full p-2 pl-9 rounded-md text-gray-700 focus:outline-none text-small input-search bg-gray-800 placeholder-gray-700"
-          />
-        </div>
-      )}
-
-      {/* PREDICTIONS SECTION */}
-      {activeTab === "predictions" && (
-        <section className="rounded-lg">
-          {isLoadingPredictions && predictions.length === 0 && (
-            <div className="flex justify-center items-center py-8">
-              <Spinner size="lg" />
-            </div>
-          )}
-          {!isLoadingPredictions && predictions.length === 0 && (
-            <div className="text-center text-gray-500 py-8 container">
-              No predictions found
-            </div>
-          )}
-
-          {displayedPredictions.length > 0 && (
-            <div className="rounded-lg p-0 overflow-x-auto">
-              <table className="w-full text-sm text-left">
-                <tbody>
-                  {displayedPredictions.map((prediction, index) => (
-                    <PredictionItem
-                      key={index}
-                      prediction={prediction}
-                      onClick={(id) => router.push(`/predictions/${id}`)}
-                
-                    />
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          {/* Show More Button */}
-          {hasMorePredictions && !isLoadingPredictions && displayedPredictions.length > 0 && (
-            <div className="flex justify-center mt-4">
-              <Button
-                color="primary"
-                variant="flat"
-                onPress={loadMorePredictions}
-                className="min-w-[200px]"
-              >
-                Show More
-              </Button>
-            </div>
-          )}
-        </section>
-      )}
-
-      {/* SPORTS SECTION */}
-      {activeTab === "sports" && (
-        <section className="rounded-lg">
-          {isLoadingSports && sportsData.length === 0 && (
-            <div className="flex justify-center items-center py-8">
-              <Spinner size="lg" />
-            </div>
-          )}
-          {!isLoadingSports && sportsData.length === 0 && (
-            <div className="text-center text-gray-500 py-8 container">
-              No sports data found
-            </div>
-          )}
-
-          {displayedSports.length > 0 && (
-            <div className="rounded-lg p-0 overflow-x-auto">
-              <table className="w-full text-sm text-left">
-                <tbody>
-                  {displayedSports.map((item, index) => (
-                    <PredictionItem
-                      key={index}
-                      prediction={item}
-                      onClick={(id) => router.push(`/predictions/${id}`)}
-                    />
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          {hasMoreSports && !isLoadingSports && displayedSports.length > 0 && (
-            <div className="flex justify-center mt-4">
-              <Button
-                color="primary"
-                variant="flat"
-                onPress={loadMoreSports}
-                className="min-w-[200px]"
-              >
-                Show More
-              </Button>
-            </div>
-          )}
-        </section>
-      )}
-
-      {/* GENERAL SECTION */}
-      {activeTab === "general" && (
-        <section className="rounded-lg">
-          {isLoadingGeneral && generalData.length === 0 && (
-            <div className="flex justify-center items-center py-8">
-              <Spinner size="lg" />
-            </div>
-          )}
-          {!isLoadingGeneral && generalData.length === 0 && (
-            <div className="text-center text-gray-500 py-8 container">
-              No general data found
-            </div>
-          )}
-          {displayedGeneral.length > 0 && (
-            <div className="rounded-lg p-0 overflow-x-auto">
-              <table className="w-full text-sm text-left">
-                <tbody>
-                  {displayedGeneral.map((item, index) => (
-                    <PredictionItem
-                      key={index}
-                      prediction={item}
-                      onClick={(id) => router.push(`/predictions/${id}`)}
-                    />
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-          {hasMoreGeneral && !isLoadingGeneral && displayedGeneral.length > 0 && (
-            <div className="flex justify-center mt-4">
-              <Button
-                color="primary"
-                variant="flat"
-                onPress={loadMoreGeneral}
-                className="min-w-[200px]"
-              >
-                Show More
-              </Button>
-            </div>
-          )}
-        </section>
-      )}
-
-      {/* CRYPTO SECTION */}
-      {activeTab === "crypto" && (
-        <section className="rounded-lg">
-          {isLoadingCrypto && cryptoData.length === 0 && (
-            <div className="flex justify-center items-center py-8">
-              <Spinner size="lg" />
-            </div>
-          )}
-          {!isLoadingCrypto && cryptoData.length === 0 && (
-            <div className="text-center text-gray-500 py-8 container">
-              No crypto data found
-            </div>
-          )}
-          {displayedCrypto.length > 0 && (
-            <div className="rounded-lg p-0 overflow-x-auto">
-              <table className="w-full text-sm text-left">
-                <tbody>
-                  {displayedCrypto.map((item, index) => (
-                    <PredictionItem
-                      key={index}
-                      prediction={item}
-                      onClick={(id) => router.push(`/predictions/${id}`)}
-                    />
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-          {hasMoreCrypto && !isLoadingCrypto && displayedCrypto.length > 0 && (
-            <div className="flex justify-center mt-4">
-              <Button
-                color="primary"
-                variant="flat"
-                onPress={loadMoreCrypto}
-                className="min-w-[200px]"
-              >
-                Show More
-              </Button>
-            </div>
-          )}
-        </section>
-      )}
-
-      {/* MARKETS SECTION */}
-      {activeTab === "markets" && (
-        <section className="rounded-lg">
-          {isLoadingMarkets && marketsData.length === 0 && (
-            <div className="flex justify-center items-center py-8">
-              <Spinner size="lg" />
-            </div>
-          )}
-          {!isLoadingMarkets && marketsData.length === 0 && (
-            <div className="text-center text-gray-500 py-8 container">
-              No markets data found
-            </div>
-          )}
-          {displayedMarkets.length > 0 && (
-            <div className="rounded-lg p-0 overflow-x-auto">
-              <table className="w-full text-sm text-left">
-                <tbody>
-                  {displayedMarkets.map((item, index) => (
-                    <PredictionItem
-                      key={index}
-                      prediction={item}
-                      onClick={(id) => router.push(`/predictions/${id}`)}
-                    />
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-          {hasMoreMarkets && !isLoadingMarkets && displayedMarkets.length > 0 && (
-            <div className="flex justify-center mt-4">
-              <Button
-                color="primary"
-                variant="flat"
-                onPress={loadMoreMarkets}
-                className="min-w-[200px]"
-              >
-                Show More
-              </Button>
-            </div>
-          )}
-        </section>
-      )}
-
-      {/* LEADERBOARD SECTION */}
-      {activeTab === "leaderboard" && (
-        <section className="rounded-lg max-w-[780px]">
-          {isLoadingLeaderboard && (
-            <div className="flex justify-center items-center py-8">
-              <Spinner size="lg" />
-            </div>
-          )}
-          {!isLoadingLeaderboard && leaderboardData.length === 0 && (
-            <div className="text-center text-gray-500 py-8 container">No leaderboard data found</div>
-          )}
-          {leaderboardData.length > 0 && (
-            <div className=" rounded-xl overflow-hidden border-none">
-              {/* Header */}
-              <div className="bg-content2 px-6 py-4 border-b border-content3 grid grid-cols-12 gap-4">
-                <div className="col-span-1 font-semibold ">Rank</div>
-                <div className="col-span-6 font-semibold ">Agent</div>
-                <div className="col-span-1 font-semibold ">Wins</div>
-                <div className="col-span-1 font-semibold ">Losses</div>
-                <div className="col-span-1 font-semibold ">Open</div>
-                <div className="col-span-2 font-semibold ">Win Rate</div>
-              </div>
-
-              {/* Rows */}
-              {leaderboardData.map((item) => (
-                <div
-                  key={item.id}
-                  className={`px-6 py-4 grid grid-cols-12 gap-4 border-b border-content3 hover:bg-content2 transition-colors
-                      ${item.rank === 1 ? 'bg-content0' : ''} 
-                      ${item.rank === 2 ? 'bg-content2' : ''} 
-                      ${item.rank === 3 ? 'bg-danger-50' : ''}`}
-                >
-                  <div className="col-span-1 p-2 font-medium">
-                    {item.rank <= 3 ? (
-                      <span className={`
-                          inline-flex items-center justify-center w-6 h-6 rounded-full font-bold
-                          ${item.rank === 1 ? 'bg-warning text-warning-foreground' : ''}
-                          ${item.rank === 2 ? 'bg-content3 text-foreground' : ''}
-                          ${item.rank === 3 ? 'bg-danger text-danger-foreground' : ''}
-                        `}>
-                        {item.rank}
-                      </span>
-                    ) : (
-                      <span className="text-foreground-500">{item.rank}</span>
-                    )}
-                  </div>
-                  <div className="col-span-6 flex items-center gap-3">
-                    <Image
-                      src={item.image || '/assets/images/default-agent.png'}
-                      alt={item.name}
-                      width={40}
-                      height={40}
-                      className="rounded-full min-w-[40px] min-h-[40px] w-[40px] h-[40px]"
-                    />
-                    <span className="text-foreground font-medium">{item.name}</span>
-                  </div>
-                  <div className="col-span-1 text-foreground-600">{item.wins}</div>
-                  <div className="col-span-1 text-foreground-600">{item.losses}</div>
-                  <div className="col-span-1 text-foreground-600">{item.open}</div>
-                  <div className="col-span-2 text-primary font-medium">{Number(item.win_rate * 100).toFixed(2)}%</div>
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
-      )}
-    </>
+    </div>
   );
 } 

@@ -31,6 +31,14 @@ const nextConfig = {
         contentDispositionType: 'attachment',
         contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
     },
+    webpack: (config) => {
+        config.module.rules.push({
+            test: /node_modules\/@solana\/wallet-adapter-react-ui\/styles\.css$/,
+            type: 'asset/source',
+        });
+        
+        return config;
+    },
 };
 
 export default nextConfig;

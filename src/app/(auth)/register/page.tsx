@@ -1,18 +1,22 @@
 'use client';
+
 import Link from "next/link";
 import Image from "next/image";
-import toast from "react-hot-toast";
+import { toast } from "react-hot-toast";
 import { useState } from "react";
 import { validateUserName, validatePassword } from "@/app/utils/validation";
 import { useRouter } from "next/navigation";
-import { Button } from "@heroui/button";
-import { Input } from "@heroui/input";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Loader2 } from "lucide-react";
 
 const RegisterPage = () => {
     const [formData, setFormData] = useState<{ username: string; password: string }>({
         username: '',
         password: '',
     });
+    const [isLoading, setIsLoading] = useState(false);
 
     const router = useRouter();
 
@@ -20,33 +24,16 @@ const RegisterPage = () => {
         e.preventDefault();
         const usernameCheck = validateUserName(formData.username);
         if (usernameCheck) {
-            toast(usernameCheck,
-                {
-                    icon: '🤬',
-                    style: {
-                        borderRadius: '10px',
-                        background: '#333',
-                        color: '#fff',
-                    },
-                }
-            );
+            toast.error(usernameCheck);
             return;
         }
         const passwordCheck = validatePassword(formData.password);
         if (passwordCheck) {
-            toast(passwordCheck,
-                {
-                    icon: '🤬',
-                    style: {
-                        borderRadius: '10px',
-                        background: '#333',
-                        color: '#fff',
-                    },
-                }
-            );
+            toast.error(passwordCheck);
             return;
         }
 
+        setIsLoading(true);
         try {
             const result = await fetch("/api/signup", {
                 method: "POST",
@@ -63,6 +50,8 @@ const RegisterPage = () => {
         } catch (error) {
             console.error("An error occurred:", error);
             toast.error("An unexpected error occurred.");
+        } finally {
+            setIsLoading(false);
         }
     }
 
@@ -71,23 +60,82 @@ const RegisterPage = () => {
     };
 
     return (
-        <div className="flex flex-col items-center justify-center h-screen">
-            <Image
-                src={"/assets/images/logo.svg"}
-                alt="Hero Image"
-                width={160}
-                height={160}
-                className="rounded-full"
-            />
-            {/* <h1 className="text-[2em] font-bold my-[0.67em] text-white">Market Maker</h1> */}
-            <form className="flex flex-col w-80 gap-3 items-center justify-center" onSubmit={handleSubmit}>
-                <Input type="text" name="username" className="text-white" value={formData.username} placeholder={"Username"} onChange={handleChange} required={true} variant="bordered" classNames={{ inputWrapper: 'border-small border-default-200 rounded-sm' }}/>
-                <Input type="password" name="password" className="text-white" value={formData.password} placeholder={"Password"} onChange={handleChange} required={true} variant="bordered" classNames={{ inputWrapper: 'border-small border-default-200 rounded-sm' }}/>
-                <Button type="submit" className="bg-none p-2 rounded-sm text-xs w-full" color="primary">Register</Button>
-            </form>
-            <p className="my-[1em] text-white">Already have an account? <Link href="/login" className="underline">Login</Link></p>
+        <div className="container relative min-h-screen flex-col items-center justify-center grid lg:max-w-none lg:grid-cols-1 lg:px-0">
+            <div className="flex flex-col items-center space-y-6">
+                <Image
+                    src="/assets/images/logo.svg"
+                    alt="Logo"
+                    width={120}
+                    height={120}
+                    className="mb-2"
+                />
+                
+                <Card className="w-[350px] bg-background/60 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+                    <CardHeader className="space-y-1">
+                        <CardTitle className="text-2xl text-center">Create an account</CardTitle>
+                        <CardDescription className="text-center">
+                            Enter your details to get started
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <form onSubmit={handleSubmit} className="space-y-4">
+                            <div className="space-y-2">
+                                <Input
+                                    id="username"
+                                    name="username"
+                                    type="text"
+                                    placeholder="Username"
+                                    value={formData.username}
+                                    onChange={handleChange}
+                                    required
+                                    className="bg-background"
+                                    disabled={isLoading}
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Input
+                                    id="password"
+                                    name="password"
+                                    type="password"
+                                    placeholder="Password"
+                                    value={formData.password}
+                                    onChange={handleChange}
+                                    required
+                                    className="bg-background"
+                                    disabled={isLoading}
+                                />
+                            </div>
+                            <Button 
+                                className="w-full" 
+                                type="submit"
+                                disabled={isLoading}
+                            >
+                                {isLoading ? (
+                                    <>
+                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                        Creating account...
+                                    </>
+                                ) : (
+                                    "Create Account"
+                                )}
+                            </Button>
+                        </form>
+                    </CardContent>
+                    <CardFooter>
+                        <div className="text-sm text-muted-foreground text-center w-full">
+                            Already have an account?{" "}
+                            <Link 
+                                href="/login" 
+                                className="text-primary underline-offset-4 hover:underline"
+                            >
+                                Sign in
+                            </Link>
+                        </div>
+                    </CardFooter>
+                </Card>
+            </div>
         </div>
-    )
+    );
 }
 
 export default RegisterPage;

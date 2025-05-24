@@ -8,10 +8,19 @@ export const CATEGORIES = [
     'General',
     'Markets',
     'Crypto',
-    'Soccer',
-    'English Premier League',
-    'NBA',
+    'Sports'
+]
+
+export const SPORTS_CATEGORIES = [
     'NFL',
+    'NBA',
+    'Soccer',
+    'MLB',
+    'NHL',
+    'Tennis',
+    'Golf',
+    'Racing',
+    'Other'
 ]
 
 export const GPT_MODELS = [

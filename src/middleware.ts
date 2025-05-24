@@ -23,6 +23,7 @@ const publicRoutes = [
     '/api/getRecentActivity',
     '/api/public/bet/:id*',
     '/api/public/prediction/:id*',
+    '/api/getPublicMarketStats',
 ]
 
 export default async function middleware(req: NextRequest) {

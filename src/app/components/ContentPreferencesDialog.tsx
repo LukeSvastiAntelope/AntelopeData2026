@@ -1,18 +1,29 @@
 'use client';
 
-import {
-    Modal,
-    ModalContent,
-    ModalHeader,
-    ModalBody,
-    ModalFooter,
-} from "@heroui/modal";
-import { Select, SelectItem } from "@heroui/select";
-import { Input } from "@heroui/input";
-import { Button } from "@heroui/button";
-import { Chip } from "@heroui/chip";
 import { useState, useEffect } from "react";
-import { IAgentProfile } from "@/app/utils/interface"; // Assuming IAgentProfile is here
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    DialogFooter,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
+import { Loader2, X, ChevronRight, ChevronLeft } from "lucide-react";
+import { IAgentProfile } from "@/app/utils/interface";
+import { cn } from "@/lib/utils";
+import { CATEGORIES, SPORTS_CATEGORIES } from "@/app/utils/const";
 
 interface ContentPreferencesDialogProps {
     isOpen: boolean;
@@ -27,12 +38,10 @@ interface ContentPreferencesDialogProps {
         interests?: string[];
     }) => void;
     onSkip: () => void;
-    agent: IAgentProfile | null; // To pre-fill if values already exist, though defaults are for first-time
+    agent: IAgentProfile | null;
 }
 
-const CATEGORIES = ["General", "Sports", "Finance", "Crypto", "Technology", "Politics", "Entertainment"];
 const RISK_LEVELS = ["Low", "Medium", "High"];
-const SPORTS_SUB_CATEGORIES = ["NFL", "NBA", "Soccer", "EPL", "MLB", "NHL", "Tennis", "Golf", "Racing", "Other"];
 
 const ContentPreferencesDialog = ({
     isOpen,
@@ -49,6 +58,8 @@ const ContentPreferencesDialog = ({
     const [sportPreference, setSportPreference] = useState("");
     const [interests, setInterests] = useState<string[]>([]);
     const [newInterest, setNewInterest] = useState("");
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isCollapsed, setIsCollapsed] = useState(false);
 
     useEffect(() => {
         if (isOpen && agent) {
@@ -92,180 +103,257 @@ const ContentPreferencesDialog = ({
         setInterests(interests.filter(i => i !== interest));
     };
 
-    const handleSaveClick = () => {
-        const prefsToSave: any = {
-            category,
-            riskLevel,
-            conservativeBetSize,
-            moderateBetSize,
-            aggressiveBetSize,
-            interests: category !== "Sports" ? interests : [],
-        };
-        if (category === "Sports" && sportPreference) {
-            prefsToSave.sportPreference = sportPreference;
+    const handleSaveClick = async () => {
+        setIsSubmitting(true);
+        try {
+            const prefsToSave = {
+                category,
+                riskLevel,
+                conservativeBetSize,
+                moderateBetSize,
+                aggressiveBetSize,
+                interests: category !== "Sports" ? interests : [],
+                ...(category === "Sports" && sportPreference ? { sportPreference } : {}),
+            };
+            await onSave(prefsToSave);
+        } finally {
+            setIsSubmitting(false);
         }
-        onSave(prefsToSave);
     };
 
     return (
-        <Modal
-            isOpen={isOpen}
-            onClose={onClose}
-            size="lg" // Slightly larger for more content
-            isDismissable={false} // User must explicitly save or skip
-            classNames={{
-                base: "bg-[#1c1c1c] dark", // Consistent styling
-            }}
-        >
-            <ModalContent>
-                <ModalHeader className="text-white">Set Your Content Preferences</ModalHeader>
-                <ModalBody className="space-y-4">
-                    <div>
-                        <p className="text-sm text-gray-400 mb-2">
-                            Help us tailor your experience by setting your preferred content category, interests, risk appetite, and default betting sizes. You can change these later in your profile.
-                        </p>
-                    </div>
-                    <Select
-                        label="Preferred Category"
-                        selectedKeys={[category]}
-                        onChange={(e) => setCategory(e.target.value)}
-                        placeholder="Select a category"
-                        aria-label="Category Select"
-                         classNames={{
-                            label: "text-white/60",
-                            trigger: "bg-[#2c2c2c] text-white",
-                        }}
-                    >
-                        {CATEGORIES.map((cat) => (
-                            <SelectItem key={cat} value={cat} textValue={cat} className="text-white">
-                                {cat}
-                            </SelectItem>
-                        ))}
-                    </Select>
+        <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+            <DialogContent className={cn(
+                "flex p-0 bg-background border-border",
+                isCollapsed ? "sm:max-w-[100px]" : "sm:max-w-[825px]"
+            )}>
+                {/* Main Content */}
+                <div className={cn(
+                    "flex-1 p-6",
+                    isCollapsed ? "hidden" : "block"
+                )}>
+                    <DialogHeader>
+                        <DialogTitle>Strategy Settings</DialogTitle>
+                        <DialogDescription>
+                            Step 2 of 3: Configure your agent's prediction strategy
+                        </DialogDescription>
+                        <Progress value={66} className="h-2" />
+                    </DialogHeader>
 
-                    {category === "Sports" ? (
-                        <Select
-                            label="Specific Sport (Optional)"
-                            selectedKeys={sportPreference ? [sportPreference] : []}
-                            onChange={(e) => setSportPreference(e.target.value)}
-                            placeholder="Select a sport"
-                            aria-label="Sport Preference Select"
-                            classNames={{
-                                label: "text-white/60",
-                                trigger: "bg-[#2c2c2c] text-white",
-                            }}
-                        >
-                            {SPORTS_SUB_CATEGORIES.map((sport) => (
-                                <SelectItem key={sport} value={sport} textValue={sport} className="text-white">
-                                    {sport}
-                                </SelectItem>
-                            ))}
-                        </Select>
-                    ) : (
-                        <div className="space-y-2">
-                            <div className="text-white/60 text-sm">Category Interests</div>
-                            <div className="flex flex-wrap gap-2 mb-2">
-                                {interests.map((interest) => (
-                                    <Chip
-                                        key={interest}
-                                        onClose={() => removeInterest(interest)}
-                                        variant="flat"
-                                        className="bg-[#2c2c2c] text-white"
-                                    >
-                                        {interest}
-                                    </Chip>
-                                ))}
-                            </div>
-                            <div className="flex gap-2">
-                                <Input
-                                    placeholder="Enter an interest"
-                                    value={newInterest}
-                                    onChange={(e) => setNewInterest(e.target.value)}
-                                    onKeyPress={(e) => e.key === 'Enter' && addInterest()}
-                                    classNames={{
-                                        input: "bg-[#2c2c2c] text-white",
-                                    }}
-                                />
-                                <Button
-                                    color="primary"
-                                    onPress={addInterest}
-                                    className="bg-blue-500"
-                                >
-                                    Add
-                                </Button>
+                    <div className="space-y-6 py-4">
+                        <div className="text-sm text-muted-foreground">
+                            Help us tailor your experience by setting your preferred content category, 
+                            interests, risk appetite, and default betting sizes. You can change these 
+                            later in your profile.
+                        </div>
+
+                        <div className="space-y-4">
+                            <Select value={category} onValueChange={setCategory}>
+                                <SelectTrigger className="w-full bg-muted">
+                                    <SelectValue placeholder="Select a category" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {CATEGORIES.map((cat) => (
+                                        <SelectItem key={cat} value={cat}>
+                                            {cat}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+
+                            {category === "Sports" ? (
+                                <Select value={sportPreference} onValueChange={setSportPreference}>
+                                    <SelectTrigger className="w-full bg-muted">
+                                        <SelectValue placeholder="Select a sport (Optional)" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {SPORTS_CATEGORIES.map((sport) => (
+                                            <SelectItem key={sport} value={sport}>
+                                                {sport}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            ) : (
+                                <div className="space-y-3">
+                                    <label className="text-sm font-medium">Category Interests</label>
+                                    <div className="flex flex-wrap gap-2">
+                                        {interests.map((interest) => (
+                                            <Badge 
+                                                key={interest} 
+                                                variant="secondary"
+                                                className="px-2 py-1 flex items-center gap-1"
+                                            >
+                                                {interest}
+                                                <button
+                                                    onClick={() => removeInterest(interest)}
+                                                    className="ml-1 hover:text-destructive"
+                                                >
+                                                    <X className="h-3 w-3" />
+                                                </button>
+                                            </Badge>
+                                        ))}
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <Input
+                                            placeholder="Enter an interest"
+                                            value={newInterest}
+                                            onChange={(e) => setNewInterest(e.target.value)}
+                                            onKeyDown={(e) => e.key === 'Enter' && addInterest()}
+                                            className="bg-muted"
+                                        />
+                                        <Button
+                                            onClick={addInterest}
+                                            variant="secondary"
+                                        >
+                                            Add
+                                        </Button>
+                                    </div>
+                                </div>
+                            )}
+
+                            <Select value={riskLevel} onValueChange={setRiskLevel}>
+                                <SelectTrigger className="w-full bg-muted">
+                                    <SelectValue placeholder="Select risk level" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {RISK_LEVELS.map((level) => (
+                                        <SelectItem key={level} value={level}>
+                                            {level}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+
+                            <div className="space-y-3">
+                                <label className="text-sm font-medium">Default Betting Sizes</label>
+                                <div className="grid grid-cols-3 gap-4">
+                                    <div className="space-y-2">
+                                        <label className="text-xs text-muted-foreground">Small Bet</label>
+                                        <Input
+                                            type="number"
+                                            value={conservativeBetSize}
+                                            onChange={(e) => setConservativeBetSize(Number(e.target.value))}
+                                            min={1}
+                                            className="bg-muted"
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-xs text-muted-foreground">Medium Bet</label>
+                                        <Input
+                                            type="number"
+                                            value={moderateBetSize}
+                                            onChange={(e) => setModerateBetSize(Number(e.target.value))}
+                                            min={1}
+                                            className="bg-muted"
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-xs text-muted-foreground">Large Bet</label>
+                                        <Input
+                                            type="number"
+                                            value={aggressiveBetSize}
+                                            onChange={(e) => setAggressiveBetSize(Number(e.target.value))}
+                                            min={1}
+                                            className="bg-muted"
+                                        />
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                    )}
-
-                    <Select
-                        label="Default Risk Level"
-                        selectedKeys={[riskLevel]}
-                        onChange={(e) => setRiskLevel(e.target.value)}
-                        placeholder="Select your risk level"
-                        aria-label="Risk Level Select"
-                        classNames={{
-                            label: "text-white/60",
-                            trigger: "bg-[#2c2c2c] text-white",
-                        }}
-                    >
-                        {RISK_LEVELS.map((level) => (
-                            <SelectItem key={level} value={level} textValue={level} className="text-white">
-                                {level}
-                            </SelectItem>
-                        ))}
-                    </Select>
-                    
-                    <div className="text-white/80 text-sm mb-1 mt-2">Default Betting Sizes:</div>
-                    <div className="grid grid-cols-3 gap-4">
-                        <Input
-                            label="Small Bet"
-                            type="number"
-                            value={conservativeBetSize.toString()}
-                            onValueChange={(val) => setConservativeBetSize(Number(val))}
-                            placeholder="e.g., 10"
-                            min={1}
-                            classNames={{ input: "bg-[#2c2c2c] text-white", label: "text-white/60" }}
-                        />
-                        <Input
-                            label="Medium Bet"
-                            type="number"
-                            value={moderateBetSize.toString()}
-                            onValueChange={(val) => setModerateBetSize(Number(val))}
-                            placeholder="e.g., 30"
-                            min={1}
-                            classNames={{ input: "bg-[#2c2c2c] text-white", label: "text-white/60" }}
-                        />
-                        <Input
-                            label="Large Bet"
-                            type="number"
-                            value={aggressiveBetSize.toString()}
-                            onValueChange={(val) => setAggressiveBetSize(Number(val))}
-                            placeholder="e.g., 90"
-                            min={1}
-                            classNames={{ input: "bg-[#2c2c2c] text-white", label: "text-white/60" }}
-                        />
                     </div>
 
-                </ModalBody>
-                <ModalFooter>
+                    <DialogFooter className="gap-2">
+                        <Button
+                            variant="ghost"
+                            onClick={onSkip}
+                            disabled={isSubmitting}
+                        >
+                            Skip for Now
+                        </Button>
+                        <Button
+                            onClick={handleSaveClick}
+                            disabled={isSubmitting}
+                        >
+                            {isSubmitting ? (
+                                <>
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    Saving...
+                                </>
+                            ) : (
+                                "Continue"
+                            )}
+                        </Button>
+                    </DialogFooter>
+                </div>
+
+                {/* Right Column */}
+                <div className="relative">
+                    {/* Expand/Collapse Button */}
                     <Button
-                        variant="light" // Less prominent
-                        onPress={onSkip}
-                        className="text-gray-400 hover:text-white"
+                        variant="ghost"
+                        size="icon"
+                        className="absolute -left-3 top-3 h-6 w-6 rounded-full border bg-background shadow-md"
+                        onClick={() => setIsCollapsed(!isCollapsed)}
                     >
-                        Skip for Now
+                        {isCollapsed ? (
+                            <ChevronRight className="h-4 w-4" />
+                        ) : (
+                            <ChevronLeft className="h-4 w-4" />
+                        )}
                     </Button>
-                    <Button
-                        color="primary"
-                        onPress={handleSaveClick}
-                        className="bg-blue-500" // Consistent with AgentProfileDialog
-                    >
-                        Save Settings & Continue
-                    </Button>
-                </ModalFooter>
-            </ModalContent>
-        </Modal>
+
+                    <div className={cn(
+                        "h-full bg-muted/30",
+                        isCollapsed ? "w-[50px]" : "w-[250px]"
+                    )}>
+                        {!isCollapsed && (
+                            <div className="p-6 space-y-6">
+                                <div className="flex items-center">
+                                    <h3 className="text-lg font-semibold leading-none tracking-tight">
+                                        Strategy
+                                    </h3>
+                                </div>
+
+                                <div className="space-y-4">
+                                    <div className="space-y-1">
+                                        <h4 className="text-sm font-medium">Selected Category</h4>
+                                        <p className="text-sm text-muted-foreground">{category}</p>
+                                    </div>
+                                    {category === "Sports" && sportPreference && (
+                                        <div className="space-y-1">
+                                            <h4 className="text-sm font-medium">Sport</h4>
+                                            <p className="text-sm text-muted-foreground">{sportPreference}</p>
+                                        </div>
+                                    )}
+                                    <div className="space-y-1">
+                                        <h4 className="text-sm font-medium">Risk Level</h4>
+                                        <p className="text-sm text-muted-foreground">{riskLevel}</p>
+                                    </div>
+                                    {interests.length > 0 && (
+                                        <div className="space-y-1">
+                                            <h4 className="text-sm font-medium">Interests</h4>
+                                            <div className="flex flex-wrap gap-1">
+                                                {interests.map((interest) => (
+                                                    <Badge 
+                                                        key={interest} 
+                                                        variant="outline"
+                                                        className="text-xs"
+                                                    >
+                                                        {interest}
+                                                    </Badge>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </DialogContent>
+        </Dialog>
     );
-};
+}
 
 export default ContentPreferencesDialog; 
