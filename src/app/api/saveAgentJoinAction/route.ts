@@ -19,9 +19,11 @@ export async function POST(req: NextRequest) {
     }
 
     try {
-        // Format a nice announcement with the optional description
+        // Format a clean announcement with the agent name and description
         const sanitizedDescription = description ? description.trim() : '';
-        const actionDescription = `Agent ${name} just joined. ${sanitizedDescription}`;
+        const actionDescription = sanitizedDescription ? 
+            `${name} just joined\n${sanitizedDescription}` : 
+            `${name} just joined`;
         const type = "agent_join";
         
         // Debug log
