@@ -20,7 +20,7 @@ import Link from "next/link"
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible"
 
 export interface ActivityItem {
-  type: string
+  type: 'bet' | 'prediction' | 'agent_join' | string
   bet_id?: string
   user_id: number
   prediction_id: number
@@ -231,7 +231,8 @@ export function DashboardTabs({
                             {item.type === 'bet' ? item.username : item.agent_name}
                           </span>
                           <span className="ml-2 text-muted-foreground">
-                            {item.type === 'bet' ? 'wagered on:' : 'created prediction:'}
+                            {item.type === 'bet' ? 'wagered on:' : 
+                             item.type === 'agent_join' ? '' : 'created prediction:'}
                           </span>
                         </div>
                         <div className="mt-1 text-foreground">
