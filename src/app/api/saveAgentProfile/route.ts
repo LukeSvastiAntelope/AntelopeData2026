@@ -10,43 +10,58 @@ export async function POST(req: NextRequest) {
         return Response.json({ error: 'Invalid token' }, { status: 401 });
     }
 
-    const { agent } = await req.json();
+    const requestBody = await req.json();
+    console.log('Received request body:', JSON.stringify(requestBody, null, 2));
+    
+    // Handle both formats: { agent: {...} } and direct agent object
+    const agent = requestBody.agent || requestBody;
 
     try {
         // Validate required fields
         if (!agent.name || agent.name.trim() === '') {
+            console.error('Missing or empty agent name');
             return Response.json({ 
                 status: false, 
                 message: "Agent name is required" 
             }, { status: 400 });
         }
 
+        // Get user ID from JWT payload (stored in email field)
+        const userId = (jwtPayload.id || jwtPayload.user_id || jwtPayload.email) as number;
+        if (!userId) {
+            console.error('No user ID found in JWT payload:', jwtPayload);
+            return Response.json({ 
+                status: false, 
+                message: "User ID not found in token" 
+            }, { status: 400 });
+        }
+
         // Ensure image is not empty
         if (!agent.image || agent.image.trim() === '') {
             // Generate a placeholder avatar if none is provided
-            agent.image = `https://api.dicebear.com/7.x/bottts/svg?seed=agent${agent.user_id}`;
+            agent.image = `https://api.dicebear.com/7.x/bottts/svg?seed=agent${userId}`;
         }
 
         const updateParams: Partial<IFormDataAgentProfile> = {
             id: agent.id,
-            user_id: agent.user_id,
+            user_id: userId,
             name: agent.name,
-            description: agent.description,
-            maxBetSize: agent.maxBetSize,
-            interests: agent.interests.join(','),
-            riskLevel: agent.riskLevel,
-            conservativeBetSize: agent.conservativeBetSize,
-            moderateBetSize: agent.moderateBetSize,
-            aggressiveBetSize: agent.aggressiveBetSize,
-            principles: agent.principles,
+            description: agent.description || '',
+            maxBetSize: agent.maxBetSize || 100,
+            interests: Array.isArray(agent.interests) ? agent.interests.join(',') : (agent.interests || ''),
+            riskLevel: agent.riskLevel || 'Moderate',
+            conservativeBetSize: agent.conservativeBetSize || 10,
+            moderateBetSize: agent.moderateBetSize || 25,
+            aggressiveBetSize: agent.aggressiveBetSize || 50,
+            principles: agent.principles || '',
             image: agent.image,
-            maxTimelineLimit: agent.maxTimelineLimit,
-            category: agent.category,
+            maxTimelineLimit: agent.maxTimelineLimit || 30,
+            category: agent.category || 'General',
             sport_preference: agent.sport_preference,
-            model: agent.model,
-            plugins: agent.plugins.join(','),
-            is_bet: agent.is_bet,
-            is_onboarded: agent.is_onboarded
+            model: agent.model || 'gpt-4o',
+            plugins: Array.isArray(agent.plugins) ? agent.plugins.join(',') : (agent.plugins || ''),
+            is_bet: agent.is_bet !== undefined ? agent.is_bet : 1,
+            is_onboarded: agent.is_onboarded !== undefined ? agent.is_onboarded : false
         };
 
         // Ensure sport_preference is only set if category is Sports
@@ -54,7 +69,10 @@ export async function POST(req: NextRequest) {
             delete updateParams.sport_preference; 
         }
 
-        await UserRepo.updateAgent(jwtPayload.email as string, updateParams as IFormDataAgentProfile);
+        console.log('Update params:', JSON.stringify(updateParams, null, 2));
+        console.log('Using user ID:', userId);
+
+        await UserRepo.updateAgent(userId.toString(), updateParams as IFormDataAgentProfile);
         return Response.json({ status: true, message: "update profile successfully" });
     } catch (error) {
         console.log("Error in saveAgentProfile: ", error);

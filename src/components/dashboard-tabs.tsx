@@ -203,7 +203,7 @@ export function DashboardTabs({
               </Card>
             ))
           ) : activityData.length === 0 ? (
-            <Card className="border border-zinc-800">
+            <Card className="border border-border">
               <CardContent className="p-6 flex flex-col items-center justify-center">
                 <CircleEllipsis className="h-10 w-10 text-muted-foreground mb-2" />
                 <p className="text-muted-foreground text-center">No activity data available</p>
@@ -211,10 +211,9 @@ export function DashboardTabs({
             </Card>
           ) : (
             activityData.map((item, index) => (
-              <Card key={`${item.type}_${item.prediction_id}_${index}`} className="bg-zinc-950/50 border border-zinc-800/50 shadow-[0_0_1px_1px_rgba(0,0,0,0.2)]">
+              <Card key={`${item.type}_${item.prediction_id}_${index}`} className="bg-card border border-border shadow-sm">
                 <CardContent className="p-4">
                   <div className="flex items-start gap-4">
-                    {/* Avatar section */}
                     <Avatar>
                       {item.agent_image ? (
                         <AvatarImage src={item.agent_image} alt={item.agent_name} />
@@ -228,23 +227,20 @@ export function DashboardTabs({
                     <div className="flex-1 space-y-1">
                       <div className="flex flex-col">
                         <div className="flex items-center">
-                          <span className="font-medium text-zinc-100">
+                          <span className="font-medium text-foreground">
                             {item.type === 'bet' ? item.username : item.agent_name}
                           </span>
-                          <span className="ml-2 text-zinc-400">
+                          <span className="ml-2 text-muted-foreground">
                             {item.type === 'bet' ? 'wagered on:' : 'created prediction:'}
                           </span>
                         </div>
-                        <Link 
-                          href={`/predictions/${item.prediction_id}`}
-                          className="mt-1 text-zinc-300 hover:text-white transition-colors"
-                        >
-                          {item.description}
-                        </Link>
+                        <div className="mt-1 text-foreground">
+                          {item.description || 'No description available'}
+                        </div>
                         
                         {item.type === 'bet' && (
                           <div className="flex items-center mt-2 space-x-2">
-                            <Badge variant="secondary" className="bg-zinc-900 text-zinc-100">
+                            <Badge variant="secondary" className="bg-muted text-foreground">
                               {item.amount} ANML
                             </Badge>
                             <Badge variant="outline" className={item.choice === 'YES' ? 'border-emerald-500 text-emerald-500' : 'border-red-500 text-red-500'}>
@@ -253,8 +249,14 @@ export function DashboardTabs({
                           </div>
                         )}
                         
-                        <div className="text-xs text-zinc-500 mt-2">
-                          {formatDate(item.created_at)}
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          <Badge variant="secondary" className="bg-muted text-foreground">
+                            {item.source || 'Unknown'}
+                          </Badge>
+                        </div>
+                        
+                        <div className="text-xs text-muted-foreground mt-2">
+                          {item.created_at ? formatDistanceToNow(new Date(item.created_at), { addSuffix: true }) : 'Recently'}
                         </div>
                       </div>
                     </div>
@@ -328,14 +330,14 @@ export function DashboardTabs({
                       <TableCell className="font-medium max-w-0">
                         <Link 
                           href={`/bets/${bet.id}`}
-                          className="truncate block hover:text-white transition-colors"
+                          className="truncate block hover:text-foreground transition-colors"
                         >
                           {bet.prediction?.description || "Loading prediction..."}
                         </Link>
                         {bet.fullReasoning && (
                           <div className="mt-2 text-sm text-muted-foreground">
                             <Collapsible>
-                              <CollapsibleTrigger className="flex items-center gap-1 text-xs text-muted-foreground hover:text-white transition-colors">
+                              <CollapsibleTrigger className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
                                 <ChevronRight className="h-3 w-3" />
                                 View Reasoning Steps
                               </CollapsibleTrigger>
@@ -462,7 +464,7 @@ export function DashboardTabs({
                       <TableCell className="font-medium max-w-0">
                         <Link 
                           href={`/predictions/${prediction.id}`}
-                          className="truncate block hover:text-white transition-colors"
+                          className="truncate block hover:text-foreground transition-colors"
                         >
                           {prediction.description}
                         </Link>
