@@ -243,7 +243,7 @@ async function getRecentActivity(limit: number, offset: number) {
           '0' as source,
           users.username as username,
           agents.name as agent_name,
-          '' as agent_image
+          agents.image as agent_image
         FROM actions
         JOIN users ON actions.user_id = users.id
         JOIN agents ON agents.user_id = users.id)

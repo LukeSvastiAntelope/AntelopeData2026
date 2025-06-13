@@ -135,7 +135,7 @@ const ContentPreferencesDialog = ({
                     <DialogHeader>
                         <DialogTitle>Strategy Settings</DialogTitle>
                         <DialogDescription>
-                            Step 2 of 3: Configure your agent's prediction strategy
+                            Step 2 of 3: Configure your agent&apos;s prediction strategy
                         </DialogDescription>
                         <Progress value={66} className="h-2" />
                     </DialogHeader>

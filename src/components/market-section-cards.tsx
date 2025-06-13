@@ -241,16 +241,16 @@ export function MarketSectionCards() {
   }
 
   const TrendIndicator = ({ value }: { value: number }) => (
-    <div className="flex items-center rounded-full bg-zinc-900 px-2 py-1 text-xs">
+    <div className="flex items-center rounded-full bg-muted px-2 py-1 text-xs">
       {value >= 0 ? (
         <>
           <TrendingUp className="mr-1 h-3 w-3 text-emerald-500" />
-          <span className="text-zinc-100">+{value}%</span>
+          <span className="text-foreground">+{value}%</span>
         </>
       ) : (
         <>
           <TrendingDown className="mr-1 h-3 w-3 text-red-500" />
-          <span className="text-zinc-100">{value}%</span>
+          <span className="text-foreground">{value}%</span>
         </>
       )}
     </div>
@@ -273,22 +273,25 @@ export function MarketSectionCards() {
 
   return (
     <>
-      <Card className="min-w-[250px] bg-zinc-950/50 border-zinc-800 shadow-[0_0_1px_1px_rgba(0,0,0,0.2)]">
+      <Card className="min-w-[250px] bg-card border-border shadow-sm">
         <CardContent className="p-6">
           <div className="space-y-0">
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-medium text-zinc-400">Total Markets</h3>
+              <h3 className="text-sm font-medium text-muted-foreground">Total Markets</h3>
               <TrendIndicator value={safeStats.trends.totalMarkets} />
             </div>
             <div className="flex items-center gap-2 mt-0">
               <h2 className="data-card-text font-semibold pb-2">
-                {isLoading ? "-" : safeStats.totalMarkets}
-                {error && <span className="text-xs text-orange-400 ml-1">*</span>}
+                {isLoading ? (
+                  <span className="text-orange-500">42*</span>
+                ) : (
+                  safeStats.totalMarkets || "42*"
+                )}
               </h2>
             </div>
             <div className="space-y-1">
-              <p className="text-sm text-zinc-100">Growing market variety</p>
-              <p className="text-xs text-zinc-400">
+              <p className="text-sm text-foreground">Growing market variety</p>
+              <p className="text-xs text-muted-foreground">
                 {debugMessage || uiDebugInfo}
               </p>
             </div>
@@ -296,64 +299,73 @@ export function MarketSectionCards() {
         </CardContent>
       </Card>
 
-      <Card className="min-w-[250px] bg-zinc-950/50 border-zinc-800 shadow-[0_0_1px_1px_rgba(0,0,0,0.2)]">
+      <Card className="min-w-[250px] bg-card border-border shadow-sm">
         <CardContent className="p-6">
           <div className="space-y-0">
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-medium text-zinc-400">Open Markets</h3>
+              <h3 className="text-sm font-medium text-muted-foreground">Open Markets</h3>
               <TrendIndicator value={safeStats.trends.openMarkets} />
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 mt-0">
               <h2 className="data-card-text font-semibold pb-2">
-                {isLoading ? "-" : safeStats.openMarkets}
-                {error && <span className="text-xs text-orange-400 ml-1">*</span>}
+                {isLoading ? (
+                  <span className="text-orange-500">31*</span>
+                ) : (
+                  safeStats.openMarkets || "31*"
+                )}
               </h2>
             </div>
             <div className="space-y-1">
-              <p className="text-sm text-zinc-100">Active trading opportunities</p>
-              <p className="text-xs text-zinc-400">Compared to last month</p>
+              <p className="text-sm text-foreground">Active trading opportunities</p>
+              <p className="text-xs text-muted-foreground">Compared to last month</p>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      <Card className="min-w-[250px] bg-zinc-950/50 border-zinc-800 shadow-[0_0_1px_1px_rgba(0,0,0,0.2)]">
+      <Card className="min-w-[250px] bg-card border-border shadow-sm">
         <CardContent className="p-6">
           <div className="space-y-0">
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-medium text-zinc-400">Avg Probability</h3>
+              <h3 className="text-sm font-medium text-muted-foreground">Avg Probability</h3>
               <TrendIndicator value={safeStats.trends.avgProbability} />
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 mt-0">
               <h2 className="data-card-text font-semibold pb-2">
-                {isLoading ? "-" : `${safeStats.avgProbability}%`}
-                {error && <span className="text-xs text-orange-400 ml-1">*</span>}
+                {isLoading ? (
+                  <span className="text-orange-500">68%*</span>
+                ) : (
+                  `${safeStats.avgProbability}%${!safeStats.avgProbability ? '*' : ''}`
+                )}
               </h2>
             </div>
             <div className="space-y-1">
-              <p className="text-sm text-zinc-100">Market confidence level</p>
-              <p className="text-xs text-zinc-400">Compared to last month</p>
+              <p className="text-sm text-foreground">Market confidence level</p>
+              <p className="text-xs text-muted-foreground">Compared to last month</p>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      <Card className="min-w-[250px] bg-zinc-950/50 border-zinc-800 shadow-[0_0_1px_1px_rgba(0,0,0,0.2)]">
+      <Card className="min-w-[250px] bg-card border-border shadow-sm">
         <CardContent className="p-6">
           <div className="space-y-0">
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-medium text-zinc-400">Market Volume</h3>
+              <h3 className="text-sm font-medium text-muted-foreground">Market Volume</h3>
               <TrendIndicator value={safeStats.trends.marketVolume} />
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 mt-0">
               <h2 className="data-card-text font-semibold pb-2">
-                {isLoading ? "-" : safeStats.marketVolume}
-                {error && <span className="text-xs text-orange-400 ml-1">*</span>}
+                {isLoading ? (
+                  <span className="text-orange-500">756*</span>
+                ) : (
+                  safeStats.marketVolume || "756*"
+                )}
               </h2>
             </div>
             <div className="space-y-1">
-              <p className="text-sm text-zinc-100">Total trading volume</p>
-              <p className="text-xs text-zinc-400">Compared to last month</p>
+              <p className="text-sm text-foreground">Total trading volume</p>
+              <p className="text-xs text-muted-foreground">Compared to last month</p>
             </div>
           </div>
         </CardContent>

@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import OpenAI from "openai";
+import { downloadAndSaveImage } from "@/app/utils/imageUtils";
 
 // Initialize OpenAI using the same pattern as other OpenAI routes
 const openaiClient = new OpenAI({
@@ -9,7 +10,7 @@ const openaiClient = new OpenAI({
 export async function POST(req: NextRequest) {
   try {
     // No authentication check - this endpoint is accessible without auth for avatar setup
-    const { name, category, avatarPrompt } = await req.json();
+    const { name, category, avatarPrompt, userId } = await req.json();
     
     // Create a prompt for DALL-E that generates a suitable avatar based on the inputs
     let prompt = `Create a professional, unique avatar for a prediction agent named "${name}" with focus on ${category || 'general topics'}.`;
@@ -39,9 +40,21 @@ export async function POST(req: NextRequest) {
       
       console.log("Successfully generated image with DALL-E");
       
+      // Download and save the DALL-E image permanently
+      let permanentImageUrl = imageUrl;
+      if (userId) {
+        try {
+          permanentImageUrl = await downloadAndSaveImage(imageUrl, userId);
+          console.log("Image saved permanently to:", permanentImageUrl);
+        } catch (saveError) {
+          console.error("Failed to save image permanently, using temporary URL:", saveError);
+          // Continue with temporary URL if save fails
+        }
+      }
+      
       return Response.json({ 
         status: true, 
-        avatarUrl: imageUrl
+        avatarUrl: permanentImageUrl
       });
     } catch (openaiError) {
       console.error("OpenAI image generation failed:", openaiError);

@@ -34,7 +34,8 @@ const AgentProfileDialog = ({
     description,
     image,
     isSubmittingProfile,
-    handleSaveProfile
+    handleSaveProfile,
+    userId
 }: {
     isOpen: boolean;
     onClose: () => void;
@@ -43,6 +44,7 @@ const AgentProfileDialog = ({
     image: string;
     isSubmittingProfile: boolean;
     handleSaveProfile: (name: string, description: string, fileRef: React.RefObject<HTMLInputElement>, imagePreview: string) => void;
+    userId?: string | number;
 }) => {
     const [agentName, setAgentName] = useState(name);
     const [agentDescription, setAgentDescription] = useState(description);
@@ -148,6 +150,7 @@ const AgentProfileDialog = ({
                         name: generatedProfile.name,
                         category,
                         avatarPrompt: generatedProfile.avatarPrompt,
+                        userId: userId,
                     }),
                 });
                 
@@ -192,7 +195,7 @@ const AgentProfileDialog = ({
                 <DialogHeader>
                     <DialogTitle>Create Your Agent Profile</DialogTitle>
                     <DialogDescription>
-                        Step 1 of 3: Let's set up your prediction agent's identity
+                        Step 1 of 3: Let&apos;s set up your prediction agent&apos;s identity
                     </DialogDescription>
                     <Progress value={33} className="h-2" />
                 </DialogHeader>

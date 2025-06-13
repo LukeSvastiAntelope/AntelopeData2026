@@ -309,18 +309,18 @@ export default function DashboardPage() {
   }, [agent]);
 
   return (
-    <div className="flex-1 p-2 w-full">
-      <div className="mx-auto rounded-lg bg-black text-card-foreground shadow-lg">
+    <div className="flex-1 p-2 w-full bg-background">
+      <div className="mx-auto rounded-lg bg-card text-card-foreground shadow-lg">
         {/* Header */}
         <div className="px-6 py-4">
           <div className="flex items-center">
-            <SidebarTrigger className="-ml-0.5 h-5 w-5 text-zinc-400 hover:text-zinc-100" />
-            <div className="h-4 border-l border-zinc-800 mx-4" />
-            <h1 className="text-base font-medium">Dashboard</h1>
+            <SidebarTrigger className="-ml-0.5 h-5 w-5 text-muted-foreground hover:text-foreground" />
+            <div className="h-4 border-l border-border mx-4" />
+            <h1 className="text-base font-medium text-card-foreground">Dashboard</h1>
           </div>
         </div>
         
-        <div className="border-b border-zinc-800" />
+        <div className="border-b border-border" />
 
         <div className="p-6">
           {/* Top metrics cards */}

@@ -125,10 +125,11 @@ export class AIEnhancedPredictionGenerator {
             return (result.images_results || [])
                 .slice(0, 5)
                 .map((img: GoogleImageResult) => ({
-                    url: img.original,
+                    url: img.original, // This is the actual direct URL, not SerpAPI proxy
                     source: img.source,
                     title: img.title
-                }));
+                }))
+                .filter(img => img.url && !img.url.includes('serpapi.com')); // Filter out any SerpAPI URLs
         } catch (error) {
             console.error('Failed to fetch Google images:', error);
             return [];

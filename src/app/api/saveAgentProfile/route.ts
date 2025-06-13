@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { UserRepo } from "@/app/utils/database/user-repo";
 import { verifyConfirmationToken } from "@/app/utils/api/token"
 import { IFormDataAgentProfile } from "@/app/utils/interface";
+import { downloadAndSaveImage, saveBase64Image } from "@/app/utils/imageUtils";
 
 export async function POST(req: NextRequest) {
     const token = req.headers.get('Authorization')?.split(' ')[1];
@@ -36,10 +37,28 @@ export async function POST(req: NextRequest) {
             }, { status: 400 });
         }
 
-        // Ensure image is not empty
+        // Handle image processing and saving
         if (!agent.image || agent.image.trim() === '') {
             // Generate a placeholder avatar if none is provided
             agent.image = `https://api.dicebear.com/7.x/bottts/svg?seed=agent${userId}`;
+        } else {
+            // Process the image to save it permanently if it's a temporary URL or base64
+            try {
+                if (agent.image.startsWith('data:image/')) {
+                    // Handle base64 images (from manual uploads)
+                    console.log('Processing base64 image for permanent storage');
+                    agent.image = await saveBase64Image(agent.image, userId);
+                } else if (agent.image.includes('oaidalleapiprodscus.blob.core.windows.net') || 
+                          agent.image.includes('openai.com')) {
+                    // Handle DALL-E temporary URLs
+                    console.log('Processing DALL-E image for permanent storage');
+                    agent.image = await downloadAndSaveImage(agent.image, userId);
+                }
+                // Other URLs (like DiceBear, local paths) are left as-is
+            } catch (imageError) {
+                console.error('Error processing image, using fallback:', imageError);
+                agent.image = `https://api.dicebear.com/7.x/bottts/svg?seed=agent${userId}`;
+            }
         }
 
         const updateParams: Partial<IFormDataAgentProfile> = {

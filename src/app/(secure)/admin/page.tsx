@@ -362,6 +362,17 @@ const AdminPage = () => {
                         Topic Control
                     </button>
                 </Tooltip>
+                <Tooltip
+                    content="Manage daily bet analysis scheduler."
+                    showArrow
+                >
+                    <button
+                        onClick={() => router.push("/admin/scheduler")}
+                        className="px-1 py-2 hover:text-white text-gray-500 ml-4 border-l border-gray-600 pl-4"
+                    >
+                        Scheduler
+                    </button>
+                </Tooltip>
             </div>
             {
                 activeTab === "overview" && (

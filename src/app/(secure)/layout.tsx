@@ -410,6 +410,7 @@ const SecureLayout = ({ children }: { children: React.ReactNode }) => {
                     image={agent.image || ""}
                     isSubmittingProfile={isSubmittingProfile}
                     handleSaveProfile={handleSaveProfile}
+                    userId={user?.id}
                 />
             )}
 

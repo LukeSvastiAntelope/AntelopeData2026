@@ -38,9 +38,25 @@ export interface PredictionItem {
   league_id: number
 }
 
+export interface BetHistoryItem {
+  id: string
+  prediction_id: string
+  choice: string
+  amount: number
+  created_at: string
+  prediction: {
+    id: number
+    description: string
+    outcome: string
+    status: string
+    str_thumb?: string
+    source?: string
+  }
+}
+
 interface MarketsTabsProps {
   predictionsData: {
-    myPredictions: PredictionItem[]
+    myBets: BetHistoryItem[]
     general: PredictionItem[]
     sports: PredictionItem[]
     crypto: PredictionItem[]
@@ -48,14 +64,14 @@ interface MarketsTabsProps {
   }
   leaderboardData?: ILeaderboardData[]
   isLoading: {
-    myPredictions: boolean
+    myBets: boolean
     general: boolean
     sports: boolean
     crypto: boolean
     markets: boolean
     leaderboard?: boolean
     loadingMore?: {
-      myPredictions: boolean
+      myBets: boolean
       general: boolean
       sports: boolean
       crypto: boolean
@@ -64,7 +80,7 @@ interface MarketsTabsProps {
     }
   }
   pagination: {
-    myPredictions: { page: number; hasMore: boolean }
+    myBets: { page: number; hasMore: boolean }
     general: { page: number; hasMore: boolean }
     sports: { page: number; hasMore: boolean }
     crypto: { page: number; hasMore: boolean }
@@ -72,7 +88,7 @@ interface MarketsTabsProps {
     leaderboard?: { page: number; hasMore: boolean }
   }
   onLoadMore: {
-    myPredictions: () => void
+    myBets: () => void
     general: () => void
     sports: () => void
     crypto: () => void
@@ -88,7 +104,7 @@ export function MarketsTabs({
   pagination,
   onLoadMore
 }: MarketsTabsProps) {
-  const [activeTab, setActiveTab] = useState("predictions")
+  const [activeTab, setActiveTab] = useState("myBets")
   const [searchTerm, setSearchTerm] = useState("")
   
   const formatDate = (dateString: string) => {
@@ -128,22 +144,23 @@ export function MarketsTabs({
         />
       </div>
       
-      <div className="rounded-lg border border-zinc-800">
+      <div className="rounded-lg border border-border">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-[40%]">Market</TableHead>
-              <TableHead className="w-[15%]">Odds</TableHead>
-              <TableHead className="w-[15%]">Status</TableHead>
-              <TableHead className="w-[15%]">Resolution</TableHead>
-              <TableHead className="w-[15%]">Created</TableHead>
+              <TableHead className="w-12"></TableHead>
+              <TableHead className="w-1/2">Market</TableHead>
+              <TableHead className="w-auto">Odds</TableHead>
+              <TableHead className="w-auto">Status</TableHead>
+              <TableHead className="w-auto">Resolution</TableHead>
+              <TableHead className="w-auto">Created</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading[category] ? (
               Array(5).fill(0).map((_, i) => (
                 <TableRow key={i}>
-                  <TableCell colSpan={5} className="h-14">
+                  <TableCell colSpan={6} className="h-14">
                     <div className="flex items-center justify-center">
                       <Skeleton className="h-4 w-full" />
                     </div>
@@ -152,7 +169,7 @@ export function MarketsTabs({
               ))
             ) : filterPredictions(predictions).length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="h-32 text-center">
+                <TableCell colSpan={6} className="h-32 text-center">
                   <div className="flex flex-col items-center justify-center">
                     <CircleEllipsis className="h-10 w-10 text-muted-foreground mb-2" />
                     <p className="text-muted-foreground">No predictions available</p>
@@ -162,21 +179,38 @@ export function MarketsTabs({
             ) : (
               filterPredictions(predictions).map((prediction) => (
                 <TableRow key={prediction.id}>
-                  <TableCell className="font-medium max-w-0">
+                  <TableCell className="w-12">
+                    {prediction.str_thumb ? (
+                      <Image
+                        src={`/api/image-proxy?url=${encodeURIComponent(prediction.str_thumb)}`}
+                        alt={prediction.description.substring(0, 30)}
+                        width={24}
+                        height={24}
+                        className="w-6 h-6 min-w-6 min-h-6 max-w-6 max-h-6 rounded-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-6 h-6 min-w-6 min-h-6 max-w-6 max-h-6 rounded-full bg-muted flex items-center justify-center text-muted-foreground text-xs">
+                        {prediction.source?.charAt(0)?.toUpperCase() || 'P'}
+                      </div>
+                    )}
+                  </TableCell>
+                  <TableCell className="font-medium w-1/2">
                     <Link 
                       href={`/predictions/${prediction.id}`}
-                      className="truncate block hover:text-white transition-colors"
+                      className="block hover:text-foreground transition-colors leading-relaxed"
                     >
-                      {prediction.description}
+                      <div className="whitespace-normal break-words">
+                        {prediction.description}
+                      </div>
                     </Link>
                   </TableCell>
                   <TableCell className="whitespace-nowrap">{calculateProbability(prediction)}</TableCell>
-                  <TableCell>
+                  <TableCell className="whitespace-nowrap">
                     <Badge variant={prediction.status === 'open' ? 'outline' : 'secondary'}>
                       {prediction.status === 'open' ? 'Open' : 'Resolved'}
                     </Badge>
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="whitespace-nowrap">
                     {prediction.status === 'resolved' && (
                       <Badge variant="outline" 
                         className={prediction.outcome === 'YES' ? 'border-emerald-500 text-emerald-500' : 'border-red-500 text-red-500'}>
@@ -184,7 +218,7 @@ export function MarketsTabs({
                       </Badge>
                     )}
                   </TableCell>
-                  <TableCell className="text-xs text-muted-foreground">
+                  <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
                     {formatDate(prediction.created_at)}
                   </TableCell>
                 </TableRow>
@@ -194,7 +228,7 @@ export function MarketsTabs({
         </Table>
         
         {pagination[category].hasMore && (
-          <div className="flex justify-center p-4 border-t border-zinc-800">
+          <div className="flex justify-center p-4 border-t border-border">
             <Button 
               onClick={onLoadMore[category]}
               disabled={isLoading.loadingMore?.[category]}
@@ -215,12 +249,147 @@ export function MarketsTabs({
     </div>
   )
 
+  const renderBetHistoryTable = () => (
+    <div className="space-y-4">
+      <div className="flex items-center gap-4">
+        <Input
+          placeholder="Search bets..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="max-w-sm"
+        />
+      </div>
+      
+      <div className="rounded-lg border border-border">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-12"></TableHead>
+              <TableHead className="w-1/2">Market</TableHead>
+              <TableHead className="w-auto">Choice</TableHead>
+              <TableHead className="w-auto">Amount</TableHead>
+              <TableHead className="w-auto">Status</TableHead>
+              <TableHead className="w-auto">Result</TableHead>
+              <TableHead className="w-auto">Date</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {isLoading.myBets ? (
+              Array(5).fill(0).map((_, i) => (
+                <TableRow key={i}>
+                  <TableCell colSpan={7} className="h-14">
+                    <div className="flex items-center justify-center">
+                      <Skeleton className="h-4 w-full" />
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))
+            ) : predictionsData.myBets.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={7} className="h-32 text-center">
+                  <div className="flex flex-col items-center justify-center">
+                    <CircleEllipsis className="h-10 w-10 text-muted-foreground mb-2" />
+                    <p className="text-muted-foreground">No bets found</p>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ) : (
+              predictionsData.myBets
+                .filter(bet => !searchTerm || bet.prediction.description.toLowerCase().includes(searchTerm.toLowerCase()))
+                .map((bet) => (
+                <TableRow key={bet.id}>
+                  <TableCell className="w-12">
+                    {bet.prediction.str_thumb ? (
+                      <Image
+                        src={`/api/image-proxy?url=${encodeURIComponent(bet.prediction.str_thumb)}`}
+                        alt={bet.prediction.description.substring(0, 30)}
+                        width={24}
+                        height={24}
+                        className="w-6 h-6 min-w-6 min-h-6 max-w-6 max-h-6 rounded-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-6 h-6 min-w-6 min-h-6 max-w-6 max-h-6 rounded-full bg-muted flex items-center justify-center text-muted-foreground text-xs">
+                        {bet.prediction.source?.charAt(0)?.toUpperCase() || 'B'}
+                      </div>
+                    )}
+                  </TableCell>
+                  <TableCell className="font-medium w-1/2">
+                    <Link 
+                      href={`/bets/${bet.id}`}
+                      className="block hover:text-foreground transition-colors leading-relaxed"
+                    >
+                      <div className="whitespace-normal break-words">
+                        {bet.prediction.description}
+                      </div>
+                    </Link>
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap">
+                    <Badge variant="outline" className={bet.choice.toLowerCase() === 'yes' ? 'border-emerald-500 text-emerald-500' : 'border-red-500 text-red-500'}>
+                      {bet.choice.toUpperCase()}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="font-medium whitespace-nowrap">{bet.amount}</TableCell>
+                  <TableCell className="whitespace-nowrap">
+                    <Badge variant={bet.prediction.status === 'open' ? 'outline' : 'secondary'}>
+                      {bet.prediction.status === 'open' ? 'Open' : 'Resolved'}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap">
+                    {bet.prediction.status === 'resolved' && (
+                      <Badge variant="outline" 
+                        className={
+                          (bet.choice.toLowerCase() === 'yes' && bet.prediction.outcome === 'YES') || 
+                          (bet.choice.toLowerCase() === 'no' && bet.prediction.outcome === 'NO') 
+                            ? 'border-emerald-500 text-emerald-500' : 
+                          bet.prediction.outcome 
+                            ? 'border-red-500 text-red-500' :
+                            'border-yellow-500 text-yellow-500'
+                        }>
+                        {bet.prediction.outcome ? (
+                          (bet.choice.toLowerCase() === 'yes' && bet.prediction.outcome === 'YES') || 
+                          (bet.choice.toLowerCase() === 'no' && bet.prediction.outcome === 'NO') 
+                            ? 'Won' : 'Lost'
+                        ) : 'Pending'}
+                      </Badge>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+                    {formatDate(bet.created_at)}
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+        
+        {pagination.myBets.hasMore && (
+          <div className="flex justify-center p-4 border-t border-border">
+            <Button 
+              onClick={onLoadMore.myBets}
+              disabled={isLoading.loadingMore?.myBets}
+              variant="outline"
+            >
+              {isLoading.loadingMore?.myBets ? (
+                <span className="flex items-center gap-2">
+                  <span className="h-4 w-4 rounded-full border-2 border-current border-r-transparent animate-spin"></span>
+                  Loading...
+                </span>
+              ) : (
+                "Load More"
+              )}
+            </Button>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+
   const renderLeaderboardTable = () => (
-    <div className="rounded-lg border border-zinc-800">
+    <div className="rounded-lg border border-border">
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead className="w-[10%]">Rank</TableHead>
+            <TableHead className="w-8"></TableHead>
             <TableHead className="w-[30%]">Agent</TableHead>
             <TableHead className="w-[15%]">Win Rate</TableHead>
             <TableHead className="w-[15%]">Total Bets</TableHead>
@@ -249,9 +418,9 @@ export function MarketsTabs({
               </TableCell>
             </TableRow>
           ) : (
-            leaderboardData.map((agent) => (
+            leaderboardData.map((agent, index) => (
               <TableRow key={agent.id}>
-                <TableCell className="font-medium">#{agent.rank}</TableCell>
+                <TableCell className="font-medium">{index + 1}</TableCell>
                 <TableCell>
                   <div className="flex items-center gap-2">
                     <Image
@@ -259,7 +428,7 @@ export function MarketsTabs({
                       alt={agent.name || "Agent avatar"}
                       width={32}
                       height={32}
-                      className="rounded-full"
+                      className="w-[32px] h-[32px] min-w-[32px] min-h-[32px] max-w-[32px] max-h-[32px] rounded-full object-cover"
                     />
                     <span className="font-medium">{agent.name}</span>
                   </div>
@@ -275,7 +444,7 @@ export function MarketsTabs({
       </Table>
       
       {pagination.leaderboard?.hasMore && (
-        <div className="flex justify-center p-4 border-t border-zinc-800">
+        <div className="flex justify-center p-4 border-t border-border">
           <Button 
             onClick={onLoadMore.leaderboard}
             disabled={isLoading.loadingMore?.leaderboard}
@@ -297,13 +466,13 @@ export function MarketsTabs({
 
   return (
     <div>
-      <div className="flex items-center space-x-1 border-b border-zinc-800 mb-4">
+      <div className="flex items-center space-x-1 border-b border-border mb-4">
         <Button 
           variant="ghost" 
-          onClick={() => setActiveTab("predictions")} 
-          className={`rounded-none border-b-2 px-4 ${activeTab === "predictions" ? "border-b-primary text-foreground" : "border-b-transparent text-muted-foreground hover:text-foreground"}`}
+          onClick={() => setActiveTab("myBets")} 
+          className={`rounded-none border-b-2 px-4 ${activeTab === "myBets" ? "border-b-primary text-foreground" : "border-b-transparent text-muted-foreground hover:text-foreground"}`}
         >
-          Predictions
+          My Bets
         </Button>
         <Button 
           variant="ghost" 
@@ -342,7 +511,7 @@ export function MarketsTabs({
         </Button>
       </div>
 
-      {activeTab === "predictions" && renderPredictionsTable(predictionsData.myPredictions, "myPredictions")}
+      {activeTab === "myBets" && renderBetHistoryTable()}
       {activeTab === "general" && renderPredictionsTable(predictionsData.general, "general")}
       {activeTab === "sports" && renderPredictionsTable(predictionsData.sports, "sports")}
       {activeTab === "crypto" && renderPredictionsTable(predictionsData.crypto, "crypto")}
@@ -350,4 +519,4 @@ export function MarketsTabs({
       {activeTab === "leaderboard" && renderLeaderboardTable()}
     </div>
   )
-} 
+}

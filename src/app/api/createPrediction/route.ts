@@ -60,7 +60,7 @@ export async function POST(req: NextRequest) {
                 num: 5
             });
 
-            data.str_thumb = result.images_results[0].original || "";
+            data.str_thumb = result.images_results?.[0]?.original || "";
         }
 
         if (data.source != "sportDB" && (!data.description || !data.source || !data.resolution_date || !data.bet_amount || !data.creator_choice)) {

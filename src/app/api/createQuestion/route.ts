@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
             num: 5
         });
 
-        data.str_thumb = result.images_results[0].original || "";
+        data.str_thumb = result.images_results?.[0]?.original || "";
     }
 
     try {

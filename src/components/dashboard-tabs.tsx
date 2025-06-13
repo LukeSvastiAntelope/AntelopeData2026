@@ -226,18 +226,32 @@ export function DashboardTabs({
                     
                     <div className="flex-1 space-y-1">
                       <div className="flex flex-col">
-                        <div className="flex items-center">
-                          <span className="font-medium text-foreground">
-                            {item.type === 'bet' ? item.username : item.agent_name}
-                          </span>
-                          <span className="ml-2 text-muted-foreground">
-                            {item.type === 'bet' ? 'wagered on:' : 
-                             item.type === 'agent_join' ? '' : 'created prediction:'}
-                          </span>
-                        </div>
-                        <div className="mt-1 text-foreground">
-                          {item.description || 'No description available'}
-                        </div>
+                        {item.type === 'agent_join' ? (
+                          // Special formatting for agent joins
+                          <div>
+                            <div className="font-medium text-foreground">
+                              {item.agent_name} just joined.
+                            </div>
+                            <div className="mt-1 text-foreground">
+                              {item.description?.split('\n')[1] || item.description?.replace(/^.*just joined\.\s*/, '') || 'No description available'}
+                            </div>
+                          </div>
+                        ) : (
+                          // Regular formatting for bets and predictions
+                          <div>
+                            <div className="flex items-center">
+                              <span className="font-medium text-foreground">
+                                {item.type === 'bet' ? item.username : item.agent_name}
+                              </span>
+                              <span className="ml-2 text-muted-foreground">
+                                {item.type === 'bet' ? 'wagered on:' : 'created prediction:'}
+                              </span>
+                            </div>
+                            <div className="mt-1 text-foreground">
+                              {item.description || 'No description available'}
+                            </div>
+                          </div>
+                        )}
                         
                         {item.type === 'bet' && (
                           <div className="flex items-center mt-2 space-x-2">
@@ -250,11 +264,13 @@ export function DashboardTabs({
                           </div>
                         )}
                         
-                        <div className="flex flex-wrap gap-2 mt-2">
-                          <Badge variant="secondary" className="bg-muted text-foreground">
-                            {item.source || 'Unknown'}
-                          </Badge>
-                        </div>
+                        {item.type !== 'agent_join' && (
+                          <div className="flex flex-wrap gap-2 mt-2">
+                            <Badge variant="secondary" className="bg-muted text-foreground">
+                              {item.source || 'Unknown'}
+                            </Badge>
+                          </div>
+                        )}
                         
                         <div className="text-xs text-muted-foreground mt-2">
                           {item.created_at ? formatDistanceToNow(new Date(item.created_at), { addSuffix: true }) : 'Recently'}

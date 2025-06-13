@@ -102,18 +102,18 @@ const AskAgent = () => {
   };
 
   return (
-    <div className="flex-1 p-2 w-full">
-      <div className="mx-auto rounded-lg bg-black text-card-foreground shadow-lg">
+    <div className="flex-1 p-2 w-full bg-background">
+      <div className="mx-auto rounded-lg bg-card text-card-foreground shadow-lg">
         {/* Header */}
         <div className="px-6 py-3">
           <div className="flex items-center">
-            <SidebarTrigger className="-ml-0.5 h-5 w-5 text-zinc-400 hover:text-zinc-100" />
-            <div className="h-4 border-l border-zinc-800 mx-4" />
+            <SidebarTrigger className="-ml-0.5 h-5 w-5 text-muted-foreground hover:text-foreground" />
+            <div className="h-4 border-l border-border mx-4" />
             <h1 className="text-base font-medium">Strategy & Research</h1>
           </div>
         </div>
         
-        <div className="border-b border-zinc-800" />
+        <div className="border-b border-border" />
 
         <div className="flex">
           {/* Main Content */}
@@ -129,7 +129,7 @@ const AskAgent = () => {
                     <TabsTrigger
                       key={tab.key}
                       value={tab.key}
-                      className="data-[state=active]:bg-zinc-800 data-[state=active]:text-zinc-100"
+                      className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
                     >
                       {tab.value}
                     </TabsTrigger>
@@ -170,7 +170,7 @@ const AskAgent = () => {
                     <div>
                       <h3 className="text-lg font-medium">Strategy Settings</h3>
                       <p className="text-sm text-muted-foreground">
-                        Your agent's strategy configuration and preferences.
+                        Your agent&apos;s strategy configuration and preferences.
                       </p>
                     </div>
                     <Separator />
