@@ -1,7 +1,8 @@
 "use client"
 
 import Link from "next/link"
-import Image from "next/image"
+// Remove Image import as it's no longer used for logos
+// import Image from "next/image"
 import { usePathname } from "next/navigation"
 import { 
   Sidebar, 
@@ -13,6 +14,7 @@ import {
   SidebarMenuButton
 } from "@/components/ui/sidebar"
 import { useAgent } from "@/app/context/AgentContext"
+import { MinimalThemeToggle } from "@/components/theme-toggle"
 import {
   LayoutDashboard,
   BarChart3,
@@ -25,6 +27,8 @@ import {
   Search,
   Shield
 } from "lucide-react"
+import LogoText from "@/components/logo-text"; // Added import
+import LogoIcon from "@/components/logo-icon"; // Added import
 
 interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> {
   collapsible?: "offcanvas" | "icon" | "none";
@@ -95,19 +99,16 @@ export function AppSidebar({ className, collapsible = "offcanvas", ...props }: S
       <SidebarHeader className="flex flex-col gap-4 pb-4">
         <div className="flex items-center px-4">
           <Link href="/dashboard" className="flex items-center px-4">
-            <Image 
-              src="/assets/images/logo-text.svg"
-              alt="Antelope Logo"
-              width={120}
-              height={30}
-              className="transition-opacity group-data-[collapsible=offcanvas]:opacity-0"
+            <LogoText 
+              className="text-zinc-900 dark:text-zinc-100 transition-opacity group-data-[collapsible=offcanvas]:opacity-0"
+              width={120} 
+              height={30} 
             />
             <div className="hidden size-6 items-center justify-center rounded-md group-data-[collapsible=offcanvas]:flex">
-              <Image 
-                src="/assets/images/logo-icon.svg"
-                alt="Antelope"
-                width={24}
-                height={24}
+              <LogoIcon 
+                className="text-zinc-900 dark:text-zinc-100"
+                width={24} 
+                height={24} 
               />
             </div>
           </Link>
@@ -115,10 +116,10 @@ export function AppSidebar({ className, collapsible = "offcanvas", ...props }: S
         <div className="px-4">
           <Link 
             href="/create" 
-            className="flex items-center gap-2 w-full px-4 py-2 text-sm font-medium rounded-md bg-white text-zinc-900 hover:bg-zinc-100 transition-colors"
+            className="flex items-center gap-2 w-full px-4 py-2 text-sm font-medium rounded-md bg-foreground text-background border border-border hover:bg-foreground/90 transition-colors"
           >
-            <PlusCircle className="h-4 w-4 text-zinc-900 group-data-[collapsible=offcanvas]:hidden" />
-            <span className="group-data-[collapsible=offcanvas]:hidden text-zinc-900">Create Prediction</span>
+            <PlusCircle className="h-4 w-4 group-data-[collapsible=offcanvas]:hidden text-background" />
+            <span className="group-data-[collapsible=offcanvas]:hidden text-background">Create Prediction</span>
           </Link>
         </div>
       </SidebarHeader>
@@ -133,8 +134,8 @@ export function AppSidebar({ className, collapsible = "offcanvas", ...props }: S
                 tooltip={item.title}
               >
                 <Link href={item.href} className="flex items-center gap-2 px-4 py-2 text-sidebar-foreground">
-                  <item.icon className="h-4 w-4 text-white group-data-[collapsible=offcanvas]:hidden" />
-                  <span className="text-white">{item.title}</span>
+                  <item.icon className="h-4 w-4 group-data-[collapsible=offcanvas]:hidden" />
+                  <span>{item.title}</span>
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
@@ -151,8 +152,8 @@ export function AppSidebar({ className, collapsible = "offcanvas", ...props }: S
                   tooltip={item.title}
                 >
                   <Link href={item.href} className="flex items-center gap-2 px-4 py-2 text-sidebar-foreground">
-                    <item.icon className="h-4 w-4 text-white group-data-[collapsible=offcanvas]:hidden" />
-                    <span className="text-white">{item.title}</span>
+                    <item.icon className="h-4 w-4 group-data-[collapsible=offcanvas]:hidden" />
+                    <span>{item.title}</span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
@@ -171,8 +172,8 @@ export function AppSidebar({ className, collapsible = "offcanvas", ...props }: S
                 tooltip={item.title}
               >
                 <Link href={item.href} className="flex items-center gap-2 px-4 py-2 text-sidebar-foreground">
-                  <item.icon className="h-4 w-4 text-white group-data-[collapsible=offcanvas]:hidden" />
-                  <span className="text-white">{item.title}</span>
+                  <item.icon className="h-4 w-4 group-data-[collapsible=offcanvas]:hidden" />
+                  <span>{item.title}</span>
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
@@ -181,19 +182,24 @@ export function AppSidebar({ className, collapsible = "offcanvas", ...props }: S
         
         {agent && (
           <div className="px-4 pt-4">
-            <div className="flex items-center px-4">
-              {agent && agent.image ? (
-                <div className="h-8 w-8 rounded-full overflow-hidden">
-                  <img src={agent.image} alt={agent.name || "Agent"} className="w-full h-full object-cover" />
+            <div className="flex items-center justify-between px-4">
+              <div className="flex items-center min-w-0 flex-1">
+                {agent && agent.image ? (
+                  <div className="h-8 w-8 rounded-full overflow-hidden flex-shrink-0">
+                    <img src={agent.image} alt={agent.name || "Agent"} className="w-full h-full object-cover" />
+                  </div>
+                ) : (
+                  <div className="h-8 w-8 rounded-full bg-blue-500 flex items-center justify-center text-white overflow-hidden flex-shrink-0">
+                    <span className="font-medium">{agent?.name?.charAt(0) || "A"}</span>
+                  </div>
+                )}
+                <div className="ml-2 overflow-hidden group-data-[collapsible=offcanvas]:hidden min-w-0 flex-1">
+                  <div className="font-medium text-sm truncate text-sidebar-foreground">{agent?.name || "Agent"}</div>
+                  <div className="text-xs text-muted-foreground truncate">Balance: {agent?.wallet_balance || 0} ANML</div>
                 </div>
-              ) : (
-                <div className="h-8 w-8 rounded-full bg-blue-500 flex items-center justify-center text-white overflow-hidden">
-                  <span className="font-medium">{agent?.name?.charAt(0) || "A"}</span>
-                </div>
-              )}
-              <div className="ml-2 overflow-hidden group-data-[collapsible=offcanvas]:hidden">
-                <div className="font-medium text-sm truncate text-white">{agent?.name || "Agent"}</div>
-                <div className="text-xs text-zinc-400 truncate">Balance: {agent?.wallet_balance || 0} ANML</div>
+              </div>
+              <div className="flex-shrink-0 group-data-[collapsible=offcanvas]:hidden">
+                <MinimalThemeToggle />
               </div>
             </div>
           </div>
