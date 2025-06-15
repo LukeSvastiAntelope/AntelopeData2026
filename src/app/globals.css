@@ -49,12 +49,12 @@
   --input: 240 5.9% 90%;
   --ring: 240 5.9% 10%;
   
-  /* Chart colors for light theme - Neutral zinc palette */
-  --chart-1: 240 3.8% 46.1%;
-  --chart-2: 240 5% 64.9%;
-  --chart-3: 240 4.8% 95.9%;
-  --chart-4: 240 5.9% 10%;
-  --chart-5: 240 3.7% 15.9%;
+  /* Chart colors for light theme - Modern ShadCN palette */
+  --chart-1: 221 83% 53%;
+  --chart-2: 142 71% 45%;
+  --chart-3: 43 74% 66%;
+  --chart-4: 262 83% 58%;
+  --chart-5: 346 77% 49%;
   
   /* Sidebar colors for light theme */
   --sidebar: 0 0% 98%;
@@ -96,12 +96,12 @@
   --input: 240 3.7% 15.9%;
   --ring: 240 4.9% 83.9%;
   
-  /* Chart colors for dark theme - Neutral zinc palette */
-  --chart-1: 240 5% 64.9%;
-  --chart-2: 240 3.8% 46.1%;
-  --chart-3: 240 3.7% 15.9%;
-  --chart-4: 0 0% 98%;
-  --chart-5: 240 4.9% 83.9%;
+  /* Chart colors for dark theme - Modern ShadCN palette */
+  --chart-1: 221 83% 53%;
+  --chart-2: 142 71% 45%;
+  --chart-3: 43 74% 66%;
+  --chart-4: 262 83% 58%;
+  --chart-5: 346 77% 49%;
   
   /* Sidebar colors for dark theme */
   --sidebar: 240 5.9% 10%;
@@ -247,16 +247,7 @@
   animation-delay: 300ms;
 }
 
-/* Chat message hover effects */
+/* Chat message styles */
 .chat-message {
-  transition: all 0.2s ease-in-out;
-}
-
-.chat-message:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-}
-
-.dark .chat-message:hover {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  /* No hover effects */
 }

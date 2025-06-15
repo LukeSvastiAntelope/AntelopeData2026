@@ -68,6 +68,7 @@ export default function CohortChatPage() {
   const [selectedModel, setSelectedModel] = useState('gpt-4o');
   const [sources, setSources] = useState<{survey: boolean; twins: boolean; web: boolean}>({survey: true, twins: true, web: false});
   const [systemPrompt, setSystemPrompt] = useState('You are an expert analyst summarising the perspectives of a group of survey respondents.');
+  const [rightPanelView, setRightPanelView] = useState<'cohort' | 'agent'>('cohort');
   
   // Ref for auto-scrolling to bottom of chat
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -83,7 +84,10 @@ export default function CohortChatPage() {
     if (token) {
       fetch('/api/surveys', { headers: { 'Authorization': `Bearer ${token}` } })
         .then(res => res.json())
-        .then(data => { if (data.surveys) setSurveys(data.surveys); });
+        .then(data => { 
+          console.log('Surveys data:', data);
+          if (data.surveys) setSurveys(data.surveys); 
+        });
     }
     // Fetch cohorts on mount
     if (token) {
@@ -184,7 +188,7 @@ export default function CohortChatPage() {
     setIsLoading(false);
   };
 
-  const handleKeyDown=(e:React.KeyboardEvent<HTMLInputElement>)=> {
+  const handleKeyDown=(e:React.KeyboardEvent<HTMLTextAreaElement>)=> {
     if (e.key==='Enter' && !e.shiftKey){
       e.preventDefault();
       handleSend();
@@ -317,7 +321,7 @@ export default function CohortChatPage() {
 
   return (
     <div className="flex-1 p-2 w-full bg-background">
-      <div className="mx-auto rounded-lg bg-card text-card-foreground shadow-lg flex">
+      <div className="mx-auto h-full rounded-lg bg-card text-card-foreground shadow-lg flex">
         {/* Main area */}
         <div className={cn('flex-1', isCollapsed? 'w-[calc(100%-50px)]':'w-[calc(100%-350px)]')}>
           {/* Header */}
@@ -331,124 +335,110 @@ export default function CohortChatPage() {
 
           <div className="border-b border-border" />
 
-          <div className="p-6">
+          <div className="p-4">
 
-          {/* Tabs */}
-          <Tabs defaultValue="chat" className="w-full">
-            <TabsList className="mb-4">
-              <TabsTrigger value="chat">Chat</TabsTrigger>
-              <TabsTrigger value="agent">Agent Setup</TabsTrigger>
-            </TabsList>
-            <TabsContent value="chat">
-            <div className="space-y-6">
-            {/* Chat Area */}
-            <div className="flex flex-col h-[calc(100vh-180px)]">
-              {messages.length===0 ? (
-                <div className="flex flex-col items-center justify-center flex-1 gap-6">
-                  <p className="text-sm text-muted-foreground">Ask the cohort a question to begin.</p>
-                  <div className="flex gap-2 w-full max-w-xl">
-                    <Input className="flex-1" placeholder="Ask the cohort…" value={input} onChange={e=>setInput(e.target.value)} onKeyDown={handleKeyDown}/>
-                    <Button size="icon" variant="outline" onClick={handleSend} disabled={isLoading}><Send className="h-4 w-4"/></Button>
-                  </div>
-                </div>
-              ) : (
-                <>
-                  <ScrollArea className="flex-1">
-                    <div className="p-4 space-y-4">
-                      {messages.map((m,idx)=>(
-                        <div 
-                          key={idx} 
-                          className="flex gap-3 text-sm justify-start animate-in fade-in duration-500"
-                          style={{ 
-                            animationDelay: `${Math.min(idx * 50, 500)}ms`,
-                            animationFillMode: 'both'
-                          }}
-                        >
-                          {m.role==='agent' && <Avatar className="h-8 w-8 flex-shrink-0"><AvatarImage src="/assets/images/logo-simple.svg"/><AvatarFallback>C</AvatarFallback></Avatar>}
-                          {m.role==='user' && <Avatar className="h-8 w-8 flex-shrink-0"><AvatarFallback>U</AvatarFallback></Avatar>}
-                          <div className={cn(
-                            'rounded-lg px-4 py-2 max-w-[80%] chat-message',
-                            m.role==='user'? 'bg-primary text-primary-foreground':'bg-muted text-foreground'
-                          )}>
-                            {m.role==='agent' ? (
-                              <TooltipProvider delayDuration={150}>
-                                {renderWithCitations(m.content, m.citations)}
-                              </TooltipProvider>
-                            ): m.content}
-                            {m.role==='agent' && m.chartSpec && (
-                              <div className="mt-4 animate-in fade-in duration-700 delay-300">
-                                <ChartRenderer spec={m.chartSpec}/>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                      {isLoading && (
-                        <div className="flex gap-3 text-sm justify-start animate-in fade-in duration-300">
-                          <Avatar className="h-8 w-8 flex-shrink-0"><AvatarFallback>C</AvatarFallback></Avatar>
-                          <div className="rounded-lg px-4 py-2 bg-muted text-foreground chat-message">
-                            <div className="flex items-center gap-2">
-                              <div className="flex gap-1">
-                                <div className="w-2 h-2 bg-current rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                                <div className="w-2 h-2 bg-current rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                                <div className="w-2 h-2 bg-current rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
-                              </div>
-                              <span className="text-sm opacity-70">Analyzing cohort...</span>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                      {/* Auto-scroll target */}
-                      <div ref={messagesEndRef} />
-                    </div>
-                  </ScrollArea>
-                  <div className="sticky bottom-0 p-4 border-t border-border bg-card">
-                    <div className="flex gap-2">
-                      <Input placeholder="Ask the cohort…" className="flex-1" value={input} onChange={e=>setInput(e.target.value)} onKeyDown={handleKeyDown} disabled={isLoading}/>
-                      <Button size="icon" variant="outline" onClick={handleSend} disabled={isLoading}><Send className="h-4 w-4"/></Button>
-                    </div>
-                  </div>
-                </>
-              )}
-            </div>
-            </div>
-            </TabsContent>
-            <TabsContent value="agent">
-              <div className="space-y-6">
-                {/* Model select */}
-                <div className="space-y-2 max-w-sm">
-                  <Label>Model</Label>
-                  <Select value={selectedModel} onValueChange={setSelectedModel}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {getAllModels().map((model) => (
-                        <SelectItem key={model.id} value={model.id}>
-                          {model.name} ({model.provider})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Sources */}
-                <div className="space-y-2">
-                  <Label>Sources</Label>
-                  {['survey','twins','web'].map(src=> (
-                    <div key={src} className="flex items-center gap-2">
-                      <Checkbox checked={sources[src as keyof typeof sources]} onCheckedChange={val=>setSources({...sources,[src]:!!val})}/>
-                      <span className="text-sm capitalize">{src}</span>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Prompt Editor */}
-                <div className="space-y-2">
-                  <Label>Agent Instructions</Label>
-                  <Textarea value={systemPrompt} onChange={e=>setSystemPrompt(e.target.value)} className="min-h-32"/>
+          {/* Chat Area - No more tabs, just clean chat */}
+          <div className="flex flex-col h-[calc(100vh-140px)]">
+            {messages.length===0 ? (
+              <div className="flex flex-col items-center justify-center flex-1 gap-6">
+                <h1 className="text-2xl font-bold">Ask Questions.</h1>
+                <div className="relative w-full max-w-xl">
+                  <Textarea 
+                    className="flex-1 min-h-[80px] pr-12 resize-none" 
+                    placeholder="Ask the cohort…" 
+                    value={input} 
+                    onChange={e=>setInput(e.target.value)} 
+                    onKeyDown={handleKeyDown}
+                    rows={2}
+                  />
+                  <Button 
+                    size="icon" 
+                    variant="ghost" 
+                    className="absolute right-2 bottom-2 h-8 w-8" 
+                    onClick={handleSend} 
+                    disabled={isLoading}
+                  >
+                    <Send className="h-4 w-4"/>
+                  </Button>
                 </div>
               </div>
-            </TabsContent>
-          </Tabs>
+            ) : (
+              <>
+                <ScrollArea className="flex-1">
+                  <div className="p-4 space-y-4">
+                    {messages.map((m,idx)=>(
+                      <div 
+                        key={idx} 
+                        className="flex gap-3 text-sm justify-start animate-in fade-in duration-500"
+                        style={{ 
+                          animationDelay: `${Math.min(idx * 50, 500)}ms`,
+                          animationFillMode: 'both'
+                        }}
+                      >
+                        {m.role==='agent' && <Avatar className="h-8 w-8 flex-shrink-0"><AvatarImage src="/assets/images/logo-simple.svg"/><AvatarFallback>C</AvatarFallback></Avatar>}
+                        {m.role==='user' && <Avatar className="h-8 w-8 flex-shrink-0"><AvatarFallback>U</AvatarFallback></Avatar>}
+                        <div className={cn(
+                          'rounded-lg px-4 py-2 max-w-[80%] chat-message',
+                          m.role==='user'? 'bg-primary text-primary-foreground':'text-foreground'
+                        )}>
+                          {m.role==='agent' ? (
+                            <TooltipProvider delayDuration={150}>
+                              {renderWithCitations(m.content, m.citations)}
+                            </TooltipProvider>
+                          ): m.content}
+                          {m.role==='agent' && m.chartSpec && (
+                            <div className="mt-4 animate-in fade-in duration-700 delay-300">
+                              <ChartRenderer spec={m.chartSpec}/>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                    {isLoading && (
+                      <div className="flex gap-3 text-sm justify-start animate-in fade-in duration-300">
+                        <Avatar className="h-8 w-8 flex-shrink-0"><AvatarFallback>C</AvatarFallback></Avatar>
+                        <div className="rounded-lg px-4 py-2 text-foreground chat-message">
+                          <div className="flex items-center gap-2">
+                            <div className="flex gap-1">
+                              <div className="w-2 h-2 bg-current rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                              <div className="w-2 h-2 bg-current rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                              <div className="w-2 h-2 bg-current rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                            </div>
+                            <span className="text-sm opacity-70">Analyzing cohort...</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    {/* Auto-scroll target */}
+                    <div ref={messagesEndRef} />
+                  </div>
+                </ScrollArea>
+                <div className="sticky bottom-0 p-4 bg-card">
+                  <div className="relative">
+                    <Textarea 
+                      placeholder="Ask the cohort…" 
+                      className="flex-1 min-h-[80px] pr-12 resize-none" 
+                      value={input} 
+                      onChange={e=>setInput(e.target.value)} 
+                      onKeyDown={handleKeyDown} 
+                      disabled={isLoading}
+                      rows={2}
+                    />
+                    <Button 
+                      size="icon" 
+                      variant="ghost" 
+                      className="absolute right-2 bottom-2 h-8 w-8" 
+                      onClick={handleSend} 
+                      disabled={isLoading}
+                    >
+                      <Send className="h-4 w-4"/>
+                    </Button>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+
           </div>
         </div>
         {/* Right Pane */}
@@ -459,51 +449,112 @@ export default function CohortChatPage() {
           <div className={cn('h-full bg-muted/30', isCollapsed? 'w-[50px]':'w-[350px] overflow-y-auto p-6 space-y-6')}>
             {!isCollapsed && (
               <>
-                {/* Cohort select (reuse existing) */}
-                <div className="space-y-2">
-                  <Label>Cohort</Label>
-                  <Select value={selectedCohortId? String(selectedCohortId):'all'} onValueChange={val=>setSelectedCohortId(val==='all'? null: Number(val))}>
-                    <SelectTrigger><SelectValue placeholder="All"/></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All</SelectItem>
-                      {cohorts.map(c=> <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
+                {/* Panel Toggle */}
+                <div className="flex rounded-md bg-muted/50 p-0.5">
+                  <Button
+                    variant={rightPanelView === 'cohort' ? 'secondary' : 'ghost'}
+                    size="sm"
+                    className="flex-1 h-7 text-xs font-medium"
+                    onClick={() => setRightPanelView('cohort')}
+                  >
+                    Cohort
+                  </Button>
+                  <Button
+                    variant={rightPanelView === 'agent' ? 'secondary' : 'ghost'}
+                    size="sm"
+                    className="flex-1 h-7 text-xs font-medium"
+                    onClick={() => setRightPanelView('agent')}
+                  >
+                    Agent
+                  </Button>
                 </div>
-                {/* Survey select */}
-                <div className="space-y-2">
-                  <Label>Survey</Label>
-                  <Select value={selectedSurveyId? String(selectedSurveyId):'all'} onValueChange={val=>setSelectedSurveyId(val==='all'? null: Number(val))}>
-                    <SelectTrigger><SelectValue placeholder="All"/></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All</SelectItem>
-                      {surveys.map(s=> <SelectItem key={s.id} value={String(s.id)}>{s.title}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-                {/* Filter Builder */}
-                <div className="space-y-4 mt-4">
-                  <h3 className="text-sm font-medium">Ad-hoc Filter</h3>
-                  {filterRules.map((rule, idx) => (
-                    <div key={idx} className="flex gap-2 items-center">
-                      <Input placeholder="field" value={rule.field} onChange={e=>updateRule(idx,'field',e.target.value)} className="w-28" />
-                      <select value={rule.op} onChange={e=>updateRule(idx,'op',e.target.value as any)} className="h-8 rounded-md border border-input bg-background px-2 text-xs">
-                        <option value="=">=</option>
-                        <option value="IN">IN</option>
-                        <option value="CONTAINS">CONTAINS</option>
-                      </select>
-                      <Input placeholder="value" value={Array.isArray(rule.value)? rule.value.join(','): rule.value as string} onChange={e=>updateRule(idx,'value',e.target.value)} className="flex-1" />
+
+                {rightPanelView === 'cohort' ? (
+                  <>
+                    {/* Cohort select */}
+                    <div className="space-y-2">
+                      <Label>Cohort</Label>
+                      <Select value={selectedCohortId? String(selectedCohortId):'all'} onValueChange={val=>setSelectedCohortId(val==='all'? null: Number(val))}>
+                        <SelectTrigger><SelectValue placeholder="All"/></SelectTrigger>
+                        <SelectContent className="z-50">
+                          <SelectItem value="all">All</SelectItem>
+                          {cohorts.map(c=> <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
                     </div>
-                  ))}
-                  <Button size="sm" variant="secondary" onClick={() => setFilterRules([...filterRules,{ field:'', op:'=', value:''}])}>+ Add Rule</Button>
-                </div>
-                {/* Save Cohort */}
-                <div className="flex gap-2 items-center mt-2">
-                  <Input placeholder="Cohort name" value={newCohortName} onChange={e=>setNewCohortName(e.target.value)} className="flex-1" />
-                  <Button size="sm" onClick={handleSaveCohort} disabled={saving || !newCohortName.trim() || filterRules.length===0}>Save Cohort</Button>
-                </div>
-                <Separator className="my-4"/>
-                {messages.length>0 && selectedCohortId && (<Button variant="destructive" onClick={handleDeleteCohort}>Delete</Button>)}
+                    {/* Survey select */}
+                    <div className="space-y-2">
+                      <Label>Survey</Label>
+                      <Select value={selectedSurveyId? String(selectedSurveyId):'all'} onValueChange={val=>setSelectedSurveyId(val==='all'? null: Number(val))}>
+                        <SelectTrigger><SelectValue placeholder="All"/></SelectTrigger>
+                        <SelectContent className="z-50">
+                          <SelectItem value="all">All</SelectItem>
+                          {surveys.map(s=> <SelectItem key={s.id} value={String(s.id)}>{s.title}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {/* Filter Builder */}
+                    <div className="space-y-4 mt-4">
+                      <h3 className="text-sm font-medium">Ad-hoc Filter</h3>
+                      {filterRules.map((rule, idx) => (
+                        <div key={idx} className="flex gap-2 items-center">
+                          <Input placeholder="field" value={rule.field} onChange={e=>updateRule(idx,'field',e.target.value)} className="w-28" />
+                          <select value={rule.op} onChange={e=>updateRule(idx,'op',e.target.value as any)} className="h-8 rounded-md border border-input bg-background px-2 text-xs">
+                            <option value="=">=</option>
+                            <option value="IN">IN</option>
+                            <option value="CONTAINS">CONTAINS</option>
+                          </select>
+                          <Input placeholder="value" value={Array.isArray(rule.value)? rule.value.join(','): rule.value as string} onChange={e=>updateRule(idx,'value',e.target.value)} className="flex-1" />
+                        </div>
+                      ))}
+                      <Button size="sm" variant="secondary" onClick={() => setFilterRules([...filterRules,{ field:'', op:'=', value:''}])}>+ Add Rule</Button>
+                    </div>
+                    {/* Save Cohort */}
+                    <div className="flex gap-2 items-center mt-2">
+                      <Input placeholder="Cohort name" value={newCohortName} onChange={e=>setNewCohortName(e.target.value)} className="flex-1" />
+                      <Button size="sm" onClick={handleSaveCohort} disabled={saving || !newCohortName.trim() || filterRules.length===0}>Save Cohort</Button>
+                    </div>
+                    <Separator className="my-4"/>
+                    {messages.length>0 && selectedCohortId && (<Button variant="destructive" onClick={handleDeleteCohort}>Delete</Button>)}
+                  </>
+                ) : (
+                  <>
+                    {/* Agent Setup */}
+                    <div className="space-y-6">
+                      {/* Model select */}
+                      <div className="space-y-2">
+                        <Label>Model</Label>
+                        <Select value={selectedModel} onValueChange={setSelectedModel}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent className="z-50">
+                            {getAllModels().map((model) => (
+                              <SelectItem key={model.id} value={model.id}>
+                                {model.name} ({model.provider})
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {/* Sources */}
+                      <div className="space-y-2">
+                        <Label>Sources</Label>
+                        {['survey','twins','web'].map(src=> (
+                          <div key={src} className="flex items-center gap-2">
+                            <Checkbox checked={sources[src as keyof typeof sources]} onCheckedChange={val=>setSources({...sources,[src]:!!val})}/>
+                            <span className="text-sm capitalize">{src}</span>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Prompt Editor */}
+                      <div className="space-y-2">
+                        <Label>Agent Instructions</Label>
+                        <Textarea value={systemPrompt} onChange={e=>setSystemPrompt(e.target.value)} className="min-h-32"/>
+                      </div>
+                    </div>
+                  </>
+                )}
               </>
             )}
           </div>

@@ -10,6 +10,7 @@
       "init-scheduler": "node scripts/init-scheduler.js"
    },
    "dependencies": {
+      "@anthropic-ai/sdk": "^0.54.0",
       "@heroui/accordion": "2.2.8",
       "@heroui/badge": "2.2.6",
       "@heroui/button": "2.2.10",
@@ -95,6 +96,7 @@
       "react-markdown": "^10.1.0",
       "recharts": "^2.15.3",
       "remark-gfm": "^4.0.1",
+      "remark-smartypants": "^3.0.2",
       "serpapi": "^2.1.0",
       "sqlite": "^5.1.1",
       "sqlite3": "^5.1.7",

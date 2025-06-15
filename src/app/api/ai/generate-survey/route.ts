@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from 'openai';
+import Anthropic from '@anthropic-ai/sdk';
 import { GPT_MODELS } from '@/app/utils/const';
 
 // POST /api/ai/generate-survey - Generate survey using AI
@@ -30,7 +31,8 @@ export async function POST(req: NextRequest) {
         }
 
         // Initialize the appropriate AI client based on model type
-        let aiClient: OpenAI;
+        let aiClient: OpenAI | Anthropic;
+        let isAnthropic = false;
         
         if (modelConfig.type === "openai") {
             if (!process.env.OPENAI_API_KEY) {
@@ -61,6 +63,16 @@ export async function POST(req: NextRequest) {
                 apiKey: process.env.GEMINI_API_KEY,
                 baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai/'
             });
+        } else if (modelConfig.type === "anthropic") {
+            if (!process.env.ANTHROPIC_API_KEY) {
+                return NextResponse.json({ 
+                    error: 'Anthropic API key not configured' 
+                }, { status: 503 });
+            }
+            aiClient = new Anthropic({
+                apiKey: process.env.ANTHROPIC_API_KEY,
+            });
+            isAnthropic = true;
         } else {
             return NextResponse.json({ 
                 error: 'Unsupported model type' 
@@ -97,17 +109,39 @@ Guidelines:
 - Ensure questions flow logically
 - Make critical questions required`;
 
-        const completion = await aiClient.chat.completions.create({
-            model: modelConfig.model,
-            messages: [
-                { role: "system", content: systemPrompt },
-                { role: "user", content: prompt }
-            ],
-            temperature: 0.7,
-            max_tokens: 2000,
-        });
+        let aiResponse: string | undefined;
 
-        const aiResponse = completion.choices[0]?.message?.content;
+        if (isAnthropic) {
+            // Use Anthropic API
+            const completion = await (aiClient as Anthropic).messages.create({
+                model: modelConfig.model,
+                max_tokens: 2000,
+                system: systemPrompt,
+                messages: [
+                    { role: "user", content: prompt }
+                ],
+                temperature: 0.7,
+            });
+
+            // Extract text content from Claude's response
+            aiResponse = completion.content
+                .filter((block: any) => block.type === 'text')
+                .map((block: any) => block.text)
+                .join('');
+        } else {
+            // Use OpenAI-compatible API
+            const completion = await (aiClient as OpenAI).chat.completions.create({
+                model: modelConfig.model,
+                messages: [
+                    { role: "system", content: systemPrompt },
+                    { role: "user", content: prompt }
+                ],
+                temperature: 0.7,
+                max_tokens: 2000,
+            });
+
+            aiResponse = completion.choices[0]?.message?.content;
+        }
         
         if (!aiResponse) {
             return NextResponse.json({ 

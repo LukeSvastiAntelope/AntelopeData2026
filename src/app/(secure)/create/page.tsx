@@ -19,6 +19,22 @@ import {
 const CreatePage = () => {
   const predictionTypes = [
     {
+      title: "AI Survey Builder",
+      description: "Use AI to generate surveys from a simple description",
+      icon: Lightbulb,
+      href: "/create/survey/ai",
+      color: "bg-purple-500/10 text-purple-600 dark:text-purple-400",
+      examples: ["Describe your survey needs", "AI creates questions", "Edit and refine results"]
+    },
+    {
+      title: "Survey / Questionnaire",
+      description: "Create surveys that turn respondents into digital twin agents",
+      icon: Users,
+      href: "/create/survey",
+      color: "bg-pink-500/10 text-pink-600 dark:text-pink-400",
+      examples: ["Market research surveys", "Opinion polls", "Customer feedback forms"]
+    },
+    {
       title: "Binary Question",
       description: "Create a yes/no prediction with two possible outcomes",
       icon: Binary,
@@ -49,22 +65,6 @@ const CreatePage = () => {
       href: "/multipleQuestion",
       color: "bg-purple-500/10 text-purple-600 dark:text-purple-400",
       examples: ["Election results", "Product launch dates", "Market categories"]
-    },
-    {
-      title: "Survey / Questionnaire",
-      description: "Create surveys that turn respondents into digital twin agents",
-      icon: Users,
-      href: "/create/survey",
-      color: "bg-pink-500/10 text-pink-600 dark:text-pink-400",
-      examples: ["Market research surveys", "Opinion polls", "Customer feedback forms"]
-    },
-    {
-      title: "AI Survey Builder",
-      description: "Use AI to generate surveys from a simple description",
-      icon: Lightbulb,
-      href: "/create/survey/ai",
-      color: "bg-purple-500/10 text-purple-600 dark:text-purple-400",
-      examples: ["Describe your survey needs", "AI creates questions", "Edit and refine results"]
     }
   ]
 

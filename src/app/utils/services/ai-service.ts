@@ -1,4 +1,5 @@
 import OpenAI from 'openai';
+import Anthropic from '@anthropic-ai/sdk';
 
 export interface AIMessage {
   role: 'system' | 'user' | 'assistant';
@@ -27,6 +28,8 @@ export interface AICompletionResponse {
 // Initialize AI clients - only on server side
 let openai: OpenAI | null = null;
 let deepseek: OpenAI | null = null;
+let gemini: OpenAI | null = null;
+let anthropic: Anthropic | null = null;
 
 function getOpenAIClient() {
   if (!openai) {
@@ -45,10 +48,31 @@ function getDeepSeekClient() {
   return deepseek;
 }
 
+function getGeminiClient() {
+  if (!gemini) {
+    gemini = new OpenAI({
+      apiKey: process.env.GEMINI_API_KEY,
+      baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai/'
+    });
+  }
+  return gemini;
+}
+
+function getAnthropicClient() {
+  if (!anthropic) {
+    anthropic = new Anthropic({
+      apiKey: process.env.ANTHROPIC_API_KEY
+    });
+  }
+  return anthropic;
+}
+
 // Determine provider from model ID
-function getProvider(modelId: string): 'openai' | 'deepseek' {
+function getProvider(modelId: string): 'openai' | 'deepseek' | 'gemini' | 'anthropic' {
   if (modelId.startsWith('gpt-') || modelId.startsWith('o1') || modelId.startsWith('o3')) return 'openai';
   if (modelId.startsWith('deepseek-')) return 'deepseek';
+  if (modelId.startsWith('gemini-')) return 'gemini';
+  if (modelId.startsWith('claude-')) return 'anthropic';
   return 'openai'; // default fallback
 }
 
@@ -61,6 +85,10 @@ export async function createCompletion(options: AICompletionOptions): Promise<AI
       return createOpenAICompletion(options);
     case 'deepseek':
       return createDeepSeekCompletion(options);
+    case 'gemini':
+      return createGeminiCompletion(options);
+    case 'anthropic':
+      return createAnthropicCompletion(options);
     default:
       throw new Error(`Unsupported provider for model: ${options.model}`);
   }
@@ -141,6 +169,83 @@ async function createDeepSeekCompletion(options: AICompletionOptions): Promise<A
       promptTokens: completion.usage.prompt_tokens,
       completionTokens: completion.usage.completion_tokens,
       totalTokens: completion.usage.total_tokens,
+    } : undefined
+  };
+}
+
+// Gemini completion (uses OpenAI-compatible API)
+async function createGeminiCompletion(options: AICompletionOptions): Promise<AICompletionResponse> {
+  const client = getGeminiClient();
+  const completion = await client.chat.completions.create({
+    model: options.model,
+    messages: options.messages.map(msg => ({
+      role: msg.role,
+      content: msg.content
+    })),
+    temperature: options.temperature || 0.25,
+    max_tokens: options.maxTokens || 500,
+    stream: false,
+  });
+
+  return {
+    content: completion.choices[0].message.content || '',
+    usage: completion.usage ? {
+      promptTokens: completion.usage.prompt_tokens,
+      completionTokens: completion.usage.completion_tokens,
+      totalTokens: completion.usage.total_tokens,
+    } : undefined
+  };
+}
+
+// Anthropic Claude completion (uses native Anthropic API)
+async function createAnthropicCompletion(options: AICompletionOptions): Promise<AICompletionResponse> {
+  const client = getAnthropicClient();
+  
+  // Convert messages to Anthropic format
+  const messages = options.messages.filter(msg => msg.role !== 'system').map(msg => ({
+    role: msg.role as 'user' | 'assistant',
+    content: msg.content
+  }));
+  
+  // Extract system message if present
+  const systemMessage = options.messages.find(msg => msg.role === 'system');
+  
+  const requestParams: any = {
+    model: options.model,
+    max_tokens: options.maxTokens || 500,
+    messages: messages,
+  };
+  
+  if (systemMessage) {
+    requestParams.system = systemMessage.content;
+  }
+  
+  // Add optional parameters
+  if (options.temperature !== undefined) {
+    requestParams.temperature = options.temperature;
+  }
+
+  console.log(`Making request to ${options.model} with params:`, requestParams);
+  
+  const completion = await client.messages.create(requestParams);
+  
+  console.log(`Response from ${options.model}:`, {
+    content: completion.content,
+    usage: completion.usage
+  });
+
+  // Extract text content from Claude's response
+  const textContent = completion.content
+    .filter((block: any) => block.type === 'text')
+    .map((block: any) => block.text)
+    .join('');
+
+  return {
+    content: textContent,
+    usage: completion.usage ? {
+      promptTokens: completion.usage.input_tokens,
+      completionTokens: completion.usage.output_tokens,
+      totalTokens: completion.usage.input_tokens + completion.usage.output_tokens,
     } : undefined
   };
 } 

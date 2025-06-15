@@ -17,6 +17,16 @@ export const AVAILABLE_MODELS = {
     { id: 'deepseek-chat', name: 'DeepSeek Chat', provider: 'DeepSeek' },
     { id: 'deepseek-coder', name: 'DeepSeek Coder', provider: 'DeepSeek' },
   ],
+  gemini: [
+    { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash', provider: 'Google' },
+    { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro', provider: 'Google' },
+    { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash', provider: 'Google' },
+  ],
+  anthropic: [
+    { id: 'claude-3-5-sonnet-latest', name: 'Claude 3.5 Sonnet', provider: 'Anthropic' },
+    { id: 'claude-3-5-haiku-latest', name: 'Claude 3.5 Haiku', provider: 'Anthropic' },
+    { id: 'claude-3-opus-latest', name: 'Claude 3 Opus', provider: 'Anthropic' },
+  ],
 };
 
 // Get all available models as a flat array
@@ -24,5 +34,7 @@ export const getAllModels = () => {
   return [
     ...AVAILABLE_MODELS.openai,
     ...AVAILABLE_MODELS.deepseek,
+    ...AVAILABLE_MODELS.gemini,
+    ...AVAILABLE_MODELS.anthropic,
   ];
 }; 
