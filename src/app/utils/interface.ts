@@ -434,3 +434,192 @@ export interface IAgentContext {
     isAgentProfileLoading: boolean;
     setIsAgentProfileLoading: Dispatch<SetStateAction<boolean>>;
 }
+
+// ===== SURVEY & DIGITAL-TWIN INTERFACES =====
+
+export type QuestionType = 'text' | 'single-choice' | 'multi-choice' | 'scale' | 'email' | 'number';
+export type SurveyStatus = 'draft' | 'published' | 'closed';
+export type EnrichmentStatus = 'pending' | 'processing' | 'completed' | 'failed';
+
+export interface SurveyDB {
+    id: number;
+    title: string;
+    description: string;
+    slug: string;
+    created_by: number;
+    is_public: boolean;
+    created_at: string;
+    updated_at: string;
+    status: SurveyStatus;
+}
+
+export interface SurveyQuestionDB {
+    id: number;
+    survey_id: number;
+    type: QuestionType;
+    prompt: string;
+    options: string[] | null; // JSON parsed to array
+    is_required: boolean;
+    question_order: number;
+    created_at: string;
+}
+
+export interface SurveyResponseDB {
+    id: number;
+    survey_id: number;
+    responder_id: number | null;
+    submitted_at: string;
+    demographics: Record<string, any>; // JSON parsed
+    ip_address: string;
+    user_agent: string;
+}
+
+export interface SurveyAnswerDB {
+    id: number;
+    response_id: number;
+    question_id: number;
+    answer_value: string;
+    created_at: string;
+}
+
+export interface ResponderAgentDB {
+    id: number;
+    base_profile: Record<string, any>; // JSON parsed
+    enrichment_status: EnrichmentStatus;
+    created_from_response_id: number;
+    agent_token: string;
+    created_at: string;
+    updated_at: string;
+    last_queried_at: string | null;
+    query_count: number;
+}
+
+export interface AgentQueryDB {
+    id: number;
+    responder_agent_id: number;
+    query_text: string;
+    response_text: string;
+    queried_by: number | null;
+    created_at: string;
+    response_time_ms: number;
+}
+
+// Frontend interfaces (cleaner versions)
+export interface Survey {
+    id: number;
+    title: string;
+    description: string;
+    slug: string;
+    createdBy: number;
+    isPublic: boolean;
+    createdAt: string;
+    updatedAt: string;
+    status: SurveyStatus;
+    questions?: SurveyQuestion[];
+    responseCount?: number;
+}
+
+export interface SurveyQuestion {
+    id: number;
+    surveyId: number;
+    type: QuestionType;
+    prompt: string;
+    options?: string[];
+    isRequired: boolean;
+    order: number;
+}
+
+export interface SurveyResponse {
+    id: number;
+    surveyId: number;
+    responderId?: number;
+    submittedAt: string;
+    demographics: Record<string, any>;
+    answers: SurveyAnswer[];
+}
+
+export interface SurveyAnswer {
+    id: number;
+    responseId: number;
+    questionId: number;
+    value: string;
+}
+
+export interface ResponderAgent {
+    id: number;
+    baseProfile: Record<string, any>;
+    enrichmentStatus: EnrichmentStatus;
+    createdFromResponseId: number;
+    agentToken: string;
+    createdAt: string;
+    updatedAt: string;
+    lastQueriedAt?: string;
+    queryCount: number;
+}
+
+// Form interfaces for creating/editing
+export interface CreateSurveyInput {
+    title: string;
+    description: string;
+    isPublic: boolean;
+    questions: CreateQuestionInput[];
+}
+
+export interface CreateQuestionInput {
+    type: QuestionType;
+    prompt: string;
+    options?: string[];
+    isRequired: boolean;
+    order: number;
+}
+
+export interface SubmitSurveyInput {
+    surveyId: number;
+    demographics: Record<string, any>;
+    answers: SubmitAnswerInput[];
+}
+
+export interface SubmitAnswerInput {
+    questionId: number;
+    value: string;
+}
+
+export interface QueryAgentInput {
+    agentToken: string;
+    query: string;
+}
+
+export interface QueryAgentResponse {
+    response: string;
+    responseTimeMs: number;
+    agentProfile: Record<string, any>;
+}
+
+// At the end before export statements or near other DB interfaces, add CohortDB and Cohort types
+export interface CohortDB {
+    id: number;
+    name: string;
+    description?: string;
+    filter_json: Record<string, any>[]; // JSON parsed array of filter rules
+    visibility: 'private' | 'org' | 'public';
+    created_by: number;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface Cohort {
+    id: number;
+    name: string;
+    description?: string;
+    filter: CohortFilterRule[];
+    visibility: 'private' | 'org' | 'public';
+    createdBy: number;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface CohortFilterRule {
+    field: string;
+    op: '=' | 'IN' | 'CONTAINS';
+    value: string | string[];
+}

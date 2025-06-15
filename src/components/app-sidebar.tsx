@@ -25,7 +25,10 @@ import {
   Info,
   Settings,
   Search,
-  Shield
+  Shield,
+  FileText,
+  Brain,
+  MessageCircle
 } from "lucide-react"
 import LogoText from "@/components/logo-text"; // Added import
 import LogoIcon from "@/components/logo-icon"; // Added import
@@ -41,18 +44,33 @@ export function AppSidebar({ className, collapsible = "offcanvas", ...props }: S
   const mainNavItems = [
     {
       title: "Dashboard",
-      href: "/dashboard",
+      href: "/surveys",
       icon: LayoutDashboard
     },
     {
-      title: "Markets",
-      href: "/markets",
-      icon: BarChart3
+      title: "Chat",
+      href: "/cohort-chat",
+      icon: MessageCircle
     },
+    // {
+    //   title: "Markets",
+    //   href: "/markets",
+    //   icon: BarChart3
+    // },
+    // {
+    //   title: "Strategy",
+    //   href: "/strategy",
+    //   icon: LineChart
+    // },
+    // {
+    //   title: "Surveys",
+    //   href: "/surveys",
+    //   icon: FileText
+    // },
     {
-      title: "Strategy",
-      href: "/strategy",
-      icon: LineChart
+      title: "Digital Twins",
+      href: "/digital-twins",
+      icon: Brain
     }
   ]
 
@@ -98,7 +116,7 @@ export function AppSidebar({ className, collapsible = "offcanvas", ...props }: S
     >
       <SidebarHeader className="flex flex-col gap-4 pb-4">
         <div className="flex items-center px-4">
-          <Link href="/dashboard" className="flex items-center px-4">
+          <Link href="/surveys" className="flex items-center px-4">
             <LogoText 
               className="text-zinc-900 dark:text-zinc-100 transition-opacity group-data-[collapsible=offcanvas]:opacity-0"
               width={120} 
@@ -119,7 +137,7 @@ export function AppSidebar({ className, collapsible = "offcanvas", ...props }: S
             className="flex items-center gap-2 w-full px-4 py-2 text-sm font-medium rounded-md bg-foreground text-background border border-border hover:bg-foreground/90 transition-colors"
           >
             <PlusCircle className="h-4 w-4 group-data-[collapsible=offcanvas]:hidden text-background" />
-            <span className="group-data-[collapsible=offcanvas]:hidden text-background">Create Prediction</span>
+            <span className="group-data-[collapsible=offcanvas]:hidden text-background">Create Survey</span>
           </Link>
         </div>
       </SidebarHeader>

@@ -11,6 +11,7 @@ import toast from "react-hot-toast";
 import { Tooltip } from "@heroui/tooltip";
 import { formatDate } from "date-fns";
 import { useRouter } from "next/navigation";
+import { handleAuthError } from '../../utils/lib';
 
 interface TopicUser {
     id: number;
@@ -201,7 +202,7 @@ const AdminPage = () => {
         // Get JWT token (assuming it's stored in localStorage)
         const token = typeof window !== 'undefined' ? localStorage.getItem("token") ?? "" : "";
         if (!token && process.env.NODE_ENV !== 'development') { // Allow no token in dev for easier testing if middleware is off
-            toast.error("Authentication token not found. Please log in again.");
+            handleAuthError(undefined, false); // Use centralized handler without toast
             setIsDeleteConfirmOpen(false);
             setSelectedUserForDeletion(null);
             return;
