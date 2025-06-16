@@ -28,7 +28,7 @@ import { getAllModels } from '@/app/utils/models';
 
 // Optional markdown plugins – if not installed, fall back gracefully
 let smart: any = null;
-try { smart = require('remark-smartypants'); } catch {}
+try { smart = remarkSmart; } catch {}
 
 const toPlugin=(mod:any)=>{
   if(!mod) return null;
@@ -157,7 +157,7 @@ export default function CohortChatPage() {
       const last=updated[updated.length-1];
       if(last && last.role==='agent') {
         const chartMatchFull = last.content.match(/```chart[\s\S]*?```/);
-        let parts = last.content.split('\n---\n');
+        const parts = last.content.split('\n---\n');
         if(parts.length>1) {
           const answerTxt=parts[0];
           const stats=parts.slice(1).join('\n---\n');
