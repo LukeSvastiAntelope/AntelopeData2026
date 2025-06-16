@@ -235,7 +235,7 @@ export default function TestEnhancedChartPage() {
           <div className="space-y-2">
             <h4 className="font-medium">1. Generate Test Data</h4>
             <p className="text-sm text-muted-foreground">
-              Click "Generate Test Data" to create 7 days of sample daily analysis data. 
+              Click &quot;Generate Test Data&quot; to create 7 days of sample daily analysis data. 
               This simulates what would happen when agents perform daily re-evaluation of their bets.
             </p>
           </div>

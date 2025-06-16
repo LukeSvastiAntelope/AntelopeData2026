@@ -278,7 +278,7 @@ const SurveyAnalyticsPage = () => {
                     Digital Twin: {selectedResponse.demographics.name}
                   </CardTitle>
                   <CardDescription>
-                    Interact with this respondent's digital twin
+                    Interact with this respondent&apos;s digital twin
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
