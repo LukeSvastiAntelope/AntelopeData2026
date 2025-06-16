@@ -55,7 +55,7 @@ const WagerPrinciplesDialog = ({
                 <DialogHeader>
                     <DialogTitle>Wager Principles</DialogTitle>
                     <DialogDescription>
-                                                    Step 3 of 3: Define your agent&apos;s betting strategy
+                        Step 3 of 3: Define your agent&apos;s betting strategy
                     </DialogDescription>
                     <Progress value={100} className="h-2" />
                 </DialogHeader>
@@ -64,10 +64,11 @@ const WagerPrinciplesDialog = ({
                     <div className="text-sm text-muted-foreground space-y-2">
                         <p>
                             Based on your agent&apos;s profile, we&apos;ve drafted some initial wager principles.
-                                                          These principles will guide your agent&apos;s betting decisions. 
+                            These principles will guide your agent&apos;s betting decisions. 
                             Review and edit them as you see fit, or skip this step for now.
                         </p>
                         <p className="text-xs opacity-70">
+                            You can always update these later in your agent&apos;s profile settings.
                             You can always update these later in your agent&apos;s profile settings.
                         </p>
                     </div>
