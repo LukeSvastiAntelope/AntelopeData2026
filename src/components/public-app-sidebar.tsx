@@ -18,9 +18,7 @@ import {
   BarChart3,
   LineChart,
   Info,
-  Users,
-  LogIn,
-  UserPlus
+  Users
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
@@ -124,28 +122,6 @@ export function PublicAppSidebar({ className, collapsible = "offcanvas", ...prop
             </SidebarMenuItem>
           ))}
         </SidebarMenu>
-
-        <div className="px-8 pt-4 flex flex-col gap-2">
-          <Button 
-            asChild
-            className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
-          >
-            <Link href="/login" className="flex items-center gap-2">
-              <LogIn className="h-4 w-4" />
-              <span>Login</span>
-            </Link>
-          </Button>
-          <Button 
-            asChild
-            variant="outline"
-            className="w-full border-border hover:bg-accent"
-          >
-            <Link href="/register" className="flex items-center gap-2">
-              <UserPlus className="h-4 w-4" />
-              <span>Register</span>
-            </Link>
-          </Button>
-        </div>
       </SidebarFooter>
     </Sidebar>
   )
