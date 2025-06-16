@@ -3,7 +3,7 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import { IAgentProfile, IAgentContext, UserDB } from '../utils/interface';
 import { usePathname, useRouter } from 'next/navigation';
-import { toast } from 'react-hot-toast';
+import { handleAuthError } from '../utils/lib';
 const AgentContext = createContext<IAgentContext | undefined>(undefined);
 
 export const AgentProvider = ({ children }: { children: React.ReactNode }) => {
@@ -37,26 +37,17 @@ export const AgentProvider = ({ children }: { children: React.ReactNode }) => {
                 setUser(data.user);
             } else {
                 if (!isAuthPage) {
-                    handleAuthError();
+                    handleAuthError(router, false);
                 }
             }
         } catch (error) {
             console.log("Error fetching agent profile", error);
             if (!isPredictionPage && !isAuthPage) {
-                handleAuthError();
+                handleAuthError(router, false);
             }
         } finally {
             setIsAgentProfileLoading(false);
             setIsInitialized(true);
-        }
-    };
-
-    const handleAuthError = () => {
-        toast.error("Authentication error. Please log in again.");
-        localStorage.removeItem("userId");
-        localStorage.removeItem("token");
-        if (!isAuthPage) {
-            router.push("/login");
         }
     };
 
@@ -65,13 +56,15 @@ export const AgentProvider = ({ children }: { children: React.ReactNode }) => {
         
         // If we're on an auth page and have a token, redirect to dashboard
         if (token && isAuthPage) {
-            router.push("/dashboard");
+            router.push("/surveys");
             return;
         }
         
         // If we're not on an auth page and don't have a token, redirect to login
         if (!token && !isAuthPage) {
             router.push("/login");
+            // Mark initialization complete so the fallback UI does not hang
+            setIsInitialized(true);
             return;
         }
 

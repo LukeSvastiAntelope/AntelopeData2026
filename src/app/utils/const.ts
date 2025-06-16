@@ -48,6 +48,24 @@ export const GPT_MODELS = [
         type: "gemini",
         model: "gemini-2.0-flash"
     },
+    {
+        key: "claude-3-5-sonnet",
+        label: "Claude 3.5 Sonnet",
+        type: "anthropic",
+        model: "claude-3-5-sonnet-latest"
+    },
+    {
+        key: "claude-3-5-haiku",
+        label: "Claude 3.5 Haiku",
+        type: "anthropic",
+        model: "claude-3-5-haiku-latest"
+    },
+    {
+        key: "claude-3-opus",
+        label: "Claude 3 Opus",
+        type: "anthropic",
+        model: "claude-3-opus-latest"
+    },
     // {
     //     key: "deepseek",
     //     label: "deepseek",

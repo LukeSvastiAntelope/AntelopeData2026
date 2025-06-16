@@ -107,6 +107,183 @@ const config: Config = {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
       },
+      typography: {
+        DEFAULT: {
+          css: {
+            // Better base typography
+            fontSize: '0.9375rem', // 15px base
+            lineHeight: '1.6',
+            color: 'hsl(var(--foreground))',
+            maxWidth: 'none',
+            
+            // Improved paragraph spacing
+            p: {
+              marginTop: '1.25em',
+              marginBottom: '1.25em',
+              lineHeight: '1.65',
+            },
+            
+            // Better heading hierarchy
+            'h1, h2, h3, h4': {
+              color: 'hsl(var(--foreground))',
+              fontWeight: '600',
+              lineHeight: '1.3',
+            },
+            
+            h1: {
+              fontSize: '1.5em',
+              marginTop: '0',
+              marginBottom: '0.8888889em',
+            },
+            
+            h2: {
+              fontSize: '1.25em',
+              marginTop: '1.6em',
+              marginBottom: '0.8em',
+            },
+            
+            h3: {
+              fontSize: '1.125em',
+              marginTop: '1.5555556em',
+              marginBottom: '0.6666667em',
+            },
+            
+            // Enhanced links
+            a: {
+              color: 'hsl(var(--primary))',
+              textDecoration: 'none',
+              fontWeight: '500',
+              '&:hover': {
+                color: 'hsl(var(--primary))',
+                textDecoration: 'underline',
+              },
+            },
+            
+            // Better lists
+            'ul, ol': {
+              marginTop: '1.25em',
+              marginBottom: '1.25em',
+              paddingLeft: '1.625em',
+            },
+            
+            li: {
+              marginTop: '0.5em',
+              marginBottom: '0.5em',
+            },
+            
+            'li p': {
+              marginTop: '0.75em',
+              marginBottom: '0.75em',
+            },
+            
+            // Code styling
+            code: {
+              color: 'hsl(var(--foreground))',
+              backgroundColor: 'hsl(var(--muted))',
+              paddingLeft: '0.25rem',
+              paddingRight: '0.25rem',
+              paddingTop: '0.125rem',
+              paddingBottom: '0.125rem',
+              borderRadius: '0.25rem',
+              fontSize: '0.875em',
+              fontWeight: '500',
+            },
+            
+            'code::before': {
+              content: '""',
+            },
+            
+            'code::after': {
+              content: '""',
+            },
+            
+            // Blockquotes
+            blockquote: {
+              fontWeight: '400',
+              fontStyle: 'italic',
+              color: 'hsl(var(--muted-foreground))',
+              borderLeftWidth: '0.25rem',
+              borderLeftColor: 'hsl(var(--border))',
+              quotes: '"\\201C""\\201D""\\2018""\\2019"',
+              marginTop: '1.6em',
+              marginBottom: '1.6em',
+              paddingLeft: '1em',
+            },
+            
+            // Tables
+            table: {
+              width: '100%',
+              tableLayout: 'auto',
+              textAlign: 'left',
+              marginTop: '2em',
+              marginBottom: '2em',
+              fontSize: '0.875em',
+              lineHeight: '1.7142857',
+            },
+            
+            thead: {
+              borderBottomWidth: '1px',
+              borderBottomColor: 'hsl(var(--border))',
+            },
+            
+            'thead th': {
+              color: 'hsl(var(--foreground))',
+              fontWeight: '600',
+              verticalAlign: 'bottom',
+              paddingRight: '0.5714286em',
+              paddingBottom: '0.5714286em',
+              paddingLeft: '0.5714286em',
+            },
+            
+            'tbody tr': {
+              borderBottomWidth: '1px',
+              borderBottomColor: 'hsl(var(--border))',
+            },
+            
+            'tbody td': {
+              verticalAlign: 'baseline',
+              paddingTop: '0.5714286em',
+              paddingRight: '0.5714286em',
+              paddingBottom: '0.5714286em',
+              paddingLeft: '0.5714286em',
+            },
+          },
+        },
+        
+        // Responsive sizes
+        sm: {
+          css: {
+            fontSize: '0.875rem',
+            lineHeight: '1.6',
+            p: {
+              marginTop: '1.1428571em',
+              marginBottom: '1.1428571em',
+            },
+          },
+        },
+        
+        lg: {
+          css: {
+            fontSize: '1rem',
+            lineHeight: '1.65',
+            p: {
+              marginTop: '1.3333333em',
+              marginBottom: '1.3333333em',
+            },
+          },
+        },
+        
+        xl: {
+          css: {
+            fontSize: '1.125rem',
+            lineHeight: '1.7',
+            p: {
+              marginTop: '1.4444444em',
+              marginBottom: '1.4444444em',
+            },
+          },
+        },
+      },
     },
   },
   darkMode: ["class"],

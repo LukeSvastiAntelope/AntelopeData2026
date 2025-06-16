@@ -23,6 +23,7 @@ const publicRoutes = [
     '/api/getRecentActivity',
     '/api/public/bet/:id*',
     '/api/public/prediction/:id*',
+    '/api/public/surveys/:slug*',
     '/api/getPublicMarketStats',
     '/api/image-proxy',
     '/api/testDailyAnalysis', // Temporary for testing
@@ -33,6 +34,13 @@ const publicRoutes = [
     '/api/admin/scheduler/config', // Admin scheduler config
     '/api/admin/scheduler/trigger', // Admin manual trigger
     '/api/predictions/:id*/odds-history', // Historical odds data
+    '/api/agents/query', // Public agent querying
+    '/api/digital-twin/:id*/responses', // Twin responses list
+    '/api/digital-twin/:id*/update', // Update twin
+    '/api/digital-twin/:id*', // Public digital twin profile
+    // '/api/cohorts',           // (was public during early dev; now requires auth)
+    // '/api/cohort/query',      // (was public during v1 testing; now requires auth)
+    '/api/public/surveys', // List surveys
 ]
 
 export default async function middleware(req: NextRequest) {
@@ -40,9 +48,10 @@ export default async function middleware(req: NextRequest) {
     console.log(`[Middleware] Received request for path: ${path}`);
 
     const isPublicApiRoute = publicRoutes.some(route => {
-        if (route.endsWith(':id*')) {
-            const baseRoute = route.substring(0, route.length - ':id*'.length);
-            const regex = new RegExp(`^${baseRoute}[^/]+/?$`);
+        if (route.endsWith(':id*') || route.endsWith(':slug*')) {
+            const baseRoute = route.substring(0, route.length - (route.endsWith(':id*') ? ':id*'.length : ':slug*'.length));
+            // Allow any characters after the base route (including nested paths)
+            const regex = new RegExp(`^${baseRoute.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}.+`);
             const match = regex.test(path);
             // console.log(`[Middleware] Wildcard test: Path="${path}", Route="${route}", Regex="${regex.source}", Match=${match}`);
             return match;
@@ -51,6 +60,7 @@ export default async function middleware(req: NextRequest) {
         // console.log(`[Middleware] Exact test: Path="${path}", Route="${route}", Match=${match}`);
         return match;
     });
+
     console.log(`[Middleware] Path: "${path}", isPublicApiRoute: ${isPublicApiRoute}`);
 
     // This route is for fetching prediction details by ID, also public (though potentially an older pattern)
@@ -126,6 +136,17 @@ export default async function middleware(req: NextRequest) {
         }
         console.log(`[Middleware] Path: "${path}" - Token verified successfully.`);
 
+        // Create a new request with user ID in headers
+        const requestHeaders = new Headers(req.headers);
+        requestHeaders.set('x-user-id', String(isAuthenticated.email)); // Using email as user ID
+        requestHeaders.set('x-user-role', String(isAuthenticated.role || 'user')); // Add user role
+        
+        const response = NextResponse.next({
+            request: {
+                headers: requestHeaders,
+            },
+        });
+
         if (path.startsWith('/api/admin')) {
             const userData = isAuthenticated; // Assuming verifyConfirmationToken returns user data object with role
             if (!userData || typeof userData === 'boolean' || !userData.role || userData.role !== 'admin') {
@@ -134,6 +155,8 @@ export default async function middleware(req: NextRequest) {
             }
             console.log(`[Middleware] Path: "${path}" - Admin route, user is admin.`);
         }
+        
+        return response;
     }
     
     console.log(`[Middleware] Path: "${path}" - Defaulting to NextResponse.next().`);
