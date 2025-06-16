@@ -15,6 +15,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { formatDistanceToNow } from "date-fns"
 import { CircleEllipsis } from "lucide-react"
+import FrontLanding from "@/components/landing/FrontLanding"
 
 interface IActivity {
   id: number;
@@ -313,7 +314,7 @@ function PublicDashboard() {
 export default function HomePage() {
   return (
     <PublicLayout>
-      <PublicDashboard />
+      <FrontLanding />
     </PublicLayout>
   );
 } 
