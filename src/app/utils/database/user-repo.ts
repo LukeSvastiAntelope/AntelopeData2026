@@ -206,7 +206,7 @@ async function getRecentActivity(limit: number, offset: number) {
         FROM bets
         JOIN users ON bets.user_id = users.id
         JOIN predictions ON bets.prediction_id = predictions.id
-        JOIN agents ON agents.user_id = users.id
+        JOIN agents ON agents.id = bets.agent_id
         WHERE bets.is_secret = 0)
         
         UNION ALL
@@ -243,7 +243,7 @@ async function getRecentActivity(limit: number, offset: number) {
           '0' as source,
           users.username as username,
           agents.name as agent_name,
-          '' as agent_image
+          agents.image as agent_image
         FROM actions
         JOIN users ON actions.user_id = users.id
         JOIN agents ON agents.user_id = users.id)
@@ -456,17 +456,46 @@ async function createAgent(id: string) {
     const defaultName = "My Agent";
     
     await db.execute(
-        'INSERT INTO agents (user_id, riskLevel, conservativeBetSize, moderateBetSize, aggressiveBetSize, image, name, is_onboarded) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-        [Number(id), AGENT_RISK_LEVEL[0], 0, 0, 0, defaultAvatar, defaultName, 0]
+        'INSERT INTO agents (user_id, riskLevel, conservativeBetSize, moderateBetSize, aggressiveBetSize, image, name, is_onboarded, description, maxBetSize, interests, principles, maxTimelineLimit, category, model, plugins, is_bet) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [Number(id), AGENT_RISK_LEVEL[0], 10, 25, 50, defaultAvatar, defaultName, 0, '', 100, '', '', 30, 'General', 'gpt-4o', '', 1]
     );
     return await getAgentByUserId(id);
 }
 
 async function updateAgent(id: string, params: IFormDataAgentProfile) {
     const db = await getMySQLConnection();
+    
+    // Build dynamic query based on provided parameters
+    const fields = [];
+    const values = [];
+    
+    if (params.name !== undefined) { fields.push('name = ?'); values.push(params.name); }
+    if (params.description !== undefined) { fields.push('description = ?'); values.push(params.description); }
+    if (params.maxBetSize !== undefined) { fields.push('maxBetSize = ?'); values.push(params.maxBetSize); }
+    if (params.interests !== undefined) { fields.push('interests = ?'); values.push(params.interests); }
+    if (params.riskLevel !== undefined) { fields.push('riskLevel = ?'); values.push(params.riskLevel); }
+    if (params.conservativeBetSize !== undefined) { fields.push('conservativeBetSize = ?'); values.push(params.conservativeBetSize); }
+    if (params.moderateBetSize !== undefined) { fields.push('moderateBetSize = ?'); values.push(params.moderateBetSize); }
+    if (params.aggressiveBetSize !== undefined) { fields.push('aggressiveBetSize = ?'); values.push(params.aggressiveBetSize); }
+    if (params.principles !== undefined) { fields.push('principles = ?'); values.push(params.principles); }
+    if (params.image !== undefined) { fields.push('image = ?'); values.push(params.image); }
+    if (params.maxTimelineLimit !== undefined) { fields.push('maxTimelineLimit = ?'); values.push(params.maxTimelineLimit); }
+    if (params.category !== undefined) { fields.push('category = ?'); values.push(params.category); }
+    if (params.model !== undefined) { fields.push('model = ?'); values.push(params.model); }
+    if (params.plugins !== undefined) { fields.push('plugins = ?'); values.push(params.plugins); }
+    if (params.is_bet !== undefined) { fields.push('is_bet = ?'); values.push(params.is_bet); }
+    if (params.is_onboarded !== undefined) { fields.push('is_onboarded = ?'); values.push(params.is_onboarded); }
+    if (params.sport_preference !== undefined) { fields.push('sport_preference = ?'); values.push(params.sport_preference); }
+    
+    if (fields.length === 0) {
+        throw new Error('No fields to update');
+    }
+    
+    values.push(id); // Add user_id for WHERE clause
+    
     await db.execute(
-        'UPDATE agents SET name = ?, description = ?, maxBetSize = ?, interests = ?, riskLevel = ?, conservativeBetSize = ?, moderateBetSize = ?, aggressiveBetSize = ?, principles = ?, image = ?, maxTimelineLimit = ?, category = ?, model = ?, plugins = ? WHERE user_id = ?',
-        [params.name, params.description, params.maxBetSize, params.interests, params.riskLevel, params.conservativeBetSize, params.moderateBetSize, params.aggressiveBetSize, params.principles, params.image, params.maxTimelineLimit, params.category, params.model, params.plugins, id]
+        `UPDATE agents SET ${fields.join(', ')} WHERE user_id = ?`,
+        values
     );
 }
 

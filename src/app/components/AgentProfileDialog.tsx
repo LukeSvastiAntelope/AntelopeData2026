@@ -34,7 +34,8 @@ const AgentProfileDialog = ({
     description,
     image,
     isSubmittingProfile,
-    handleSaveProfile
+    handleSaveProfile,
+    userId
 }: {
     isOpen: boolean;
     onClose: () => void;
@@ -43,6 +44,7 @@ const AgentProfileDialog = ({
     image: string;
     isSubmittingProfile: boolean;
     handleSaveProfile: (name: string, description: string, fileRef: React.RefObject<HTMLInputElement>, imagePreview: string) => void;
+    userId?: string | number;
 }) => {
     const [agentName, setAgentName] = useState(name);
     const [agentDescription, setAgentDescription] = useState(description);
@@ -148,6 +150,7 @@ const AgentProfileDialog = ({
                         name: generatedProfile.name,
                         category,
                         avatarPrompt: generatedProfile.avatarPrompt,
+                        userId: userId,
                     }),
                 });
                 

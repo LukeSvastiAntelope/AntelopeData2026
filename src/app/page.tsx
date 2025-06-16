@@ -14,6 +14,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { formatDistanceToNow } from "date-fns"
+import { CircleEllipsis } from "lucide-react"
 
 interface IActivity {
   id: number;
@@ -109,17 +110,17 @@ function PublicDashboard() {
 
   return (
     <div className="flex-1 p-2 w-full">
-      <div className="mx-auto rounded-lg bg-black text-card-foreground shadow-lg">
+      <div className="mx-auto rounded-lg bg-card text-card-foreground shadow-lg">
         {/* Header */}
         <div className="px-6 py-4">
           <div className="flex items-center">
-            <SidebarTrigger className="-ml-0.5 h-5 w-5 text-zinc-400 hover:text-zinc-100" />
-            <div className="h-4 border-l border-zinc-800 mx-4" />
-            <h1 className="text-base font-medium">Dashboard</h1>
+            <SidebarTrigger className="-ml-0.5 h-5 w-5 text-muted-foreground hover:text-foreground" />
+            <div className="h-4 border-l border-border mx-4" />
+            <h1 className="text-base font-medium text-card-foreground">Dashboard</h1>
           </div>
         </div>
         
-        <div className="border-b border-zinc-800" />
+        <div className="border-b border-border" />
 
         <div className="p-6">
           {/* Top metrics cards */}
@@ -129,24 +130,24 @@ function PublicDashboard() {
 
           {/* Tabs section */}
           <div className="mt-6">
-            <div className="flex items-center space-x-1 border-b mb-4">
+            <div className="flex items-center space-x-1 border-b border-border mb-4">
               <Button 
                 variant="ghost" 
-                onClick={() => setActiveTab("activity")} 
+                onPress={() => setActiveTab("activity")} 
                 className={`rounded-none border-b-2 px-4 ${activeTab === "activity" ? "border-b-primary text-foreground" : "border-b-transparent text-muted-foreground hover:text-foreground"}`}
               >
                 Activity
               </Button>
               <Button 
                 variant="ghost" 
-                onClick={() => setActiveTab("bets")} 
+                onPress={() => setActiveTab("bets")} 
                 className={`rounded-none border-b-2 px-4 ${activeTab === "bets" ? "border-b-primary text-foreground" : "border-b-transparent text-muted-foreground hover:text-foreground"}`}
               >
                 Bets History
               </Button>
               <Button 
                 variant="ghost" 
-                onClick={() => setActiveTab("predictions")} 
+                onPress={() => setActiveTab("predictions")} 
                 className={`rounded-none border-b-2 px-4 ${activeTab === "predictions" ? "border-b-primary text-foreground" : "border-b-transparent text-muted-foreground hover:text-foreground"}`}
               >
                 Predictions
@@ -155,23 +156,23 @@ function PublicDashboard() {
 
             {/* Content based on active tab */}
             {(activeTab === "bets" || activeTab === "predictions") && (
-              <div className="flex flex-col gap-2 mb-8 border border-white/10 rounded-xl p-6 text-center empty-state place-content-center">
+              <div className="flex flex-col gap-2 mb-8 border border-border rounded-xl p-6 text-center empty-state place-content-center bg-card">
                 <div className="map-center"></div>
-                <h1 className="font-bold mb-1 font-kodemono">Login to access {activeTab}</h1>
-                <p className="text-gray-400 pb-2">
+                <h1 className="font-bold mb-1 font-kodemono text-card-foreground">Login to access {activeTab}</h1>
+                <p className="text-muted-foreground pb-2">
                   Create an account or login to view your {activeTab === "bets" ? "bet history" : "predictions"}.
                 </p>
                 <div className="flex justify-center gap-4 mt-2">
                   <Button 
                     onPress={() => router.push('/login')} 
-                    className="bg-blue-600 hover:bg-blue-700"
+                    className="bg-primary text-primary-foreground hover:bg-primary/90"
                     color="primary"
                   >
                     Login
                   </Button>
                   <Button 
                     onPress={() => router.push('/register')} 
-                    className=""
+                    className="border-border text-foreground hover:bg-accent hover:text-accent-foreground"
                     variant="bordered"
                   >
                     Register
@@ -183,36 +184,35 @@ function PublicDashboard() {
             {activeTab === "activity" && (
               <div className="space-y-4 overflow-x-auto">
                 {isLoadingActivity && activity.length === 0 ? (
-                  Array(5).fill(0).map((_, i) => (
-                    <Card key={i} className="bg-zinc-950/50 border border-zinc-800/50 shadow-[0_0_1px_1px_rgba(0,0,0,0.2)]">
-                      <CardContent className="p-4">
-                        <div className="flex items-start gap-4">
-                          <div className="h-10 w-10 rounded-full bg-zinc-800 animate-pulse" />
-                          <div className="flex-1 space-y-2">
-                            <div className="h-4 bg-zinc-800 rounded animate-pulse w-3/4" />
-                            <div className="h-4 bg-zinc-800 rounded animate-pulse w-full" />
-                            <div className="h-4 bg-zinc-800 rounded animate-pulse w-1/3" />
+                  Array(3).fill(0).map((_, i) => (
+                    <Card key={i} className="bg-card border border-border shadow-sm">
+                      <CardContent className="p-6">
+                        <div className="space-y-3">
+                          <div className="h-10 w-10 rounded-full bg-muted animate-pulse" />
+                          <div className="space-y-2">
+                            <div className="h-4 bg-muted rounded animate-pulse w-3/4" />
+                            <div className="h-4 bg-muted rounded animate-pulse w-full" />
+                            <div className="h-4 bg-muted rounded animate-pulse w-1/3" />
                           </div>
                         </div>
                       </CardContent>
                     </Card>
                   ))
                 ) : activity.length === 0 && !isLoadingActivity ? (
-                  <Card className="bg-zinc-950/50 border border-zinc-800/50 shadow-[0_0_1px_1px_rgba(0,0,0,0.2)]">
-                    <CardContent className="p-6 flex flex-col items-center justify-center">
-                      <div className="text-zinc-400 mb-2">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <circle cx="12" cy="12" r="10" />
-                          <line x1="12" y1="8" x2="12" y2="12" />
-                          <line x1="12" y1="16" x2="12.01" y2="16" />
-                        </svg>
+                  <Card className="bg-card border border-border shadow-sm">
+                    <CardContent className="p-12 text-center">
+                      <div className="flex flex-col items-center space-y-2">
+                        <CircleEllipsis className="h-10 w-10 text-muted-foreground" />
+                        <h3 className="text-lg font-medium">No activity found</h3>
+                        <p className="text-muted-foreground">
+                          Bets and predictions will appear here as they are created.
+                        </p>
                       </div>
-                      <p className="text-zinc-400 text-center">No activity found</p>
                     </CardContent>
                   </Card>
                 ) : (
                   filterActivity(activity, searchTerm).map((item, index) => (
-                    <Card key={`${item.type}_${item.prediction_id}_${index}`} className="bg-zinc-950/50 border border-zinc-800/50 shadow-[0_0_1px_1px_rgba(0,0,0,0.2)]">
+                    <Card key={`${item.type}_${item.prediction_id}_${index}`} className="bg-card border border-border shadow-sm">
                       <CardContent className="p-4">
                         <div className="flex items-start gap-4">
                           <Avatar>
@@ -228,15 +228,15 @@ function PublicDashboard() {
                           <div className="flex-1 space-y-1">
                             <div className="flex flex-col">
                               <div className="flex items-center">
-                                <span className="font-medium text-zinc-100">
+                                <span className="font-medium text-foreground">
                                   {item.type === 'bet' ? item.username : item.agent_name}
                                 </span>
-                                <span className="ml-2 text-zinc-400">
+                                <span className="ml-2 text-muted-foreground">
                                   {item.type === 'bet' ? 'wagered on:' : 'created prediction:'}
                                 </span>
                               </div>
                               <div 
-                                className="mt-1 text-zinc-300 hover:text-white transition-colors cursor-pointer"
+                                className="mt-1 text-foreground hover:text-primary transition-colors cursor-pointer"
                                 onClick={() => {
                                   if (item.type === "bet" && item.bet_id) {
                                     router.push(`/public/bet/${item.bet_id}`);
@@ -250,7 +250,7 @@ function PublicDashboard() {
                               
                               {item.type === 'bet' && (
                                 <div className="flex items-center mt-2 space-x-2">
-                                  <Badge variant="secondary" className="bg-zinc-900 text-zinc-100">
+                                  <Badge variant="secondary" className="bg-muted text-foreground">
                                     {item.amount} ANML
                                   </Badge>
                                   <Badge variant="outline" className={item.choice === 'YES' ? 'border-emerald-500 text-emerald-500' : 'border-red-500 text-red-500'}>
@@ -259,7 +259,7 @@ function PublicDashboard() {
                                 </div>
                               )}
                               
-                              <div className="text-xs text-zinc-500 mt-2">
+                              <div className="text-xs text-muted-foreground mt-2">
                                 {formatDate(item.created_at)}
                               </div>
                             </div>
@@ -274,9 +274,9 @@ function PublicDashboard() {
                   <div className="flex justify-center mt-6">
                     <Button
                       variant="bordered"
-                      onClick={loadMoreActivity}
+                      onPress={loadMoreActivity}
                       disabled={isLoadingActivity}
-                      className="border-zinc-700 hover:bg-zinc-800 min-w-[200px]"
+                      className="min-w-[200px]"
                     >
                       {isLoadingActivity ? (
                         <span className="flex items-center gap-2">
@@ -297,7 +297,7 @@ function PublicDashboard() {
                 )}
                 
                 {!hasMoreActivity && activity.length > 0 && (
-                  <div className="text-center text-zinc-500 py-4">
+                  <div className="text-center text-muted-foreground py-4">
                     No more activity to load
                   </div>
                 )}

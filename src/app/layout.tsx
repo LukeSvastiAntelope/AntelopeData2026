@@ -21,7 +21,7 @@ export default function RootLayout({
     children: React.ReactNode
 }) {
     return (
-        <html lang="en" suppressHydrationWarning className="dark [color-scheme:dark]">
+        <html lang="en" suppressHydrationWarning>
             <head>
                 <link rel="icon" href="/favicon.ico" />
                 <Script
@@ -37,7 +37,7 @@ export default function RootLayout({
                     `}
                 </Script>
             </head>
-            <body className={`${notoSans.className} antialiased bg-background text-foreground dark [color-scheme:dark]`}>
+            <body className={`${notoSans.className} antialiased bg-background text-foreground transition-colors duration-300`}>
                 <ThemeProvider>
                     <Toaster
                         position="top-right"

@@ -69,6 +69,7 @@ const WagerPrinciplesDialog = ({
                         </p>
                         <p className="text-xs opacity-70">
                             You can always update these later in your agent&apos;s profile settings.
+                            You can always update these later in your agent&apos;s profile settings.
                         </p>
                     </div>
 

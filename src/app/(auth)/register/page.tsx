@@ -1,7 +1,6 @@
 'use client';
 
 import Link from "next/link";
-import Image from "next/image";
 import { toast } from "react-hot-toast";
 import { useState } from "react";
 import { validateUserName, validatePassword } from "@/app/utils/validation";
@@ -62,12 +61,12 @@ const RegisterPage = () => {
     return (
         <div className="container relative min-h-screen flex-col items-center justify-center grid lg:max-w-none lg:grid-cols-1 lg:px-0">
             <div className="flex flex-col items-center space-y-6">
-                <Image
+                <img 
                     src="/assets/images/logo.svg"
                     alt="Logo"
                     width={120}
                     height={120}
-                    className="mb-2"
+                    className="mb-2 brightness-0 dark:brightness-0 dark:invert"
                 />
                 
                 <Card className="w-[350px] bg-background/60 backdrop-blur supports-[backdrop-filter]:bg-background/60">

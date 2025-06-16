@@ -327,7 +327,7 @@ export default function PredictionDetail() {
 
   return (
     <div className="flex-1 p-2 w-full">
-      <div className="mx-auto rounded-lg bg-black text-card-foreground shadow-lg">
+      <div className="mx-auto rounded-lg bg-background text-foreground shadow-lg border border-border">
         {/* Header */}
         <div className="px-6 py-4">
           <div className="flex items-center justify-between">

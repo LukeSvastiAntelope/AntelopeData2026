@@ -25,6 +25,7 @@ import { Spinner } from "@heroui/spinner";
 import { Link2, Bookmark, ArrowUpRight, CircleEllipsis } from "lucide-react";
 import { format as formatDateFn } from "date-fns";
 import { Badge } from "@heroui/badge";
+import { AccumulatedOddsChart } from "@/components/accumulated-odds-chart";
 
 ChartJS.register(
     BarElement,
@@ -276,8 +277,8 @@ export default function BetDetailPage() {
     }
 
     return (
-        <div className="flex-1 p-2 w-full">
-            <div className="mx-auto rounded-lg bg-black text-card-foreground shadow-lg">
+        <div className="flex-1 p-2 w-full bg-background">
+            <div className="mx-auto rounded-lg bg-card text-foreground shadow-lg border border-border">
                 {/* Header */}
                 <div className="px-6 py-4">
                     <div className="flex items-center justify-between">
@@ -416,6 +417,13 @@ export default function BetDetailPage() {
                                 <MultiChoiceOddsBar choices={choiceOdds} />
                             </div>
                             
+                        )}
+
+                        {/* Accumulated Odds Over Time Chart */}
+                        {prediction?.bets && prediction.bets.length > 0 && (
+                            <div className="mb-8">
+                                <AccumulatedOddsChart bets={prediction.bets} />
+                            </div>
                         )}
                                     
                                     <Card className="p-0">

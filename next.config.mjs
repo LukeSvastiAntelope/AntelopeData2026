@@ -8,6 +8,14 @@ const nextConfig = {
         STRIPE_PUBLIC_KEY: process.env.STRIPE_PUBLIC_KEY,
         CREDIT_BALANCE: process.env.CREDIT_BALANCE,
     },
+    allowedDevOrigins: [
+        '*.ngrok.app',
+        '*.ngrok.io',
+        '*.ngrok-free.app'
+    ],
+    experimental: {
+        optimizePackageImports: ['@heroui/react', '@nextui-org/react'],
+    },
     images: {
         remotePatterns: [
             {
@@ -25,6 +33,10 @@ const nextConfig = {
             {
                 protocol: 'https',
                 hostname: 'oaidalleapiprodscus.blob.core.windows.net',
+            },
+            {
+                protocol: 'https',
+                hostname: 'www.aljazeera.com',
             }
         ],
         dangerouslyAllowSVG: true,

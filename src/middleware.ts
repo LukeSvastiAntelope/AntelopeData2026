@@ -24,6 +24,15 @@ const publicRoutes = [
     '/api/public/bet/:id*',
     '/api/public/prediction/:id*',
     '/api/getPublicMarketStats',
+    '/api/image-proxy',
+    '/api/testDailyAnalysis', // Temporary for testing
+    '/api/testPositionAdjustment', // Temporary for testing
+    '/api/testOddsHistory', // Temporary for testing
+    '/api/scheduler/init', // Scheduler initialization
+    '/api/admin/scheduler/stats', // Admin scheduler stats
+    '/api/admin/scheduler/config', // Admin scheduler config
+    '/api/admin/scheduler/trigger', // Admin manual trigger
+    '/api/predictions/:id*/odds-history', // Historical odds data
 ]
 
 export default async function middleware(req: NextRequest) {

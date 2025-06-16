@@ -7,7 +7,7 @@ import { useFetch } from "@/app/utils/lib";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import { SidebarTrigger } from "@/components/ui/sidebar";
-import { MarketsTabs } from "@/components/markets-tabs";
+import { MarketsTabs, BetHistoryItem } from "@/components/markets-tabs";
 import { MarketSectionCards } from "@/components/market-section-cards";
 // import { ChartAreaInteractive } from "@/components/chart-area-interactive";
 import { useAgent } from "@/app/context/AgentContext";
@@ -21,13 +21,13 @@ export default function MarketsPage() {
 
   // Data states
   const [predictionsData, setPredictionsData] = useState<{
-    myPredictions: IPrediction[];
+    myBets: BetHistoryItem[];
     general: IPrediction[];
     sports: IPrediction[];
     crypto: IPrediction[];
     markets: IPrediction[];
   }>({
-    myPredictions: [],
+    myBets: [],
     general: [],
     sports: [],
     crypto: [],
@@ -36,13 +36,13 @@ export default function MarketsPage() {
 
   // Store full predictions for pagination
   const [fullPredictions, setFullPredictions] = useState<{
-    myPredictions: IPrediction[];
+    myBets: BetHistoryItem[];
     general: IPrediction[];
     sports: IPrediction[];
     crypto: IPrediction[];
     markets: IPrediction[];
   }>({
-    myPredictions: [],
+    myBets: [],
     general: [],
     sports: [],
     crypto: [],
@@ -55,14 +55,14 @@ export default function MarketsPage() {
 
   // Loading states
   const [isLoading, setIsLoading] = useState({
-    myPredictions: false,
+    myBets: false,
     general: false,
     sports: false,
     crypto: false,
     markets: false,
     leaderboard: false,
     loadingMore: {
-      myPredictions: false,
+      myBets: false,
       general: false,
       sports: false,
       crypto: false,
@@ -73,7 +73,7 @@ export default function MarketsPage() {
 
   // Pagination states
   const [pagination, setPagination] = useState({
-    myPredictions: { page: 1, hasMore: true },
+    myBets: { page: 1, hasMore: true },
     general: { page: 1, hasMore: true },
     sports: { page: 1, hasMore: true },
     crypto: { page: 1, hasMore: true },
@@ -90,7 +90,7 @@ export default function MarketsPage() {
     try {
       setIsLoading(prev => ({
         ...prev,
-        myPredictions: true,
+        myBets: true,
         general: true,
         sports: true,
         crypto: true,
@@ -101,14 +101,14 @@ export default function MarketsPage() {
       console.log('🔍 Agent context:', { agentId: agent?.id, agentExists: !!agent })
 
       // Get predictions created by the user
-      console.log('📡 Calling /api/getPredictionHistory...')
-      const myPredictionsResponse = await fetch.get("/api/getPredictionHistory");
-      console.log('📊 MyPredictions API response:', {
-        status: myPredictionsResponse?.status,
-        count: myPredictionsResponse?.predictions?.length,
-        error: myPredictionsResponse?.error,
-        message: myPredictionsResponse?.message,
-        fullResponse: myPredictionsResponse
+      console.log('📡 Calling /api/getAgentBetHistory...')
+      const myBetsResponse = await fetch.get("/api/getAgentBetHistory?page=1&showAll=false");
+      console.log('📊 MyBets API response:', {
+        status: myBetsResponse?.status,
+        count: myBetsResponse?.bets?.length,
+        error: myBetsResponse?.error,
+        message: myBetsResponse?.message,
+        fullResponse: myBetsResponse
       })
       
       // Get predictions by source - make separate calls for each category
@@ -128,15 +128,29 @@ export default function MarketsPage() {
         markets: { status: marketsResponse?.status, count: marketsResponse?.predictions?.length, total: marketsResponse?.pagination?.total }
       })
 
-      if (generalResponse.status && sportsResponse.status && cryptoResponse.status && marketsResponse.status && myPredictionsResponse.status) {
-        const myPredictionsData = myPredictionsResponse.predictions || [];
+      if (generalResponse.status && sportsResponse.status && cryptoResponse.status && marketsResponse.status && myBetsResponse.status) {
+        const myBetsData = (myBetsResponse.bets || []).map((bet: any) => ({
+          id: bet.id.toString(),
+          prediction_id: bet.prediction_id.toString(),
+          choice: bet.choice,
+          amount: bet.amount,
+          created_at: bet.created_at,
+          prediction: {
+            id: bet.prediction?.id || bet.prediction_id,
+            description: bet.prediction?.description || "Unknown Prediction",
+            outcome: bet.prediction?.outcome || "",
+            status: bet.prediction?.status || "",
+            str_thumb: bet.prediction?.str_thumb,
+            source: bet.prediction?.source
+          }
+        }));
         const general = generalResponse.predictions || [];
         const sports = sportsResponse.predictions || [];
         const crypto = cryptoResponse.predictions || [];
         const markets = marketsResponse.predictions || [];
         
         console.log('🔍 Processing predictions data:', {
-          myPredictions: myPredictionsData.length,
+          myBets: myBetsData.length,
           general: general.length,
           sports: sports.length,
           crypto: crypto.length,
@@ -145,7 +159,7 @@ export default function MarketsPage() {
 
         // Store full predictions for pagination
         setFullPredictions({
-          myPredictions: myPredictionsData,
+          myBets: myBetsData,
           general,
           sports,
           crypto,
@@ -153,7 +167,7 @@ export default function MarketsPage() {
         });
 
         setPredictionsData({
-          myPredictions: myPredictionsData.slice(0, ITEMS_PER_PAGE),
+          myBets: myBetsData.slice(0, ITEMS_PER_PAGE),
           general: general.slice(0, ITEMS_PER_PAGE),
           sports: sports.slice(0, ITEMS_PER_PAGE),
           crypto: crypto.slice(0, ITEMS_PER_PAGE),
@@ -161,7 +175,7 @@ export default function MarketsPage() {
         });
 
         console.log('📋 Final predictions data set:', {
-          myPredictions: myPredictionsData.slice(0, ITEMS_PER_PAGE).length,
+          myBets: myBetsData.slice(0, ITEMS_PER_PAGE).length,
           general: general.slice(0, ITEMS_PER_PAGE).length,
           sports: sports.slice(0, ITEMS_PER_PAGE).length,
           crypto: crypto.slice(0, ITEMS_PER_PAGE).length,
@@ -170,7 +184,7 @@ export default function MarketsPage() {
 
         // Update pagination based on API responses
         setPagination({
-          myPredictions: { page: 1, hasMore: myPredictionsData.length > ITEMS_PER_PAGE },
+          myBets: { page: 1, hasMore: myBetsData.length > ITEMS_PER_PAGE },
           general: { page: 1, hasMore: generalResponse.pagination?.hasMore || false },
           sports: { page: 1, hasMore: sportsResponse.pagination?.hasMore || false },
           crypto: { page: 1, hasMore: cryptoResponse.pagination?.hasMore || false },
@@ -190,12 +204,12 @@ export default function MarketsPage() {
           sportsApiStatus: sportsResponse?.status,
           cryptoApiStatus: cryptoResponse?.status,
           marketsApiStatus: marketsResponse?.status,
-          myPredictionsApiStatus: myPredictionsResponse?.status
+          myBetsApiStatus: myBetsResponse?.status
         })
         
         // Set empty data but don't show toast if it's just empty data
         setPredictionsData({
-          myPredictions: [],
+          myBets: [],
           general: [],
           sports: [],
           crypto: [],
@@ -203,7 +217,7 @@ export default function MarketsPage() {
         });
         
         setFullPredictions({
-          myPredictions: [],
+          myBets: [],
           general: [],
           sports: [],
           crypto: [],
@@ -211,7 +225,7 @@ export default function MarketsPage() {
         });
         
         // Only show error toast for actual errors, not empty data
-        if (generalResponse?.error || sportsResponse?.error || cryptoResponse?.error || marketsResponse?.error || myPredictionsResponse?.error) {
+        if (generalResponse?.error || sportsResponse?.error || cryptoResponse?.error || marketsResponse?.error || myBetsResponse?.error) {
           toast.error('Failed to fetch predictions');
         } else {
           console.log('ℹ️ No error message, likely just empty data or authentication issue')
@@ -223,7 +237,7 @@ export default function MarketsPage() {
       
       // Set empty data on error
       setPredictionsData({
-        myPredictions: [],
+        myBets: [],
         general: [],
         sports: [],
         crypto: [],
@@ -231,7 +245,7 @@ export default function MarketsPage() {
       });
       
       setFullPredictions({
-        myPredictions: [],
+        myBets: [],
         general: [],
         sports: [],
         crypto: [],
@@ -240,7 +254,7 @@ export default function MarketsPage() {
     } finally {
       setIsLoading(prev => ({
         ...prev,
-        myPredictions: false,
+        myBets: false,
         general: false,
         sports: false,
         crypto: false,
@@ -304,7 +318,7 @@ export default function MarketsPage() {
       
       // Make API call based on category
       switch (category) {
-        case 'myPredictions':
+        case 'myBets':
           // For user's own predictions, we'll keep using the existing approach
           const start = (nextPage - 1) * ITEMS_PER_PAGE;
           const end = start + ITEMS_PER_PAGE;
@@ -339,7 +353,7 @@ export default function MarketsPage() {
       }
       
       // Handle API response for marketplace categories
-      if (response && response.status && category !== 'myPredictions') {
+      if (response && response.status && category !== 'myBets') {
         const newPredictions = response.predictions || [];
         
         setPredictionsData(prev => ({
@@ -412,17 +426,17 @@ export default function MarketsPage() {
 
   return (
     <div className="flex-1 p-2 w-full">
-      <div className="mx-auto rounded-lg bg-black text-card-foreground shadow-lg">
+      <div className="mx-auto rounded-lg bg-card text-card-foreground shadow-lg">
         {/* Header */}
         <div className="px-6 py-4">
           <div className="flex items-center">
-            <SidebarTrigger className="-ml-0.5 h-5 w-5 text-zinc-400 hover:text-zinc-100" />
-            <div className="h-4 border-l border-zinc-800 mx-4" />
-            <h1 className="text-base font-medium">Markets</h1>
+            <SidebarTrigger className="-ml-0.5 h-5 w-5 text-muted-foreground hover:text-foreground" />
+            <div className="h-4 border-l border-border mx-4" />
+            <h1 className="text-base font-medium text-card-foreground">Markets</h1>
           </div>
         </div>
         
-        <div className="border-b border-zinc-800" />
+        <div className="border-b border-border" />
 
         <div className="p-6">
           {/* Top metrics cards */}
@@ -443,7 +457,7 @@ export default function MarketsPage() {
               isLoading={isLoading}
               pagination={pagination}
               onLoadMore={{
-                myPredictions: () => handleLoadMore('myPredictions'),
+                myBets: () => handleLoadMore('myBets'),
                 general: () => handleLoadMore('general'),
                 sports: () => handleLoadMore('sports'),
                 crypto: () => handleLoadMore('crypto'),

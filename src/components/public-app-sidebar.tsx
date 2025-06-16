@@ -1,8 +1,9 @@
 "use client"
 
 import Link from "next/link"
-import Image from "next/image"
 import { usePathname } from "next/navigation"
+import LogoText from "@/components/logo-text"
+import LogoIcon from "@/components/logo-icon"
 import { 
   Sidebar, 
   SidebarContent, 
@@ -71,19 +72,16 @@ export function PublicAppSidebar({ className, collapsible = "offcanvas", ...prop
       <SidebarHeader className="flex flex-col gap-4 pb-4">
         <div className="flex items-center px-4">
           <Link href="/" className="flex items-center px-4">
-            <Image 
-              src="/assets/images/logo-text.svg"
-              alt="Antelope Logo"
-              width={120}
-              height={30}
-              className="transition-opacity group-data-[collapsible=offcanvas]:opacity-0"
+            <LogoText 
+              className="text-zinc-900 dark:text-zinc-100 transition-opacity group-data-[collapsible=offcanvas]:opacity-0"
+              width={120} 
+              height={30} 
             />
             <div className="hidden size-6 items-center justify-center rounded-md group-data-[collapsible=offcanvas]:flex">
-              <Image 
-                src="/assets/images/logo-icon.svg"
-                alt="Antelope"
-                width={24}
-                height={24}
+              <LogoIcon 
+                className="text-zinc-900 dark:text-zinc-100"
+                width={24} 
+                height={24} 
               />
             </div>
           </Link>
@@ -100,8 +98,8 @@ export function PublicAppSidebar({ className, collapsible = "offcanvas", ...prop
                 tooltip={item.title}
               >
                 <Link href={item.href} className="flex items-center gap-2 px-4 py-2 text-sidebar-foreground">
-                  <item.icon className="h-4 w-4 text-white group-data-[collapsible=offcanvas]:hidden" />
-                  <span className="text-white">{item.title}</span>
+                  <item.icon className="h-4 w-4 text-sidebar-foreground group-data-[collapsible=offcanvas]:hidden" />
+                  <span className="text-sidebar-foreground">{item.title}</span>
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
@@ -119,8 +117,8 @@ export function PublicAppSidebar({ className, collapsible = "offcanvas", ...prop
                 tooltip={item.title}
               >
                 <Link href={item.href} className="flex items-center gap-2 px-4 py-2 text-sidebar-foreground">
-                  <item.icon className="h-4 w-4 text-white group-data-[collapsible=offcanvas]:hidden" />
-                  <span className="text-white">{item.title}</span>
+                  <item.icon className="h-4 w-4 text-sidebar-foreground group-data-[collapsible=offcanvas]:hidden" />
+                  <span className="text-sidebar-foreground">{item.title}</span>
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
@@ -130,7 +128,7 @@ export function PublicAppSidebar({ className, collapsible = "offcanvas", ...prop
         <div className="px-8 pt-4 flex flex-col gap-2">
           <Button 
             asChild
-            className="w-full bg-blue-600 hover:bg-blue-700"
+            className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
           >
             <Link href="/login" className="flex items-center gap-2">
               <LogIn className="h-4 w-4" />
@@ -140,7 +138,7 @@ export function PublicAppSidebar({ className, collapsible = "offcanvas", ...prop
           <Button 
             asChild
             variant="outline"
-            className="w-full border-zinc-700 hover:bg-zinc-800"
+            className="w-full border-border hover:bg-accent"
           >
             <Link href="/register" className="flex items-center gap-2">
               <UserPlus className="h-4 w-4" />

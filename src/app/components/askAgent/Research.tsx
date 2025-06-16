@@ -144,7 +144,7 @@ const Research = ({ agentProfile }: IAskAgentProps) => {
                       "rounded-lg px-4 py-2 max-w-[80%]",
                       message.role === "user"
                         ? "bg-primary text-primary-foreground"
-                        : "bg-zinc-800/50 text-foreground"
+                        : "bg-muted text-foreground"
                     )}
                   >
                     {message.role === "agent" ? (
@@ -172,7 +172,7 @@ const Research = ({ agentProfile }: IAskAgentProps) => {
                   <AvatarImage src={agentProfile?.image || "/assets/images/logo-simple.svg"} />
                   <AvatarFallback>{agentProfile?.name?.[0] || "A"}</AvatarFallback>
                 </Avatar>
-                <div className="rounded-lg px-4 py-2 bg-zinc-800/50 text-foreground">
+                <div className="rounded-lg px-4 py-2 bg-muted text-foreground">
                   <span className="animate-pulse">Thinking...</span>
                 </div>
               </div>
@@ -182,21 +182,21 @@ const Research = ({ agentProfile }: IAskAgentProps) => {
         </ScrollArea>
       </div>
       
-      <div className="sticky bottom-0 p-4 border-t border-zinc-800 bg-black">
+      <div className="sticky bottom-0 p-4 border-t border-border">
         <div className="flex gap-2">
           <Input
             placeholder="Type your message..."
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            className="flex-1 bg-zinc-900 border-zinc-800"
+            className="flex-1"
             disabled={isLoading}
           />
           <Button 
             onClick={handleSend}
             disabled={isLoading}
             size="icon"
-            className="bg-zinc-800 hover:bg-zinc-700"
+            variant="outline"
           >
             <Send className="h-4 w-4" />
           </Button>

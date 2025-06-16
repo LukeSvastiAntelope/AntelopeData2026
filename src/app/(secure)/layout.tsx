@@ -104,11 +104,19 @@ const SecureLayout = ({ children }: { children: React.ReactNode }) => {
                 user_id: agent?.user_id,
                 name: name.slice(0, 30),
                 description: description.slice(0, 200),
-                category: agent?.category,
-                riskLevel: agent?.riskLevel,
-                conservativeBetSize: agent?.conservativeBetSize,
-                moderateBetSize: agent?.moderateBetSize,
-                aggressiveBetSize: agent?.aggressiveBetSize,
+                category: agent?.category || 'General',
+                riskLevel: agent?.riskLevel || 'Moderate',
+                conservativeBetSize: agent?.conservativeBetSize || 10,
+                moderateBetSize: agent?.moderateBetSize || 25,
+                aggressiveBetSize: agent?.aggressiveBetSize || 50,
+                maxBetSize: agent?.maxBetSize || 100,
+                interests: agent?.interests || [],
+                plugins: agent?.plugins || [],
+                principles: agent?.principles || '',
+                maxTimelineLimit: agent?.maxTimelineLimit || 30,
+                model: agent?.model || 'gpt-4o',
+                is_bet: agent?.is_bet || 1,
+                is_onboarded: agent?.is_onboarded || false,
             };
 
             const avatarFile = fileRef?.current?.files?.[0];
@@ -374,12 +382,12 @@ const SecureLayout = ({ children }: { children: React.ReactNode }) => {
 
     return (
         <SidebarProvider defaultOpen={true}>
-            <div className="flex min-h-screen w-full">
+            <div className="flex min-h-screen w-full bg-background">
                 <AppSidebar />
                 
                 <div className="flex flex-col flex-1">
                     {/* Main Content */}
-                    <SidebarInset>
+                    <SidebarInset className="bg-background">
                         {children}
                     </SidebarInset>
                 </div>
@@ -402,6 +410,7 @@ const SecureLayout = ({ children }: { children: React.ReactNode }) => {
                     image={agent.image || ""}
                     isSubmittingProfile={isSubmittingProfile}
                     handleSaveProfile={handleSaveProfile}
+                    userId={user?.id}
                 />
             )}
 
