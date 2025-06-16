@@ -31,7 +31,7 @@ export default function FrontLanding() {
           {/* Hero Section */}
           <section className="text-center max-w-2xl mx-auto space-y-6">
             <h2 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-card-foreground">
-              Create Surveys and turn responders them into Digital Twins.
+              Create Surveys and turn responders into Digital Twins.
             </h2>
             <p className="text-muted-foreground">
               Antelope lets you generate AI-powered surveys, build anonymised Digital Twins, and understand your audience in minutes—not weeks.
