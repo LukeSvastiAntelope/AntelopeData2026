@@ -3,22 +3,26 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import toast from "react-hot-toast";
 import Image from "next/image";
-import { Button } from "@heroui/button";
-import { Input, Textarea } from "@heroui/input";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { validatePassword } from "@/app/utils/validation";
-import { Skeleton } from "@heroui/skeleton";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useFetch } from "@/app/utils/lib";
 import type { IAgentProfile } from "@/app/utils/interface";
 import { LoginButton, TelegramAuthData } from '@telegram-auth/react';
 import { signIn } from "next-auth/react"
 import { useSession } from "next-auth/react"
+import { Label } from "@/components/ui/label"
+import { SidebarTrigger } from "@/components/ui/sidebar"
+import { Loader2 } from "lucide-react"
 
 // Skeleton for loading state
 const ProfileSkeleton = () => {
     return (
         <div className="space-y-8">
             {/* Profile Info Section Skeleton */}
-            <div className="bg-content1/50 backdrop-blur-md rounded-2xl p-8 shadow-lg border border-white/10">
+            <div className="bg-content1/50 backdrop-blur-md rounded-2xl p-8 border border-white/10">
                 <Skeleton className="h-8 w-48 mb-4" /> {/* "Profile Information" heading */}
 
                 {/* Avatar and Upload Button */}
@@ -42,7 +46,7 @@ const ProfileSkeleton = () => {
             </div>
 
             {/* Credentials Section Skeleton */}
-            <div className="bg-content1/50 backdrop-blur-md rounded-2xl p-8 shadow-lg border border-white/10">
+            <div className="bg-content1/50 backdrop-blur-md rounded-2xl p-8 border border-white/10">
                 <Skeleton className="h-8 w-32 mb-4" /> {/* "Credentials" heading */}
                 <div className="flex flex-col gap-4 max-w-md">
                     <Skeleton className="h-14 w-full" /> {/* Current Password */}
@@ -313,12 +317,14 @@ export default function AgentProfile() {
         }
     }, [session]);
 
-    if (isLoading) return <ProfileSkeleton />;
-
-    return (
+    const renderContent = () => {
+      if (isLoading) {
+        return <ProfileSkeleton />
+      }
+      return (
         <div className="space-y-8">
             {/* Profile Info Section */}
-            <div className="bg-content1/50 backdrop-blur-md rounded-2xl p-8 shadow-lg hover:shadow-xl transition-all duration-300 border border-white/10">
+            <div className="bg-content1/50 backdrop-blur-md rounded-2xl p-8 border border-white/10">
                 <h2 className="text-base font-bold mb-4">Profile Information</h2>
 
                 {/* Avatar Upload */}
@@ -341,8 +347,7 @@ export default function AgentProfile() {
                         )}
                     </div>
                     <Button
-                        color="primary"
-                        onPress={() => fileRef.current?.click()}
+                        onClick={() => fileRef.current?.click()}
                         className="hover:scale-105 transition-transform"
                     >
                         Change Avatar
@@ -358,39 +363,41 @@ export default function AgentProfile() {
 
                 <div className="flex flex-col md:flex-row items-start gap-8">
                     {/* Editable Fields for Name & Description */}
-                    <div className="flex-1 space-y-4">
-                        <Input
-                            label="Name"
+                    <div className="flex-1 space-y-4 max-w-md">
+                        <div className="space-y-2">
+                          <Label htmlFor="profile-name">Name</Label>
+                          <Input
+                            id="profile-name"
                             value={name}
                             onChange={(e) => setName(e.target.value)}
-                            className="max-w-md"
-                        />
-                        <Textarea
-                            label="Description"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="profile-description">Description</Label>
+                          <Textarea
+                            id="profile-description"
                             value={description}
                             onChange={(e) => setDescription(e.target.value)}
-                            className="max-w-md"
-                        />
+                          />
+                        </div>
                     </div>
                 </div>
 
                 {/* Save Profile Info Button */}
                 <div className="mt-6 flex items-center gap-4">
                     <Button
-                        color="primary"
-                        variant="shadow"
-                        onPress={handleSaveProfile}
-                        isLoading={isSubmittingProfile}
+                        onClick={handleSaveProfile}
+                        disabled={isSubmittingProfile}
                         className="hover:scale-105 transition-transform"
                     >
-                        Update Profile
+                      {isSubmittingProfile && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      Update Profile
                     </Button>
-
                 </div>
             </div>
 
             {/* Telegram Connection Status */}
-            <div className="bg-content1/50 backdrop-blur-md rounded-2xl p-8 shadow-lg hover:shadow-xl transition-all duration-300 border border-white/10">
+            <div className="bg-content1/50 backdrop-blur-md rounded-2xl p-8 transition-all duration-300 border border-white/10">
                 <h2 className="text-base font-bold mb-4">External Connections</h2>
                 <div className="flex max-md:flex-col gap-2">
                     {
@@ -439,11 +446,11 @@ export default function AgentProfile() {
                                         No Discord connection is active.
                                     </p> */}
                                     <Button
-                                        color="secondary"
                                         className="bg-[#5865F2] hover:bg-[#4752C4] transition-colors flex items-center gap-2 text-white"
-                                        onPress={connectDiscord}
-                                        isLoading={isSubmittingDiscord}
+                                        onClick={connectDiscord}
+                                        disabled={isSubmittingDiscord}
                                     >
+                                        {isSubmittingDiscord && <Loader2 className="h-4 w-4 animate-spin" />}
                                         <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
                                             <path d="M19.27 5.33C17.94 4.71 16.5 4.26 15 4a.09.09 0 0 0-.07.03c-.18.33-.39.76-.53 1.09a16.09 16.09 0 0 0-4.8 0c-.14-.34-.35-.76-.54-1.09c-.01-.02-.04-.03-.07-.03c-1.5.26-2.93.71-4.27 1.33c-.01 0-.02.01-.03.02c-2.72 4.07-3.47 8.03-3.1 11.95c0 .02.01.04.03.05c1.8 1.32 3.53 2.12 5.24 2.65c.03.01.06 0 .07-.02c.4-.55.76-1.13 1.07-1.74c.02-.04 0-.08-.04-.09c-.57-.22-1.11-.48-1.64-.78c-.04-.02-.04-.08-.01-.11c.11-.08.22-.17.33-.25c.02-.02.05-.02.07-.01c3.44 1.57 7.15 1.57 10.55 0c.02-.01.05-.01.07.01c.11.09.22.17.33.26c.04.03.04.09-.01.11c-.52.31-1.07.56-1.64.78c-.04.01-.05.06-.04.09c.32.61.68 1.19 1.07 1.74c.03.01.06.02.09.01c1.72-.53 3.45-1.33 5.25-2.65c.02-.01.03-.03.03-.05c.44-4.53-.73-8.46-3.1-11.95c-.01-.01-.02-.02-.04-.02zM8.52 14.91c-1.03 0-1.89-.95-1.89-2.12s.84-2.12 1.89-2.12c1.06 0 1.9.96 1.89 2.12c0 1.17-.84 2.12-1.89 2.12zm6.97 0c-1.03 0-1.89-.95-1.89-2.12s.84-2.12 1.89-2.12c1.06 0 1.9.96 1.89 2.12c0 1.17-.83 2.12-1.89 2.12z" />
                                         </svg>
@@ -456,40 +463,71 @@ export default function AgentProfile() {
             </div>
 
             {/* Credentials Section */}
-            <div className="bg-content1/50 backdrop-blur-md rounded-2xl p-8 shadow-lg hover:shadow-xl transition-all duration-300 border border-white/10">
+            <div className="bg-content1/50 backdrop-blur-md rounded-2xl p-8 transition-all duration-300 border border-white/10">
                 <h2 className="text-base font-bold mb-4">Credentials</h2>
                 <div className="flex flex-col gap-4 max-w-md">
-                    <Input
-                        label="Current Password"
+                    <div className="space-y-2">
+                      <Label htmlFor="current-password">Current Password</Label>
+                      <Input
+                        id="current-password"
                         type="password"
                         value={currentPassword}
                         onChange={(e) => setCurrentPassword(e.target.value)}
-                    />
-                    <Input
-                        label="New Password"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="new-password">New Password</Label>
+                      <Input
+                        id="new-password"
                         type="password"
                         value={newPassword}
                         onChange={(e) => setNewPassword(e.target.value)}
-                    />
-                    <Input
-                        label="Confirm New Password"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="confirm-password">Confirm New Password</Label>
+                      <Input
+                        id="confirm-password"
                         type="password"
                         value={confirmPassword}
                         onChange={(e) => setConfirmPassword(e.target.value)}
-                    />
+                      />
+                    </div>
                 </div>
 
                 <div className="mt-6">
                     <Button
-                        color="primary"
-                        onPress={handleChangePassword}
-                        isLoading={isSubmittingPassword}
+                        onClick={handleChangePassword}
+                        disabled={isSubmittingPassword}
                         className="hover:scale-105 transition-transform"
                     >
-                        Update Password
+                      {isSubmittingPassword && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      Update Password
                     </Button>
                 </div>
             </div>
         </div>
+      )
+    }
+
+    return (
+      <div className="flex-1 p-2 w-full bg-background">
+        <div className="mx-auto rounded-lg bg-card text-card-foreground">
+          {/* Header */}
+          <div className="px-6 py-4">
+            <div className="flex items-center">
+              <SidebarTrigger className="-ml-0.5 h-5 w-5 text-muted-foreground hover:text-foreground" />
+              <div className="h-4 border-l border-border mx-4" />
+              <h1 className="text-base font-medium text-card-foreground">Profile</h1>
+            </div>
+          </div>
+
+          <div className="border-b border-border" />
+
+          <div className="p-6">
+            {renderContent()}
+          </div>
+        </div>
+      </div>
     );
 }

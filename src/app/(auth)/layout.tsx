@@ -11,7 +11,7 @@ const AuthLayout = ({ children }: { children: React.ReactNode }) => {
         if (typeof window !== 'undefined' && 
             localStorage.getItem("token") && 
             (pathname === '/login' || pathname === '/register')) {
-            route.push("/dashboard");
+            route.push("/surveys");
         }
     }, [route, pathname]);
 

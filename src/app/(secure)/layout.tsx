@@ -162,7 +162,7 @@ const SecureLayout = ({ children }: { children: React.ReactNode }) => {
     const triggerGenerateAndShowPrinciplesDialog = async () => {
         if (!agent) {
             toast.error("Agent data not available for generating principles.");
-            router.push('/dashboard');
+            router.push('/surveys');
             return;
         }
         setIsGeneratingPrinciples(true);
@@ -318,7 +318,7 @@ const SecureLayout = ({ children }: { children: React.ReactNode }) => {
                 toast.success("Wager principles saved! Onboarding complete.");
                 await fetchAgentProfile();
                 setIsWagerPrinciplesOpen(false);
-                router.push('/dashboard');
+                router.push('/surveys');
             } else {
                 toast.error(response.message || "Failed to save principles.");
             }
@@ -349,7 +349,7 @@ const SecureLayout = ({ children }: { children: React.ReactNode }) => {
             }
         }
         setIsWagerPrinciplesOpen(false);
-        router.push('/dashboard');
+        router.push('/surveys');
     };
 
     useEffect(() => {

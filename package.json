@@ -10,6 +10,7 @@
       "init-scheduler": "node scripts/init-scheduler.js"
    },
    "dependencies": {
+      "@anthropic-ai/sdk": "^0.54.0",
       "@heroui/accordion": "2.2.8",
       "@heroui/badge": "2.2.6",
       "@heroui/button": "2.2.10",
@@ -70,6 +71,10 @@
       "class-variance-authority": "^0.7.1",
       "clsx": "^2.1.1",
       "crypto-js": "^4.2.0",
+      "d3-array": "^3.2.4",
+      "d3-axis": "^3.0.0",
+      "d3-scale": "^4.0.2",
+      "d3-selection": "^3.0.0",
       "date-fns": "^4.1.0",
       "framer-motion": "^12.12.2",
       "jose": "^5.9.6",
@@ -91,6 +96,7 @@
       "react-markdown": "^10.1.0",
       "recharts": "^2.15.3",
       "remark-gfm": "^4.0.1",
+      "remark-smartypants": "^3.0.2",
       "serpapi": "^2.1.0",
       "sqlite": "^5.1.1",
       "sqlite3": "^5.1.7",
@@ -103,6 +109,10 @@
    "devDependencies": {
       "@types/bcryptjs": "^2.4.6",
       "@types/crypto-js": "^4.2.2",
+      "@types/d3-array": "^3.2.1",
+      "@types/d3-axis": "^3.0.6",
+      "@types/d3-scale": "^4.0.9",
+      "@types/d3-selection": "^3.0.11",
       "@types/node": "^20.17.10",
       "@types/node-cron": "^3.0.11",
       "@types/react": "^19",

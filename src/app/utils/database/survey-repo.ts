@@ -1,0 +1,518 @@
+import { openSql as getMySQLConnection } from "./db";
+import { RowDataPacket, ResultSetHeader } from 'mysql2/promise';
+import { 
+    SurveyDB, 
+    SurveyQuestionDB, 
+    SurveyResponseDB, 
+    SurveyAnswerDB, 
+    ResponderAgentDB,
+    CreateSurveyInput,
+    SubmitSurveyInput,
+    Survey,
+    SurveyQuestion,
+    SurveyResponse,
+    ResponderAgent
+} from "../interface";
+import { generateConfirmationToken } from "../api/token";
+import { randomUUID } from 'crypto';
+
+export const SurveyRepo = {
+    createSurvey: async (data: any, createdBy: number) => {
+        const db = await getMySQLConnection();
+        const connection = await db.getConnection();
+        
+        try {
+            await connection.beginTransaction();
+            
+            // Generate unique slug using UUID for guaranteed uniqueness
+            const baseSlug = data.title
+                .toLowerCase()
+                .replace(/[^a-z0-9]+/g, '-')
+                .replace(/^-+|-+$/g, '')
+                .substring(0, 50); // Limit length
+            
+            // Create a unique slug with UUID suffix
+            const uniqueId = randomUUID().split('-')[0]; // Use first part of UUID (8 chars)
+            const slug = `${baseSlug}-${uniqueId}`;
+            
+            // Create survey
+            const [surveyResult] = await connection.execute<ResultSetHeader>(
+                `INSERT INTO surveys (title, description, slug, created_by, is_public, status) 
+                 VALUES (?, ?, ?, ?, ?, 'draft')`,
+                [data.title, data.description, slug, createdBy, data.isPublic]
+            );
+            
+            const surveyId = surveyResult.insertId;
+            
+            // Create questions
+            for (const question of data.questions) {
+                await connection.execute(
+                    `INSERT INTO survey_questions (survey_id, type, prompt, options, is_required, question_order) 
+                     VALUES (?, ?, ?, ?, ?, ?)`,
+                    [
+                        surveyId,
+                        question.type || 'text',
+                        question.prompt || '',
+                        question.options ? JSON.stringify(question.options) : null,
+                        question.isRequired ? 1 : 0,
+                        question.order || 1
+                    ]
+                );
+            }
+            
+            await connection.commit();
+            connection.release();
+            return surveyId;
+            
+        } catch (error) {
+            await connection.rollback();
+            connection.release();
+            throw error;
+        }
+    },
+
+    getSurveyBySlug: async (slug: string) => {
+        const db = await getMySQLConnection();
+        
+        const [rows] = await db.execute<RowDataPacket[]>(
+            "SELECT * FROM surveys WHERE slug = ? AND status = 'published'",
+            [slug]
+        );
+        
+        if (!rows[0]) return null;
+        
+        const survey = rows[0];
+        
+        // Get questions
+        const [questionRows] = await db.execute<RowDataPacket[]>(
+            'SELECT * FROM survey_questions WHERE survey_id = ? ORDER BY question_order ASC',
+            [survey.id]
+        );
+        
+        return {
+            ...survey,
+            questions: questionRows.map((q: any) => ({
+                ...q,
+                options: q.options // MySQL JSON field already returns parsed data
+            }))
+        };
+    },
+
+    submitSurveyResponse: async (data: any, ipAddress: string, userAgent: string) => {
+        const db = await getMySQLConnection();
+        const connection = await db.getConnection();
+        
+        try {
+            await connection.beginTransaction();
+            
+            // Create response
+            const [responseResult] = await connection.execute<ResultSetHeader>(
+                `INSERT INTO survey_responses (survey_id, demographics, ip_address, user_agent) 
+                 VALUES (?, ?, ?, ?)`,
+                [data.surveyId, JSON.stringify(data.demographics), ipAddress, userAgent]
+            );
+            
+            const responseId = responseResult.insertId;
+            
+            // Create answers
+            for (const answer of data.answers) {
+                // Handle undefined values - convert to null for database
+                let answerValue = answer.value;
+                if (answerValue === undefined || answerValue === null) {
+                    answerValue = '';
+                } else if (Array.isArray(answerValue)) {
+                    // For arrays, filter out undefined values and join
+                    answerValue = answerValue.filter(v => v !== undefined && v !== null).join(', ');
+                } else if (typeof answerValue !== 'string') {
+                    // Convert non-string values to string
+                    answerValue = String(answerValue);
+                }
+                
+                await connection.execute(
+                    `INSERT INTO survey_answers (response_id, question_id, answer_value) 
+                     VALUES (?, ?, ?)`,
+                    [responseId, answer.questionId, answerValue]
+                );
+            }
+            
+            // Check if digital twin already exists for this email
+            const email = data.demographics.email;
+            let agentToken;
+            
+            if (email) {
+                const [existingAgents] = await connection.execute<RowDataPacket[]>(
+                    'SELECT agent_token FROM responder_agents WHERE email = ?',
+                    [email]
+                );
+                
+                if (existingAgents.length > 0) {
+                    // Use existing agent token
+                    agentToken = existingAgents[0].agent_token;
+                    console.log(`🔄 Using existing digital twin for ${email}: ${agentToken}`);
+                } else {
+                    // Create new responder agent
+                    agentToken = `agent_${responseId}_${Date.now()}`;
+                    
+                    await connection.execute(
+                        `INSERT INTO responder_agents (created_from_response_id, agent_token, email, base_profile) 
+                         VALUES (?, ?, ?, ?)`,
+                        [responseId, agentToken, email, JSON.stringify({ demographics: data.demographics, status: 'initial' })]
+                    );
+                    console.log(`✅ Created new digital twin for ${email}: ${agentToken}`);
+                }
+            } else {
+                // No email provided, create anonymous agent
+                agentToken = `agent_${responseId}_${Date.now()}`;
+                
+                await connection.execute(
+                    `INSERT INTO responder_agents (created_from_response_id, agent_token, base_profile) 
+                     VALUES (?, ?, ?)`,
+                    [responseId, agentToken, JSON.stringify({ demographics: data.demographics, status: 'initial' })]
+                );
+            }
+            
+            await connection.commit();
+            connection.release();
+            
+            return { responseId, agentToken };
+            
+        } catch (error) {
+            await connection.rollback();
+            connection.release();
+            throw error;
+        }
+    },
+
+    getSurveysByCreator: async (createdBy: number) => {
+        const db = await getMySQLConnection();
+        
+        const [rows] = await db.execute<RowDataPacket[]>(
+            `SELECT s.*, COUNT(sr.id) as response_count 
+             FROM surveys s 
+             LEFT JOIN survey_responses sr ON s.id = sr.survey_id 
+             WHERE s.created_by = ? 
+             GROUP BY s.id 
+             ORDER BY s.created_at DESC`,
+            [createdBy]
+        );
+        
+        return rows;
+    },
+
+    getAllSurveys: async () => {
+        const db = await getMySQLConnection();
+        
+        const [rows] = await db.execute<RowDataPacket[]>(
+            `SELECT s.*, COUNT(sr.id) as response_count 
+             FROM surveys s 
+             LEFT JOIN survey_responses sr ON s.id = sr.survey_id 
+             GROUP BY s.id 
+             ORDER BY s.created_at DESC`
+        );
+        
+        return rows;
+    },
+
+    getResponderAgentByToken: async (token: string) => {
+        const db = await getMySQLConnection();
+        
+        const [rows] = await db.execute<RowDataPacket[]>(
+            'SELECT * FROM responder_agents WHERE agent_token = ?',
+            [token]
+        );
+        
+        if (!rows[0]) return null;
+        
+        const row = rows[0];
+        
+        return {
+            ...row,
+            baseProfile: row.base_profile // MySQL JSON field already returns parsed data
+        };
+    },
+
+    getResponderAgentByEmail: async (email: string) => {
+        const db = await getMySQLConnection();
+        
+        const [rows] = await db.execute<RowDataPacket[]>(
+            'SELECT * FROM responder_agents WHERE email = ?',
+            [email]
+        );
+        
+        if (!rows[0]) return null;
+        
+        const row = rows[0];
+        
+        return {
+            ...row,
+            baseProfile: row.base_profile // MySQL JSON field already returns parsed data
+        };
+    },
+
+    updateResponderAgentProfile: async (agentToken: string, newProfile: any) => {
+        const db = await getMySQLConnection();
+        
+        await db.execute(
+            'UPDATE responder_agents SET base_profile = ?, updated_at = CURRENT_TIMESTAMP WHERE agent_token = ?',
+            [JSON.stringify(newProfile), agentToken]
+        );
+        
+        return true;
+    },
+
+    getSurveyById: async (surveyId: number, createdBy: number) => {
+        const db = await getMySQLConnection();
+        
+        const [rows] = await db.execute<RowDataPacket[]>(
+            "SELECT * FROM surveys WHERE id = ? AND created_by = ?",
+            [surveyId, createdBy]
+        );
+        
+        if (!rows[0]) return null;
+        
+        const survey = rows[0];
+        
+        // Get questions
+        const [questionRows] = await db.execute<RowDataPacket[]>(
+            'SELECT * FROM survey_questions WHERE survey_id = ? ORDER BY question_order ASC',
+            [survey.id]
+        );
+        
+        return {
+            ...survey,
+            questions: questionRows.map((q: any) => ({
+                ...q,
+                options: q.options // MySQL JSON field already returns parsed data
+            }))
+        };
+    },
+
+    updateSurvey: async (surveyId: number, data: any, createdBy: number) => {
+        const db = await getMySQLConnection();
+        const connection = await db.getConnection();
+        
+        try {
+            await connection.beginTransaction();
+            
+            // Check if survey exists and belongs to user
+            const [existingRows] = await connection.execute<RowDataPacket[]>(
+                "SELECT id FROM surveys WHERE id = ? AND created_by = ?",
+                [surveyId, createdBy]
+            );
+            
+            if (!existingRows[0]) {
+                await connection.rollback();
+                connection.release();
+                return false;
+            }
+            
+            // Only regenerate slug if title changed significantly
+            // Get current survey to check if slug needs updating
+            const [currentRows] = await connection.execute<RowDataPacket[]>(
+                "SELECT slug, title FROM surveys WHERE id = ?",
+                [surveyId]
+            );
+            
+            let slug = currentRows[0].slug; // Keep existing slug by default
+            
+            // Only generate new slug if title changed significantly
+            if (data.title !== currentRows[0].title) {
+                const baseSlug = data.title
+                    .toLowerCase()
+                    .replace(/[^a-z0-9]+/g, '-')
+                    .replace(/^-+|-+$/g, '')
+                    .substring(0, 50);
+                
+                const uniqueId = randomUUID().split('-')[0];
+                slug = `${baseSlug}-${uniqueId}`;
+            }
+            
+            // Update survey
+            await connection.execute(
+                `UPDATE surveys SET title = ?, description = ?, slug = ?, is_public = ? WHERE id = ?`,
+                [data.title, data.description, slug, data.isPublic, surveyId]
+            );
+            
+            // Delete existing questions
+            await connection.execute(
+                'DELETE FROM survey_questions WHERE survey_id = ?',
+                [surveyId]
+            );
+            
+            // Create new questions
+            for (const question of data.questions) {
+                await connection.execute(
+                    `INSERT INTO survey_questions (survey_id, type, prompt, options, is_required, question_order) 
+                     VALUES (?, ?, ?, ?, ?, ?)`,
+                    [
+                        surveyId,
+                        question.type || 'text',
+                        question.prompt || '',
+                        question.options ? JSON.stringify(question.options) : null,
+                        question.isRequired ? 1 : 0,
+                        question.order || 1
+                    ]
+                );
+            }
+            
+            await connection.commit();
+            connection.release();
+            return true;
+            
+        } catch (error) {
+            await connection.rollback();
+            connection.release();
+            throw error;
+        }
+    },
+
+    publishSurvey: async (surveyId: number, data: any, createdBy: number) => {
+        const db = await getMySQLConnection();
+        const connection = await db.getConnection();
+        
+        try {
+            await connection.beginTransaction();
+            
+            // Check if survey exists and belongs to user
+            const [existingRows] = await connection.execute<RowDataPacket[]>(
+                "SELECT id FROM surveys WHERE id = ? AND created_by = ?",
+                [surveyId, createdBy]
+            );
+            
+            if (!existingRows[0]) {
+                await connection.rollback();
+                connection.release();
+                return false;
+            }
+            
+            // Only regenerate slug if title changed significantly
+            // Get current survey to check if slug needs updating
+            const [currentRows] = await connection.execute<RowDataPacket[]>(
+                "SELECT slug, title FROM surveys WHERE id = ?",
+                [surveyId]
+            );
+            
+            let slug = currentRows[0].slug; // Keep existing slug by default
+            
+            // Only generate new slug if title changed significantly
+            if (data.title !== currentRows[0].title) {
+                const baseSlug = data.title
+                    .toLowerCase()
+                    .replace(/[^a-z0-9]+/g, '-')
+                    .replace(/^-+|-+$/g, '')
+                    .substring(0, 50);
+                
+                const uniqueId = randomUUID().split('-')[0];
+                slug = `${baseSlug}-${uniqueId}`;
+            }
+            
+            // Update survey and set status to published
+            await connection.execute(
+                `UPDATE surveys SET title = ?, description = ?, slug = ?, is_public = ?, status = 'published' WHERE id = ?`,
+                [data.title, data.description, slug, data.isPublic, surveyId]
+            );
+            
+            // Delete existing questions
+            await connection.execute(
+                'DELETE FROM survey_questions WHERE survey_id = ?',
+                [surveyId]
+            );
+            
+            // Create new questions
+            for (const question of data.questions) {
+                await connection.execute(
+                    `INSERT INTO survey_questions (survey_id, type, prompt, options, is_required, question_order) 
+                     VALUES (?, ?, ?, ?, ?, ?)`,
+                    [
+                        surveyId,
+                        question.type || 'text',
+                        question.prompt || '',
+                        question.options ? JSON.stringify(question.options) : null,
+                        question.isRequired ? 1 : 0,
+                        question.order || 1
+                    ]
+                );
+            }
+            
+            await connection.commit();
+            connection.release();
+            return true;
+            
+        } catch (error) {
+            await connection.rollback();
+            connection.release();
+            throw error;
+        }
+    },
+
+    getSurveyAnalytics: async (surveyId: number, createdBy: number) => {
+        const db = await getMySQLConnection();
+        
+        try {
+            // Get survey details
+            const [surveyRows] = await db.execute<RowDataPacket[]>(
+                "SELECT * FROM surveys WHERE id = ? AND created_by = ?",
+                [surveyId, createdBy]
+            );
+            
+            if (!surveyRows[0]) return null;
+            
+            const survey = surveyRows[0];
+            
+            // Get all responses with demographics and agent tokens
+            const [responseRows] = await db.execute<RowDataPacket[]>(
+                `SELECT 
+                    sr.id,
+                    sr.demographics,
+                    sr.submitted_at,
+                    ra.agent_token
+                FROM survey_responses sr
+                LEFT JOIN responder_agents ra ON sr.id = ra.created_from_response_id
+                WHERE sr.survey_id = ?
+                ORDER BY sr.submitted_at DESC`,
+                [surveyId]
+            );
+            
+            // Get questions for this survey
+            const [questionRows] = await db.execute<RowDataPacket[]>(
+                'SELECT * FROM survey_questions WHERE survey_id = ? ORDER BY question_order ASC',
+                [surveyId]
+            );
+            
+            // For each response, get their answers
+            const responses = [];
+            for (const response of responseRows) {
+                const [answerRows] = await db.execute<RowDataPacket[]>(
+                    `SELECT 
+                        sa.question_id,
+                        sa.answer_value,
+                        sq.prompt as question_text
+                    FROM survey_answers sa
+                    JOIN survey_questions sq ON sa.question_id = sq.id
+                    WHERE sa.response_id = ?`,
+                    [response.id]
+                );
+                
+                responses.push({
+                    id: response.id,
+                    submitted_at: response.submitted_at,
+                    demographics: response.demographics, // Already parsed JSON
+                    agentToken: response.agent_token,
+                    answers: answerRows.map((answer: any) => ({
+                        questionId: answer.question_id,
+                        questionText: answer.question_text,
+                        value: answer.answer_value
+                    }))
+                });
+            }
+            
+            return {
+                survey,
+                responses
+            };
+            
+        } catch (error) {
+            throw error;
+        }
+    }
+}; 

@@ -1,5 +1,6 @@
 import { useRouter } from 'next/navigation';
 import CryptoJS from 'crypto-js';
+import { toast } from 'react-hot-toast';
 
 const SECRET_KEY = generateDailySecretKey(); // Change this key to something secure
 
@@ -75,6 +76,26 @@ export const convertDateToPostDate = (time: string): string => {
   return formattedDate;
 }
 
+// Centralized authentication error handler
+export const handleAuthError = (router?: any, showToast: boolean = false) => {
+  if (showToast) {
+    toast.error("Session expired. Please log in again.");
+  }
+  
+  // Clear auth data
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem("userId");
+    localStorage.removeItem("token");
+  }
+  
+  // Redirect to login if router is available
+  if (router) {
+    router.push('/login');
+  } else if (typeof window !== 'undefined') {
+    window.location.href = '/login';
+  }
+};
+
 export function useFetch() {
   const router = useRouter();
 
@@ -112,10 +133,8 @@ export function useFetch() {
     // check for error response
     if (!response.ok) {
       if (response.status === 401) {
-        // api auto logs out on 401 Unauthorized, so redirect to login page
-        localStorage.setItem("userId", "");
-        localStorage.setItem("token", "");
-        router.push('/login');
+        // Handle auth error silently
+        handleAuthError(router, false);
         return;
       }
 

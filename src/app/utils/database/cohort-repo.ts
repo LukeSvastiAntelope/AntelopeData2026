@@ -1,0 +1,61 @@
+import { openSql as getMySQLConnection } from "./db";
+import { RowDataPacket } from "mysql2/promise";
+import { CohortDB, CohortFilterRule } from "../interface";
+
+export const CohortRepo = {
+  /**
+   * List cohorts visible to a user.
+   * - Admins can see all.
+   * - Public cohorts visible to everyone.
+   * - Org visibility TBD (future).
+   */
+  listVisibleCohorts: async (userId: number | null, userRole: "user" | "admin" | undefined) => {
+    const db = await getMySQLConnection();
+
+    let query = "SELECT * FROM cohorts WHERE visibility = 'public'";
+    const params: any[] = [];
+
+    if (userRole === "admin") {
+      query = "SELECT * FROM cohorts"; // Admin sees all
+    } else if (userId) {
+      // Include cohorts the user created
+      query = `${query} OR created_by = ?`;
+      params.push(userId);
+    }
+
+    const [rows] = await db.execute<RowDataPacket[]>(query, params);
+
+    return rows as CohortDB[];
+  },
+
+  /**
+   * Create a new cohort. Returns inserted ID.
+   */
+  createCohort: async (input: { name: string; description?: string; filter: CohortFilterRule[]; visibility: 'private'|'org'|'public'; createdBy: number; }) => {
+    const db = await getMySQLConnection();
+    const { name, description, filter, visibility, createdBy } = input;
+    const [result]: any = await db.execute(
+      `INSERT INTO cohorts (name, description, filter_json, visibility, created_by) VALUES (?, ?, ?, ?, ?)` ,
+      [name, description || null, JSON.stringify(filter), visibility, createdBy]
+    );
+    return result.insertId as number;
+  },
+
+  updateCohort: async (id:number, userId:number, data: { name?: string; description?: string; filter?: CohortFilterRule[]; visibility?: 'private'|'org'|'public' }) => {
+    const db = await getMySQLConnection();
+    const fields: string[] = [];
+    const params: any[] = [];
+    if (data.name) { fields.push('name = ?'); params.push(data.name); }
+    if (data.description !== undefined) { fields.push('description = ?'); params.push(data.description); }
+    if (data.filter) { fields.push('filter_json = ?'); params.push(JSON.stringify(data.filter)); }
+    if (data.visibility) { fields.push('visibility = ?'); params.push(data.visibility); }
+    if (fields.length === 0) return;
+    params.push(id, userId);
+    await db.execute(`UPDATE cohorts SET ${fields.join(', ')} WHERE id = ? AND created_by = ?`, params);
+  },
+
+  deleteCohort: async (id:number, userId:number) => {
+    const db = await getMySQLConnection();
+    await db.execute('DELETE FROM cohorts WHERE id = ? AND created_by = ?', [id, userId]);
+  }
+}; 
