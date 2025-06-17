@@ -8,7 +8,7 @@ export function PublicLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   
   return (
-    <SidebarProvider defaultOpen={true}>
+    <SidebarProvider defaultOpen={false}>
       <div className="flex min-h-screen w-full">
         <PublicAppSidebar />
         
