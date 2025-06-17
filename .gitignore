@@ -65,9 +65,6 @@ coverage/
 node_modules/
 jspm_packages/
 
-# Package lock file
-package-lock.json
-
 # Optional npm cache directory
 .npm
 
