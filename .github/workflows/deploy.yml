@@ -18,9 +18,11 @@ jobs:
         cache: 'npm'
     
     - name: Install Dependencies
+      working-directory: ./
       run: npm ci
     
     - name: Build
+      working-directory: ./
       run: npm run build
       env:
         # Add your environment variables here
@@ -33,7 +35,7 @@ jobs:
         username: ${{ secrets.DROPLET_USERNAME }}
         key: ${{ secrets.DROPLET_SSH_KEY }}
         script: |
-          cd /root/marketmaker  # Update this to your app's path on the server
+          cd /root/marketmaker
           git pull origin main
           npm ci
           npm run build
