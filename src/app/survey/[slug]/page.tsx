@@ -425,8 +425,8 @@ const SurveyPage = () => {
                     <option value="">Select education level</option>
                     <option value="high-school">High School</option>
                     <option value="some-college">Some College</option>
-                    <option value="bachelors">Bachelor's Degree</option>
-                    <option value="masters">Master's Degree</option>
+                    <option value="bachelors">Bachelor&apos;s Degree</option>
+                    <option value="masters">Master&apos;s Degree</option>
                     <option value="phd">PhD/Doctorate</option>
                     <option value="other">Other</option>
                   </select>

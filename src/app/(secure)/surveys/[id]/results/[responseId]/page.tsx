@@ -91,7 +91,7 @@ const ResponderDetailPage = () => {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2"><Brain className="h-5 w-5"/>Digital Twin</CardTitle>
-              <CardDescription>Interact with this respondent's digital twin</CardDescription>
+              <CardDescription>Interact with this respondent&apos;s digital twin</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-2 gap-3 text-sm">
