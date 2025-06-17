@@ -3,9 +3,6 @@
 # echo "=== Starting Deployment ==="
 # cd /root/marketmaker
 
-echo "=== Pulling Latest Changes ==="
-git pull origin main
-
 echo "=== Installing Dependencies ==="
 npm install
 
