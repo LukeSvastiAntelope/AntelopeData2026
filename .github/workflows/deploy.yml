@@ -86,18 +86,23 @@ jobs:
           git pull origin main
           
           echo "=== Installing Dependencies ==="
-          npm install
+          export NVM_DIR="$HOME/.nvm"
+          [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
+          [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
+          
+          # Use the correct user environment
+          su - root -c "cd /root/marketmaker && npm install"
           
           echo "=== Building Project ==="
-          npm run build
+          su - root -c "cd /root/marketmaker && npm run build"
           
           echo "=== Checking PM2 Status ==="
-          pm2 list
+          su - root -c "pm2 list"
           
           echo "=== Restarting Application ==="
-          pm2 restart 7
+          su - root -c "pm2 restart 7"
           
           echo "=== Final PM2 Status ==="
-          pm2 list
+          su - root -c "pm2 list"
       
         
