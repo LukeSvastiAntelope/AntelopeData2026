@@ -66,5 +66,7 @@ jobs:
         key: ${{ secrets.DROPLET_SSH_KEY }}
         script: |
           cd /root/marketmaker
+          echo "=== Pulling Latest Changes ==="
+          git pull origin main
           chmod +x deploy.sh
           ./deploy.sh
