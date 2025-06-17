@@ -6,13 +6,13 @@ echo "=== Checking Node Version ==="
 node -v
 
 echo "=== Installing Dependencies ==="
-npm install
+npm ci
 
 echo "=== Building Project ==="
 npm run build
 
 echo "=== Restarting Application ==="
-pm2 restart 7
+pm2 restart 4
 
 echo "=== Final PM2 Status ==="
 pm2 list 
