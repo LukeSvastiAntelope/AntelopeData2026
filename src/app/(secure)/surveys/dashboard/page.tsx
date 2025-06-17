@@ -462,7 +462,7 @@ const SurveyDashboardPage = () => {
                     </div>
                     <div className="flex-1">
                       <p className="font-medium">
-                        {activity.respondent_name} responded to "{activity.survey_title}"
+                        {activity.respondent_name} responded to &quot;{activity.survey_title}&quot;
                       </p>
                       <p className="text-sm text-muted-foreground">
                         {formatTimestamp(activity.timestamp)}

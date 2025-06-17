@@ -206,7 +206,7 @@ const DigitalTwinsPage = () => {
             </div>
             <h2 className="text-2xl font-bold">Digital Twin Explorer</h2>
             <p className="text-muted-foreground text-base max-w-2xl mx-auto">
-              Search and interact with digital twins created from survey responses. Each twin represents a real person's perspectives and can answer questions based on their profile.
+              Search and interact with digital twins created from survey responses. Each twin represents a real person&apos;s perspectives and can answer questions based on their profile.
             </p>
           </div>
 

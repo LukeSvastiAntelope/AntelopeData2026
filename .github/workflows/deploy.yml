@@ -1,0 +1,72 @@
+name: Deploy to Digital Ocean
+
+on:
+  push:
+    branches: [ main ]  # or your default branch
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '23'
+        cache: 'npm'
+    
+    - name: Install Dependencies
+      run: npm install
+    
+    - name: Build
+      run: npm run build
+      env:
+        # Add your environment variables here
+        NODE_ENV: production
+        NEXT_PUBLIC_APP_URL: https://getantelope.com
+        ENVIRONMENT_MODE: production
+        HOUSE_FEE_RATE: 1
+        CREDIT_BALANCE: 1000
+        JWT_SECRET: ${{ secrets.JWT_SECRET }}
+        OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+        GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        SERPAPI_API_KEY: ${{ secrets.SERPAPI_API_KEY }}
+        PINECONE_API_KEY: ${{ secrets.PINECONE_API_KEY }}
+        COINMARKETCAP_API_KEY: ${{ secrets.COINMARKETCAP_API_KEY }}
+        TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        TELEGRAM_BOT_USERNAME: ${{ secrets.TELEGRAM_BOT_USERNAME }}
+        TELEGRAM_CHANNEL_ID: ${{ secrets.TELEGRAM_CHANNEL_ID }}
+        ESCROW_SOLANA_ADDRESS: ${{ secrets.ESCROW_SOLANA_ADDRESS }}
+        ESCROW_SOLANA_PRIVATE: ${{ secrets.ESCROW_SOLANA_PRIVATE }}
+        STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+        STRIPE_PUBLIC_KEY: ${{ secrets.STRIPE_PUBLIC_KEY }}
+        STRIPE_SECRET_WEBHOOK_KEY: ${{ secrets.STRIPE_SECRET_WEBHOOK_KEY }}
+        SPORTS_DB_API_KEY: ${{ secrets.SPORTS_DB_API_KEY }}
+        PINATA_KEY: ${{ secrets.PINATA_KEY }}
+        PINATA_SECRET: ${{ secrets.PINATA_SECRET}}
+        PINATA_JWT: ${{ secrets.PINATA_JWT }}
+        PINATA_GATEWAY: ${{ secrets.PINATA_GATEWAY }}
+        MYSQL_HOST: ${{ secrets.MYSQL_HOST }}
+        MYSQL_PORT: ${{ secrets.MYSQL_PORT }}
+        MYSQL_USER: ${{ secrets.MYSQL_USER }}
+        MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
+        MYSQL_DATABASE: ${{ secrets.MYSQL_DATABASE }}
+        AUTH_SECRET: ${{ secrets.AUTH_SECRET }}
+        AUTH_DISCORD_ID: ${{ secrets.AUTH_DISCORD_ID }}
+        AUTH_DISCORD_SECRET: ${{ secrets.AUTH_DISCORD_SECRET }}
+    
+    - name: Deploy to Digital Ocean
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.DROPLET_HOST }}
+        username: root
+        key: ${{ secrets.DROPLET_SSH_KEY }}
+        script: |
+          cd /root/marketmaker
+          echo "=== Pulling Latest Changes ==="
+          git pull origin main
+          chmod +x deploy.sh
+          ./deploy.sh
