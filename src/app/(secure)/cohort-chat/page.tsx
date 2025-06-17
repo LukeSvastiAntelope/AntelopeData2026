@@ -24,13 +24,9 @@ import ChartRenderer from '@/components/ChartRenderer'
 import { getAllModels } from '@/app/utils/models'
 import remarkSmart from 'remark-smartypants'
 
-<<<<<<< feature/surveys
-const smart: any = remarkSmart
-=======
 // Optional markdown plugins – if not installed, fall back gracefully
 let smart: any = null;
 try { smart = remarkSmart; } catch {}
->>>>>>> main
 
 const toPlugin=(mod:any)=>{
   if(!mod) return null;
