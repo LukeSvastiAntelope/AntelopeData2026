@@ -65,10 +65,39 @@ jobs:
         username: root
         key: ${{ secrets.DROPLET_SSH_KEY }}
         script: |
+          echo "=== Checking Environment ==="
+          which node
+          node --version
+          which npm
+          npm --version
+          which pm2
+          pm2 --version
+          
+          echo "=== Current Directory ==="
+          pwd
+          
+          echo "=== Checking Project Directory ==="
+          ls -la /root/marketmaker
+          
+          echo "=== Starting Deployment ==="
           cd /root/marketmaker
+          
+          echo "=== Pulling Latest Changes ==="
           git pull origin main
-          npm ci
+          
+          echo "=== Installing Dependencies ==="
+          npm install
+          
+          echo "=== Building Project ==="
           npm run build
-          pm2 restart 7  # Update this to match your PM2 process name 
+          
+          echo "=== Checking PM2 Status ==="
+          pm2 list
+          
+          echo "=== Restarting Application ==="
+          pm2 restart 7
+          
+          echo "=== Final PM2 Status ==="
+          pm2 list
       
         
