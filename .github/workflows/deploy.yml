@@ -65,44 +65,6 @@ jobs:
         username: root
         key: ${{ secrets.DROPLET_SSH_KEY }}
         script: |
-          echo "=== Checking Environment ==="
-          which node
-          node --version
-          which npm
-          npm --version
-          which pm2
-          pm2 --version
-          
-          echo "=== Current Directory ==="
-          pwd
-          
-          echo "=== Checking Project Directory ==="
-          ls -la /root/marketmaker
-          
-          echo "=== Starting Deployment ==="
           cd /root/marketmaker
-          
-          echo "=== Pulling Latest Changes ==="
-          git pull origin main
-          
-          echo "=== Installing Dependencies ==="
-          export NVM_DIR="$HOME/.nvm"
-          [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
-          [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
-          
-          # Use the correct user environment
-          su - root -c "cd /root/marketmaker && npm install"
-          
-          echo "=== Building Project ==="
-          su - root -c "cd /root/marketmaker && npm run build"
-          
-          echo "=== Checking PM2 Status ==="
-          su - root -c "pm2 list"
-          
-          echo "=== Restarting Application ==="
-          su - root -c "pm2 restart 7"
-          
-          echo "=== Final PM2 Status ==="
-          su - root -c "pm2 list"
-      
-        
+          chmod +x deploy.sh
+          ./deploy.sh
