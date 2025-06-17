@@ -33,7 +33,7 @@ jobs:
         username: ${{ secrets.DROPLET_USERNAME }}
         key: ${{ secrets.DROPLET_SSH_KEY }}
         script: |
-          cd marketmaker  # Update this to your app's path on the server
+          cd /root/marketmaker  # Update this to your app's path on the server
           git pull origin main
           npm ci
           npm run build
