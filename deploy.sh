@@ -2,6 +2,8 @@
 
 # echo "=== Starting Deployment ==="
 # cd /root/marketmaker
+echo "=== Checking Node Version ==="
+node -v
 
 echo "=== Installing Dependencies ==="
 npm install
