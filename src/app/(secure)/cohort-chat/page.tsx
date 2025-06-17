@@ -19,16 +19,18 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import remarkSmart from 'remark-smartypants';
-// import rehypeSlug from 'rehype-slug';
-// import rehypeAutolinkHeadings from 'rehype-autolink-headings';
-import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
-import ChartRenderer from '@/components/ChartRenderer';
-import { getAllModels } from '@/app/utils/models';
+import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
+import ChartRenderer from '@/components/ChartRenderer'
+import { getAllModels } from '@/app/utils/models'
+import remarkSmart from 'remark-smartypants'
 
+<<<<<<< feature/surveys
+const smart: any = remarkSmart
+=======
 // Optional markdown plugins – if not installed, fall back gracefully
 let smart: any = null;
 try { smart = remarkSmart; } catch {}
+>>>>>>> main
 
 const toPlugin=(mod:any)=>{
   if(!mod) return null;

@@ -8,6 +8,8 @@ import { EnhancedOddsChart } from '@/components/enhanced-odds-chart';
 import { AccumulatedOddsChart } from '@/components/accumulated-odds-chart';
 import { IBet } from '@/app/utils/interface';
 
+/* eslint-disable react/no-unescaped-entities */
+
 // Sample bet data for testing
 const sampleBets: IBet[] = [
   {

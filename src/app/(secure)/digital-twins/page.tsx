@@ -1,6 +1,7 @@
+/* eslint-disable react/no-unescaped-entities */
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -10,12 +11,17 @@ import { Badge } from "@/components/ui/badge"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import { 
   Brain, 
-  Search,
   MessageCircle,
   Users,
   Loader2,
   Send
 } from "lucide-react"
+
+// Charts & table utilities
+import { AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, CartesianGrid, XAxis, YAxis, LabelList } from "recharts"
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
+import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@/components/ui/table"
+import { formatDistanceToNow } from "date-fns"
 
 interface DigitalTwin {
   agentToken: string
@@ -37,6 +43,66 @@ const DigitalTwinsPage = () => {
   const [question, setQuestion] = useState('')
   const [response, setResponse] = useState('')
   const [querying, setQuerying] = useState(false)
+
+  const grayscalePalette = [
+    'hsl(0, 0%, 9%)',   // Very dark gray (almost black)
+    'hsl(0, 0%, 26%)',  // Dark gray
+    'hsl(0, 0%, 40%)',  // Medium gray
+    'hsl(0, 0%, 54%)',  // Light gray
+    'hsl(0, 0%, 71%)',  // Very light gray
+  ]
+
+  /* --------------------------------------------------
+   * Aggregated data for dashboard visualisations
+   * -------------------------------------------------- */
+  const aggregation = useMemo(() => {
+    const ageBuckets: Record<string, number> = {
+      '<18': 0,
+      '18-24': 0,
+      '25-34': 0,
+      '35-44': 0,
+      '45-54': 0,
+      '55-64': 0,
+      '65+': 0,
+    }
+
+    const locationCounts: Record<string, number> = {}
+    const politicalCounts: Record<string, number> = {}
+
+    allTwins.forEach((twin) => {
+      const ageNumber = parseInt(twin.demographics?.age as string)
+      if (!isNaN(ageNumber)) {
+        let bucket = '65+'
+        if (ageNumber < 18) bucket = '<18'
+        else if (ageNumber < 25) bucket = '18-24'
+        else if (ageNumber < 35) bucket = '25-34'
+        else if (ageNumber < 45) bucket = '35-44'
+        else if (ageNumber < 55) bucket = '45-54'
+        else if (ageNumber < 65) bucket = '55-64'
+        ageBuckets[bucket] += 1
+      }
+
+      const loc = twin.demographics?.location || 'Unknown'
+      locationCounts[loc] = (locationCounts[loc] || 0) + 1
+
+      const political = twin.demographics?.politicalViews || 'Unknown'
+      politicalCounts[political] = (politicalCounts[political] || 0) + 1
+    })
+
+    const ageData = Object.entries(ageBuckets).map(([group, count]) => ({ group, count }))
+
+    const locationData = Object.entries(locationCounts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([location, count]) => ({ name: location, count }))
+
+    const politicalData = Object.entries(politicalCounts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([political, count]) => ({ name: political, count }))
+
+    return { ageData, locationData, politicalData }
+  }, [allTwins])
 
   // Load all digital twins on component mount
   useEffect(() => {
@@ -130,230 +196,260 @@ const DigitalTwinsPage = () => {
         
         <div className="border-b border-border" />
 
-        <div className="p-6 space-y-6">
+        <div className="p-4 space-y-4">
           {/* Introduction */}
-          <div className="text-center">
+          <div className="text-center space-y-2">
             <div className="flex items-center justify-center mb-4">
               <div className="p-3 rounded-full bg-primary/10">
                 <Brain className="h-8 w-8 text-primary" />
               </div>
             </div>
-            <h2 className="text-2xl font-bold mb-2">Digital Twin Explorer</h2>
+            <h2 className="text-2xl font-bold">Digital Twin Explorer</h2>
             <p className="text-muted-foreground text-base max-w-2xl mx-auto">
               Search and interact with digital twins created from survey responses. Each twin represents a real person&apos;s perspectives and can answer questions based on their profile.
             </p>
           </div>
 
-          {/* Search Section */}
+          {/* Dashboard Overview */}
+          {allTwins.length > 0 && (
+            <section className="space-y-4">
+              {/* Charts Grid */}
+              <div className="grid gap-4 md:grid-cols-3">
+                {/* Age Distribution (ShadCN Area style) */}
+                <Card>
+                  <CardHeader className="px-6 pt-6 pb-0">
+                    <CardTitle>Age Distribution</CardTitle>
+                    <CardDescription>Total twins by age cohort</CardDescription>
+                  </CardHeader>
+                  <CardContent className="px-0 pt-2 pb-4 sm:px-0 sm:pt-2">
+                    <ChartContainer config={{ count: { color: "hsl(var(--zinc-600))" } }} className="aspect-auto h-[220px] w-full">
+                      <AreaChart 
+                        data={aggregation.ageData}
+                        margin={{
+                          left: -20,
+                          right: 20,
+                          top: 12,
+                          bottom: 12,
+                        }}
+                      >
+                        <defs>
+                          <linearGradient id="fillAge" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="hsl(0, 0%, 40%)" stopOpacity={0.8} />
+                            <stop offset="95%" stopColor="hsl(0, 0%, 40%)" stopOpacity={0.1} />
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted))" />
+                        <XAxis dataKey="group" tickLine={false} axisLine={false} stroke="hsl(var(--muted-foreground))" />
+                        <YAxis allowDecimals={false} tickLine={false} axisLine={false} />
+                        <ChartTooltip content={<ChartTooltipContent />} />
+                        <Area type="monotone" dataKey="count" stroke="hsl(0, 0%, 40%)" strokeWidth={2} fill="url(#fillAge)" />
+                      </AreaChart>
+                    </ChartContainer>
+                  </CardContent>
+                </Card>
+
+                {/* Top Locations */}
+                <Card>
+                  <CardHeader className="px-6 pt-6 pb-0">
+                    <CardTitle>Top Locations</CardTitle>
+                    <CardDescription>Most common geographical locations</CardDescription>
+                  </CardHeader>
+                  <CardContent className="px-0 pt-2 pb-4 sm:px-0 sm:pt-2 flex flex-col items-center justify-center">
+                    <div className="flex flex-row items-center justify-start gap-2 w-full px-4">
+                      <div className="w-3/5 flex justify-end">
+                        <ChartContainer config={{ visitors: { label: "Count" } }} className="aspect-square w-[200px]">
+                          <PieChart>
+                            <Pie
+                              data={aggregation.locationData.map((d, i) => ({ ...d, fill: grayscalePalette[i % grayscalePalette.length] }))}
+                              dataKey="count"
+                              nameKey="name"
+                              outerRadius={85}
+                              innerRadius={35}
+                              paddingAngle={2}
+                            >
+                              {aggregation.locationData.map((_, index) => (
+                                <Cell key={`cell-${index}`} fill={grayscalePalette[index % grayscalePalette.length]} />
+                              ))}
+                            </Pie>
+                            <ChartTooltip content={<ChartTooltipContent />} />
+                          </PieChart>
+                        </ChartContainer>
+                      </div>
+                      {/* Legend */}
+                      <div className="w-2/5 flex flex-col gap-1 text-xs">
+                        {aggregation.locationData.map((d, i) => (
+                          <div key={d.name} className="flex items-center gap-1">
+                            <span
+                              className="inline-block h-2 w-2 rounded-sm"
+                              style={{ backgroundColor: grayscalePalette[i % grayscalePalette.length] }}
+                            />
+                            <span className="text-muted-foreground">{d.name}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Top Occupations */}
+                <Card>
+                  <CardHeader className="px-6 pt-6 pb-0">
+                    <CardTitle>Political Leanings</CardTitle>
+                    <CardDescription>Most common political orientations</CardDescription>
+                  </CardHeader>
+                  <CardContent className="px-6 pt-2 pb-4">
+                    <ChartContainer config={{ 
+                      count: { label: "Count", color: "hsl(0, 0%, 40%)" },
+                      label: { color: "var(--background)" }
+                    }} className="aspect-auto h-[220px] w-full">
+                      <BarChart 
+                        data={aggregation.politicalData}
+                        layout="vertical"
+                        margin={{
+                          left: 0,
+                          right: 16,
+                          top: 12,
+                          bottom: 12,
+                        }}
+                      >
+                        <CartesianGrid horizontal={false} />
+                        <YAxis
+                          dataKey="name"
+                          type="category"
+                          tickLine={false}
+                          tickMargin={10}
+                          axisLine={false}
+                          hide
+                        />
+                        <XAxis dataKey="count" type="number" hide />
+                        <ChartTooltip
+                          cursor={false}
+                          content={<ChartTooltipContent indicator="line" />}
+                        />
+                        <Bar 
+                          dataKey="count" 
+                          layout="vertical"
+                          radius={4}
+                        >
+                          {aggregation.politicalData.map((_, index) => (
+                            <Cell key={`cell-${index}`} fill={grayscalePalette[index % grayscalePalette.length]} />
+                          ))}
+                          <LabelList
+                            dataKey="name"
+                            position="insideLeft"
+                            offset={8}
+                            fill="white"
+                            fontSize={12}
+                          />
+                          <LabelList
+                            dataKey="count"
+                            position="right"
+                            offset={8}
+                            fill="hsl(var(--foreground))"
+                            fontSize={12}
+                          />
+                        </Bar>
+                      </BarChart>
+                    </ChartContainer>
+                  </CardContent>
+                </Card>
+              </div>
+
+            {/* Twins Table */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Digital Twins ({allTwins.length})</CardTitle>
+              </CardHeader>
+              <CardContent className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Age</TableHead>
+                      <TableHead>Location</TableHead>
+                      <TableHead>Political Leaning</TableHead>
+                      <TableHead>Survey</TableHead>
+                      <TableHead>Created</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {allTwins.map((twin) => (
+                      <TableRow key={twin.agentToken} className="cursor-pointer" onClick={() => setSelectedTwin(twin.agentToken)}>
+                        <TableCell>{twin.demographics?.name || 'Anonymous'}</TableCell>
+                        <TableCell>{twin.demographics?.age || '—'}</TableCell>
+                        <TableCell>{twin.demographics?.location || '—'}</TableCell>
+                        <TableCell>{twin.demographics?.politicalViews || '—'}</TableCell>
+                        <TableCell>{twin.surveyTitle}</TableCell>
+                        <TableCell>{twin.createdAt ? formatDistanceToNow(new Date(twin.createdAt), { addSuffix: true }) : '—'}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </section>
+        )}
+
+        {/* Query Section */}
+        {selectedTwin && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Search className="h-5 w-5" />
-                Search Digital Twins
+                <MessageCircle className="h-5 w-5" />
+                Ask a Question
               </CardTitle>
               <CardDescription>
-                Find digital twins based on demographics, interests, or characteristics
+                Ask the selected digital twin a question and get a response based on their persona
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex gap-2">
-                <Input
-                  placeholder="e.g., 'young professionals in tech', 'conservative voters', 'parents with children'"
-                  value={queryText}
-                  onChange={(e) => setQueryText(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && searchTwins()}
+              <div>
+                <Label htmlFor="question">Your Question</Label>
+                <Textarea
+                  id="question"
+                  placeholder="e.g., 'What do you think about remote work?', 'How do you feel about climate change?'"
+                  value={question}
+                  onChange={(e) => setQuestion(e.target.value)}
+                  rows={3}
                 />
-                <Button onClick={searchTwins} disabled={searching}>
-                  {searching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-                  Search
-                </Button>
-                {searchResults.length > 0 && (
-                  <Button 
-                    variant="outline" 
-                    onClick={() => {
-                      setSearchResults([])
-                      setQueryText('')
-                    }}
-                  >
-                    Clear Search
-                  </Button>
-                )}
               </div>
+              
+              <Button onClick={queryTwin} disabled={querying || !question.trim()}>
+                {querying ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                Ask Question
+              </Button>
 
-              {/* Search Results */}
-              {searchResults.length > 0 && (
-                <div className="space-y-3">
-                  <h4 className="font-medium">Found {searchResults.length} digital twins:</h4>
-                  <div className="grid gap-3">
-                    {searchResults.map((twin) => (
-                      <div 
-                        key={twin.agentToken}
-                        className={`p-4 border rounded-lg cursor-pointer transition-colors ${
-                          selectedTwin === twin.agentToken 
-                            ? 'border-primary bg-primary/5' 
-                            : 'border-border hover:border-primary/50'
-                        }`}
-                        onClick={() => setSelectedTwin(twin.agentToken)}
-                      >
-                        <div className="flex items-start justify-between mb-2">
-                          <div>
-                            <Badge variant="secondary" className="mb-2">
-                              {twin.surveyTitle}
-                            </Badge>
-                            <p className="text-sm font-medium">
-                              {twin.demographics?.name || 'Anonymous'}, {twin.demographics?.age}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {twin.demographics?.location} • {twin.demographics?.occupation}
-                            </p>
-                          </div>
-                          <Badge variant="outline">
-                            {Math.round(twin.score * 100)}% match
-                          </Badge>
-                        </div>
-                        
-                        {twin.principles && (
-                          <div className="text-xs text-muted-foreground">
-                            <strong>Values:</strong> {twin.principles.coreValues?.slice(0, 3).join(', ')}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
+              {response && (
+                <div className="mt-4 p-4 bg-muted/50 rounded-lg">
+                  <h4 className="font-medium mb-2">Response:</h4>
+                  <p className="text-sm">{response}</p>
                 </div>
               )}
             </CardContent>
           </Card>
+        )}
 
-          {/* All Digital Twins Section */}
-          {searchResults.length === 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Users className="h-5 w-5" />
-                  All Digital Twins
-                </CardTitle>
-                <CardDescription>
-                  Browse all available digital twins created from survey responses
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {loading ? (
-                  <div className="text-center py-8">
-                    <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
-                    <p className="text-muted-foreground">Loading digital twins...</p>
-                  </div>
-                ) : allTwins.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <Brain className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                    <p>No digital twins found</p>
-                    <p className="text-sm">Create surveys to start building digital twins</p>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    <h4 className="font-medium">{allTwins.length} digital twins available:</h4>
-                    <div className="grid gap-3">
-                      {allTwins.map((twin) => (
-                        <div 
-                          key={twin.agentToken}
-                          className={`p-4 border rounded-lg cursor-pointer transition-colors ${
-                            selectedTwin === twin.agentToken 
-                              ? 'border-primary bg-primary/5' 
-                              : 'border-border hover:border-primary/50'
-                          }`}
-                          onClick={() => setSelectedTwin(twin.agentToken)}
-                        >
-                          <div className="flex items-start justify-between mb-2">
-                            <div>
-                              <Badge variant="secondary" className="mb-2">
-                                {twin.surveyTitle}
-                              </Badge>
-                              <p className="text-sm font-medium">
-                                {twin.demographics?.name || 'Anonymous'}, {twin.demographics?.age}
-                              </p>
-                              <p className="text-xs text-muted-foreground">
-                                {twin.demographics?.location} • {twin.demographics?.occupation}
-                              </p>
-                            </div>
-                            <Badge variant="outline">
-                              Digital Twin
-                            </Badge>
-                          </div>
-                          
-                          {twin.principles && (
-                            <div className="text-xs text-muted-foreground">
-                              <strong>Values:</strong> {twin.principles.coreValues?.slice(0, 3).join(', ')}
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                                )}
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Query Section */}
-          {selectedTwin && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <MessageCircle className="h-5 w-5" />
-                  Ask a Question
-                </CardTitle>
-                <CardDescription>
-                  Ask the selected digital twin a question and get a response based on their persona
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <Label htmlFor="question">Your Question</Label>
-                  <Textarea
-                    id="question"
-                    placeholder="e.g., 'What do you think about remote work?', 'How do you feel about climate change?'"
-                    value={question}
-                    onChange={(e) => setQuestion(e.target.value)}
-                    rows={3}
-                  />
-                </div>
-                
-                <Button onClick={queryTwin} disabled={querying || !question.trim()}>
-                  {querying ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                  Ask Question
-                </Button>
-
-                {response && (
-                  <div className="mt-4 p-4 bg-muted/50 rounded-lg">
-                    <h4 className="font-medium mb-2">Response:</h4>
-                    <p className="text-sm">{response}</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Info Section */}
-          <Card className="bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800">
-            <CardContent className="pt-6">
-              <div className="flex items-start gap-3">
-                <Users className="h-5 w-5 text-blue-600 mt-0.5" />
-                <div>
-                  <h4 className="font-medium text-blue-900 dark:text-blue-100 mb-2">
-                    How Digital Twins Work
-                  </h4>
-                  <ul className="text-sm text-blue-700 dark:text-blue-300 space-y-1">
-                    <li>• Each digital twin is created from real survey responses</li>
-                    <li>• AI analyzes demographics and answers to build a persona</li>
-                    <li>• Twins can answer new questions based on their profile</li>
-                    <li>• All personal information is anonymized and secure</li>
-                  </ul>
-                </div>
+        {/* Info Section */}
+        <Card className="bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800">
+          <CardContent className="pt-6">
+            <div className="flex items-start gap-3">
+              <Users className="h-5 w-5 text-blue-600 mt-0.5" />
+              <div>
+                <h4 className="font-medium text-blue-900 dark:text-blue-100 mb-2">
+                  How Digital Twins Work
+                </h4>
+                <ul className="text-sm text-blue-700 dark:text-blue-300 space-y-1">
+                  <li>• Each digital twin is created from real survey responses</li>
+                  <li>• AI analyzes demographics and answers to build a persona</li>
+                  <li>• Twins can answer new questions based on their profile</li>
+                  <li>• All personal information is anonymized and secure</li>
+                </ul>
               </div>
-            </CardContent>
-          </Card>
-        </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
+    </div>
     </div>
   )
 }
