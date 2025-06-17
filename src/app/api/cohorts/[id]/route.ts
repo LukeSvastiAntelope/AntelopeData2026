@@ -19,4 +19,4 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   const id = Number((await params).id);
   await CohortRepo.deleteCohort(id, userId);
   return NextResponse.json({ status:true });
-} 
+}
