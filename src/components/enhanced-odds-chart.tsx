@@ -155,7 +155,7 @@ export function EnhancedOddsChart({ bets, predictionId, showAnalysisData = true 
   const getCombinedData = (): MarketSentimentData[] => {
     const betsData = processBetsData();
     
-    let combinedData: MarketSentimentData[] = [];
+    const combinedData: MarketSentimentData[] = [];
     
     if (viewMode === 'bets' || viewMode === 'combined') {
       combinedData.push(...betsData);
