@@ -166,7 +166,7 @@ export default function FrontLanding() {
               ].map((t) => (
                 <Card key={t.name} className="bg-card border-border shadow-sm h-full">
                   <CardContent className="p-6 flex flex-col gap-4">
-                    <p className="italic text-muted-foreground flex-1">"{t.quote}"</p>
+                    <p className="italic text-muted-foreground flex-1">&ldquo;{t.quote}&rdquo;</p>
                     <div className="text-sm font-medium text-card-foreground">{t.name}</div>
                     <div className="text-xs text-muted-foreground">{t.title}</div>
                   </CardContent>
