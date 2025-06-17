@@ -59,11 +59,11 @@ jobs:
         AUTH_DISCORD_SECRET: ${{ secrets.AUTH_DISCORD_SECRET }}
     
     - name: Deploy to Digital Ocean
-      uses: appleboy/ssh-action@master
       with:
         host: ${{ secrets.DROPLET_HOST }}
-        username: ${{ secrets.DROPLET_USERNAME }}
+        username: root
         key: ${{ secrets.DROPLET_SSH_KEY }}
+        port: 22
       run: |
         cd /root/marketmaker
         git pull origin main
