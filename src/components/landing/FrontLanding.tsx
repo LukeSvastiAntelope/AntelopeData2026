@@ -4,6 +4,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Lightbulb, MessageCircle, Rocket, Brain } from "lucide-react"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
+import Link from "next/link"
 // Hero image served from public/assets/images/hero-image.png
 
 export default function FrontLanding() {
@@ -20,7 +21,7 @@ export default function FrontLanding() {
               <div className="h-4 border-l border-border mx-4" />
               <h1 className="text-base font-medium text-card-foreground">Welcome</h1>
             </div>
-            <Button variant="outline" onClick={() => router.push("/login")}>Login</Button>
+            <Link href="/login" className="text-sm font-medium text-primary hover:underline">Login</Link>
           </div>
         </div>
 
