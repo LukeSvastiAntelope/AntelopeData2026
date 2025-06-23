@@ -8,6 +8,9 @@ node -v
 echo "=== Installing Dependencies ==="
 npm ci
 
+echo "=== DB Migration ==="
+npx prisma generate
+
 echo "=== Building Project ==="
 npm run build
 
