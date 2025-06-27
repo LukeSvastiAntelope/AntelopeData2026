@@ -38,6 +38,8 @@ const publicRoutes = [
     '/api/digital-twin/:id*/responses', // Twin responses list
     '/api/digital-twin/:id*/update', // Update twin
     '/api/digital-twin/:id*', // Public digital twin profile
+    '/api/digital-twin/check-email', // Check for existing digital twin by email
+    '/api/digital-twin/magic-link', // Send magic link for digital twin access
     // '/api/cohorts',           // (was public during early dev; now requires auth)
     // '/api/cohort/query',      // (was public during v1 testing; now requires auth)
     '/api/public/surveys', // List surveys

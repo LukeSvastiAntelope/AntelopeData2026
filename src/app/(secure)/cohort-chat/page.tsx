@@ -62,6 +62,8 @@ export default function CohortChatPage() {
   const [saving, setSaving] = useState(false);
   const [surveys, setSurveys] = useState<{id:number,title:string}[]>([]);
   const [selectedSurveyId, setSelectedSurveyId] = useState<number | null>(null);
+  const [selectedSurveyData, setSelectedSurveyData] = useState<any>(null);
+  const [dynamicPrompts, setDynamicPrompts] = useState<string[]>([]);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [selectedModel, setSelectedModel] = useState('gpt-4o');
   const [sources, setSources] = useState<{survey: boolean; twins: boolean; web: boolean}>({survey: true, twins: true, web: false});
@@ -84,7 +86,16 @@ export default function CohortChatPage() {
         .then(res => res.json())
         .then(data => { 
           console.log('Surveys data:', data);
-          if (data.surveys) setSurveys(data.surveys); 
+          if (data.surveys) {
+            setSurveys(data.surveys);
+            // Auto-select the latest survey (most recent created_at)
+            if (data.surveys.length > 0) {
+              const latestSurvey = data.surveys.reduce((latest: any, current: any) => 
+                new Date(current.created_at) > new Date(latest.created_at) ? current : latest
+              );
+              setSelectedSurveyId(latestSurvey.id);
+            }
+          }
         });
     }
     // Fetch cohorts on mount
@@ -96,6 +107,42 @@ export default function CohortChatPage() {
         });
     }
   }, []);
+
+  // Fetch survey details when selectedSurveyId changes
+  useEffect(() => {
+    if (selectedSurveyId) {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('token') ?? '' : '';
+      if (token) {
+        fetch(`/api/surveys/${selectedSurveyId}`, { 
+          headers: { 'Authorization': `Bearer ${token}` } 
+        })
+          .then(res => res.json())
+          .then(data => {
+            if (data.status && data.survey) {
+              setSelectedSurveyData(data.survey);
+              const prompts = generateDynamicPrompts(data.survey);
+              setDynamicPrompts(prompts);
+            }
+          })
+          .catch(error => {
+            console.error('Error fetching survey details:', error);
+            // Fallback to default prompts
+            setDynamicPrompts([
+              "What are the key trends in responses?",
+              "How do demographics affect answers?", 
+              "Show response patterns"
+            ]);
+          });
+      }
+    } else {
+      setSelectedSurveyData(null);
+      setDynamicPrompts([
+        "What are the key trends in responses?",
+        "How do demographics affect answers?", 
+        "Show response patterns"
+      ]);
+    }
+  }, [selectedSurveyId]);
 
   const handleSend = async () => {
     if (!input.trim()) {
@@ -225,6 +272,52 @@ export default function CohortChatPage() {
   // helper to update filter rule
   const updateRule = (idx:number, key: keyof CohortFilterRule, value:string) => {
     setFilterRules(prev => prev.map((r,i)=> i===idx? { ...r, [key]: value }: r));
+  };
+
+  // Generate dynamic prompts based on survey data
+  const generateDynamicPrompts = (surveyData: any) => {
+    if (!surveyData || !surveyData.questions) return [];
+    
+    const prompts: string[] = [];
+    const questions = surveyData.questions;
+    
+    // Analyze question types and content to generate relevant prompts
+    const hasRatingQuestions = questions.some((q: any) => q.type === 'rating' || q.type === 'scale');
+    const hasChoiceQuestions = questions.some((q: any) => q.type === 'single-choice' || q.type === 'multiple-choice');
+    const hasTextQuestions = questions.some((q: any) => q.type === 'text');
+    
+    // Get first few question prompts for specific analysis
+    const sampleQuestions = questions.slice(0, 3);
+    
+    if (hasRatingQuestions) {
+      prompts.push("What are the average ratings across different demographics?");
+    }
+    
+    if (hasChoiceQuestions) {
+      prompts.push("Show the distribution of responses for multiple choice questions");
+    }
+    
+    if (hasTextQuestions) {
+      prompts.push("What are the common themes in open-ended responses?");
+    }
+    
+    // Add survey-specific prompts based on question content
+    if (sampleQuestions.length > 0) {
+      const firstQuestion = sampleQuestions[0];
+      if (firstQuestion.prompt) {
+        // Create a prompt about the first question
+        const questionSnippet = firstQuestion.prompt.length > 50 
+          ? firstQuestion.prompt.substring(0, 50) + "..." 
+          : firstQuestion.prompt;
+        prompts.push(`Analyze responses to: "${questionSnippet}"`);
+      }
+    }
+    
+    // Add general analysis prompts
+    prompts.push(`Summarize key insights from "${surveyData.title}"`);
+    prompts.push("Compare responses across age groups");
+    
+    return prompts.slice(0, 3); // Return max 3 prompts
   };
 
   const renderWithCitations=(text:string,citations?:Record<string,string>)=> {
@@ -359,6 +452,22 @@ export default function CohortChatPage() {
                     <Send className="h-4 w-4"/>
                   </Button>
                 </div>
+                <div className="text-xs text-center max-w-xl space-y-2">
+                  <p className="font-medium text-muted-foreground">
+                    {selectedSurveyData ? `Try asking about "${selectedSurveyData.title}":` : "Try asking:"}
+                  </p>
+                  <div className="flex flex-wrap gap-2 justify-center">
+                    {dynamicPrompts.map((prompt, index) => (
+                      <div 
+                        key={index}
+                        className="px-3 py-1.5 border border-border rounded-md bg-background/50 text-muted-foreground hover:bg-background/80 transition-colors cursor-pointer"
+                        onClick={() => setInput(prompt)}
+                      >
+                        &quot;{prompt}&quot;
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
             ) : (
               <>
@@ -431,6 +540,20 @@ export default function CohortChatPage() {
                     >
                       <Send className="h-4 w-4"/>
                     </Button>
+                  </div>
+                  <div className="text-xs mt-2 space-y-2">
+                    <p className="font-medium text-muted-foreground">Examples:</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {dynamicPrompts.map((prompt, index) => (
+                        <div 
+                          key={index}
+                          className="px-2 py-1 border border-border rounded text-muted-foreground bg-background/50 hover:bg-background/80 transition-colors cursor-pointer"
+                          onClick={() => setInput(prompt)}
+                        >
+                          &quot;{prompt}&quot;
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
               </>

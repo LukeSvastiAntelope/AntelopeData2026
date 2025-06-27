@@ -264,11 +264,11 @@ const SecureLayout = ({ children }: { children: React.ReactNode }) => {
                                         </div>
                                     </div>
                                     <Link
-                                        href="/surveys"
-                                        className={`flex items-center group md:gap-2 ${pathname === '/surveys' ? 'text-white' : 'text-gray-500 hover:text-white'}`}
+                                                        href="/overview"
+                className={`flex items-center group md:gap-2 ${pathname === '/overview' ? 'text-white' : 'text-gray-500 hover:text-white'}`}
                                     >
-                                        <span className={`icon-dashboard-active group-hover:block ${pathname === '/surveys' ? 'block' : 'hidden'}`} />
-                                        <span className={`icon-dashboard group-hover:hidden ${pathname === '/surveys' ? 'hidden' : 'block'}`} />
+                                                        <span className={`icon-dashboard-active group-hover:block ${pathname === '/overview' ? 'block' : 'hidden'}`} />
+                <span className={`icon-dashboard group-hover:hidden ${pathname === '/overview' ? 'hidden' : 'block'}`} />
                                         <span className="hidden md:block">Dashboard</span>
                                     </Link>
 

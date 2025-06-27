@@ -176,7 +176,7 @@ export default function PublicPredictionDetailPage() {
             <p className="mb-4 text-gray-400">Login or create an account to join the action!</p>
           </CardBody>
           <CardFooter>
-            <Button color="primary" onPress={() => router.push('/login?redirect=/surveys')} className="mr-2">
+                            <Button color="primary" onPress={() => router.push('/login?redirect=/overview')} className="mr-2">
               Login
             </Button>
             <Button variant="bordered" onPress={() => router.push('/register')}>

@@ -1,7 +1,7 @@
 "use client"
 
-import { TrendingUp, TrendingDown } from "lucide-react"
-import { Card, CardContent } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { TrendingUp as TrendingUpIcon, TrendingDown as TrendingDownIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useRouter } from "next/navigation"
 import { useState, useEffect } from "react"
@@ -60,12 +60,12 @@ export function PublicSectionCards() {
     <div className="flex items-center rounded-full bg-muted px-2 py-1 text-xs">
       {value >= 0 ? (
         <>
-          <TrendingUp className="mr-1 h-3 w-3 text-emerald-500" />
+          <TrendingUpIcon className="mr-1 h-3 w-3 text-emerald-500" />
           <span className="text-foreground">+{value}%</span>
         </>
       ) : (
         <>
-          <TrendingDown className="mr-1 h-3 w-3 text-red-500" />
+          <TrendingDownIcon className="mr-1 h-3 w-3 text-red-500" />
           <span className="text-foreground">{value}%</span>
         </>
       )}

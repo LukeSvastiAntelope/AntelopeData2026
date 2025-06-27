@@ -70,7 +70,7 @@ export async function POST(req: NextRequest) {
       filterRules = cohort.filter;
     }
 
-    // Fetch survey answers that match - ONLY from user's surveys
+    // Fetch survey answers that match - ONLY from user's surveys with question context
     const db = await getMySQLConnection();
     const params: any[] = [];
     let whereClause = buildWhereClause(filterRules, params);
@@ -88,10 +88,18 @@ export async function POST(req: NextRequest) {
       params.push(surveyId);
     }
     
+    // Filter out very short or non-meaningful answers
+    whereClause += ' AND LENGTH(TRIM(sa.answer_value)) > 3';
+    whereClause += ' AND sa.answer_value NOT REGEXP \'^[0-9]+$\''; // Exclude pure numbers
+    whereClause += ' AND sa.answer_value != \'\'';
+    whereClause += ' AND sa.answer_value IS NOT NULL';
+    whereClause += ' AND UPPER(sa.answer_value) NOT IN (\'N/A\', \'NULL\')';
+    
     // MySQL prepared statements do not allow parameter placeholders for LIMIT.
     const safeLimit = Math.max(1, Math.min(topK, 1000));
     const [rows] = await db.execute<any[]>(
-      `SELECT sr.id as rid, sa.answer_value,
+      `SELECT sr.id as rid, sa.answer_value, sq.prompt as question_text, sq.type as question_type,
+               s.title as survey_title, sq.options as question_options,
                COALESCE(sr.age_range,
                         JSON_UNQUOTE(JSON_EXTRACT(sr.demographics,'$.ageRange')),
                         JSON_UNQUOTE(JSON_EXTRACT(sr.demographics,'$.age')),
@@ -104,8 +112,16 @@ export async function POST(req: NextRequest) {
                JSON_UNQUOTE(JSON_EXTRACT(sr.demographics,'$.politicalViews')) AS political_val
        FROM survey_responses sr
        JOIN survey_answers sa ON sr.id = sa.response_id
+       JOIN survey_questions sq ON sa.question_id = sq.id
        JOIN surveys s ON sr.survey_id = s.id
        WHERE ${whereClause}
+       ORDER BY 
+         CASE 
+           WHEN sq.type IN ('single-choice', 'multiple-choice') THEN 1
+           WHEN LENGTH(sa.answer_value) > 50 THEN 2
+           ELSE 3
+         END,
+         LENGTH(sa.answer_value) DESC
        LIMIT ${safeLimit}`,
       params
     );
@@ -114,7 +130,32 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ status: true, answer: "No survey data available for this cohort." });
     }
 
-    const answersText = rows.map((r) => r.answer_value).join("\n");
+    // Check if we have sufficient meaningful data - be more lenient for choice questions
+    const meaningfulAnswers = rows.filter((r: any) => {
+      if (!r.answer_value || typeof r.answer_value !== 'string') return false;
+      
+      const trimmed = r.answer_value.trim();
+      if (trimmed.length === 0) return false;
+      
+      // For choice questions, any non-empty answer is meaningful
+      if (r.question_type === 'single-choice' || r.question_type === 'multiple-choice') {
+        return trimmed.length > 0;
+      }
+      
+      // For text questions, require more substantial answers
+      return trimmed.length > 10 && trimmed.split(' ').length > 2;
+    });
+
+    if (meaningfulAnswers.length < 3) {
+      return NextResponse.json({ 
+        status: true, 
+        answer: `I found only ${meaningfulAnswers.length} meaningful responses for this cohort, which is insufficient to provide a reliable analysis. Please try a broader cohort or check if there are more survey responses available.` 
+      });
+    }
+
+    console.log(`Found ${rows.length} total responses, ${meaningfulAnswers.length} meaningful responses`);
+
+    const answersText = meaningfulAnswers.map((r: any) => r.answer_value).join("\n");
 
     // Demographic distribution summaries
     const ageCounts: Record<string, number> = {};
@@ -251,15 +292,22 @@ export async function POST(req: NextRequest) {
       values: ageValues
     };
 
-    // Prepare stats & quotes
-    const sampleSize = rows.length;
-    const quoteObjs = rows.slice(0, 3).map((r: any, idx: number) => ({ id: idx + 1, text: r.answer_value as string }));
+    // Prepare stats & quotes - use meaningful answers and include question context
+    const sampleSize = meaningfulAnswers.length;
+    const quoteObjs = meaningfulAnswers.slice(0, 8).map((r: any, idx: number) => ({ 
+      id: idx + 1, 
+      text: r.answer_value as string,
+      question: r.question_text as string,
+      questionType: r.question_type as string,
+      questionOptions: r.question_options as string,
+      surveyTitle: r.survey_title as string
+    }));
 
-    // naive sentiment counts
+    // naive sentiment counts - use meaningful answers only
     let pos = 0, neg = 0, neu = 0;
-    const positiveWords = ['good','love','great','like','best','excellent'];
-    const negativeWords = ['bad','hate','poor','worst','expensive','overpriced'];
-    rows.forEach((r:any)=>{
+    const positiveWords = ['good','love','great','like','best','excellent','positive','happy','satisfied','pleased'];
+    const negativeWords = ['bad','hate','poor','worst','expensive','overpriced','negative','unhappy','dissatisfied','disappointed'];
+    meaningfulAnswers.forEach((r:any)=>{
       const text = (r.answer_value as string).toLowerCase();
       if (positiveWords.some(w=>text.includes(w))) pos++; else if (negativeWords.some(w=>text.includes(w))) neg++; else neu++;
     });
@@ -280,15 +328,57 @@ export async function POST(req: NextRequest) {
 
     const statsAppendix = `\n\n---\nsample-size: ${sampleSize}\nsentiment: 👍 ${Math.round((pos/sampleSize)*100)}% | 😐 ${Math.round((neu/sampleSize)*100)}% | 👎 ${Math.round((neg/sampleSize)*100)}%\ndemographics: ${fullDemographicSummary}\ncitations:\n` + quoteObjs.map(q=>`[${q.id}] "${q.text.slice(0,120)}"`).join('\n');
 
-    // Build prompt with quotes list
-    const quotesForPrompt = quoteObjs.map(q=>`[${q.id}] ${q.text}`).join('\n');
-    const prompt = `You are asked to represent the collective voice of a cohort of people. Cite at most 3 supporting quotes using markers like [1], [2]. Demographics of the cohort: ${fullDemographicSummary}. Do not mention limitations about providing graphs. After answering, stop; do NOT output the stats block.\n\nUser question: "${question}"\n\nSupporting quotes:\n${quotesForPrompt}`;
+    // Build prompt with quotes list including question context
+    const quotesForPrompt = quoteObjs.map(q=> {
+      let questionContext = `Question: "${q.question}"`;
+      
+      // Add options context for choice questions
+      if ((q.questionType === 'single-choice' || q.questionType === 'multiple-choice') && q.questionOptions) {
+        try {
+          const options = JSON.parse(q.questionOptions);
+          if (Array.isArray(options) && options.length > 0) {
+            questionContext += ` (Options: ${options.join(', ')})`;
+          }
+        } catch (e) {
+          // Ignore JSON parse errors
+        }
+      }
+      
+      return `[${q.id}] ${questionContext} (from "${q.surveyTitle}") | Answer: "${q.text}"`;
+    }).join('\n');
+    
+    // Check if the user's question can be answered with available data
+    const questionLower = question.toLowerCase();
+    const availableTopics = quoteObjs.map(q => q.question.toLowerCase()).join(' ');
+    
+    // Get unique survey titles for context
+    const surveyTitles = [...new Set(quoteObjs.map(q => q.surveyTitle))];
+    
+    const prompt = `You are asked to represent the collective voice of a cohort of survey respondents based on the actual survey responses provided below.
+
+INSTRUCTIONS:
+- Answer the user's question by analyzing and interpreting the survey responses provided
+- You can make reasonable inferences from the survey data, question context, and survey topics
+- If a question asks about something that can be inferred from the survey responses (e.g., "Who are the most popular creators?" when survey asks about creator impacts), try to answer based on patterns in the responses
+- If the survey topic is clearly related to the user's question, provide insights based on the available responses
+- Only say you don't have sufficient data if the user's question is completely unrelated to the survey topics
+- Always cite supporting quotes using markers like [1], [2], [3]
+- Include the survey question context when relevant to help users understand the responses
+
+Survey Context: The responses come from "${surveyTitles.join('", "')}"
+Demographics of the cohort: ${fullDemographicSummary}
+Sample size: ${sampleSize} meaningful responses
+
+User question: "${question}"
+
+Available survey responses with their questions:
+${quotesForPrompt}`;
 
     // build deterministic demographic sentence before prompt
     const demographicSentence = fullDemographicSummary ? `Demographics: ${fullDemographicSummary}.` : '';
 
     const encoder = new TextEncoder();
-    const systemMessage = systemPrompt || "You are an expert analyst summarising the perspectives of a group of survey respondents. Respond clearly and concisely without repeating words or phrases.";
+    const systemMessage = systemPrompt || "You are an expert analyst summarising the perspectives of a group of survey respondents. Use the survey responses and context to provide meaningful insights. You can make reasonable inferences from the data patterns and survey topics, but always ground your responses in the actual survey data provided.";
 
     // update completion call - use more tokens for o3 models due to reasoning overhead
     const isO3Model = model.startsWith('o3') || model.startsWith('o1');

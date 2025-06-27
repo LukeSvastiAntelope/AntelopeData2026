@@ -136,7 +136,7 @@ const CreateSurveyPage = () => {
       if (response.ok) {
         const result = await response.json()
         toast.success('Survey created successfully!')
-        router.push('/surveys') // Redirect to surveys dashboard
+        router.push('/overview') // Redirect to overview dashboard
       } else {
         const error = await response.json()
         toast.error(error.message || 'Failed to create survey')

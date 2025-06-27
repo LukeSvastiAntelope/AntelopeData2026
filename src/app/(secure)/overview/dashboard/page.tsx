@@ -163,7 +163,7 @@ const SurveyDashboardPage = () => {
           <div className="flex items-center">
             <SidebarTrigger className="-ml-0.5 h-5 w-5 text-muted-foreground hover:text-foreground" />
             <div className="h-4 border-l border-border mx-4" />
-            <Link href="/surveys" className="text-muted-foreground hover:text-foreground">
+                          <Link href="/overview" className="text-muted-foreground hover:text-foreground">
               <ArrowLeft className="h-4 w-4" />
             </Link>
             <div className="h-4 border-l border-border mx-4" />
@@ -372,7 +372,7 @@ const SurveyDashboardPage = () => {
                         <p className="text-xs text-muted-foreground">twins</p>
                       </div>
                       <Button variant="outline" size="sm" asChild className="ml-4">
-                        <Link href={`/surveys/${survey.id}/analytics`}>
+                        <Link href={`/overview/${survey.id}/analytics`}>
                           <Eye className="h-3 w-3" />
                         </Link>
                       </Button>
@@ -487,9 +487,9 @@ const SurveyDashboardPage = () => {
               </Link>
             </Button>
             <Button variant="outline" asChild>
-              <Link href="/surveys">
+                              <Link href="/overview">
                 <Eye className="h-4 w-4 mr-2" />
-                View All Surveys
+                                  View All
               </Link>
             </Button>
             <Button variant="outline" asChild>
