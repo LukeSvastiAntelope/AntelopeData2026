@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -65,6 +65,20 @@ const AISurveyBuilderPage = () => {
   const [editableTitle, setEditableTitle] = useState('')
   const [editableDescription, setEditableDescription] = useState('')
   const [editableQuestions, setEditableQuestions] = useState<GeneratedQuestion[]>([])
+
+  // Load saved model preference on mount
+  useEffect(() => {
+    const savedModel = localStorage.getItem('ai-survey-selected-model');
+    if (savedModel) {
+      setSelectedModel(savedModel);
+    }
+  }, []);
+  
+  // Save model preference when it changes
+  const handleModelChange = (model: string) => {
+    setSelectedModel(model);
+    localStorage.setItem('ai-survey-selected-model', model);
+  };
 
   const examplePrompts = [
     "Create a customer satisfaction survey for a restaurant",
@@ -321,7 +335,7 @@ const AISurveyBuilderPage = () => {
                 </div>
                 <div>
                   <Label htmlFor="model">AI Model</Label>
-                  <Select value={selectedModel} onValueChange={setSelectedModel}>
+                  <Select value={selectedModel} onValueChange={handleModelChange}>
                     <SelectTrigger className="mt-1">
                       <SelectValue placeholder="Select AI model" />
                     </SelectTrigger>
@@ -605,7 +619,7 @@ const AISurveyBuilderPage = () => {
                                   </div>
                                 ))}
                                 {(!question.options || question.options.length === 0) && (
-                                  <p className="text-sm text-muted-foreground">No options added yet. Click "Add Option" to get started.</p>
+                                  <p className="text-sm text-muted-foreground">No options added yet. Click &quot;Add Option&quot; to get started.</p>
                                 )}
                               </div>
                             </div>
