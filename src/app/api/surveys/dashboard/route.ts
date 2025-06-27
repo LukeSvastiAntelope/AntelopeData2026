@@ -50,10 +50,9 @@ export async function GET(request: NextRequest) {
         s.status,
         s.created_at,
         COUNT(sr.id) as response_count,
-        COUNT(DISTINCT ra.id) as digital_twins_count
+        COUNT(DISTINCT sr.agent_token) as digital_twins_count
       FROM surveys s
       LEFT JOIN survey_responses sr ON s.id = sr.survey_id
-      LEFT JOIN responder_agents ra ON sr.id = ra.created_from_response_id
       WHERE s.created_by = ?
       GROUP BY s.id, s.title, s.status, s.created_at
       ORDER BY response_count DESC
@@ -123,14 +122,14 @@ export async function GET(request: NextRequest) {
     // Get digital twin creation stats over time
     const [digitalTwinTrendsRows] = await db.execute<RowDataPacket[]>(
       `SELECT 
-        DATE(ra.created_at) as date,
-        COUNT(*) as digital_twins_created
-      FROM responder_agents ra
-      JOIN survey_responses sr ON ra.created_from_response_id = sr.id
+        DATE(sr.submitted_at) as date,
+        COUNT(DISTINCT sr.agent_token) as digital_twins_created
+      FROM survey_responses sr
       JOIN surveys s ON sr.survey_id = s.id
       WHERE s.created_by = ? 
-        AND ra.created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
-      GROUP BY DATE(ra.created_at)
+        AND sr.submitted_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+        AND sr.agent_token IS NOT NULL
+      GROUP BY DATE(sr.submitted_at)
       ORDER BY date ASC`,
       [userId]
     )

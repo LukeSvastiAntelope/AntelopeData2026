@@ -105,7 +105,7 @@ export const SurveyRepo = {
         try {
             await connection.beginTransaction();
             
-            // Create response
+            // Insert survey response
             const [responseResult] = await connection.execute<ResultSetHeader>(
                 `INSERT INTO survey_responses (survey_id, demographics, ip_address, user_agent) 
                  VALUES (?, ?, ?, ?)`,
@@ -114,30 +114,18 @@ export const SurveyRepo = {
             
             const responseId = responseResult.insertId;
             
-            // Create answers
+            // Insert answers
             for (const answer of data.answers) {
-                // Handle undefined values - convert to null for database
-                let answerValue = answer.value;
-                if (answerValue === undefined || answerValue === null) {
-                    answerValue = '';
-                } else if (Array.isArray(answerValue)) {
-                    // For arrays, filter out undefined values and join
-                    answerValue = answerValue.filter(v => v !== undefined && v !== null).join(', ');
-                } else if (typeof answerValue !== 'string') {
-                    // Convert non-string values to string
-                    answerValue = String(answerValue);
-                }
-                
                 await connection.execute(
-                    `INSERT INTO survey_answers (response_id, question_id, answer_value) 
-                     VALUES (?, ?, ?)`,
-                    [responseId, answer.questionId, answerValue]
+                    'INSERT INTO survey_answers (response_id, question_id, answer_value) VALUES (?, ?, ?)',
+                    [responseId, answer.questionId, Array.isArray(answer.value) ? JSON.stringify(answer.value) : answer.value]
                 );
             }
             
-            // Check if digital twin already exists for this email
-            const email = data.demographics.email;
+            // Handle digital twin creation/linking
+            const email = data.demographics?.email;
             let agentToken;
+            let isExistingTwin = false;
             
             if (email) {
                 const [existingAgents] = await connection.execute<RowDataPacket[]>(
@@ -146,9 +134,17 @@ export const SurveyRepo = {
                 );
                 
                 if (existingAgents.length > 0) {
-                    // Use existing agent token
+                    // Use existing agent token and link this response to the existing digital twin
                     agentToken = existingAgents[0].agent_token;
-                    console.log(`🔄 Using existing digital twin for ${email}: ${agentToken}`);
+                    isExistingTwin = true;
+                    
+                    // Update the survey_response to include the agent_token
+                    await connection.execute(
+                        'UPDATE survey_responses SET agent_token = ? WHERE id = ?',
+                        [agentToken, responseId]
+                    );
+                    
+                    console.log(`🔄 Using existing digital twin for ${email}: ${agentToken}, linked to response ${responseId}`);
                 } else {
                     // Create new responder agent
                     agentToken = `agent_${responseId}_${Date.now()}`;
@@ -158,6 +154,13 @@ export const SurveyRepo = {
                          VALUES (?, ?, ?, ?)`,
                         [responseId, agentToken, email, JSON.stringify({ demographics: data.demographics, status: 'initial' })]
                     );
+                    
+                    // Update the survey_response to include the agent_token
+                    await connection.execute(
+                        'UPDATE survey_responses SET agent_token = ? WHERE id = ?',
+                        [agentToken, responseId]
+                    );
+                    
                     console.log(`✅ Created new digital twin for ${email}: ${agentToken}`);
                 }
             } else {
@@ -169,12 +172,18 @@ export const SurveyRepo = {
                      VALUES (?, ?, ?)`,
                     [responseId, agentToken, JSON.stringify({ demographics: data.demographics, status: 'initial' })]
                 );
+                
+                // Update the survey_response to include the agent_token
+                await connection.execute(
+                    'UPDATE survey_responses SET agent_token = ? WHERE id = ?',
+                    [agentToken, responseId]
+                );
             }
             
             await connection.commit();
             connection.release();
             
-            return { responseId, agentToken };
+            return { responseId, agentToken, isExistingTwin };
             
         } catch (error) {
             await connection.rollback();
@@ -465,9 +474,8 @@ export const SurveyRepo = {
                     sr.id,
                     sr.demographics,
                     sr.submitted_at,
-                    ra.agent_token
+                    sr.agent_token
                 FROM survey_responses sr
-                LEFT JOIN responder_agents ra ON sr.id = ra.created_from_response_id
                 WHERE sr.survey_id = ?
                 ORDER BY sr.submitted_at DESC`,
                 [surveyId]
