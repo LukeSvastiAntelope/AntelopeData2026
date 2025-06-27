@@ -67,6 +67,7 @@ jobs:
         script: |
           cd /root/marketmaker
           echo "=== Pulling Latest Changes ==="
+          git stash
           git pull origin main
           chmod +x deploy.sh
           ./deploy.sh
