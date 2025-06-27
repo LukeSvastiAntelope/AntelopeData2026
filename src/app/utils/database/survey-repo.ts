@@ -514,5 +514,81 @@ export const SurveyRepo = {
         } catch (error) {
             throw error;
         }
+    },
+
+    getSurveyResponse: async (surveyId: number, responseId: number) => {
+        const db = await getMySQLConnection();
+        
+        try {
+            // Get the specific response with demographics
+            const [responseRows] = await db.execute<RowDataPacket[]>(
+                `SELECT 
+                    sr.id,
+                    sr.demographics,
+                    sr.submitted_at,
+                    ra.agent_token
+                FROM survey_responses sr
+                LEFT JOIN responder_agents ra ON sr.id = ra.created_from_response_id
+                WHERE sr.survey_id = ? AND sr.id = ?`,
+                [surveyId, responseId]
+            );
+            
+            if (!responseRows[0]) return null;
+            
+            const response = responseRows[0];
+            
+            // Get all answers for this response with question details
+            const [answerRows] = await db.execute<RowDataPacket[]>(
+                `SELECT 
+                    sa.id,
+                    sa.question_id,
+                    sa.answer_value,
+                    sq.prompt,
+                    sq.type,
+                    sq.options
+                FROM survey_answers sa
+                JOIN survey_questions sq ON sa.question_id = sq.id
+                WHERE sa.response_id = ?
+                ORDER BY sq.question_order ASC`,
+                [responseId]
+            );
+            
+            return {
+                id: response.id,
+                submitted_at: response.submitted_at,
+                demographics: response.demographics, // Already parsed JSON
+                agent_token: response.agent_token,
+                answers: answerRows.map((answer: any) => ({
+                    id: answer.id,
+                    question_id: answer.question_id,
+                    answer_value: answer.answer_value,
+                    question: {
+                        id: answer.question_id,
+                        prompt: answer.prompt,
+                        type: answer.type,
+                        options: answer.options ? (() => {
+                            // If it's already an array, return as is
+                            if (Array.isArray(answer.options)) {
+                                return answer.options;
+                            }
+                            
+                            // If it's not a string, convert to string first
+                            const optionsStr = typeof answer.options === 'string' ? answer.options : String(answer.options);
+                            
+                            try {
+                                // Try to parse as JSON first
+                                return JSON.parse(optionsStr);
+                            } catch {
+                                // If not JSON, treat as comma-separated string
+                                return optionsStr.split(',').map((opt: string) => opt.trim());
+                            }
+                        })() : null
+                    }
+                }))
+            };
+            
+        } catch (error) {
+            throw error;
+        }
     }
 }; 

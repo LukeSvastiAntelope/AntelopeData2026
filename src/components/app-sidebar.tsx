@@ -43,8 +43,8 @@ export function AppSidebar({ className, collapsible = "offcanvas", ...props }: S
 
   const mainNavItems = [
     {
-      title: "Dashboard",
-      href: "/surveys",
+      title: "Overview",
+      href: "/overview",
       icon: LayoutDashboard
     },
     {
@@ -62,11 +62,11 @@ export function AppSidebar({ className, collapsible = "offcanvas", ...props }: S
     //   href: "/strategy",
     //   icon: LineChart
     // },
-    // {
-    //   title: "Surveys",
-    //   href: "/surveys",
-    //   icon: FileText
-    // },
+    {
+      title: "Surveys",
+      href: "/surveys",
+      icon: FileText
+    },
     {
       title: "Digital Twins",
       href: "/digital-twins",
@@ -116,7 +116,7 @@ export function AppSidebar({ className, collapsible = "offcanvas", ...props }: S
     >
       <SidebarHeader className="flex flex-col gap-4 pb-4">
         <div className="flex items-center px-4">
-          <Link href="/surveys" className="flex items-center px-4">
+          <Link href="/overview" className="flex items-center px-4">
             <LogoText 
               className="text-zinc-900 dark:text-zinc-100 transition-opacity group-data-[collapsible=offcanvas]:opacity-0"
               width={120} 

@@ -9,7 +9,7 @@ import { WalletModalProvider } from "@solana/wallet-adapter-react-ui";
 import { WalletAdapterNetwork } from '@solana/wallet-adapter-base';
 import { clusterApiUrl } from "@solana/web3.js";
 import {
-    LedgerWalletAdapter,
+    // LedgerWalletAdapter,
     SolflareWalletAdapter,
     MathWalletAdapter,
 } from "@solana/wallet-adapter-wallets";
@@ -22,7 +22,7 @@ export function SolProvider({ children }: { children: React.ReactNode }) {
     const wallets = useMemo(
         () => [
             new SolflareWalletAdapter(),
-            new LedgerWalletAdapter(),
+            // new LedgerWalletAdapter(),
             new MathWalletAdapter(),
         ],
         []

@@ -3,10 +3,11 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "react-hot-toast";
-import { Spinner } from "@heroui/spinner";
-import { Button } from "@heroui/button";
-import { Image } from "@heroui/image";
-import { Tooltip } from "@heroui/tooltip";
+// import { Spinner } from "@heroui/spinner";
+// import { Button } from "@heroui/button";
+// import { Image } from "@heroui/image";
+// import { Tooltip } from "@heroui/tooltip";
+import { Button } from "@/components/ui/button";
 import { PublicLayout } from "./components/PublicLayout";
 import { PublicSectionCards } from "@/components/public-section-cards"
 import { SidebarTrigger } from "@/components/ui/sidebar";
@@ -14,7 +15,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { formatDistanceToNow } from "date-fns"
-import { CircleEllipsis } from "lucide-react"
+import { CircleEllipsis as CircleEllipsisIcon } from "lucide-react"
 import FrontLanding from "@/components/landing/FrontLanding"
 
 interface IActivity {
@@ -134,21 +135,21 @@ function PublicDashboard() {
             <div className="flex items-center space-x-1 border-b border-border mb-4">
               <Button 
                 variant="ghost" 
-                onPress={() => setActiveTab("activity")} 
+                onClick={() => setActiveTab("activity")} 
                 className={`rounded-none border-b-2 px-4 ${activeTab === "activity" ? "border-b-primary text-foreground" : "border-b-transparent text-muted-foreground hover:text-foreground"}`}
               >
                 Activity
               </Button>
               <Button 
                 variant="ghost" 
-                onPress={() => setActiveTab("bets")} 
+                onClick={() => setActiveTab("bets")} 
                 className={`rounded-none border-b-2 px-4 ${activeTab === "bets" ? "border-b-primary text-foreground" : "border-b-transparent text-muted-foreground hover:text-foreground"}`}
               >
                 Bets History
               </Button>
               <Button 
                 variant="ghost" 
-                onPress={() => setActiveTab("predictions")} 
+                onClick={() => setActiveTab("predictions")} 
                 className={`rounded-none border-b-2 px-4 ${activeTab === "predictions" ? "border-b-primary text-foreground" : "border-b-transparent text-muted-foreground hover:text-foreground"}`}
               >
                 Predictions
@@ -165,16 +166,15 @@ function PublicDashboard() {
                 </p>
                 <div className="flex justify-center gap-4 mt-2">
                   <Button 
-                    onPress={() => router.push('/login')} 
+                    onClick={() => router.push('/login')} 
                     className="bg-primary text-primary-foreground hover:bg-primary/90"
-                    color="primary"
                   >
                     Login
                   </Button>
                   <Button 
-                    onPress={() => router.push('/register')} 
+                    onClick={() => router.push('/register')} 
+                    variant="outline"
                     className="border-border text-foreground hover:bg-accent hover:text-accent-foreground"
-                    variant="bordered"
                   >
                     Register
                   </Button>
@@ -203,7 +203,7 @@ function PublicDashboard() {
                   <Card className="bg-card border border-border shadow-sm">
                     <CardContent className="p-12 text-center">
                       <div className="flex flex-col items-center space-y-2">
-                        <CircleEllipsis className="h-10 w-10 text-muted-foreground" />
+                        <CircleEllipsisIcon className="h-10 w-10 text-muted-foreground" />
                         <h3 className="text-lg font-medium">No activity found</h3>
                         <p className="text-muted-foreground">
                           Bets and predictions will appear here as they are created.
@@ -274,8 +274,8 @@ function PublicDashboard() {
                 {hasMoreActivity && !isLoadingActivity && activity.length > 0 && (
                   <div className="flex justify-center mt-6">
                     <Button
-                      variant="bordered"
-                      onPress={loadMoreActivity}
+                      variant="outline"
+                      onClick={loadMoreActivity}
                       disabled={isLoadingActivity}
                       className="min-w-[200px]"
                     >

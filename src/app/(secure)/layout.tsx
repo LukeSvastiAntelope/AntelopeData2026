@@ -1,13 +1,18 @@
 'use client';
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { Skeleton } from "@heroui/react";
+import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "react-hot-toast";
 import { useFetch } from "../utils/lib";
 import Link from "next/link";
 import Image from "next/image";
 import AgentNameDialog from "../components/AgentNameDialog";
-import { Tooltip as NextUITooltip } from "@heroui/react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import PredictionTypeDialog from "../components/PredictionTypeDialog";
 import { AgentProvider } from "../context/AgentContext";
 import { useAgent } from "../context/AgentContext";
@@ -95,15 +100,23 @@ const SecureLayout = ({ children }: { children: React.ReactNode }) => {
         try {
             setIsSubmittingProfile(true);
             const token = typeof window !== 'undefined' ? localStorage.getItem("token") ?? "" : "";
-            await fetch('/api/saveAgentProfile', {
+            const response = await fetch('/api/saveAgentProfile', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify({ agent: { id: agent?.id, user_id: agent?.user_id, name, is_onboarded: true } }),
             });
-            await fetchAgentProfile();
-            setIsAgentNameOpen(false);
+            const data = await response.json();
+            if (data.status) {
+                await fetchAgentProfile();
+                setIsAgentNameOpen(false);
+                toast.success("Welcome! Your account has been set up successfully.");
+                router.push('/overview');
+            } else {
+                toast.error(data.message || "Failed to save your name. Please try again.");
+            }
         } catch (err) {
             console.error(err);
+            toast.error("An error occurred. Please try again.");
         } finally {
             setIsSubmittingProfile(false);
         }
@@ -261,7 +274,7 @@ const SecureLayout = ({ children }: { children: React.ReactNode }) => {
             if (response.status) {
                 toast.success("Wager principles saved! Onboarding complete.");
                 await fetchAgentProfile();
-                router.push('/surveys');
+                router.push('/overview');
             } else {
                 toast.error(response.message || "Failed to save principles.");
             }
@@ -291,7 +304,7 @@ const SecureLayout = ({ children }: { children: React.ReactNode }) => {
                 setIsSubmittingProfile(false);
             }
         }
-        router.push('/surveys');
+        router.push('/overview');
     };
 
     useEffect(() => {
@@ -339,6 +352,7 @@ const SecureLayout = ({ children }: { children: React.ReactNode }) => {
                     initialName={agent?.name || ""}
                     onSave={handleSaveAgentName}
                     isSubmitting={isSubmittingProfile}
+                    userEmail={user?.username || ""}
                 />
             )}
         </SidebarProvider>

@@ -70,4 +70,69 @@ export class EmailService {
       // Don't throw; avoid breaking user flow
     }
   }
+
+  /**
+   * Send magic login link for Digital Twin access via SendGrid REST API.
+   */
+  static async sendTwinLoginLink(
+    toEmail: string,
+    toName: string | undefined,
+    agentToken: string
+  ): Promise<void> {
+    const twinUrl = `${BASE_URL}/digital-twin/${agentToken}`
+
+    const htmlContent = `
+      <p>Hi ${toName || 'there'},</p>
+      <p>You requested access to your Digital Twin. Click the link below to securely access it:</p>
+      <p><a href="${twinUrl}" target="_blank" rel="noopener noreferrer">Access Your Digital Twin</a></p>
+      <p>This link is unique to you and will give you access to view, edit, or delete your Digital Twin.</p>
+      <p>If you didn't request this link, you can safely ignore this email.</p>
+      <p>— The Antelope Team</p>
+    `
+
+    const payload = {
+      personalizations: [
+        {
+          to: [{ email: toEmail, name: toName || undefined }],
+          subject: 'Access Your Digital Twin',
+        },
+      ],
+      from: {
+        email: FROM_EMAIL,
+        name: FROM_NAME,
+      },
+      content: [
+        {
+          type: 'text/html',
+          value: htmlContent,
+        },
+      ],
+    }
+
+    try {
+      if (!SENDGRID_API_KEY) {
+        console.warn('[EmailService] SENDGRID_API_KEY not set – email not sent. Payload:', payload)
+        return
+      }
+
+      const res = await fetch('https://api.sendgrid.com/v3/mail/send', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${SENDGRID_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      })
+
+      if (!res.ok) {
+        const text = await res.text()
+        throw new Error(`SendGrid API responded with ${res.status}: ${text}`)
+      }
+
+      console.log(`[EmailService] Magic link email sent to ${toEmail}`)
+    } catch (error) {
+      console.error('[EmailService] Failed to send magic link email:', error)
+      // Don't throw; avoid breaking user flow
+    }
+  }
 } 

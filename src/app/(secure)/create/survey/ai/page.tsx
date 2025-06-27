@@ -195,7 +195,7 @@ const AISurveyBuilderPage = () => {
 
       if (response.ok) {
         const data = await response.json()
-        router.push(`/surveys/${data.id}/edit`)
+        router.push(`/overview/${data.id}/edit`)
       } else {
         const errorData = await response.json()
         setError(errorData.message || 'Failed to save survey')
