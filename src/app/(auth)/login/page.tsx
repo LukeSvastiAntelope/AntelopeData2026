@@ -47,7 +47,7 @@ const LoginPage = () => {
                     localStorage.setItem("token", data.token);
                     localStorage.setItem("userId", data.user.id);
                 }
-                router.push("/surveys");
+                router.push("/overview");
             } else {
                 toast.error(data.message.toString());
             }

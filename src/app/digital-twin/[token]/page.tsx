@@ -123,162 +123,164 @@ export default function DigitalTwinProfilePage() {
                 Basic demographics captured from your survey response.
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-3">
-              {Object.keys(demographics).length === 0 && (
-                <p className="text-muted-foreground text-sm">No demographic data available.</p>
-              )}
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3">
+                {Object.keys(demographics).length === 0 && (
+                  <p className="text-muted-foreground text-sm">No demographic data available.</p>
+                )}
 
-              <div>
-                <span className="font-medium">Name:</span>{' '}
-                {editMode ? (
-                  <Input className="mt-1" value={draft.name || ''} onChange={e=>setDraft({...draft, name:e.target.value})} />
-                ) : (
-                  demographics.name || '—'
-                )}
-              </div>
-              <div>
-                <span className="font-medium">Email:</span>{' '}
-                {editMode ? (
-                  <Input className="mt-1" value={draft.email || ''} onChange={e=>setDraft({...draft, email:e.target.value})} />
-                ) : (
-                  demographics.email || '—'
-                )}
-              </div>
-              <div>
-                <span className="font-medium">Age:</span>{' '}
-                {editMode ? (
-                  <Input className="mt-1" value={draft.age || ''} onChange={e=>setDraft({...draft, age:e.target.value})} />
-                ) : (
-                  demographics.age || '—'
-                )}
-              </div>
-              <div>
-                <span className="font-medium">Location:</span>{' '}
-                {editMode ? (
-                  <Input className="mt-1" value={draft.location || ''} onChange={e=>setDraft({...draft, location:e.target.value})} />
-                ) : (
-                  demographics.location || '—'
-                )}
-              </div>
-              <div>
-                <span className="font-medium">Occupation:</span>{' '}
-                {editMode ? (
-                  <Input className="mt-1" value={draft.occupation || ''} onChange={e=>setDraft({...draft, occupation:e.target.value})} />
-                ) : (
-                  demographics.occupation || '—'
-                )}
-              </div>
-              <div>
-                <span className="font-medium">Interests:</span>{' '}
-                {editMode ? (
-                  <Input className="mt-1" value={draft.interests || ''} onChange={e=>setDraft({...draft, interests:e.target.value})} />
-                ) : (
-                  demographics.interests || '—'
-                )}
-              </div>
-              <div>
-                <span className="font-medium">Education:</span>{' '}
-                {editMode ? (
-                  <select
-                    className="w-full mt-1 border rounded-md bg-background px-2 py-1"
-                    value={draft.education || ''}
-                    onChange={e=>setDraft({...draft, education:e.target.value})}
-                  >
-                    <option value="">Select</option>
-                    <option value="high-school">High School</option>
-                    <option value="some-college">Some College</option>
-                    <option value="bachelors">Bachelor&apos;s</option>
-                    <option value="masters">Master&apos;s</option>
-                    <option value="phd">PhD</option>
-                    <option value="other">Other</option>
-                  </select>
-                ) : (
-                  demographics.education || '—'
-                )}
-              </div>
-              <div>
-                <span className="font-medium">Income:</span>{' '}
-                {editMode ? (
-                  <select
-                    className="w-full mt-1 border rounded-md bg-background px-2 py-1"
-                    value={draft.income || ''}
-                    onChange={e=>setDraft({...draft, income:e.target.value})}
-                  >
-                    <option value="">Select</option>
-                    <option value="under-25k">Under $25k</option>
-                    <option value="25k-50k">$25k–$50k</option>
-                    <option value="50k-75k">$50k–$75k</option>
-                    <option value="75k-100k">$75k–$100k</option>
-                    <option value="100k-150k">$100k–$150k</option>
-                    <option value="over-150k">Over $150k</option>
-                    <option value="prefer-not-to-say">Prefer not to say</option>
-                  </select>
-                ) : (
-                  demographics.income || '—'
-                )}
-              </div>
-              <div>
-                <span className="font-medium">Political Views:</span>{' '}
-                {editMode ? (
-                  <select
-                    className="w-full mt-1 border rounded-md bg-background px-2 py-1"
-                    value={draft.politicalViews || ''}
-                    onChange={e=>setDraft({...draft, politicalViews:e.target.value})}
-                  >
-                    <option value="">Select</option>
-                    <option value="very-liberal">Very Liberal</option>
-                    <option value="liberal">Liberal</option>
-                    <option value="moderate">Moderate</option>
-                    <option value="conservative">Conservative</option>
-                    <option value="very-conservative">Very Conservative</option>
-                    <option value="libertarian">Libertarian</option>
-                    <option value="other">Other</option>
-                    <option value="prefer-not-to-say">Prefer not to say</option>
-                  </select>
-                ) : (
-                  demographics.politicalViews || '—'
-                )}
-              </div>
-              <div>
-                <span className="font-medium">Twitter / X:</span>{' '}
-                {editMode ? (
-                  <Input className="mt-1" value={draft.socialMedia?.twitter || ''} onChange={e=>setDraft({...draft, socialMedia:{...(draft.socialMedia||{}), twitter:e.target.value}})} />
-                ) : (
-                  demographics.socialMedia?.twitter || '—'
-                )}
-              </div>
-              <div>
-                <span className="font-medium">LinkedIn:</span>{' '}
-                {editMode ? (
-                  <Input className="mt-1" value={draft.socialMedia?.linkedin || ''} onChange={e=>setDraft({...draft, socialMedia:{...(draft.socialMedia||{}), linkedin:e.target.value}})} />
-                ) : (
-                  demographics.socialMedia?.linkedin || '—'
-                )}
-              </div>
-              <div>
-                <span className="font-medium">Instagram:</span>{' '}
-                {editMode ? (
-                  <Input className="mt-1" value={draft.socialMedia?.instagram || ''} onChange={e=>setDraft({...draft, socialMedia:{...(draft.socialMedia||{}), instagram:e.target.value}})} />
-                ) : (
-                  demographics.socialMedia?.instagram || '—'
-                )}
-              </div>
-
-              <div>
-                <span className="font-medium">Twin Token:</span>{' '}
-                <Badge variant="secondary" className="break-all">
-                  {twin.agent_token}
-                </Badge>
-              </div>
-
-              {editMode ? (
-                <div className="flex gap-2 pt-4">
-                  <Button onClick={saveChanges}>Save</Button>
-                  <Button variant="outline" onClick={()=>setEditMode(false)}>Cancel</Button>
+                <div>
+                  <span className="font-medium">Name:</span>{' '}
+                  {editMode ? (
+                    <Input className="mt-1" value={draft.name || ''} onChange={e=>setDraft({...draft, name:e.target.value})} />
+                  ) : (
+                    demographics.name || '—'
+                  )}
                 </div>
-              ) : (
-                <Button className="mt-4" onClick={startEdit}>Edit Profile</Button>
-              )}
+                <div>
+                  <span className="font-medium">Email:</span>{' '}
+                  {editMode ? (
+                    <Input className="mt-1" value={draft.email || ''} onChange={e=>setDraft({...draft, email:e.target.value})} />
+                  ) : (
+                    demographics.email || '—'
+                  )}
+                </div>
+                <div>
+                  <span className="font-medium">Age:</span>{' '}
+                  {editMode ? (
+                    <Input className="mt-1" value={draft.age || ''} onChange={e=>setDraft({...draft, age:e.target.value})} />
+                  ) : (
+                    demographics.age || '—'
+                  )}
+                </div>
+                <div>
+                  <span className="font-medium">Location:</span>{' '}
+                  {editMode ? (
+                    <Input className="mt-1" value={draft.location || ''} onChange={e=>setDraft({...draft, location:e.target.value})} />
+                  ) : (
+                    demographics.location || '—'
+                  )}
+                </div>
+                <div>
+                  <span className="font-medium">Occupation:</span>{' '}
+                  {editMode ? (
+                    <Input className="mt-1" value={draft.occupation || ''} onChange={e=>setDraft({...draft, occupation:e.target.value})} />
+                  ) : (
+                    demographics.occupation || '—'
+                  )}
+                </div>
+                <div>
+                  <span className="font-medium">Interests:</span>{' '}
+                  {editMode ? (
+                    <Input className="mt-1" value={draft.interests || ''} onChange={e=>setDraft({...draft, interests:e.target.value})} />
+                  ) : (
+                    demographics.interests || '—'
+                  )}
+                </div>
+                <div>
+                  <span className="font-medium">Education:</span>{' '}
+                  {editMode ? (
+                    <select
+                      className="w-full mt-1 border rounded-md bg-background px-2 py-1"
+                      value={draft.education || ''}
+                      onChange={e=>setDraft({...draft, education:e.target.value})}
+                    >
+                      <option value="">Select</option>
+                      <option value="high-school">High School</option>
+                      <option value="some-college">Some College</option>
+                      <option value="bachelors">Bachelor&apos;s</option>
+                      <option value="masters">Master&apos;s</option>
+                      <option value="phd">PhD</option>
+                      <option value="other">Other</option>
+                    </select>
+                  ) : (
+                    demographics.education || '—'
+                  )}
+                </div>
+                <div>
+                  <span className="font-medium">Income:</span>{' '}
+                  {editMode ? (
+                    <select
+                      className="w-full mt-1 border rounded-md bg-background px-2 py-1"
+                      value={draft.income || ''}
+                      onChange={e=>setDraft({...draft, income:e.target.value})}
+                    >
+                      <option value="">Select</option>
+                      <option value="under-25k">Under $25k</option>
+                      <option value="25k-50k">$25k–$50k</option>
+                      <option value="50k-75k">$50k–$75k</option>
+                      <option value="75k-100k">$75k–$100k</option>
+                      <option value="100k-150k">$100k–$150k</option>
+                      <option value="over-150k">Over $150k</option>
+                      <option value="prefer-not-to-say">Prefer not to say</option>
+                    </select>
+                  ) : (
+                    demographics.income || '—'
+                  )}
+                </div>
+                <div>
+                  <span className="font-medium">Political Views:</span>{' '}
+                  {editMode ? (
+                    <select
+                      className="w-full mt-1 border rounded-md bg-background px-2 py-1"
+                      value={draft.politicalViews || ''}
+                      onChange={e=>setDraft({...draft, politicalViews:e.target.value})}
+                    >
+                      <option value="">Select</option>
+                      <option value="very-liberal">Very Liberal</option>
+                      <option value="liberal">Liberal</option>
+                      <option value="moderate">Moderate</option>
+                      <option value="conservative">Conservative</option>
+                      <option value="very-conservative">Very Conservative</option>
+                      <option value="libertarian">Libertarian</option>
+                      <option value="other">Other</option>
+                      <option value="prefer-not-to-say">Prefer not to say</option>
+                    </select>
+                  ) : (
+                    demographics.politicalViews || '—'
+                  )}
+                </div>
+                <div>
+                  <span className="font-medium">Twitter / X:</span>{' '}
+                  {editMode ? (
+                    <Input className="mt-1" value={draft.socialMedia?.twitter || ''} onChange={e=>setDraft({...draft, socialMedia:{...(draft.socialMedia||{}), twitter:e.target.value}})} />
+                  ) : (
+                    demographics.socialMedia?.twitter || '—'
+                  )}
+                </div>
+                <div>
+                  <span className="font-medium">LinkedIn:</span>{' '}
+                  {editMode ? (
+                    <Input className="mt-1" value={draft.socialMedia?.linkedin || ''} onChange={e=>setDraft({...draft, socialMedia:{...(draft.socialMedia||{}), linkedin:e.target.value}})} />
+                  ) : (
+                    demographics.socialMedia?.linkedin || '—'
+                  )}
+                </div>
+                <div>
+                  <span className="font-medium">Instagram:</span>{' '}
+                  {editMode ? (
+                    <Input className="mt-1" value={draft.socialMedia?.instagram || ''} onChange={e=>setDraft({...draft, socialMedia:{...(draft.socialMedia||{}), instagram:e.target.value}})} />
+                  ) : (
+                    demographics.socialMedia?.instagram || '—'
+                  )}
+                </div>
+
+                <div>
+                  <span className="font-medium">Twin Token:</span>{' '}
+                  <Badge variant="secondary" className="break-all">
+                    {twin.agent_token}
+                  </Badge>
+                </div>
+
+                {editMode ? (
+                  <div className="flex gap-2 pt-4">
+                    <Button onClick={saveChanges}>Save</Button>
+                    <Button variant="outline" onClick={()=>setEditMode(false)}>Cancel</Button>
+                  </div>
+                ) : (
+                  <Button className="mt-4" onClick={startEdit}>Edit Profile</Button>
+                )}
+              </div>
             </CardContent>
           </Card>
 

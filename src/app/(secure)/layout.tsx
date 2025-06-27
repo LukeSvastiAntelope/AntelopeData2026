@@ -1,15 +1,18 @@
 'use client';
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { Skeleton } from "@heroui/react";
+import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "react-hot-toast";
 import { useFetch } from "../utils/lib";
 import Link from "next/link";
 import Image from "next/image";
-import AgentProfileDialog from "../components/AgentProfileDialog";
-import ContentPreferencesDialog from "../components/ContentPreferencesDialog";
-import WagerPrinciplesDialog from "../components/WagerPrinciplesDialog";
-import { Tooltip as NextUITooltip } from "@heroui/react";
+import AgentNameDialog from "../components/AgentNameDialog";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import PredictionTypeDialog from "../components/PredictionTypeDialog";
 import { AgentProvider } from "../context/AgentContext";
 import { useAgent } from "../context/AgentContext";
@@ -20,14 +23,16 @@ const SecureLayout = ({ children }: { children: React.ReactNode }) => {
     const pathname = usePathname();
     const router = useRouter();
     const [isOpen, setIsOpen] = useState(false);
-    const [isAgentProfileOpen, setIsAgentProfileOpen] = useState(false);
-    const [isContentPrefsOpen, setIsContentPrefsOpen] = useState(false);
-    const [isWagerPrinciplesOpen, setIsWagerPrinciplesOpen] = useState(false);
+    const [isAgentNameOpen, setIsAgentNameOpen] = useState(false);
     const [generatedPrinciples, setGeneratedPrinciples] = useState("");
     const [isGeneratingPrinciples, setIsGeneratingPrinciples] = useState(false);
     const [isSubmittingProfile, setIsSubmittingProfile] = useState(false);
     const fetchData = useFetch();
     const { agent, setAgent, isAgentProfileLoading, setIsAgentProfileLoading, user } = useAgent();
+    // Placeholder flags to retain existing code paths (kept for future full onboarding flow)
+    const [, setIsAgentProfileOpen] = useState(false);
+    const [, setIsContentPrefsOpen] = useState(false);
+    const [, setIsWagerPrinciplesOpen] = useState(false);
 
     const openPredictionDialog = () => {
         setIsOpen(true);
@@ -45,7 +50,7 @@ const SecureLayout = ({ children }: { children: React.ReactNode }) => {
         } finally {
             setIsAgentProfileLoading(false);
         }
-    }
+    };
 
     const compressImage = (file: File | Blob): Promise<string> => {
         return new Promise((resolve) => {
@@ -90,72 +95,30 @@ const SecureLayout = ({ children }: { children: React.ReactNode }) => {
         });
     };
 
-    const handleSaveProfile = async (name: string, description: string, fileRef: React.RefObject<HTMLInputElement | null>, imagePreview: string) => {
-        if (!name || !description) {
-            toast.error("Please fill in all fields.");
-            return;
-        }
-        setIsSubmittingProfile(true);
-        let profileUpdatedSuccessfully = false;
+    const handleSaveAgentName = async (name: string) => {
+        if (!name) return;
         try {
-            const agentProfileData = {
-                ...agent,
-                id: agent?.id,
-                user_id: agent?.user_id,
-                name: name.slice(0, 30),
-                description: description.slice(0, 200),
-                category: agent?.category || 'General',
-                riskLevel: agent?.riskLevel || 'Moderate',
-                conservativeBetSize: agent?.conservativeBetSize || 10,
-                moderateBetSize: agent?.moderateBetSize || 25,
-                aggressiveBetSize: agent?.aggressiveBetSize || 50,
-                maxBetSize: agent?.maxBetSize || 100,
-                interests: agent?.interests || [],
-                plugins: agent?.plugins || [],
-                principles: agent?.principles || '',
-                maxTimelineLimit: agent?.maxTimelineLimit || 30,
-                model: agent?.model || 'gpt-4o',
-                is_bet: agent?.is_bet || 1,
-                is_onboarded: agent?.is_onboarded || false,
-            };
-
-            const avatarFile = fileRef?.current?.files?.[0];
-            if (avatarFile) {
-                const compressedImage = await compressImage(avatarFile);
-                agentProfileData.image = 'data:image/jpeg;base64,' + compressedImage;
-            } else if (agent?.image !== imagePreview) {
-                agentProfileData.image = imagePreview;
-            }
-
+            setIsSubmittingProfile(true);
             const token = typeof window !== 'undefined' ? localStorage.getItem("token") ?? "" : "";
-            const res = await fetch('/api/saveAgentProfile', {
+            const response = await fetch('/api/saveAgentProfile', {
                 method: 'POST',
-                body: JSON.stringify({ agent: agentProfileData }),
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                }
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({ agent: { id: agent?.id, user_id: agent?.user_id, name, is_onboarded: true } }),
             });
-            const response = await res.json();
-            if (response.status) {
-                await fetchData.post('/api/saveAgentJoinAction', { name, description });
+            const data = await response.json();
+            if (data.status) {
                 await fetchAgentProfile();
-                toast.success("Profile info saved!");
-                profileUpdatedSuccessfully = true;
+                setIsAgentNameOpen(false);
+                toast.success("Welcome! Your account has been set up successfully.");
+                router.push('/overview');
             } else {
-                toast.error(response.message || "Failed to update profile info.");
+                toast.error(data.message || "Failed to save your name. Please try again.");
             }
-        } catch (error) {
-            console.error("Error saving profile:", error);
-            toast.error("Profile update failed.");
+        } catch (err) {
+            console.error(err);
+            toast.error("An error occurred. Please try again.");
         } finally {
             setIsSubmittingProfile(false);
-            if (profileUpdatedSuccessfully) {
-                setIsAgentProfileOpen(false);
-                setTimeout(() => {
-                    setIsContentPrefsOpen(true);
-                }, 100);
-            }
         }
     };
 
@@ -166,7 +129,6 @@ const SecureLayout = ({ children }: { children: React.ReactNode }) => {
             return;
         }
         setIsGeneratingPrinciples(true);
-        setIsContentPrefsOpen(false);
         try {
             const token = typeof window !== 'undefined' ? localStorage.getItem("token") ?? "" : "";
             const response = await fetch('/api/generateWagerPrinciples', {
@@ -196,7 +158,6 @@ const SecureLayout = ({ children }: { children: React.ReactNode }) => {
             setGeneratedPrinciples("1. Analyze market trends thoroughly.\n2. Manage bankroll effectively.\n3. Adapt strategies based on performance.");
         } finally {
             setIsGeneratingPrinciples(false);
-            setIsWagerPrinciplesOpen(true);
         }
     };
 
@@ -254,10 +215,7 @@ const SecureLayout = ({ children }: { children: React.ReactNode }) => {
             if (response.status) {
                 toast.success("Content preferences saved!");
                 await fetchAgentProfile();
-                setIsContentPrefsOpen(false);
-                setTimeout(() => {
-                    triggerGenerateAndShowPrinciplesDialog();
-                }, 100);
+                triggerGenerateAndShowPrinciplesDialog();
             } else {
                 toast.error(response.message || "Failed to save preferences.");
             }
@@ -270,7 +228,6 @@ const SecureLayout = ({ children }: { children: React.ReactNode }) => {
     };
 
     const handleSkipContentPrefs = async () => {
-        setIsContentPrefsOpen(false);
         await fetchAgentProfile();
         triggerGenerateAndShowPrinciplesDialog();
     };
@@ -317,8 +274,7 @@ const SecureLayout = ({ children }: { children: React.ReactNode }) => {
             if (response.status) {
                 toast.success("Wager principles saved! Onboarding complete.");
                 await fetchAgentProfile();
-                setIsWagerPrinciplesOpen(false);
-                router.push('/surveys');
+                router.push('/overview');
             } else {
                 toast.error(response.message || "Failed to save principles.");
             }
@@ -348,26 +304,14 @@ const SecureLayout = ({ children }: { children: React.ReactNode }) => {
                 setIsSubmittingProfile(false);
             }
         }
-        setIsWagerPrinciplesOpen(false);
-        router.push('/surveys');
+        router.push('/overview');
     };
 
     useEffect(() => {
         if (agent && !isAgentProfileLoading) {
-            // Check if agent needs onboarding
-            const needsOnboarding = typeof agent.is_onboarded === 'undefined' || 
-                                  agent.is_onboarded === false ||
-                                  (typeof agent.is_onboarded === 'number' && agent.is_onboarded === 0);
-            const hasIncompleteProfile = !agent.description || agent.description.trim() === '';
-
-            if (needsOnboarding) {
-                if (hasIncompleteProfile) {
-                    setIsAgentProfileOpen(true);
-                } else if (!agent.category || !agent.riskLevel) {
-                    setIsContentPrefsOpen(true);
-                } else if (!agent.principles || agent.principles.trim() === '') {
-                    setIsWagerPrinciplesOpen(true);
-                }
+            const onboarded = Boolean(agent.is_onboarded);
+            if (!onboarded) {
+                setIsAgentNameOpen(true);
             }
         }
     }, [agent, isAgentProfileLoading]);
@@ -401,37 +345,14 @@ const SecureLayout = ({ children }: { children: React.ReactNode }) => {
                 />
             )}
 
-            {isAgentProfileOpen && agent && (
-                <AgentProfileDialog 
-                    isOpen={isAgentProfileOpen} 
-                    onClose={() => setIsAgentProfileOpen(false)} 
-                    name={agent.name || ""}
-                    description={agent.description || ""}
-                    image={agent.image || ""}
-                    isSubmittingProfile={isSubmittingProfile}
-                    handleSaveProfile={handleSaveProfile}
-                    userId={user?.id}
-                />
-            )}
-
-            {isContentPrefsOpen && agent && (
-                <ContentPreferencesDialog 
-                    isOpen={isContentPrefsOpen} 
-                    onClose={() => setIsContentPrefsOpen(false)} 
-                    agent={agent}
-                    onSave={handleSaveContentPrefs}
-                    onSkip={handleSkipContentPrefs}
-                />
-            )}
-
-            {isWagerPrinciplesOpen && (
-                <WagerPrinciplesDialog 
-                    isOpen={isWagerPrinciplesOpen} 
-                    onClose={() => setIsWagerPrinciplesOpen(false)} 
-                    initialPrinciples={generatedPrinciples}
-                    onSave={handleSaveWagerPrinciples}
-                    onSkip={handleSkipWagerPrinciples}
-                    isLoadingExternally={isGeneratingPrinciples}
+            {isAgentNameOpen && (
+                <AgentNameDialog
+                    isOpen={isAgentNameOpen}
+                    onClose={() => setIsAgentNameOpen(false)}
+                    initialName={agent?.name || ""}
+                    onSave={handleSaveAgentName}
+                    isSubmitting={isSubmittingProfile}
+                    userEmail={user?.username || ""}
                 />
             )}
         </SidebarProvider>

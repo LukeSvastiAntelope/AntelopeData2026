@@ -1,132 +1,340 @@
-/* eslint-disable react/no-unescaped-entities */
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
-import Link from 'next/link'
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-  CardContent
-} from '@/components/ui/card'
-import { SidebarTrigger } from '@/components/ui/sidebar'
-import { Loader2, ArrowLeft, Brain, Mail, MapPin, Briefcase, GraduationCap, Copy, CheckCircle } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { SidebarTrigger } from "@/components/ui/sidebar"
+import { 
+  ArrowLeft,
+  User,
+  MapPin,
+  Briefcase,
+  Calendar,
+  Brain
+} from "lucide-react"
+import Link from "next/link"
+import { formatDistanceToNow } from "date-fns"
 
-interface SurveyResponseDetail {
+interface SurveyAnswer {
+  id: number
+  question_id: number
+  answer_value: string
+  question: {
+    id: number
+    prompt: string
+    type: string
+    options?: string[]
+  }
+}
+
+interface SurveyResponse {
   id: number
   submitted_at: string
-  demographics: { [key:string]:any }
-  answers: Array<{ questionId:number; questionText:string; value:string|string[] }>
-  agentToken: string
+  demographics: {
+    name?: string
+    age?: string
+    location?: string
+    occupation?: string
+    politicalViews?: string
+    [key: string]: any
+  }
+  agent_token?: string
+  answers: SurveyAnswer[]
 }
 
-interface SurveyDetailApi {
-  survey:{ id:number; title:string; description:string }
-  responses: SurveyResponseDetail[]
+interface Survey {
+  id: number
+  title: string
+  description: string
+  status: string
+  created_at: string
 }
 
-const ResponderDetailPage = () => {
-  const params = useParams() as { id:string; responseId:string }
-  const surveyId = params.id
-  const responseId = parseInt(params.responseId)
+const IndividualResponsePage = () => {
+  const params = useParams()
+  const surveyId = params.id as string
+  const responseId = params.responseId as string
+  
+  const [survey, setSurvey] = useState<Survey | null>(null)
+  const [response, setResponse] = useState<SurveyResponse | null>(null)
+  const [loading, setLoading] = useState(true)
 
-  const [data,setData] = useState<SurveyResponseDetail|null>(null)
-  const [surveyTitle,setSurveyTitle]=useState<string>('')
-  const [loading,setLoading] = useState(true)
-  const [copied,setCopied] = useState(false)
+  useEffect(() => {
+    loadResponseData()
+  }, [surveyId, responseId])
 
-  useEffect(()=>{
-    const fetchData = async () => {
-      try{
-        const res = await fetch(`/api/surveys/${surveyId}/analytics`,{
-          headers:{ 'Authorization':`Bearer ${localStorage.getItem('token')}` }
-        })
-        if(res.ok){
-          const json:SurveyDetailApi = await res.json()
-          setSurveyTitle(json.survey.title)
-          const found = json.responses.find(r=>r.id===responseId)
-          if(found) setData(found)
+  const loadResponseData = async () => {
+    setLoading(true)
+    try {
+      // Load survey details
+      const surveyRes = await fetch(`/api/surveys/${surveyId}`, {
+        headers: { 
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
-      }catch(e){console.error(e)}
-      finally{setLoading(false)}
+      })
+      
+      if (surveyRes.ok) {
+        const surveyData = await surveyRes.json()
+        setSurvey(surveyData.survey)
+      }
+
+      // Load individual response
+      const responseRes = await fetch(`/api/surveys/${surveyId}/responses/${responseId}`, {
+        headers: { 
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      })
+      
+      if (responseRes.ok) {
+        const responseData = await responseRes.json()
+        if (responseData.status) {
+          setResponse(responseData.response)
+        }
+      }
+    } catch (error) {
+      console.error('Error loading response data:', error)
+    } finally {
+      setLoading(false)
     }
-    if(!isNaN(responseId)) fetchData()
-  },[surveyId,responseId])
-
-  const copyToken = () => {
-    if(!data) return
-    navigator.clipboard.writeText(data.agentToken)
-    setCopied(true)
-    setTimeout(()=>setCopied(false),2000)
   }
 
-  const formatDate = (d:string) => new Date(d).toLocaleString('en-US',{year:'numeric',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})
-
-  if(loading){
-    return <div className="flex-1 p-2 w-full bg-background"><div className="mx-auto rounded-lg bg-card text-card-foreground shadow-lg"><div className="p-6 text-center"><Loader2 className="h-8 w-8 animate-spin mx-auto mb-4"/><p className="text-muted-foreground">Loading responder...</p></div></div></div>
+  const formatAnswer = (answer: SurveyAnswer) => {
+    const { question, answer_value } = answer
+    
+    switch (question.type) {
+      case 'multiple_choice':
+      case 'single_choice':
+        return answer_value
+      case 'text':
+      case 'textarea':
+        return answer_value
+      case 'scale':
+        return `${answer_value}/10`
+      case 'boolean':
+        return answer_value === 'true' ? 'Yes' : 'No'
+      default:
+        return answer_value
+    }
   }
-  if(!data){
-    return <div className="flex-1 p-2 w-full bg-background"><div className="mx-auto rounded-lg bg-card text-card-foreground shadow-lg"><div className="p-6 text-center"><p className="text-muted-foreground">Responder not found</p></div></div></div>
+
+  if (loading) {
+    return (
+      <div className="flex-1 p-2 w-full bg-background">
+        <div className="mx-auto rounded-lg bg-card text-card-foreground shadow-lg">
+          <div className="px-6 py-4">
+            <div className="flex items-center">
+              <SidebarTrigger className="-ml-0.5 h-5 w-5 text-muted-foreground hover:text-foreground" />
+              <div className="h-4 border-l border-border mx-4" />
+              <h1 className="text-base font-medium text-card-foreground">Survey Response</h1>
+            </div>
+          </div>
+          <div className="border-b border-border" />
+          <div className="p-4 flex items-center justify-center">
+            <div className="text-muted-foreground">Loading response...</div>
+          </div>
+        </div>
+      </div>
+    )
   }
 
-  const demo = data.demographics
+  if (!response) {
+    return (
+      <div className="flex-1 p-2 w-full bg-background">
+        <div className="mx-auto rounded-lg bg-card text-card-foreground shadow-lg">
+          <div className="px-6 py-4">
+            <div className="flex items-center">
+              <SidebarTrigger className="-ml-0.5 h-5 w-5 text-muted-foreground hover:text-foreground" />
+              <div className="h-4 border-l border-border mx-4" />
+              <Link href={`/surveys/${surveyId}/results`} className="text-muted-foreground hover:text-foreground">
+                <ArrowLeft className="h-4 w-4" />
+              </Link>
+              <div className="h-4 border-l border-border mx-4" />
+              <h1 className="text-base font-medium text-card-foreground">Response Not Found</h1>
+            </div>
+          </div>
+          <div className="border-b border-border" />
+          <div className="p-4 text-center">
+            <div className="text-muted-foreground">This response could not be found.</div>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="flex-1 p-2 w-full bg-background">
       <div className="mx-auto rounded-lg bg-card text-card-foreground shadow-lg">
-        {/* header */}
-        <div className="px-6 py-4 flex items-center">
-          <SidebarTrigger className="-ml-0.5 h-5 w-5 text-muted-foreground hover:text-foreground"/>
-          <div className="h-4 border-l border-border mx-4"/>
-          <Link href={`/surveys/${surveyId}/results`} className="text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4"/></Link>
-          <div className="h-4 border-l border-border mx-4"/>
-          <h1 className="text-base font-medium">{surveyTitle ? `${surveyTitle} – Responder Details` : 'Responder Details'}</h1>
+        {/* Header */}
+        <div className="px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <SidebarTrigger className="-ml-0.5 h-5 w-5 text-muted-foreground hover:text-foreground" />
+              <div className="h-4 border-l border-border mx-4" />
+              <Link href={`/surveys/${surveyId}/results`} className="text-muted-foreground hover:text-foreground">
+                <ArrowLeft className="h-4 w-4" />
+              </Link>
+              <div className="h-4 border-l border-border mx-4" />
+              <div>
+                <h1 className="text-base font-medium text-card-foreground">
+                  Survey Response
+                </h1>
+                <p className="text-sm text-muted-foreground">
+                  {survey?.title}
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
-        <div className="border-b border-border"/>
+        
+        <div className="border-b border-border" />
 
-        <div className="p-6 space-y-6">
+        <div className="p-4 space-y-6">
+          {/* Respondent Information */}
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2"><Brain className="h-5 w-5"/>Digital Twin</CardTitle>
-              <CardDescription>Interact with this respondent&apos;s digital twin</CardDescription>
+              <CardTitle className="flex items-center gap-2">
+                <User className="h-5 w-5" />
+                Respondent Information
+              </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-3 text-sm">
-                <div className="flex items-center gap-2"><Mail className="h-4 w-4 text-muted-foreground"/><span className="truncate">{demo.email}</span></div>
-                <div className="flex items-center gap-2"><MapPin className="h-4 w-4 text-muted-foreground"/><span>{demo.location}</span></div>
-                <div className="flex items-center gap-2"><Briefcase className="h-4 w-4 text-muted-foreground"/><span>{demo.occupation}</span></div>
-                <div className="flex items-center gap-2"><GraduationCap className="h-4 w-4 text-muted-foreground"/><span>{demo.education}</span></div>
-              </div>
-              <div className="bg-muted/50 p-3 rounded-lg">
-                <p className="text-xs text-muted-foreground">Agent Token</p>
-                <div className="flex items-center gap-2 mt-1">
-                  <code className="text-xs font-mono flex-1 truncate">{data.agentToken}</code>
-                  <Button size="sm" variant="outline" onClick={copyToken}>{copied ? <CheckCircle className="h-3 w-3"/> : <Copy className="h-3 w-3"/>}</Button>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="space-y-1">
+                  <div className="text-sm font-medium text-muted-foreground">Name</div>
+                  <div className="text-sm">{response.demographics?.name || 'Anonymous'}</div>
+                </div>
+                
+                <div className="space-y-1">
+                  <div className="text-sm font-medium text-muted-foreground">Age</div>
+                  <div className="text-sm">{response.demographics?.age || '—'}</div>
+                </div>
+                
+                <div className="space-y-1">
+                  <div className="text-sm font-medium text-muted-foreground flex items-center gap-1">
+                    <MapPin className="h-3 w-3" />
+                    Location
+                  </div>
+                  <div className="text-sm">{response.demographics?.location || '—'}</div>
+                </div>
+                
+                <div className="space-y-1">
+                  <div className="text-sm font-medium text-muted-foreground flex items-center gap-1">
+                    <Briefcase className="h-3 w-3" />
+                    Occupation
+                  </div>
+                  <div className="text-sm">{response.demographics?.occupation || '—'}</div>
+                </div>
+                
+                <div className="space-y-1">
+                  <div className="text-sm font-medium text-muted-foreground">Political Views</div>
+                  <div className="text-sm">{response.demographics?.politicalViews || '—'}</div>
+                </div>
+                
+                <div className="space-y-1">
+                  <div className="text-sm font-medium text-muted-foreground flex items-center gap-1">
+                    <Calendar className="h-3 w-3" />
+                    Submitted
+                  </div>
+                  <div className="text-sm">
+                    {formatDistanceToNow(new Date(response.submitted_at), { addSuffix: true })}
+                  </div>
                 </div>
               </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Submitted: {formatDate(data.submitted_at)}</p>
-              </div>
-              <div className="border-t pt-4">
-                <h4 className="font-medium mb-3">Survey Answers</h4>
-                <div className="space-y-4">
-                  {data.answers.map(ans => (
-                    <div key={ans.questionId}>
-                      <p className="font-medium text-muted-foreground">{ans.questionText}</p>
-                      <p>{Array.isArray(ans.value) ? ans.value.join(', ') : ans.value}</p>
-                    </div>
-                  ))}
+              
+              {response.agent_token && (
+                <div className="pt-2 border-t">
+                  <div className="flex items-center gap-2">
+                    <Brain className="h-4 w-4 text-blue-600" />
+                    <Badge variant="secondary">Digital Twin Available</Badge>
+                  </div>
                 </div>
-              </div>
+              )}
             </CardContent>
           </Card>
+
+          {/* Survey Answers */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Survey Answers</CardTitle>
+              <CardDescription>
+                Detailed responses to all survey questions
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {response.answers && response.answers.length > 0 ? (
+                response.answers.map((answer, index) => (
+                  <div key={answer.id} className="space-y-2">
+                    <div className="flex items-start gap-2">
+                      <div className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-xs font-medium text-primary">
+                        {index + 1}
+                      </div>
+                      <div className="flex-1 space-y-2">
+                        <div className="font-medium text-sm">
+                          {answer.question.prompt}
+                        </div>
+                        <div className="text-sm text-muted-foreground">
+                          Type: {answer.question.type.replace('_', ' ')}
+                        </div>
+                        <div className="p-3 bg-muted/50 rounded-lg">
+                          <div className="text-sm font-medium">
+                            {formatAnswer(answer)}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    {index < response.answers.length - 1 && (
+                      <div className="border-b border-border" />
+                    )}
+                  </div>
+                ))
+              ) : (
+                <div className="text-center text-muted-foreground py-8">
+                  No answers found for this response.
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Additional Demographics */}
+          {response.demographics && Object.keys(response.demographics).length > 5 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Additional Demographics</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {Object.entries(response.demographics)
+                    .filter(([key]) => !['name', 'age', 'location', 'occupation', 'politicalViews'].includes(key))
+                    .map(([key, value]) => (
+                      <div key={key} className="space-y-1">
+                        <div className="text-sm font-medium text-muted-foreground capitalize">
+                          {key.replace(/([A-Z])/g, ' $1').trim()}
+                        </div>
+                        <div className="text-sm">
+                          {typeof value === 'object' && value !== null ? (
+                            <div className="space-y-1">
+                              {Object.entries(value as Record<string, any>).map(([subKey, subValue]) => (
+                                <div key={subKey} className="flex items-center gap-2">
+                                  <span className="text-xs text-muted-foreground capitalize">{subKey}:</span>
+                                  <span className="text-xs">{String(subValue) || '—'}</span>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            String(value) || '—'
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
     </div>
   )
 }
 
-export default ResponderDetailPage 
+export default IndividualResponsePage 

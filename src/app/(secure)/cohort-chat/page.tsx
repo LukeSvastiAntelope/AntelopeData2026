@@ -62,6 +62,8 @@ export default function CohortChatPage() {
   const [saving, setSaving] = useState(false);
   const [surveys, setSurveys] = useState<{id:number,title:string}[]>([]);
   const [selectedSurveyId, setSelectedSurveyId] = useState<number | null>(null);
+  const [selectedSurveyData, setSelectedSurveyData] = useState<any>(null);
+  const [dynamicPrompts, setDynamicPrompts] = useState<string[]>([]);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [selectedModel, setSelectedModel] = useState('gpt-4o');
   const [sources, setSources] = useState<{survey: boolean; twins: boolean; web: boolean}>({survey: true, twins: true, web: false});
@@ -84,7 +86,16 @@ export default function CohortChatPage() {
         .then(res => res.json())
         .then(data => { 
           console.log('Surveys data:', data);
-          if (data.surveys) setSurveys(data.surveys); 
+          if (data.surveys) {
+            setSurveys(data.surveys);
+            // Auto-select the latest survey (most recent created_at)
+            if (data.surveys.length > 0) {
+              const latestSurvey = data.surveys.reduce((latest: any, current: any) => 
+                new Date(current.created_at) > new Date(latest.created_at) ? current : latest
+              );
+              setSelectedSurveyId(latestSurvey.id);
+            }
+          }
         });
     }
     // Fetch cohorts on mount
@@ -96,6 +107,56 @@ export default function CohortChatPage() {
         });
     }
   }, []);
+
+  // Fetch survey details when selectedSurveyId changes
+  useEffect(() => {
+    if (selectedSurveyId) {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('token') ?? '' : '';
+      if (token) {
+        fetch(`/api/surveys/${selectedSurveyId}`, { 
+          headers: { 'Authorization': `Bearer ${token}` } 
+        })
+          .then(res => res.json())
+          .then(data => {
+            if (data.status && data.survey) {
+              setSelectedSurveyData(data.survey);
+              const prompts = generateDynamicPrompts(data.survey);
+              setDynamicPrompts(prompts);
+            }
+          })
+          .catch(error => {
+            console.error('Error fetching survey details:', error);
+            // Fallback to default prompts
+            setDynamicPrompts([
+              "What are the key trends in responses?",
+              "How do demographics affect answers?", 
+              "Show response patterns"
+            ]);
+          });
+      }
+    } else {
+      setSelectedSurveyData(null);
+      setDynamicPrompts([
+        "What are the key trends in responses?",
+        "How do demographics affect answers?", 
+        "Show response patterns"
+      ]);
+    }
+  }, [selectedSurveyId]);
+
+  // Load saved model preference on mount
+  useEffect(() => {
+    const savedModel = localStorage.getItem('cohort-chat-selected-model');
+    if (savedModel) {
+      setSelectedModel(savedModel);
+    }
+  }, []);
+  
+  // Save model preference when it changes
+  const handleModelChange = (model: string) => {
+    setSelectedModel(model);
+    localStorage.setItem('cohort-chat-selected-model', model);
+  };
 
   const handleSend = async () => {
     if (!input.trim()) {
@@ -160,13 +221,18 @@ export default function CohortChatPage() {
           const answerTxt=parts[0];
           const stats=parts.slice(1).join('\n---\n');
           // extract citations mapping
-          const match = stats.match(/citations:\s*([\s\S]*)/);
-          const citationsBlock = match? match[1]:'';
+          const match = stats.match(/citations:\s*([\s\S]*?)(?=\n---|\n🎯|$)/);
+          const citationsBlock = match? match[1].trim():'';
           const citations:Record<string,string>={};
-          citationsBlock.split('\n').forEach(line=>{
-            const m=line.match(/\[(\d+)\]\s+"(.+?)"/);
-            if(m) citations[m[1]] = m[2];
-          });
+          if (citationsBlock) {
+            citationsBlock.split('\n').forEach(line=>{
+              // Updated regex to handle new format: [1] Q: "question" | A: "answer"
+              const m=line.match(/\[(\d+)\]\s+(.+)/);
+              if(m) {
+                citations[m[1]] = m[2];
+              }
+            });
+          }
           // extract chart spec fenced block
           if(chartMatchFull){
             try {
@@ -227,14 +293,74 @@ export default function CohortChatPage() {
     setFilterRules(prev => prev.map((r,i)=> i===idx? { ...r, [key]: value }: r));
   };
 
+  // Generate dynamic prompts based on survey data
+  const generateDynamicPrompts = (surveyData: any) => {
+    if (!surveyData || !surveyData.questions) return [];
+    
+    const prompts: string[] = [];
+    const questions = surveyData.questions;
+    
+    // Analyze question types and content to generate relevant prompts
+    const hasRatingQuestions = questions.some((q: any) => q.type === 'rating' || q.type === 'scale');
+    const hasChoiceQuestions = questions.some((q: any) => q.type === 'single-choice' || q.type === 'multiple-choice');
+    const hasTextQuestions = questions.some((q: any) => q.type === 'text');
+    
+    // Get first few question prompts for specific analysis
+    const sampleQuestions = questions.slice(0, 3);
+    
+    if (hasRatingQuestions) {
+      prompts.push("What are the average ratings across different demographics?");
+    }
+    
+    if (hasChoiceQuestions) {
+      prompts.push("Show the distribution of responses for multiple choice questions");
+    }
+    
+    if (hasTextQuestions) {
+      prompts.push("What are the common themes in open-ended responses?");
+    }
+    
+    // Add survey-specific prompts based on question content
+    if (sampleQuestions.length > 0) {
+      const firstQuestion = sampleQuestions[0];
+      if (firstQuestion.prompt) {
+        // Create a prompt about the first question
+        const questionSnippet = firstQuestion.prompt.length > 50 
+          ? firstQuestion.prompt.substring(0, 50) + "..." 
+          : firstQuestion.prompt;
+        prompts.push(`Analyze responses to: "${questionSnippet}"`);
+      }
+    }
+    
+    // Add general analysis prompts
+    prompts.push(`Summarize key insights from "${surveyData.title}"`);
+    prompts.push("Compare responses across age groups");
+    
+    return prompts.slice(0, 3); // Return max 3 prompts
+  };
+
   const renderWithCitations=(text:string,citations?:Record<string,string>)=> {
     if(!citations || Object.keys(citations).length===0) {
       text = normaliseText(text);
       return (
-        <div className="prose prose-sm prose-invert max-w-none prose-headings:font-semibold prose-p:text-foreground prose-strong:text-foreground prose-a:text-primary prose-a:no-underline hover:prose-a:underline">
+        <div className="prose prose-sm max-w-none prose-headings:text-foreground prose-headings:font-semibold prose-p:text-foreground prose-p:leading-relaxed prose-strong:text-foreground prose-strong:font-semibold prose-a:text-primary prose-a:no-underline hover:prose-a:underline prose-ul:text-foreground prose-ol:text-foreground prose-li:text-foreground prose-li:my-1 prose-blockquote:text-foreground prose-blockquote:border-l-primary">
           <ReactMarkdown
             remarkPlugins={optionalRemark}
             rehypePlugins={optionalRehype}
+            components={{
+              h1: ({ children }) => <h1 className="text-xl font-bold mb-4 mt-6 first:mt-0 text-foreground border-b border-border pb-2">{children}</h1>,
+              h2: ({ children }) => <h2 className="text-lg font-semibold mb-3 mt-5 first:mt-0 text-foreground">{children}</h2>,
+              h3: ({ children }) => <h3 className="text-base font-medium mb-2 mt-4 first:mt-0 text-foreground">{children}</h3>,
+              p: ({ children }) => <p className="mb-3 leading-relaxed text-foreground">{children}</p>,
+              ul: ({ children }) => <ul className="list-disc ml-6 mb-4 space-y-1">{children}</ul>,
+              ol: ({ children }) => <ol className="list-decimal ml-6 mb-4 space-y-1">{children}</ol>,
+              li: ({ children }) => <li className="text-foreground leading-relaxed">{children}</li>,
+              strong: ({ children }) => <strong className="font-semibold text-foreground">{children}</strong>,
+              em: ({ children }) => <em className="italic text-foreground">{children}</em>,
+              blockquote: ({ children }) => <blockquote className="border-l-4 border-primary pl-4 my-4 italic text-muted-foreground">{children}</blockquote>,
+              hr: () => <hr className="my-6 border-border" />,
+              code: ({ children }) => <code className="bg-muted px-1.5 py-0.5 rounded text-sm font-mono">{children}</code>,
+            }}
           >
             {text}
           </ReactMarkdown>
@@ -242,88 +368,80 @@ export default function CohortChatPage() {
       );
     }
     
-    // First normalize the text to ensure citations are inline
+    // Split text by citation markers and render each part
     const normalizedText = normaliseText(text);
+    const parts = normalizedText.split(/(\[\d+\])/);
     
-    // Render the markdown first
-    const markdownContent = (
-      <ReactMarkdown
-        remarkPlugins={optionalRemark}
-        rehypePlugins={optionalRehype}
-        components={{
-          // Custom renderer for text nodes to handle citations
-          p: ({ children, ...props }) => {
-            const processChildren = (children: any): any => {
-              if (typeof children === 'string') {
-                const elements: React.ReactNode[] = [];
-                const regex = /\[(\d+)\]/g;
-                let lastIndex = 0;
-                let match;
-                
-                while ((match = regex.exec(children)) !== null) {
-                  const idx = match.index;
-                  const num = match[1];
-                  
-                  // Add text before citation
-                  if (idx > lastIndex) {
-                    elements.push(children.slice(lastIndex, idx));
-                  }
-                  
-                  // Add citation tooltip
-                  const quote = citations[num];
-                  elements.push(
-                    <Tooltip key={`citation-${idx}`}>
-                      <TooltipTrigger asChild>
-                        <span className="inline-block px-1 rounded-sm bg-muted/50 underline cursor-help text-primary">
-                          [{num}]
-                        </span>
-                      </TooltipTrigger>
-                      <TooltipContent className="max-w-xs text-xs">
-                        {quote || 'Quote not found'}
-                      </TooltipContent>
-                    </Tooltip>
-                  );
-                  
-                  lastIndex = idx + match[0].length;
-                }
-                
-                // Add remaining text
-                if (lastIndex < children.length) {
-                  elements.push(children.slice(lastIndex));
-                }
-                
-                return elements.length > 1 ? elements : children;
-              }
-              
-              if (Array.isArray(children)) {
-                return children.map(processChildren);
-              }
-              
-              return children;
-            };
-            
-            return <p {...props}>{processChildren(children)}</p>;
-          }
-        }}
-      >
-        {normalizedText}
-      </ReactMarkdown>
-    );
+    const renderedParts = parts.map((part, index) => {
+      const citationMatch = part.match(/\[(\d+)\]/);
+      if (citationMatch) {
+        const num = citationMatch[1];
+        const quote = citations[num];
+        
+        return (
+          <Tooltip key={`citation-${index}-${num}`}>
+            <TooltipTrigger asChild>
+              <span className="inline-block px-1.5 py-0.5 mx-0.5 rounded bg-blue-100 underline cursor-help text-blue-700 hover:bg-blue-200 font-medium text-xs border border-blue-200">
+                [{num}]
+              </span>
+            </TooltipTrigger>
+            <TooltipContent 
+              className="max-w-lg text-xs p-3 bg-white border border-gray-200 shadow-lg z-[9999]"
+              side="top"
+              align="start"
+            >
+              <div className="space-y-1">
+                {quote ? (
+                  <div className="whitespace-pre-wrap break-words text-gray-900">
+                    {quote}
+                  </div>
+                ) : (
+                  <div className="text-gray-500">Quote not found for [{num}]</div>
+                )}
+              </div>
+            </TooltipContent>
+          </Tooltip>
+        );
+      } else {
+        // Render regular text as markdown with enhanced styling
+        return (
+          <ReactMarkdown
+            key={`text-${index}`}
+            remarkPlugins={optionalRemark}
+            rehypePlugins={optionalRehype}
+            components={{
+              p: ({ children }) => <span className="inline">{children}</span>, // Inline span instead of block p
+              h1: ({ children }) => <h1 className="text-xl font-bold mb-4 mt-6 first:mt-0 text-foreground border-b border-border pb-2 block">{children}</h1>,
+              h2: ({ children }) => <h2 className="text-lg font-semibold mb-3 mt-5 first:mt-0 text-foreground block">{children}</h2>,
+              h3: ({ children }) => <h3 className="text-base font-medium mb-2 mt-4 first:mt-0 text-foreground block">{children}</h3>,
+              ul: ({ children }) => <ul className="list-disc ml-6 mb-4 space-y-1 block">{children}</ul>,
+              ol: ({ children }) => <ol className="list-decimal ml-6 mb-4 space-y-1 block">{children}</ol>,
+              li: ({ children }) => <li className="text-foreground leading-relaxed mb-1 block">{children}</li>,
+              strong: ({ children }) => <strong className="font-semibold text-foreground">{children}</strong>,
+              em: ({ children }) => <em className="italic text-foreground">{children}</em>,
+              code: ({ children }) => <code className="bg-muted px-1.5 py-0.5 rounded text-sm font-mono">{children}</code>,
+            }}
+          >
+            {part}
+          </ReactMarkdown>
+        );
+      }
+    });
 
     return (
-      <div className="prose prose-sm prose-invert max-w-none prose-headings:font-semibold prose-p:text-foreground prose-strong:text-foreground prose-a:text-primary prose-a:no-underline hover:prose-a:underline">
-        {markdownContent}
+      <div className="prose prose-sm max-w-none prose-headings:text-foreground prose-headings:font-semibold prose-p:text-foreground prose-p:leading-relaxed prose-strong:text-foreground prose-strong:font-semibold prose-a:text-primary prose-a:no-underline hover:prose-a:underline prose-ul:text-foreground prose-ol:text-foreground prose-li:text-foreground prose-li:my-1 prose-blockquote:text-foreground prose-blockquote:border-l-primary">
+        {renderedParts}
       </div>
     );
   };
 
   return (
-    <div className="flex-1 p-2 w-full bg-background">
+    <div className="flex-1 p-1 w-full bg-background">
       <div className="mx-auto h-full rounded-lg bg-card text-card-foreground shadow-lg flex">
         {/* Main area */}
         <div className={cn('flex-1', isCollapsed? 'w-[calc(100%-50px)]':'w-[calc(100%-350px)]')}>
           {/* Header */}
-          <div className="px-6 py-4">
+          <div className="px-6 py-2">
             <div className="flex items-center">
               <SidebarTrigger className="-ml-0.5 h-5 w-5 text-muted-foreground hover:text-foreground" />
               <div className="h-4 border-l border-border mx-4" />
@@ -333,10 +451,10 @@ export default function CohortChatPage() {
 
           <div className="border-b border-border" />
 
-          <div className="p-4">
+          <div className="p-2">
 
           {/* Chat Area - No more tabs, just clean chat */}
-          <div className="flex flex-col h-[calc(100vh-140px)]">
+          <div className="flex flex-col h-[calc(100vh-80px)]">
             {messages.length===0 ? (
               <div className="flex flex-col items-center justify-center flex-1 gap-6">
                 <h1 className="text-2xl font-bold">Ask Questions.</h1>
@@ -359,15 +477,31 @@ export default function CohortChatPage() {
                     <Send className="h-4 w-4"/>
                   </Button>
                 </div>
+                <div className="text-xs text-center max-w-xl space-y-2">
+                  <p className="font-medium text-muted-foreground">
+                    {selectedSurveyData ? `Try asking about "${selectedSurveyData.title}":` : "Try asking:"}
+                  </p>
+                  <div className="flex flex-wrap gap-2 justify-center">
+                    {dynamicPrompts.map((prompt, index) => (
+                      <div 
+                        key={index}
+                        className="px-3 py-1.5 border border-border rounded-md bg-background/50 text-muted-foreground hover:bg-background/80 transition-colors cursor-pointer"
+                        onClick={() => setInput(prompt)}
+                      >
+                        &quot;{prompt}&quot;
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
             ) : (
               <>
                 <ScrollArea className="flex-1">
-                  <div className="p-4 space-y-4">
+                  <div className="p-4 space-y-6">
                     {messages.map((m,idx)=>(
                       <div 
                         key={idx} 
-                        className="flex gap-3 text-sm justify-start animate-in fade-in duration-500"
+                        className="flex gap-4 text-sm justify-start animate-in fade-in duration-500"
                         style={{ 
                           animationDelay: `${Math.min(idx * 50, 500)}ms`,
                           animationFillMode: 'both'
@@ -376,14 +510,20 @@ export default function CohortChatPage() {
                         {m.role==='agent' && <Avatar className="h-8 w-8 flex-shrink-0"><AvatarImage src="/assets/images/logo-simple.svg"/><AvatarFallback>C</AvatarFallback></Avatar>}
                         {m.role==='user' && <Avatar className="h-8 w-8 flex-shrink-0"><AvatarFallback>U</AvatarFallback></Avatar>}
                         <div className={cn(
-                          'rounded-lg px-4 py-2 max-w-[80%] chat-message',
-                          m.role==='user'? 'bg-primary text-primary-foreground':'text-foreground'
+                          'rounded-lg px-4 py-3 max-w-[85%] chat-message',
+                          m.role==='user'? 'bg-primary text-white':'text-foreground'
                         )}>
                           {m.role==='agent' ? (
                             <TooltipProvider delayDuration={150}>
-                              {renderWithCitations(m.content, m.citations)}
+                              <div className="space-y-1">
+                                {renderWithCitations(m.content, m.citations)}
+                              </div>
                             </TooltipProvider>
-                          ): m.content}
+                          ): (
+                            <div className="font-medium text-white">
+                              {m.content}
+                            </div>
+                          )}
                           {m.role==='agent' && m.chartSpec && (
                             <div className="mt-4 animate-in fade-in duration-700 delay-300">
                               <ChartRenderer spec={m.chartSpec}/>
@@ -393,16 +533,16 @@ export default function CohortChatPage() {
                       </div>
                     ))}
                     {isLoading && (
-                      <div className="flex gap-3 text-sm justify-start animate-in fade-in duration-300">
+                      <div className="flex gap-4 text-sm justify-start animate-in fade-in duration-300">
                         <Avatar className="h-8 w-8 flex-shrink-0"><AvatarFallback>C</AvatarFallback></Avatar>
-                        <div className="rounded-lg px-4 py-2 text-foreground chat-message">
-                          <div className="flex items-center gap-2">
+                        <div className="rounded-lg px-4 py-3 text-foreground chat-message">
+                          <div className="flex items-center gap-3">
                             <div className="flex gap-1">
                               <div className="w-2 h-2 bg-current rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
                               <div className="w-2 h-2 bg-current rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
                               <div className="w-2 h-2 bg-current rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
                             </div>
-                            <span className="text-sm opacity-70">Analyzing cohort...</span>
+                            <span className="text-sm opacity-70 font-medium">Analyzing cohort responses...</span>
                           </div>
                         </div>
                       </div>
@@ -414,11 +554,11 @@ export default function CohortChatPage() {
                 <div className="sticky bottom-0 p-4 bg-card">
                   <div className="relative">
                     <Textarea 
-                      placeholder="Ask the cohort…" 
                       className="flex-1 min-h-[80px] pr-12 resize-none" 
+                      placeholder="Ask the cohort…" 
                       value={input} 
                       onChange={e=>setInput(e.target.value)} 
-                      onKeyDown={handleKeyDown} 
+                      onKeyDown={handleKeyDown}
                       disabled={isLoading}
                       rows={2}
                     />
@@ -432,6 +572,23 @@ export default function CohortChatPage() {
                       <Send className="h-4 w-4"/>
                     </Button>
                   </div>
+                  {/* Only show suggestions when there are no messages */}
+                  {messages.length === 0 && (
+                    <div className="text-xs mt-3 space-y-2">
+                      <p className="font-medium text-muted-foreground">Examples:</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {dynamicPrompts.map((prompt, index) => (
+                          <div 
+                            key={index}
+                            className="px-2 py-1 border border-border rounded text-muted-foreground bg-background/50 hover:bg-background/80 transition-colors cursor-pointer"
+                            onClick={() => setInput(prompt)}
+                          >
+                            &quot;{prompt}&quot;
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </>
             )}
@@ -522,7 +679,7 @@ export default function CohortChatPage() {
                       {/* Model select */}
                       <div className="space-y-2">
                         <Label>Model</Label>
-                        <Select value={selectedModel} onValueChange={setSelectedModel}>
+                        <Select value={selectedModel} onValueChange={handleModelChange}>
                           <SelectTrigger><SelectValue /></SelectTrigger>
                           <SelectContent className="z-50">
                             {getAllModels().map((model) => (

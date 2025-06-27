@@ -1,7 +1,9 @@
+"use client"
+
 import { Button } from "@/components/ui/button"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import { Card, CardContent } from "@/components/ui/card"
-import { Lightbulb, MessageCircle, Rocket, Brain } from "lucide-react"
+import { Lightbulb as LightbulbIcon, MessageCircle as MessageCircleIcon, Rocket, Brain as BrainIcon } from "lucide-react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import LogoText from "@/components/logo-text"
@@ -70,7 +72,7 @@ export default function FrontLanding() {
             <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
               <Card className="bg-card border-border shadow-sm">
                 <CardContent className="p-6 space-y-4">
-                  <Lightbulb className="h-6 w-6 text-primary" />
+                  <LightbulbIcon className="h-6 w-6 text-primary" />
                   <h3 className="font-semibold text-lg">AI-Powered Builder</h3>
                   <p className="text-muted-foreground text-sm">
                     Describe your research goal and let our AI draft engaging questions in seconds.
@@ -79,7 +81,7 @@ export default function FrontLanding() {
               </Card>
               <Card className="bg-card border-border shadow-sm">
                 <CardContent className="p-6 space-y-4">
-                  <MessageCircle className="h-6 w-6 text-primary" />
+                  <MessageCircleIcon className="h-6 w-6 text-primary" />
                   <h3 className="font-semibold text-lg">Instant Analytics</h3>
                   <p className="text-muted-foreground text-sm">
                     Real-time dashboards, GPT-powered cohort chat, and exportable charts ready for your deck.
@@ -88,7 +90,7 @@ export default function FrontLanding() {
               </Card>
               <Card className="bg-card border-border shadow-sm">
                 <CardContent className="p-6 space-y-4">
-                  <Brain className="h-6 w-6 text-primary" />
+                  <BrainIcon className="h-6 w-6 text-primary" />
                   <h3 className="font-semibold text-lg">Personal Digital Twins</h3>
                   <p className="text-muted-foreground text-sm">
                     Every respondent gets an anonymised twin that evolves as they share more—boosting engagement &amp; data richness.
