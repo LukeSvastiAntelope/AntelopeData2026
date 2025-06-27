@@ -69,6 +69,7 @@ const SurveyPage = () => {
   const [submitted, setSubmitted] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [agentToken, setAgentToken] = useState<string | null>(null)
+  const [isExistingTwin, setIsExistingTwin] = useState(false)
   
   const [demographics, setDemographics] = useState<Demographics>({
     name: '',
@@ -89,6 +90,7 @@ const SurveyPage = () => {
   
   const [answers, setAnswers] = useState<Answer[]>([])
   const [modalOpen, setModalOpen] = useState<boolean>(true)
+  const [modalShouldClose, setModalShouldClose] = useState<boolean>(false)
 
   useEffect(() => {
     const fetchSurvey = async () => {
@@ -127,15 +129,25 @@ const SurveyPage = () => {
   }
 
   const handleModalOpenChange = (open: boolean) => {
-    if (open) {
-      setModalOpen(true)
-    } else {
-      if (demographics.name.trim() && demographics.email.trim()) {
+    // Only allow closing if we have valid name and email, or if explicitly requested to close
+    if (!open) {
+      if (modalShouldClose || (demographics.name.trim() && demographics.email.trim())) {
         setModalOpen(false)
-      } else {
-        setModalOpen(true)
+        setModalShouldClose(false)
       }
+      // If we don't have valid data and not explicitly closing, keep modal open
+    } else {
+      setModalOpen(true)
+      setModalShouldClose(false)
     }
+  }
+
+  const handleExistingTwinFound = (existingDemographics: any) => {
+    // Pre-fill all the demographics from the existing digital twin
+    setDemographics(prev => ({
+      ...prev,
+      ...existingDemographics
+    }))
   }
 
   const updateDemographics = useCallback((field: keyof Demographics | string, value: string) => {
@@ -151,7 +163,14 @@ const SurveyPage = () => {
     } else {
       setDemographics(prev => ({ ...prev, [field as keyof Demographics]: value }))
     }
-  }, [])
+    
+    // If we have valid name and email, allow modal to close
+    if ((field === 'name' || field === 'email') && 
+        ((field === 'name' && value.trim() && demographics.email.trim()) ||
+         (field === 'email' && value.trim() && demographics.name.trim()))) {
+      setModalShouldClose(true)
+    }
+  }, [demographics.name, demographics.email])
 
   const validateForm = () => {
     // Check required demographics
@@ -218,6 +237,7 @@ const SurveyPage = () => {
       if (response.ok) {
         const result = await response.json()
         setAgentToken(result.agentToken)
+        setIsExistingTwin(result.isExistingTwin || false)
         setSubmitted(true)
       } else {
         const error = await response.json()
@@ -276,6 +296,7 @@ const SurveyPage = () => {
       onOpenChange={handleModalOpenChange}
       demographics={{ name: demographics.name, email: demographics.email }}
       updateDemographics={updateDemographics}
+      onExistingTwinFound={handleExistingTwinFound}
     />
   )
 
@@ -294,10 +315,15 @@ const SurveyPage = () => {
             <div className="bg-blue-50 dark:bg-blue-950/20 p-6 rounded-lg mb-6">
               <div className="flex items-center gap-2 mb-3">
                 <Brain className="h-5 w-5 text-blue-600" />
-                <span className="font-medium text-blue-900 dark:text-blue-100">Digital Twin Created</span>
+                <span className="font-medium text-blue-900 dark:text-blue-100">
+                  {isExistingTwin ? 'Digital Twin Updated' : 'Digital Twin Created'}
+                </span>
               </div>
               <p className="text-sm text-blue-700 dark:text-blue-300 mb-4">
-                Your responses have been used to create a digital twin agent that represents your perspectives and opinions.
+                {isExistingTwin 
+                  ? 'Your responses have been added to your existing digital twin, creating an even richer representation of your perspectives across multiple surveys.'
+                  : 'Your responses have been used to create a digital twin agent that represents your perspectives and opinions.'
+                }
               </p>
               {agentToken && (
                 <div className="space-y-4">
@@ -310,7 +336,10 @@ const SurveyPage = () => {
                   </div>
                   <Button asChild>
                     <a href={`/digital-twin/${agentToken}`} target="_blank" rel="noopener noreferrer">
-                      View &amp; Complete Your Digital Twin Profile
+                      {isExistingTwin 
+                        ? 'View Your Updated Digital Twin Profile'
+                        : 'View & Complete Your Digital Twin Profile'
+                      }
                     </a>
                   </Button>
                 </div>
@@ -318,7 +347,10 @@ const SurveyPage = () => {
             </div>
 
             <p className="text-sm text-muted-foreground">
-              Your digital twin will be used for research and insights while keeping your personal information private.
+              {isExistingTwin 
+                ? 'Your updated digital twin will continue to be used for research and insights while keeping your personal information private.'
+                : 'Your digital twin will be used for research and insights while keeping your personal information private.'
+              }
             </p>
           </CardContent>
         </Card>

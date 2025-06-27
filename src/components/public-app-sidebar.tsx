@@ -1,5 +1,6 @@
 "use client"
 
+import * as React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import LogoText from "@/components/logo-text"
@@ -11,16 +12,19 @@ import {
   SidebarHeader,
   SidebarMenu,
   SidebarMenuItem,
-  SidebarMenuButton
+  SidebarMenuButton,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
 } from "@/components/ui/sidebar"
 import {
-  LayoutDashboard,
-  BarChart3,
-  LineChart,
-  Info,
-  Users,
-  LogIn,
-  UserPlus
+  LayoutDashboard as LayoutDashboardIcon,
+  BarChart3 as BarChart3Icon,
+  LineChart as LineChartIcon,
+  Info as InfoIcon,
+  Users as UsersIcon,
+  LogIn as LogInIcon,
+  UserPlus as UserPlusIcon,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
@@ -35,17 +39,17 @@ export function PublicAppSidebar({ className, collapsible = "offcanvas", ...prop
     {
       title: "Overview",
       href: "/",
-      icon: LayoutDashboard
+      icon: LayoutDashboardIcon
     },
     {
       title: "Markets",
       href: "/markets",
-      icon: BarChart3
+      icon: BarChart3Icon
     },
     {
       title: "Strategy",
       href: "/strategy",
-      icon: LineChart
+      icon: LineChartIcon
     }
   ]
 
@@ -53,12 +57,12 @@ export function PublicAppSidebar({ className, collapsible = "offcanvas", ...prop
     {
       title: "About Us",
       href: "/about",
-      icon: Info
+      icon: InfoIcon
     },
     {
       title: "Community",
       href: "/community",
-      icon: Users
+      icon: UsersIcon
     }
   ]
 
@@ -131,7 +135,7 @@ export function PublicAppSidebar({ className, collapsible = "offcanvas", ...prop
             className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
           >
             <Link href="/login" className="flex items-center gap-2">
-              <LogIn className="h-4 w-4" />
+              <LogInIcon className="h-4 w-4" />
               <span className="text-primary-foreground">Login</span>
             </Link>
           </Button>
@@ -141,7 +145,7 @@ export function PublicAppSidebar({ className, collapsible = "offcanvas", ...prop
             className="w-full border-border hover:bg-accent"
           >
             <Link href="/register" className="flex items-center gap-2">
-              <UserPlus className="h-4 w-4" />
+              <UserPlusIcon className="h-4 w-4" />
               <span>Register</span>
             </Link>
           </Button>

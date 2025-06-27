@@ -5,6 +5,8 @@ import { CohortFilterRule } from "@/app/utils/interface";
 import { TextEncoder } from "util";
 import { createCompletion } from "@/app/utils/services/ai-service";
 import { verifyConfirmationToken } from "@/app/utils/api/token";
+import { SmartSurveyQueryBuilder } from "@/app/utils/survey/smart-query-builder";
+import { QueryIntentClassifier } from "@/app/utils/survey/query-intent-classifier";
 
 interface CohortQueryPayload {
   cohort?: { id?: number; filter?: CohortFilterRule[] };
@@ -40,6 +42,62 @@ function buildWhereClause(rules: CohortFilterRule[], params: any[]): string {
   return clauses.length ? clauses.join(" AND ") : "1"; // default TRUE
 }
 
+// Helper function to get analysis-specific guidance
+function getAnalysisTypeGuidance(analysisType: string, expectedResultType: string): string {
+  switch (analysisType) {
+    case 'thematic':
+      return `THEMATIC ANALYSIS FOCUS:
+- Identify recurring themes, concepts, and patterns in the text responses
+- Group similar ideas and experiences together
+- Look for underlying motivations, concerns, and perspectives
+- Extract key insights about what matters most to respondents
+- Highlight both majority and minority viewpoints`;
+      
+    case 'categorical':
+      return `CATEGORICAL ANALYSIS FOCUS:
+- Analyze patterns in choice selections and preferences
+- Identify the most and least popular options
+- Look for demographic differences in choices
+- Explain what the selection patterns reveal about the cohort`;
+      
+    case 'sentiment':
+      return `SENTIMENT ANALYSIS FOCUS:
+- Assess the emotional tone and attitudes in responses
+- Identify positive, negative, and neutral sentiment patterns
+- Look for emotional drivers and concerns
+- Analyze how sentiment varies across different topics or demographics`;
+      
+    case 'demographic':
+      return `DEMOGRAPHIC ANALYSIS FOCUS:
+- Break down responses by age, location, occupation, and other demographics
+- Identify how different groups respond differently
+- Highlight demographic-specific patterns and preferences
+- Explain what drives differences between groups`;
+      
+    default:
+      return `GENERAL ANALYSIS FOCUS:
+- Provide comprehensive insights based on the available data
+- Balance quantitative patterns with qualitative insights
+- Consider multiple perspectives and interpretations`;
+  }
+}
+
+// Helper function for intent-specific system messages
+function getIntentSpecificSystemMessage(analysisType: string): string {
+  switch (analysisType) {
+    case 'thematic':
+      return "You specialize in thematic analysis, identifying patterns, themes, and underlying meanings in qualitative text responses.";
+    case 'categorical':
+      return "You specialize in categorical analysis, understanding choice patterns and preference distributions.";
+    case 'sentiment':
+      return "You specialize in sentiment analysis, detecting emotional tones and attitudes in responses.";
+    case 'demographic':
+      return "You specialize in demographic analysis, identifying how different population segments respond differently.";
+    default:
+      return "You provide comprehensive analysis across multiple dimensions.";
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     // Verify JWT token and get user ID
@@ -70,51 +128,66 @@ export async function POST(req: NextRequest) {
       filterRules = cohort.filter;
     }
 
-    // Fetch survey answers that match - ONLY from user's surveys
-    const db = await getMySQLConnection();
-    const params: any[] = [];
-    let whereClause = buildWhereClause(filterRules, params);
+    // 🎯 NEW: Use Smart Query Builder for intent-aware data fetching
+    const smartQueryBuilder = new SmartSurveyQueryBuilder();
+    const intentClassifier = new QueryIntentClassifier();
     
-    // Always filter by user's surveys
-    if (whereClause === "1") {
-      whereClause = 's.created_by = ?';
-    } else {
-      whereClause += ' AND s.created_by = ?';
-    }
-    params.push(userId);
-    
-    if (surveyId) {
-      whereClause += ' AND sr.survey_id = ?';
-      params.push(surveyId);
-    }
-    
-    // MySQL prepared statements do not allow parameter placeholders for LIMIT.
-    const safeLimit = Math.max(1, Math.min(topK, 1000));
-    const [rows] = await db.execute<any[]>(
-      `SELECT sr.id as rid, sa.answer_value,
-               COALESCE(sr.age_range,
-                        JSON_UNQUOTE(JSON_EXTRACT(sr.demographics,'$.ageRange')),
-                        JSON_UNQUOTE(JSON_EXTRACT(sr.demographics,'$.age')),
-                        JSON_UNQUOTE(JSON_EXTRACT(sr.demographics,'$.age_range'))
-               ) AS age_val,
-               JSON_UNQUOTE(JSON_EXTRACT(sr.demographics,'$.location')) AS location_val,
-               JSON_UNQUOTE(JSON_EXTRACT(sr.demographics,'$.occupation')) AS occupation_val,
-               JSON_UNQUOTE(JSON_EXTRACT(sr.demographics,'$.education')) AS education_val,
-               JSON_UNQUOTE(JSON_EXTRACT(sr.demographics,'$.income')) AS income_val,
-               JSON_UNQUOTE(JSON_EXTRACT(sr.demographics,'$.politicalViews')) AS political_val
-       FROM survey_responses sr
-       JOIN survey_answers sa ON sr.id = sa.response_id
-       JOIN surveys s ON sr.survey_id = s.id
-       WHERE ${whereClause}
-       LIMIT ${safeLimit}`,
-      params
+    // Classify the query intent and build optimized query
+    const queryIntent = intentClassifier.classifyQuery(question);
+    const queryResult = await smartQueryBuilder.buildSmartQuery(
+      question, 
+      filterRules, 
+      userId, 
+      surveyId, 
+      topK
     );
+
+    console.log(`🎯 Query Intent: ${queryIntent.intent} (${Math.round(queryIntent.confidence * 100)}%)`);
+    console.log(`📊 Query Strategy: ${queryResult.explanation}`);
+    console.log(`🔍 Expected Result Type: ${queryResult.expectedResultType}`);
+
+    // Execute the smart query
+    const db = await getMySQLConnection();
+    const [rows] = await db.execute<any[]>(queryResult.sql, queryResult.params);
 
     if (!rows.length) {
       return NextResponse.json({ status: true, answer: "No survey data available for this cohort." });
     }
 
-    const answersText = rows.map((r) => r.answer_value).join("\n");
+    // Check if we have sufficient meaningful data - be more lenient and contextual
+    const meaningfulAnswers = rows.filter((r: any) => {
+      if (!r.answer_value || typeof r.answer_value !== 'string') return false;
+      
+      const trimmed = r.answer_value.trim();
+      if (trimmed.length === 0) return false;
+      
+      // For choice questions, any non-empty answer is meaningful
+      if (r.question_type === 'single-choice' || r.question_type === 'multiple-choice') {
+        return trimmed.length > 0;
+      }
+      
+      // For text questions, be more nuanced in filtering
+      // Allow short but meaningful answers, exclude only obvious garbage
+      if (trimmed.length < 2) return false;
+      if (/^[0-9\s\.\-]+$/.test(trimmed) && trimmed.length < 5) return false; // Very short pure numbers
+      if (/^(yes|no|maybe|ok|good|bad)$/i.test(trimmed)) return false; // Single word non-descriptive answers
+      
+      return true; // Allow most other answers
+    });
+
+    // More flexible minimum data requirements
+    const minResponsesNeeded = Math.max(1, Math.min(3, Math.floor(rows.length * 0.3)));
+    
+    if (meaningfulAnswers.length < minResponsesNeeded) {
+      return NextResponse.json({ 
+        status: true, 
+        answer: `I found only ${meaningfulAnswers.length} meaningful responses for this cohort, which is insufficient to provide a reliable analysis. Please try a broader cohort or check if there are more survey responses available.` 
+      });
+    }
+
+    console.log(`Found ${rows.length} total responses, ${meaningfulAnswers.length} meaningful responses`);
+
+    const answersText = meaningfulAnswers.map((r: any) => r.answer_value).join("\n");
 
     // Demographic distribution summaries
     const ageCounts: Record<string, number> = {};
@@ -251,15 +324,24 @@ export async function POST(req: NextRequest) {
       values: ageValues
     };
 
-    // Prepare stats & quotes
-    const sampleSize = rows.length;
-    const quoteObjs = rows.slice(0, 3).map((r: any, idx: number) => ({ id: idx + 1, text: r.answer_value as string }));
+    // Prepare stats & quotes - use meaningful answers and include question context
+    const sampleSize = meaningfulAnswers.length;
+    // Provide more quotes for better context, prioritizing diverse question types
+    const maxQuotes = Math.min(12, meaningfulAnswers.length);
+    const quoteObjs = meaningfulAnswers.slice(0, maxQuotes).map((r: any, idx: number) => ({ 
+      id: idx + 1, 
+      text: r.answer_value as string,
+      question: r.question_text as string,
+      questionType: r.question_type as string,
+      questionOptions: r.question_options as string,
+      surveyTitle: r.survey_title as string
+    }));
 
-    // naive sentiment counts
+    // naive sentiment counts - use meaningful answers only
     let pos = 0, neg = 0, neu = 0;
-    const positiveWords = ['good','love','great','like','best','excellent'];
-    const negativeWords = ['bad','hate','poor','worst','expensive','overpriced'];
-    rows.forEach((r:any)=>{
+    const positiveWords = ['good','love','great','like','best','excellent','positive','happy','satisfied','pleased'];
+    const negativeWords = ['bad','hate','poor','worst','expensive','overpriced','negative','unhappy','dissatisfied','disappointed'];
+    meaningfulAnswers.forEach((r:any)=>{
       const text = (r.answer_value as string).toLowerCase();
       if (positiveWords.some(w=>text.includes(w))) pos++; else if (negativeWords.some(w=>text.includes(w))) neg++; else neu++;
     });
@@ -278,17 +360,98 @@ export async function POST(req: NextRequest) {
       }
     };
 
-    const statsAppendix = `\n\n---\nsample-size: ${sampleSize}\nsentiment: 👍 ${Math.round((pos/sampleSize)*100)}% | 😐 ${Math.round((neu/sampleSize)*100)}% | 👎 ${Math.round((neg/sampleSize)*100)}%\ndemographics: ${fullDemographicSummary}\ncitations:\n` + quoteObjs.map(q=>`[${q.id}] "${q.text.slice(0,120)}"`).join('\n');
+    const statsAppendix = `\n\n---\nsample-size: ${sampleSize}\nsentiment: 👍 ${Math.round((pos/sampleSize)*100)}% | 😐 ${Math.round((neu/sampleSize)*100)}% | 👎 ${Math.round((neg/sampleSize)*100)}%\ndemographics: ${fullDemographicSummary}\ncitations:\n` + quoteObjs.map(q=> {
+      // Include full quote with question context for better hover tooltips
+      const questionContext = `Q: "${q.question}" | A: "${q.text}"`;
+      return `[${q.id}] ${questionContext}`;
+    }).join('\n');
 
-    // Build prompt with quotes list
-    const quotesForPrompt = quoteObjs.map(q=>`[${q.id}] ${q.text}`).join('\n');
-    const prompt = `You are asked to represent the collective voice of a cohort of people. Cite at most 3 supporting quotes using markers like [1], [2]. Demographics of the cohort: ${fullDemographicSummary}. Do not mention limitations about providing graphs. After answering, stop; do NOT output the stats block.\n\nUser question: "${question}"\n\nSupporting quotes:\n${quotesForPrompt}`;
+    // Build prompt with quotes list including question context
+    const quotesForPrompt = quoteObjs.map(q=> {
+      let questionContext = `Question: "${q.question}"`;
+      
+      // Add options context for choice questions
+      if ((q.questionType === 'single-choice' || q.questionType === 'multiple-choice') && q.questionOptions) {
+        try {
+          const options = JSON.parse(q.questionOptions);
+          if (Array.isArray(options) && options.length > 0) {
+            questionContext += ` (Options: ${options.join(', ')})`;
+          }
+        } catch (e) {
+          // Ignore JSON parse errors
+        }
+      }
+      
+      return `[${q.id}] ${questionContext} (from "${q.surveyTitle}") | Answer: "${q.text}"`;
+    }).join('\n');
+    
+    // Analyze survey content and user question for contextual relevance
+    const questionLower = question.toLowerCase();
+    const surveyTitles = [...new Set(quoteObjs.map(q => q.surveyTitle))];
+    const surveyQuestions = [...new Set(quoteObjs.map(q => q.question))];
+    
+    // Extract key topics and themes from survey questions and titles
+    const allSurveyText = (surveyTitles.join(' ') + ' ' + surveyQuestions.join(' ')).toLowerCase();
+    
+    // Create contextual analysis for better AI understanding
+    const surveyTopicsContext = `
+Survey Topics Overview:
+- Survey Titles: ${surveyTitles.join(', ')}
+- Key Questions Asked: ${surveyQuestions.slice(0, 5).join('; ')}${surveyQuestions.length > 5 ? '...' : ''}
+- Total Questions Available: ${surveyQuestions.length}
+`;
+    
+    // 🎯 Build intent-aware prompt based on detected analysis type
+    const intentExplanation = intentClassifier.explainIntent(queryIntent);
+    const analysisTypeGuidance = getAnalysisTypeGuidance(queryIntent.analysisType, queryResult.expectedResultType);
+    
+    const prompt = `You are an expert analyst representing the collective voice of survey respondents. Your task is to provide meaningful insights based on the survey data provided.
+
+DETECTED INTENT: ${intentExplanation}
+ANALYSIS TYPE: ${queryIntent.analysisType}
+DATA TYPE: ${queryResult.expectedResultType} responses
+
+${analysisTypeGuidance}
+
+CONTEXTUAL INTELLIGENCE GUIDELINES:
+- ALWAYS try to answer the user's question if it relates to the survey topics, even if not directly asked
+- Make intelligent connections between the user's question and available survey data
+- If asking about "who/what is popular/important/impactful" and surveys discuss those topics, infer from the response patterns
+- If asking about opinions/attitudes and surveys cover related areas, extrapolate thoughtfully
+- Look for themes, patterns, and implicit information in the responses
+- Use survey question context to understand what respondents were thinking about
+- Only claim insufficient data if the question is completely unrelated to any survey content
+
+RESPONSE REQUIREMENTS:
+- Always ground your analysis in the actual survey responses provided
+- Cite specific quotes using [1], [2], [3] format frequently throughout your response
+- Explain your reasoning and how you connected the data to the question
+- If making inferences, clearly indicate this while showing your evidence
+- Include demographic context when relevant
+- Use citations liberally to support every major point you make
+
+${surveyTopicsContext}
+Demographics of the cohort: ${fullDemographicSummary}
+Sample size: ${sampleSize} meaningful responses
+
+User question: "${question}"
+
+Available survey responses with their questions:
+${quotesForPrompt}`;
+
+
 
     // build deterministic demographic sentence before prompt
     const demographicSentence = fullDemographicSummary ? `Demographics: ${fullDemographicSummary}.` : '';
 
     const encoder = new TextEncoder();
-    const systemMessage = systemPrompt || "You are an expert analyst summarising the perspectives of a group of survey respondents. Respond clearly and concisely without repeating words or phrases.";
+    
+    // 🎯 Intent-aware system message
+    const baseSystemMessage = "You are an expert analyst with strong contextual intelligence, representing survey respondents' collective voice.";
+    const intentSpecificMessage = getIntentSpecificSystemMessage(queryIntent.analysisType);
+    const systemMessage = systemPrompt || `${baseSystemMessage} ${intentSpecificMessage} You excel at making meaningful connections between user questions and available survey data. When survey topics relate to the user's question - even indirectly - you provide insightful analysis based on response patterns, themes, and implicit information. You only claim insufficient data when questions are completely unrelated to survey content. Always cite evidence and explain your reasoning clearly.`;
+
+
 
     // update completion call - use more tokens for o3 models due to reasoning overhead
     const isO3Model = model.startsWith('o3') || model.startsWith('o1');
@@ -311,10 +474,14 @@ export async function POST(req: NextRequest) {
     
     const fullAnswer = completion.content || "I apologize, but I couldn't generate a response. Please try again or switch to a different model.";
 
+    // 🎯 Add intent detection info to response for debugging
+    const intentDebugInfo = `\n\n---\n🎯 QUERY ANALYSIS:\nDetected Intent: ${queryIntent.intent} (${Math.round(queryIntent.confidence * 100)}% confidence)\nAnalysis Type: ${queryIntent.analysisType}\nData Type: ${queryResult.expectedResultType}\nStrategy: ${queryResult.explanation}`;
+
     const stream = new ReadableStream({
       start(controller) {
         controller.enqueue(encoder.encode(fullAnswer));
         controller.enqueue(encoder.encode(statsAppendix));
+        controller.enqueue(encoder.encode(intentDebugInfo));
         if (question.toLowerCase().match(/chart|graph|distribution|histogram/)) {
           controller.enqueue(encoder.encode('\n```chart\n' + JSON.stringify(chartSpec) + '\n```\n'));
         }

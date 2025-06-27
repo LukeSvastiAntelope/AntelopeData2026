@@ -167,7 +167,7 @@ const SurveyAnalyticsPage = () => {
           <div className="flex items-center">
             <SidebarTrigger className="-ml-0.5 h-5 w-5 text-muted-foreground hover:text-foreground" />
             <div className="h-4 border-l border-border mx-4" />
-            <Link href="/surveys" className="text-muted-foreground hover:text-foreground">
+                          <Link href="/overview" className="text-muted-foreground hover:text-foreground">
               <ArrowLeft className="h-4 w-4" />
             </Link>
             <div className="h-4 border-l border-border mx-4" />

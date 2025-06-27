@@ -56,7 +56,7 @@ export const AgentProvider = ({ children }: { children: React.ReactNode }) => {
         
         // If we're on an auth page and have a token, redirect to dashboard
         if (token && isAuthPage) {
-            router.push("/surveys");
+            router.push("/overview");
             return;
         }
         

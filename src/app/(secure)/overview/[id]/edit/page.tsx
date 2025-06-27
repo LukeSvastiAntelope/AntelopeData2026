@@ -171,7 +171,7 @@ const EditSurveyPage = () => {
       })
 
       if (response.ok) {
-        router.push('/surveys')
+        router.push('/overview')
       } else {
         const data = await response.json()
         setError(data.message || 'Failed to save survey')
@@ -217,7 +217,7 @@ const EditSurveyPage = () => {
       })
 
       if (response.ok) {
-        router.push('/surveys')
+        router.push('/overview')
       } else {
         const data = await response.json()
         setError(data.message || 'Failed to publish survey')
@@ -260,9 +260,9 @@ const EditSurveyPage = () => {
           <div className="p-6">
             <div className="text-center text-red-600">{error}</div>
             <div className="text-center mt-4">
-              <Button onClick={() => router.push('/surveys')}>
+              <Button onClick={() => router.push('/overview')}>
                 <ArrowLeft className="h-4 w-4 mr-2" />
-                Back to Surveys
+                Back to Overview
               </Button>
             </div>
           </div>
@@ -288,7 +288,7 @@ const EditSurveyPage = () => {
               )}
             </div>
             <div className="flex gap-2">
-              <Button variant="outline" onClick={() => router.push('/surveys')}>
+              <Button variant="outline" onClick={() => router.push('/overview')}>
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 Back
               </Button>
