@@ -140,19 +140,28 @@ export async function POST(
         // Generate digital twin persona and store in Pinecone with retry logic
         await ensureDigitalTwinInPinecone(result.agentToken, body, survey as any);
         
-        // Send confirmation email (non-blocking)
+        // Send confirmation email (non-blocking) - different email for new vs returning users
         if (body.demographics?.email) {
-            EmailService.sendSurveyConfirmation(
-                body.demographics.email,
-                body.demographics.name || '',
-                result.agentToken
-            );
+            if (result.isExistingTwin) {
+                EmailService.sendSurveyConfirmationReturning(
+                    body.demographics.email,
+                    body.demographics.name || '',
+                    result.agentToken
+                );
+            } else {
+                EmailService.sendSurveyConfirmation(
+                    body.demographics.email,
+                    body.demographics.name || '',
+                    result.agentToken
+                );
+            }
         }
         
         return NextResponse.json({ 
             status: true, 
             responseId: result.responseId,
             agentToken: result.agentToken,
+            isExistingTwin: result.isExistingTwin,
             message: 'Survey response submitted successfully. Your digital twin has been created!' 
         });
 

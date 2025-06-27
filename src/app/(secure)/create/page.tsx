@@ -5,10 +5,6 @@ import { Button } from "@/components/ui/button"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import Link from "next/link"
 import { 
-  Binary, 
-  TrendingUp, 
-  Trophy, 
-  List,
   ArrowRight,
   Lightbulb,
   Target,
@@ -27,44 +23,12 @@ const CreatePage = () => {
       examples: ["Describe your survey needs", "AI creates questions", "Edit and refine results"]
     },
     {
-      title: "Survey / Questionnaire",
+      title: "Manual Survey",
       description: "Create surveys that turn respondents into digital twin agents",
       icon: Users,
       href: "/create/survey",
       color: "bg-pink-500/10 text-pink-600 dark:text-pink-400",
       examples: ["Market research surveys", "Opinion polls", "Customer feedback forms"]
-    },
-    {
-      title: "Binary Question",
-      description: "Create a yes/no prediction with two possible outcomes",
-      icon: Binary,
-      href: "/binaryQuestion",
-      color: "bg-blue-500/10 text-blue-600 dark:text-blue-400",
-      examples: ["Will Bitcoin reach $100k by end of 2024?", "Will Team A win the championship?"]
-    },
-    {
-      title: "Prediction Market",
-      description: "Create a general prediction about future events",
-      icon: TrendingUp,
-      href: "/prediction",
-      color: "bg-green-500/10 text-green-600 dark:text-green-400",
-      examples: ["Stock price movements", "Economic indicators", "Technology adoption"]
-    },
-    {
-      title: "Sports Question",
-      description: "Create predictions about sports events and outcomes",
-      icon: Trophy,
-      href: "/sportsQuestion",
-      color: "bg-orange-500/10 text-orange-600 dark:text-orange-400",
-      examples: ["Match winners", "Tournament outcomes", "Player performance"]
-    },
-    {
-      title: "Multiple Choice",
-      description: "Create predictions with multiple possible outcomes",
-      icon: List,
-      href: "/multipleQuestion",
-      color: "bg-purple-500/10 text-purple-600 dark:text-purple-400",
-      examples: ["Election results", "Product launch dates", "Market categories"]
     }
   ]
 
@@ -76,7 +40,7 @@ const CreatePage = () => {
           <div className="flex items-center">
             <SidebarTrigger className="-ml-0.5 h-5 w-5 text-muted-foreground hover:text-foreground" />
             <div className="h-4 border-l border-border mx-4" />
-            <h1 className="text-base font-medium text-card-foreground">Create Prediction</h1>
+            <h1 className="text-base font-medium text-card-foreground">Create Survey</h1>
           </div>
         </div>
         
@@ -90,13 +54,13 @@ const CreatePage = () => {
                 <Lightbulb className="h-8 w-8 text-primary" />
               </div>
             </div>
-            <h2 className="text-2xl font-bold mb-2">Choose Creation Type</h2>
+            <h2 className="text-2xl font-bold mb-2">Choose Survey Type</h2>
             <p className="text-muted-foreground text-base max-w-2xl mx-auto">
-              Select what you want to create. Choose predictions for market-style questions, or surveys to build digital twin agents from real responses.
+              Create surveys to build digital twin agents from real responses. Choose AI-powered generation or manual creation.
             </p>
           </div>
 
-          {/* Prediction Type Cards */}
+          {/* Survey Type Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
             {predictionTypes.map((type) => (
               <Card key={type.href} className="group hover:shadow-lg transition-all duration-200 border-2 hover:border-primary/20">
@@ -142,7 +106,7 @@ const CreatePage = () => {
               <h3 className="text-lg font-semibold">Need Help Choosing?</h3>
             </div>
             <p className="text-muted-foreground mb-4">
-              For market predictions, start with a <strong>Binary Question</strong>. For research and building digital twins, try <strong>Survey / Questionnaire</strong>.
+              Use <strong>AI Survey Builder</strong> for quick generation from descriptions, or <strong>Manual Survey</strong> for complete control over questions and structure.
             </p>
             <div className="flex flex-wrap justify-center gap-2">
               <Button variant="outline" size="sm" asChild>

@@ -30,7 +30,9 @@ import {
   ChevronUp,
   ChevronDown,
   GripVertical,
-  Trash2
+  Trash2,
+  Plus,
+  Copy
 } from "lucide-react"
 
 interface GeneratedQuestion {
@@ -129,6 +131,38 @@ const AISurveyBuilderPage = () => {
     
     // Swap questions
     [newQuestions[index], newQuestions[targetIndex]] = [newQuestions[targetIndex], newQuestions[index]]
+    
+    setEditableQuestions(newQuestions)
+  }
+
+  const addNewQuestion = () => {
+    const newQuestion: GeneratedQuestion = {
+      type: 'text',
+      prompt: '',
+      isRequired: false,
+      reasoning: 'Manually added question'
+    }
+    setEditableQuestions([...editableQuestions, newQuestion])
+  }
+
+  const duplicateQuestion = (index: number) => {
+    const questionToDuplicate = editableQuestions[index]
+    const duplicatedQuestion: GeneratedQuestion = {
+      ...questionToDuplicate,
+      prompt: `${questionToDuplicate.prompt} (Copy)`,
+      reasoning: 'Duplicated from existing question'
+    }
+    const newQuestions = [...editableQuestions]
+    newQuestions.splice(index + 1, 0, duplicatedQuestion)
+    setEditableQuestions(newQuestions)
+  }
+
+  const moveQuestionToPosition = (fromIndex: number, toIndex: number) => {
+    if (fromIndex === toIndex) return
+    
+    const newQuestions = [...editableQuestions]
+    const [movedQuestion] = newQuestions.splice(fromIndex, 1)
+    newQuestions.splice(toIndex, 0, movedQuestion)
     
     setEditableQuestions(newQuestions)
   }
@@ -255,7 +289,7 @@ const AISurveyBuilderPage = () => {
                   <h3 className="font-semibold mb-2">AI-Powered Survey Generation</h3>
                   <p className="text-muted-foreground text-sm">
                     Describe what kind of survey you want to create, and our AI will generate relevant questions, 
-                    answer options, and survey structure. You can then edit and refine everything before saving.
+                    answer options, and survey structure. You can then edit, reorder, and add new questions manually.
                   </p>
                 </div>
               </div>
@@ -415,143 +449,187 @@ const AISurveyBuilderPage = () => {
               {/* Generated Questions */}
               <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Target className="h-5 w-5" />
-                    Generated Questions
-                  </CardTitle>
-                  <CardDescription>
-                    Review and edit the AI-generated questions. Use the arrow buttons to reorder questions.
-                  </CardDescription>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="flex items-center gap-2">
+                        <Target className="h-5 w-5" />
+                        Survey Questions
+                      </CardTitle>
+                      <CardDescription>
+                        Edit, reorder, and add questions. Use the controls to restructure your survey.
+                      </CardDescription>
+                    </div>
+                    <Button onClick={addNewQuestion} variant="outline">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Question
+                    </Button>
+                  </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {editableQuestions.map((question, questionIndex) => (
-                    <Card key={questionIndex} className="border-2">
-                      <CardHeader className="pb-3">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <GripVertical className="h-4 w-4 text-muted-foreground" />
-                            <span className="text-sm font-medium text-muted-foreground">
-                              Question {questionIndex + 1}
-                            </span>
-                            <Badge variant="outline">
-                              {getQuestionTypeLabel(question.type)}
-                            </Badge>
-                            {question.isRequired && (
-                              <Badge variant="secondary" className="text-xs">Required</Badge>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => moveQuestion(questionIndex, 'up')}
-                              disabled={questionIndex === 0}
-                              className="h-8 w-8 p-0"
-                              title="Move up"
-                            >
-                              <ChevronUp className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => moveQuestion(questionIndex, 'down')}
-                              disabled={questionIndex === editableQuestions.length - 1}
-                              className="h-8 w-8 p-0"
-                              title="Move down"
-                            >
-                              <ChevronDown className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => removeQuestion(questionIndex)}
-                              className="text-red-600 hover:text-red-700 h-8 w-8 p-0"
-                              title="Remove question"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </div>
-                      </CardHeader>
-                      <CardContent className="space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div>
-                            <Label>Question Type</Label>
-                            <select
-                              value={question.type}
-                              onChange={(e) => updateQuestion(questionIndex, 'type', e.target.value)}
-                              className="w-full mt-1 px-3 py-2 border border-input bg-background rounded-md"
-                            >
-                              <option value="text">Text Input</option>
-                              <option value="single-choice">Single Choice</option>
-                              <option value="multiple-choice">Multiple Choice</option>
-                              <option value="rating">Rating Scale</option>
-                              <option value="yes-no">Yes/No</option>
-                            </select>
-                          </div>
-                          <div className="flex items-center space-x-2 mt-6">
-                            <Checkbox
-                              checked={question.isRequired}
-                              onCheckedChange={(checked) => updateQuestion(questionIndex, 'isRequired', checked)}
-                            />
-                            <Label>Required</Label>
-                          </div>
-                        </div>
-
-                        <div>
-                          <Label>Question Text</Label>
-                          <Textarea
-                            value={question.prompt}
-                            onChange={(e) => updateQuestion(questionIndex, 'prompt', e.target.value)}
-                            className="mt-1"
-                            rows={2}
-                          />
-                        </div>
-
-                        {question.reasoning && (
-                          <div className="p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg">
-                            <Label className="text-xs font-medium text-blue-700 dark:text-blue-300">AI Reasoning:</Label>
-                            <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">{question.reasoning}</p>
-                          </div>
-                        )}
-
-                        {(question.type === 'single-choice' || question.type === 'multiple-choice') && (
-                          <div>
-                            <div className="flex items-center justify-between mb-2">
-                              <Label>Options</Label>
+                  {editableQuestions.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Target className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                      <p>No questions yet. Generate with AI or add manually.</p>
+                    </div>
+                  ) : (
+                    editableQuestions.map((question, questionIndex) => (
+                      <Card key={questionIndex} className="border-2">
+                        <CardHeader className="pb-3">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <GripVertical className="h-4 w-4 text-muted-foreground cursor-move" />
+                              <span className="text-sm font-medium text-muted-foreground">
+                                Question {questionIndex + 1}
+                              </span>
+                              <Badge variant="outline">
+                                {getQuestionTypeLabel(question.type)}
+                              </Badge>
+                              {question.isRequired && (
+                                <Badge variant="secondary" className="text-xs">Required</Badge>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-1">
                               <Button
-                                variant="outline"
+                                variant="ghost"
                                 size="sm"
-                                onClick={() => addOption(questionIndex)}
+                                onClick={() => duplicateQuestion(questionIndex)}
+                                className="h-8 w-8 p-0"
+                                title="Duplicate question"
                               >
-                                Add Option
+                                <Copy className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => moveQuestion(questionIndex, 'up')}
+                                disabled={questionIndex === 0}
+                                className="h-8 w-8 p-0"
+                                title="Move up"
+                              >
+                                <ChevronUp className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => moveQuestion(questionIndex, 'down')}
+                                disabled={questionIndex === editableQuestions.length - 1}
+                                className="h-8 w-8 p-0"
+                                title="Move down"
+                              >
+                                <ChevronDown className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => removeQuestion(questionIndex)}
+                                className="text-red-600 hover:text-red-700 h-8 w-8 p-0"
+                                title="Remove question"
+                              >
+                                <Trash2 className="h-4 w-4" />
                               </Button>
                             </div>
-                            <div className="space-y-2">
-                              {(question.options || []).map((option, optionIndex) => (
-                                <div key={optionIndex} className="flex items-center gap-2">
-                                  <Input
-                                    value={option}
-                                    onChange={(e) => updateOption(questionIndex, optionIndex, e.target.value)}
-                                    placeholder={`Option ${optionIndex + 1}`}
-                                    className="flex-1"
-                                  />
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => removeOption(questionIndex, optionIndex)}
-                                    className="text-red-600 hover:text-red-700"
-                                  >
-                                    Remove
-                                  </Button>
-                                </div>
-                              ))}
+                          </div>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                              <Label>Question Type</Label>
+                              <select
+                                value={question.type}
+                                onChange={(e) => updateQuestion(questionIndex, 'type', e.target.value)}
+                                className="w-full mt-1 px-3 py-2 border border-input bg-background rounded-md"
+                              >
+                                <option value="text">Text Input</option>
+                                <option value="single-choice">Single Choice</option>
+                                <option value="multiple-choice">Multiple Choice</option>
+                                <option value="rating">Rating Scale</option>
+                                <option value="yes-no">Yes/No</option>
+                              </select>
+                            </div>
+                            <div className="flex items-center space-x-2 mt-6">
+                              <Checkbox
+                                checked={question.isRequired}
+                                onCheckedChange={(checked) => updateQuestion(questionIndex, 'isRequired', checked)}
+                              />
+                              <Label>Required</Label>
                             </div>
                           </div>
-                        )}
+
+                          <div>
+                            <Label>Question Text</Label>
+                            <Textarea
+                              value={question.prompt}
+                              onChange={(e) => updateQuestion(questionIndex, 'prompt', e.target.value)}
+                              className="mt-1"
+                              rows={2}
+                              placeholder="Enter your question here..."
+                            />
+                          </div>
+
+                          {question.reasoning && (
+                            <div className="p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg">
+                              <Label className="text-xs font-medium text-blue-700 dark:text-blue-300">AI Reasoning:</Label>
+                              <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">{question.reasoning}</p>
+                            </div>
+                          )}
+
+                          {(question.type === 'single-choice' || question.type === 'multiple-choice') && (
+                            <div>
+                              <div className="flex items-center justify-between mb-2">
+                                <Label>Options</Label>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => addOption(questionIndex)}
+                                >
+                                  Add Option
+                                </Button>
+                              </div>
+                              <div className="space-y-2">
+                                {(question.options || []).map((option, optionIndex) => (
+                                  <div key={optionIndex} className="flex items-center gap-2">
+                                    <Input
+                                      value={option}
+                                      onChange={(e) => updateOption(questionIndex, optionIndex, e.target.value)}
+                                      placeholder={`Option ${optionIndex + 1}`}
+                                      className="flex-1"
+                                    />
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => removeOption(questionIndex, optionIndex)}
+                                      className="text-red-600 hover:text-red-700"
+                                    >
+                                      Remove
+                                    </Button>
+                                  </div>
+                                ))}
+                                {(!question.options || question.options.length === 0) && (
+                                  <p className="text-sm text-muted-foreground">No options added yet. Click "Add Option" to get started.</p>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    ))
+                  )}
+
+                  {/* Add Question Button at the bottom */}
+                  {editableQuestions.length > 0 && (
+                    <Card className="border-dashed border-2 border-muted-foreground/25 hover:border-primary/50 transition-colors">
+                      <CardContent className="pt-6">
+                        <Button 
+                          onClick={addNewQuestion} 
+                          variant="ghost" 
+                          className="w-full h-16 border-none text-muted-foreground hover:text-primary"
+                        >
+                          <Plus className="h-6 w-6 mr-2" />
+                          Add Another Question
+                        </Button>
                       </CardContent>
                     </Card>
-                  ))}
+                  )}
                 </CardContent>
               </Card>
 

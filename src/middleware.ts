@@ -47,7 +47,7 @@ const publicRoutes = [
 
 export default async function middleware(req: NextRequest) {
     const path = req.nextUrl.pathname;
-    console.log(`[Middleware] Received request for path: ${path}`);
+    // console.log(`[Middleware] Received request for path: ${path}`);
 
     const isPublicApiRoute = publicRoutes.some(route => {
         if (route.endsWith(':id*') || route.endsWith(':slug*')) {
@@ -63,23 +63,23 @@ export default async function middleware(req: NextRequest) {
         return match;
     });
 
-    console.log(`[Middleware] Path: "${path}", isPublicApiRoute: ${isPublicApiRoute}`);
+    // console.log(`[Middleware] Path: "${path}", isPublicApiRoute: ${isPublicApiRoute}`);
 
     // This route is for fetching prediction details by ID, also public (though potentially an older pattern)
     const isGetPredictionApiRoute = path.startsWith('/api/getPrediction/');
-    console.log(`[Middleware] Path: "${path}", isGetPredictionApiRoute: ${isGetPredictionApiRoute}`);
+    // console.log(`[Middleware] Path: "${path}", isGetPredictionApiRoute: ${isGetPredictionApiRoute}`);
 
 
     if (isPublicApiRoute) {
-        console.log(`[Middleware] Path: "${path}" - Matched publicRoutes. Bypassing auth.`);
+        // console.log(`[Middleware] Path: "${path}" - Matched publicRoutes. Bypassing auth.`);
         return NextResponse.next();
     }
     if (isGetPredictionApiRoute) {
-        console.log(`[Middleware] Path: "${path}" - Matched isGetPredictionApiRoute. Bypassing auth.`);
+        // console.log(`[Middleware] Path: "${path}" - Matched isGetPredictionApiRoute. Bypassing auth.`);
         return NextResponse.next();
     }
 
-    console.log(`[Middleware] Path: "${path}" - Not a public API route by initial checks. Proceeding to auth logic.`);
+    // console.log(`[Middleware] Path: "${path}" - Not a public API route by initial checks. Proceeding to auth logic.`);
     const authHeader = req.headers.get('authorization');
 
     // If it's a public API route (like /api/getRecentActivity or /api/getPrediction/*), let it pass.
@@ -113,9 +113,9 @@ export default async function middleware(req: NextRequest) {
 
     // For secure API routes (not in publicRoutes and starts with /api)
     if (path.startsWith('/api/') && !isPublicApiRoute && !isGetPredictionApiRoute) {
-        console.log(`[Middleware] Path: "${path}" - Entering secure API route authentication.`);
+        // console.log(`[Middleware] Path: "${path}" - Entering secure API route authentication.`);
         if (!authHeader) {
-            console.log(`[Middleware] Path: "${path}" - No Authorization header. Returning 401.`);
+            // console.log(`[Middleware] Path: "${path}" - No Authorization header. Returning 401.`);
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
         const tokenParts = authHeader.split(' ');
@@ -130,13 +130,13 @@ export default async function middleware(req: NextRequest) {
             return NextResponse.json({ error: 'Malformed token' }, { status: 401 });
         }
         
-        console.log(`[Middleware] Path: "${path}" - Attempting to verify token.`);
+        // console.log(`[Middleware] Path: "${path}" - Attempting to verify token.`);
         const isAuthenticated = await verifyConfirmationToken(token);
         if (!isAuthenticated) {
-            console.log(`[Middleware] Path: "${path}" - Token verification failed. Returning 401.`);
+            // console.log(`[Middleware] Path: "${path}" - Token verification failed. Returning 401.`);
             return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
         }
-        console.log(`[Middleware] Path: "${path}" - Token verified successfully.`);
+        // console.log(`[Middleware] Path: "${path}" - Token verified successfully.`);
 
         // Create a new request with user ID in headers
         const requestHeaders = new Headers(req.headers);
@@ -152,16 +152,16 @@ export default async function middleware(req: NextRequest) {
         if (path.startsWith('/api/admin')) {
             const userData = isAuthenticated; // Assuming verifyConfirmationToken returns user data object with role
             if (!userData || typeof userData === 'boolean' || !userData.role || userData.role !== 'admin') {
-                console.log(`[Middleware] Path: "${path}" - Admin route, but user is not admin or userData is invalid. UserData:`, userData);
+                // console.log(`[Middleware] Path: "${path}" - Admin route, but user is not admin or userData is invalid. UserData:`, userData);
                 return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
             }
-            console.log(`[Middleware] Path: "${path}" - Admin route, user is admin.`);
+            // console.log(`[Middleware] Path: "${path}" - Admin route, user is admin.`);
         }
         
         return response;
     }
     
-    console.log(`[Middleware] Path: "${path}" - Defaulting to NextResponse.next().`);
+    // console.log(`[Middleware] Path: "${path}" - Defaulting to NextResponse.next().`);
     return NextResponse.next();
 }
 
