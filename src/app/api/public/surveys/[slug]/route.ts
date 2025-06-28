@@ -10,16 +10,20 @@ export async function GET(
         const { slug } = await params;
         const survey = await SurveyRepo.getSurveyBySlug(slug);
         
-        if (!survey) {
-            return NextResponse.json({ 
-                error: 'Survey not found or not published' 
-            }, { status: 404 });
+        if (survey) {
+            return NextResponse.json({ status: true, survey });
         }
 
-        return NextResponse.json({ 
-            status: true, 
-            survey 
-        });
+        // Not active – check if survey exists but is inactive to decide 410 vs 404
+        const existsAny = await SurveyRepo.getSurveyBySlugAny(slug);
+        if (existsAny) {
+            return NextResponse.json(
+                { error: 'Survey is not active' },
+                { status: 410 }
+            );
+        }
+
+        return NextResponse.json({ error: 'Survey not found' }, { status: 404 });
 
     } catch (error) {
         console.error("Error in GET /api/surveys/[slug]:", error);

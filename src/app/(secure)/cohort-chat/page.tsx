@@ -50,6 +50,35 @@ const normaliseText=(txt:string)=>{
     .replace(/\b(\w+)\s+\1\b/gi,'$1'); // remove duplicated words
 };
 
+// Normalize markdown structure for consistent rendering across AI models
+const normalizeMarkdown = (text: string): string => {
+  let normalized = text;
+  
+  // Ensure proper spacing around headings
+  normalized = normalized.replace(/\n(#{1,6}\s[^\n]+)\n/g, '\n\n$1\n\n');
+  normalized = normalized.replace(/^(#{1,6}\s[^\n]+)\n/g, '$1\n\n');
+  
+  // Ensure proper spacing around lists
+  normalized = normalized.replace(/\n(\s*[-*+]\s[^\n]+)/g, '\n\n$1');
+  normalized = normalized.replace(/(\s*[-*+]\s[^\n]+)\n([^\s-*+\n])/g, '$1\n\n$2');
+  
+  // Ensure proper spacing around numbered lists
+  normalized = normalized.replace(/\n(\s*\d+\.\s[^\n]+)/g, '\n\n$1');
+  normalized = normalized.replace(/(\s*\d+\.\s[^\n]+)\n([^\s\d\n])/g, '$1\n\n$2');
+  
+  // Clean up excessive whitespace but preserve intentional spacing
+  normalized = normalized.replace(/\n{3,}/g, '\n\n');
+  
+  // Move citations to more natural positions (after punctuation)
+  normalized = normalized.replace(/(\[\d+\])([.,:;!?])/g, '$2$1');
+  normalized = normalized.replace(/([.,:;!?])(\s*)(\[\d+\])/g, '$1$3$2');
+  
+  // Ensure citations don't break paragraph flow
+  normalized = normalized.replace(/(\[\d+\])\s*\n\s*([A-Z])/g, '$1 $2');
+  
+  return normalized.trim();
+};
+
 export default function CohortChatPage() {
   const [cohorts, setCohorts] = useState<Cohort[]>([]);
   const [selectedCohortId, setSelectedCohortId] = useState<number | null>(null);
@@ -169,13 +198,25 @@ export default function CohortChatPage() {
     setIsLoading(true);
 
     const token = typeof window !== 'undefined' ? localStorage.getItem('token') ?? '' : '';
+    
+    // Enhance system prompt with formatting instructions for consistent markdown
+    const enhancedSystemPrompt = `${systemPrompt}
+
+FORMATTING REQUIREMENTS:
+- Use clear heading hierarchy (## for main sections, ### for subsections)
+- Add blank lines before and after headings
+- Use consistent bullet point formatting with proper spacing
+- Place citations at natural sentence/paragraph boundaries
+- Ensure proper spacing around lists and paragraphs
+- Structure your response with clear sections and subsections`;
+
     const payload = {
       cohort: selectedCohortId ? { id: selectedCohortId } : undefined,
       question,
       surveyId: selectedSurveyId || undefined,
       model: selectedModel,
       sources,
-      systemPrompt,
+      systemPrompt: enhancedSystemPrompt,
     };
 
     const res = await fetch('/api/cohort/query', {
@@ -340,8 +381,9 @@ export default function CohortChatPage() {
   };
 
   const renderWithCitations=(text:string,citations?:Record<string,string>)=> {
+    const normalizedText = normalizeMarkdown(normaliseText(text));
+    
     if(!citations || Object.keys(citations).length===0) {
-      text = normaliseText(text);
       return (
         <div className="prose prose-sm max-w-none prose-headings:text-foreground prose-headings:font-semibold prose-p:text-foreground prose-p:leading-relaxed prose-strong:text-foreground prose-strong:font-semibold prose-a:text-primary prose-a:no-underline hover:prose-a:underline prose-ul:text-foreground prose-ol:text-foreground prose-li:text-foreground prose-li:my-1 prose-blockquote:text-foreground prose-blockquote:border-l-primary">
           <ReactMarkdown
@@ -362,75 +404,95 @@ export default function CohortChatPage() {
               code: ({ children }) => <code className="bg-muted px-1.5 py-0.5 rounded text-sm font-mono">{children}</code>,
             }}
           >
-            {text}
+            {normalizedText}
           </ReactMarkdown>
         </div>
       );
     }
     
-    // Split text by citation markers and render each part
-    const normalizedText = normaliseText(text);
-    const parts = normalizedText.split(/(\[\d+\])/);
+    // Custom component to handle inline citations within markdown
+    const CitationMarkdown = ({ children }: { children: string }) => {
+      // Split text by citation markers but keep them in the result
+      const parts = children.split(/(\[\d+\])/);
+      
+      return (
+        <>
+          {parts.map((part, index) => {
+            const citationMatch = part.match(/\[(\d+)\]/);
+            if (citationMatch) {
+              const num = citationMatch[1];
+              const quote = citations[num];
+              
+              return (
+                <Tooltip key={`citation-${index}-${num}`}>
+                  <TooltipTrigger asChild>
+                    <span className="inline-flex items-baseline px-1 py-0 mx-0.5 rounded bg-blue-100 cursor-default text-blue-700 hover:bg-blue-200 font-medium text-xs border border-blue-200 leading-none align-baseline">
+                      {num}
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent 
+                    className="max-w-lg text-xs p-3 bg-white border border-gray-200 shadow-lg z-[9999]"
+                    side="top"
+                    align="start"
+                  >
+                    <div className="space-y-1">
+                      {quote ? (
+                        <div className="whitespace-pre-wrap break-words text-gray-900">
+                          {quote}
+                        </div>
+                      ) : (
+                        <div className="text-gray-500">Quote not found for [{num}]</div>
+                      )}
+                    </div>
+                  </TooltipContent>
+                </Tooltip>
+              );
+            } else {
+              return <span key={index}>{part}</span>;
+            }
+          })}
+        </>
+      );
+    };
     
-    const renderedParts = parts.map((part, index) => {
-      const citationMatch = part.match(/\[(\d+)\]/);
-      if (citationMatch) {
-        const num = citationMatch[1];
-        const quote = citations[num];
-        
-        return (
-          <Tooltip key={`citation-${index}-${num}`}>
-            <TooltipTrigger asChild>
-              <span className="inline-block px-1.5 py-0.5 mx-0.5 rounded bg-blue-100 underline cursor-help text-blue-700 hover:bg-blue-200 font-medium text-xs border border-blue-200">
-                [{num}]
-              </span>
-            </TooltipTrigger>
-            <TooltipContent 
-              className="max-w-lg text-xs p-3 bg-white border border-gray-200 shadow-lg z-[9999]"
-              side="top"
-              align="start"
-            >
-              <div className="space-y-1">
-                {quote ? (
-                  <div className="whitespace-pre-wrap break-words text-gray-900">
-                    {quote}
-                  </div>
-                ) : (
-                  <div className="text-gray-500">Quote not found for [{num}]</div>
-                )}
-              </div>
-            </TooltipContent>
-          </Tooltip>
-        );
-      } else {
-        // Render regular text as markdown with enhanced styling
-        return (
-          <ReactMarkdown
-            key={`text-${index}`}
-            remarkPlugins={optionalRemark}
-            rehypePlugins={optionalRehype}
-            components={{
-              p: ({ children }) => <span className="inline">{children}</span>, // Inline span instead of block p
-              h1: ({ children }) => <h1 className="text-xl font-bold mb-4 mt-6 first:mt-0 text-foreground border-b border-border pb-2 block">{children}</h1>,
-              h2: ({ children }) => <h2 className="text-lg font-semibold mb-3 mt-5 first:mt-0 text-foreground block">{children}</h2>,
-              h3: ({ children }) => <h3 className="text-base font-medium mb-2 mt-4 first:mt-0 text-foreground block">{children}</h3>,
-              ul: ({ children }) => <ul className="list-disc ml-6 mb-4 space-y-1 block">{children}</ul>,
-              ol: ({ children }) => <ol className="list-decimal ml-6 mb-4 space-y-1 block">{children}</ol>,
-              li: ({ children }) => <li className="text-foreground leading-relaxed mb-1 block">{children}</li>,
-              strong: ({ children }) => <strong className="font-semibold text-foreground">{children}</strong>,
-              em: ({ children }) => <em className="italic text-foreground">{children}</em>,
-              code: ({ children }) => <code className="bg-muted px-1.5 py-0.5 rounded text-sm font-mono">{children}</code>,
-            }}
-          >
-            {part}
-          </ReactMarkdown>
-        );
-      }
-    });
-
     return (
       <div className="prose prose-sm max-w-none prose-headings:text-foreground prose-headings:font-semibold prose-p:text-foreground prose-p:leading-relaxed prose-strong:text-foreground prose-strong:font-semibold prose-a:text-primary prose-a:no-underline hover:prose-a:underline prose-ul:text-foreground prose-ol:text-foreground prose-li:text-foreground prose-li:my-1 prose-blockquote:text-foreground prose-blockquote:border-l-primary">
-        {renderedParts}
+        <ReactMarkdown
+          remarkPlugins={optionalRemark}
+          rehypePlugins={optionalRehype}
+          components={{
+            h1: ({ children }) => <h1 className="text-xl font-bold mb-4 mt-6 first:mt-0 text-foreground border-b border-border pb-2">{children}</h1>,
+            h2: ({ children }) => <h2 className="text-lg font-semibold mb-3 mt-5 first:mt-0 text-foreground">{children}</h2>,
+            h3: ({ children }) => <h3 className="text-base font-medium mb-2 mt-4 first:mt-0 text-foreground">{children}</h3>,
+            p: ({ children }) => (
+              <p className="mb-3 leading-relaxed text-foreground">
+                <CitationMarkdown>{String(children)}</CitationMarkdown>
+              </p>
+            ),
+            ul: ({ children }) => <ul className="list-disc ml-6 mb-4 space-y-1">{children}</ul>,
+            ol: ({ children }) => <ol className="list-decimal ml-6 mb-4 space-y-1">{children}</ol>,
+            li: ({ children }) => (
+              <li className="text-foreground leading-relaxed">
+                <CitationMarkdown>{String(children)}</CitationMarkdown>
+              </li>
+            ),
+            strong: ({ children }) => (
+              <strong className="font-semibold text-foreground">
+                <CitationMarkdown>{String(children)}</CitationMarkdown>
+              </strong>
+            ),
+            em: ({ children }) => (
+              <em className="italic text-foreground">
+                <CitationMarkdown>{String(children)}</CitationMarkdown>
+              </em>
+            ),
+            blockquote: ({ children }) => <blockquote className="border-l-4 border-primary pl-4 my-4 italic text-muted-foreground">{children}</blockquote>,
+            hr: () => <hr className="my-6 border-border" />,
+            code: ({ children }) => <code className="bg-muted px-1.5 py-0.5 rounded text-sm font-mono">{children}</code>,
+          }}
+        >
+          {normalizedText}
+        </ReactMarkdown>
       </div>
     );
   };

@@ -5,8 +5,7 @@ import { useParams } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { SidebarTrigger } from "@/components/ui/sidebar"
-import { 
-  ArrowLeft,
+import {
   User,
   MapPin,
   Briefcase,
@@ -15,6 +14,7 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { formatDistanceToNow } from "date-fns"
+import { Breadcrumb, BreadcrumbList, BreadcrumbItem, BreadcrumbLink, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb"
 
 interface SurveyAnswer {
   id: number
@@ -146,11 +146,21 @@ const IndividualResponsePage = () => {
             <div className="flex items-center">
               <SidebarTrigger className="-ml-0.5 h-5 w-5 text-muted-foreground hover:text-foreground" />
               <div className="h-4 border-l border-border mx-4" />
-              <Link href={`/surveys/${surveyId}/results`} className="text-muted-foreground hover:text-foreground">
-                <ArrowLeft className="h-4 w-4" />
-              </Link>
-              <div className="h-4 border-l border-border mx-4" />
-              <h1 className="text-base font-medium text-card-foreground">Response Not Found</h1>
+              <Breadcrumb>
+                <BreadcrumbList>
+                  <BreadcrumbItem>
+                    <BreadcrumbLink href="/surveys">Surveys</BreadcrumbLink>
+                  </BreadcrumbItem>
+                  <BreadcrumbSeparator />
+                  <BreadcrumbItem>
+                    <BreadcrumbLink href={`/surveys/${surveyId}/results`}>{survey?.title || 'Survey'}</BreadcrumbLink>
+                  </BreadcrumbItem>
+                  <BreadcrumbSeparator />
+                  <BreadcrumbItem>
+                    <BreadcrumbPage>Response {response?.id}</BreadcrumbPage>
+                  </BreadcrumbItem>
+                </BreadcrumbList>
+              </Breadcrumb>
             </div>
           </div>
           <div className="border-b border-border" />
@@ -171,18 +181,21 @@ const IndividualResponsePage = () => {
             <div className="flex items-center">
               <SidebarTrigger className="-ml-0.5 h-5 w-5 text-muted-foreground hover:text-foreground" />
               <div className="h-4 border-l border-border mx-4" />
-              <Link href={`/surveys/${surveyId}/results`} className="text-muted-foreground hover:text-foreground">
-                <ArrowLeft className="h-4 w-4" />
-              </Link>
-              <div className="h-4 border-l border-border mx-4" />
-              <div>
-                <h1 className="text-base font-medium text-card-foreground">
-                  Survey Response
-                </h1>
-                <p className="text-sm text-muted-foreground">
-                  {survey?.title}
-                </p>
-              </div>
+              <Breadcrumb>
+                <BreadcrumbList>
+                  <BreadcrumbItem>
+                    <BreadcrumbLink href="/surveys">Surveys</BreadcrumbLink>
+                  </BreadcrumbItem>
+                  <BreadcrumbSeparator />
+                  <BreadcrumbItem>
+                    <BreadcrumbLink href={`/surveys/${surveyId}/results`}>{survey?.title || 'Survey'}</BreadcrumbLink>
+                  </BreadcrumbItem>
+                  <BreadcrumbSeparator />
+                  <BreadcrumbItem>
+                    <BreadcrumbPage>Response {response?.id}</BreadcrumbPage>
+                  </BreadcrumbItem>
+                </BreadcrumbList>
+              </Breadcrumb>
             </div>
           </div>
         </div>

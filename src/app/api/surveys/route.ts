@@ -20,7 +20,11 @@ export async function GET(req: NextRequest) {
       status: s.status,
       is_public: s.is_public,
       created_at: s.created_at,
-      response_count: s.response_count || 0
+      response_count: s.response_count || 0,
+      source: s.source || 'native',
+      source_metadata: s.source_metadata || null,
+      start_at: s.start_at,
+      end_at: s.end_at
     }));
     return NextResponse.json({ status:true, surveys: surveysWithFullData });
   } catch (err) {
