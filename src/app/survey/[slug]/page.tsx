@@ -46,6 +46,8 @@ interface Demographics {
   name: string
   email: string
   age: string
+  gender?: string
+  ethnicity?: string
   location: string
   occupation: string
   politicalViews: string
@@ -75,6 +77,8 @@ const SurveyPage = () => {
     name: '',
     email: '',
     age: '',
+    gender: '',
+    ethnicity: '',
     location: '',
     occupation: '',
     politicalViews: '',
@@ -429,6 +433,42 @@ const SurveyPage = () => {
               <h4 className="font-medium mb-3 text-sm text-muted-foreground">Personal Information (Optional)</h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
+                  <Label htmlFor="gender">Gender</Label>
+                  <select
+                    id="gender"
+                    value={demographics.gender || ''}
+                    onChange={(e) => updateDemographics('gender', e.target.value)}
+                    className="w-full px-3 py-2 border border-input bg-background rounded-md"
+                  >
+                    <option value="">Select gender</option>
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                    <option value="Non-binary">Non-binary</option>
+                    <option value="Other">Other</option>
+                    <option value="Prefer not to say">Prefer not to say</option>
+                  </select>
+                </div>
+                <div>
+                  <Label htmlFor="ethnicity">Race/Ethnicity</Label>
+                  <select
+                    id="ethnicity"
+                    value={demographics.ethnicity || ''}
+                    onChange={(e) => updateDemographics('ethnicity', e.target.value)}
+                    className="w-full px-3 py-2 border border-input bg-background rounded-md"
+                  >
+                    <option value="">Select race/ethnicity</option>
+                    <option value="White">White</option>
+                    <option value="Black or African American">Black or African American</option>
+                    <option value="Hispanic or Latino">Hispanic or Latino</option>
+                    <option value="Asian">Asian</option>
+                    <option value="Native American">Native American</option>
+                    <option value="Pacific Islander">Pacific Islander</option>
+                    <option value="Mixed Race">Mixed Race</option>
+                    <option value="Other">Other</option>
+                    <option value="Prefer not to say">Prefer not to say</option>
+                  </select>
+                </div>
+                <div>
                   <Label htmlFor="location">Location</Label>
                   <Input
                     id="location"
@@ -455,12 +495,13 @@ const SurveyPage = () => {
                     className="w-full px-3 py-2 border border-input bg-background rounded-md"
                   >
                     <option value="">Select education level</option>
-                    <option value="high-school">High School</option>
-                    <option value="some-college">Some College</option>
-                    <option value="bachelors">Bachelor&apos;s Degree</option>
-                    <option value="masters">Master&apos;s Degree</option>
-                    <option value="phd">PhD/Doctorate</option>
-                    <option value="other">Other</option>
+                    <option value="High School">High School</option>
+                    <option value="Some College">Some College</option>
+                    <option value="Bachelor's Degree">Bachelor&apos;s Degree</option>
+                    <option value="Master's Degree">Master&apos;s Degree</option>
+                    <option value="Doctorate">PhD/Doctorate</option>
+                    <option value="Trade School">Trade School</option>
+                    <option value="Other">Other</option>
                   </select>
                 </div>
                 <div>
@@ -472,13 +513,13 @@ const SurveyPage = () => {
                     className="w-full px-3 py-2 border border-input bg-background rounded-md"
                   >
                     <option value="">Select income range</option>
-                    <option value="under-25k">Under $25,000</option>
-                    <option value="25k-50k">$25,000 - $50,000</option>
-                    <option value="50k-75k">$50,000 - $75,000</option>
-                    <option value="75k-100k">$75,000 - $100,000</option>
-                    <option value="100k-150k">$100,000 - $150,000</option>
-                    <option value="over-150k">Over $150,000</option>
-                    <option value="prefer-not-to-say">Prefer not to say</option>
+                    <option value="Under $25k">Under $25,000</option>
+                    <option value="$25k-$50k">$25,000 - $50,000</option>
+                    <option value="$50k-$75k">$50,000 - $75,000</option>
+                    <option value="$75k-$100k">$75,000 - $100,000</option>
+                    <option value="$100k-$150k">$100,000 - $150,000</option>
+                    <option value="$150k+">Over $150,000</option>
+                    <option value="Prefer not to say">Prefer not to say</option>
                   </select>
                 </div>
               </div>
