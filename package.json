@@ -7,7 +7,8 @@
       "build": "next build",
       "start": "next start",
       "lint": "next lint",
-      "init-scheduler": "node scripts/init-scheduler.js"
+      "init-scheduler": "node scripts/init-scheduler.js",
+      "cron:surveys": "node scripts/close-expired-surveys.js"
    },
    "dependencies": {
       "@anthropic-ai/sdk": "^0.54.0",
@@ -89,6 +90,7 @@
       "openai": "^4.76.1",
       "pinata": "^1.10.1",
       "pinata-web3": "^0.5.3",
+      "queue-microtask": "^1.2.3",
       "react": "^19.1.0",
       "react-chartjs-2": "^5.3.0",
       "react-dom": "^19.1.0",

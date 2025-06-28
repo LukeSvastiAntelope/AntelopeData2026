@@ -32,19 +32,31 @@ export const SurveyRepo = {
                 .substring(0, 50); // Limit length
             
             // Create a unique slug with UUID suffix
-            const uniqueId = randomUUID().split('-')[0]; // Use first part of UUID (8 chars)
+            const uniqueId = randomUUID().split('-')[0]; // first segment (8 chars)
             const slug = `${baseSlug}-${uniqueId}`;
             
-            // Create survey
+            const startAt = data.startAt ?? null; // Expect ISO string or null
+            const endAt   = data.endAt ?? null;
+            
+            let status: string = 'draft';
+            if (data.autoPublish) {
+                if (startAt && new Date(startAt) > new Date()) {
+                    status = 'scheduled';
+                } else {
+                    status = 'published';
+                }
+            }
+            
+            // Insert survey meta
             const [surveyResult] = await connection.execute<ResultSetHeader>(
-                `INSERT INTO surveys (title, description, slug, created_by, is_public, status) 
-                 VALUES (?, ?, ?, ?, ?, 'draft')`,
-                [data.title, data.description, slug, createdBy, data.isPublic]
+                `INSERT INTO surveys (title, description, slug, created_by, is_public, status, start_at, end_at) 
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+                [data.title, data.description, slug, createdBy, data.isPublic, status, startAt, endAt]
             );
             
             const surveyId = surveyResult.insertId;
             
-            // Create questions
+            // Insert questions
             for (const question of data.questions) {
                 await connection.execute(
                     `INSERT INTO survey_questions (survey_id, type, prompt, options, is_required, question_order) 
@@ -71,11 +83,12 @@ export const SurveyRepo = {
         }
     },
 
+    // Fetch survey only if currently active
     getSurveyBySlug: async (slug: string) => {
         const db = await getMySQLConnection();
         
         const [rows] = await db.execute<RowDataPacket[]>(
-            "SELECT * FROM surveys WHERE slug = ? AND status = 'published'",
+            "SELECT * FROM surveys WHERE slug = ? AND status = 'active'",
             [slug]
         );
         
@@ -96,6 +109,17 @@ export const SurveyRepo = {
                 options: q.options // MySQL JSON field already returns parsed data
             }))
         };
+    },
+
+    // Fetch survey regardless of status (used to distinguish 404 vs 410)
+    getSurveyBySlugAny: async (slug: string) => {
+        const db = await getMySQLConnection();
+        
+        const [rows] = await db.execute<RowDataPacket[]>(
+            'SELECT * FROM surveys WHERE slug = ? LIMIT 1',
+            [slug]
+        );
+        return rows[0] || null;
     },
 
     submitSurveyResponse: async (data: any, ipAddress: string, userAgent: string) => {
@@ -415,10 +439,20 @@ export const SurveyRepo = {
                 slug = `${baseSlug}-${uniqueId}`;
             }
             
-            // Update survey and set status to published
+            const startAt = data.startAt ?? null;
+            const endAt   = data.endAt ?? null;
+
+            // Determine status based on scheduling
+            let newStatus = 'published';
+            if (startAt && new Date(startAt) > new Date()) {
+                newStatus = 'scheduled';
+            }
+
             await connection.execute(
-                `UPDATE surveys SET title = ?, description = ?, slug = ?, is_public = ?, status = 'published' WHERE id = ?`,
-                [data.title, data.description, slug, data.isPublic, surveyId]
+                `UPDATE surveys 
+                 SET title = ?, description = ?, slug = ?, is_public = ?, status = ?, start_at = ?, end_at = ? 
+                 WHERE id = ?`,
+                [data.title, data.description, slug, data.isPublic, newStatus, startAt, endAt, surveyId]
             );
             
             // Delete existing questions
@@ -598,5 +632,50 @@ export const SurveyRepo = {
         } catch (error) {
             throw error;
         }
+    },
+
+    // Close a survey manually
+    closeSurvey: async (surveyId: number, createdBy: number) => {
+        const db = await getMySQLConnection();
+        const [result] = await db.execute<ResultSetHeader>(
+            `UPDATE surveys SET status = 'closed' WHERE id = ? AND created_by = ?`,
+            [surveyId, createdBy]
+        );
+        return (result as ResultSetHeader).affectedRows > 0;
+    },
+
+    // Re-open a previously closed survey (if still within schedule or no schedule)
+    reopenSurvey: async (surveyId: number, createdBy: number) => {
+        const db = await getMySQLConnection();
+
+        // Fetch timing info first
+        const [rows] = await db.execute<RowDataPacket[]>(
+            `SELECT start_at, end_at FROM surveys WHERE id = ? AND created_by = ? LIMIT 1`,
+            [surveyId, createdBy]
+        );
+        if (!rows[0]) return false;
+
+        const { start_at, end_at } = rows[0];
+
+        let newStatus = 'published';
+        if (start_at && new Date(start_at) > new Date()) {
+            newStatus = 'scheduled';
+        }
+
+        const [result] = await db.execute<ResultSetHeader>(
+            `UPDATE surveys SET status = ? WHERE id = ? AND created_by = ?`,
+            [newStatus, surveyId, createdBy]
+        );
+        return (result as ResultSetHeader).affectedRows > 0;
+    },
+
+    // Automatically close surveys whose end date has passed
+    autoCloseExpired: async () => {
+        const db = await getMySQLConnection();
+        const [result] = await db.execute<ResultSetHeader>(
+            `UPDATE surveys SET status = 'closed' 
+             WHERE end_at IS NOT NULL AND end_at < NOW() AND status IN ('scheduled','published','active')`
+        );
+        return (result as ResultSetHeader).affectedRows;
     }
 }; 

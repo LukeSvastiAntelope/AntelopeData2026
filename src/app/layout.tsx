@@ -4,7 +4,7 @@ import "./globals.css";
 import { Noto_Sans } from 'next/font/google';
 import { Toaster } from "react-hot-toast";
 import { Providers } from "./components/provider/mainProvider";
-import { SolProvider } from "./components/provider/solProvider";
+// import { SolProvider } from "./components/provider/solProvider";
 import Script from "next/script";
 import { Analytics } from '@vercel/analytics/react';
 import { ThemeProvider } from "@/components/theme-provider";
@@ -44,12 +44,12 @@ export default function RootLayout({
                         reverseOrder={true}
                     />
                     <Providers>
-                        <SolProvider>
+                        {/* <SolProvider> */}
                             <main className="min-h-screen">
                                 {children}
                             </main>
                             <Analytics />
-                        </SolProvider>
+                        {/* </SolProvider> */}
                     </Providers>
                 </ThemeProvider>
             </body>
