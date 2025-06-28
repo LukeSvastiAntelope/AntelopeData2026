@@ -375,7 +375,7 @@ const DigitalTwinsPage = () => {
                   <TableBody>
                     {allTwins.map((twin) => (
                       <TableRow key={twin.agentToken} className="cursor-pointer" onClick={() => setSelectedTwin(twin.agentToken)}>
-                        <TableCell>{twin.demographics?.name || 'Anonymous'}</TableCell>
+                        <TableCell>{twin.demographics?.name || twin.demographics?.email || 'Anonymous'}</TableCell>
                         <TableCell>{twin.demographics?.age || '—'}</TableCell>
                         <TableCell>{twin.demographics?.location || '—'}</TableCell>
                         <TableCell>{twin.demographics?.politicalViews || '—'}</TableCell>

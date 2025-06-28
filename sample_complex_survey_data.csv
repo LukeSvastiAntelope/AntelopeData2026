@@ -1,0 +1,16 @@
+Name,Email,Age,Gender,Location,Education Level,Annual Income,Job Title,Satisfaction Rating,Favorite Features,Would Recommend,Product Usage Frequency,Customer Since,Support Rating,Comments
+John Doe,john@example.com,28,Male,New York,Bachelor's Degree,65000,Software Engineer,8,"Dashboard, Analytics",Yes,Daily,2022-01-15,9,Great product overall with excellent user experience
+Jane Smith,jane@example.com,34,Female,California,Master's Degree,85000,Product Manager,9,"Analytics, Reports, API",Yes,Daily,2021-08-22,8,Love the insights feature and comprehensive reporting capabilities
+Mike Johnson,mike@example.com,42,Male,Texas,High School,45000,Sales Representative,7,Dashboard,No,Weekly,2023-03-10,6,Could use more customization options and better mobile support
+Sarah Wilson,sarah@example.com,29,Female,Florida,Bachelor's Degree,72000,Marketing Specialist,10,"Dashboard, Integrations",Yes,Daily,2021-12-05,10,Excellent user experience and seamless workflow integration
+David Brown,david@example.com,35,Male,Illinois,Master's Degree,95000,Data Analyst,6,Analytics,Yes,Weekly,2022-07-18,7,Good but needs improvement in data export functionality
+Lisa Garcia,lisa@example.com,31,Female,Washington,Bachelor's Degree,68000,UX Designer,8,"Reports, Dashboard",Yes,Daily,2022-02-28,9,Very helpful for our team's daily operations and planning
+Tom Anderson,tom@example.com,27,Male,Oregon,Associate Degree,52000,Technical Support,9,Dashboard,Yes,Daily,2023-01-12,8,Intuitive and powerful interface with great performance
+Emily Davis,emily@example.com,33,Female,Colorado,Master's Degree,78000,Business Analyst,7,"Analytics, API",No,Monthly,2022-11-03,5,Missing some key features we need for advanced analytics
+James Miller,james@example.com,39,Male,Nevada,Bachelor's Degree,71000,Project Manager,8,"Reports, Integrations",Yes,Weekly,2021-09-14,8,Solid functionality with reliable performance and good support
+Maria Rodriguez,maria@example.com,26,Female,Arizona,Bachelor's Degree,58000,Content Creator,9,"Dashboard, Reports",Yes,Daily,2023-02-20,9,Perfect for our content planning and performance tracking needs
+Robert Chen,robert@example.com,45,Male,California,PhD,120000,Research Director,5,"Analytics, API",No,Monthly,2022-05-17,4,Advanced features are lacking compared to enterprise competitors
+Amanda Taylor,amanda@example.com,30,Female,New York,Master's Degree,82000,Operations Manager,9,"Dashboard, Integrations, Reports",Yes,Daily,2021-11-08,10,Comprehensive solution that covers all our operational needs
+Kevin White,kevin@example.com,36,Male,Texas,Bachelor's Degree,64000,IT Specialist,7,Analytics,Yes,Weekly,2022-09-25,7,Good analytics but interface could be more user-friendly
+Jennifer Lee,jennifer@example.com,32,Female,Washington,Master's Degree,75000,Strategy Consultant,8,"Reports, API",Yes,Weekly,2022-04-12,8,Excellent reporting capabilities with flexible API integration
+Michael Thompson,michael@example.com,41,Male,Florida,High School,48000,Customer Service,6,Dashboard,No,Monthly,2023-04-05,6,Basic functionality works but lacks advanced features we need 

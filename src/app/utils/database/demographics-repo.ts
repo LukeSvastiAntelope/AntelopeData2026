@@ -43,7 +43,7 @@ export const DemographicsRepo = {
         const [rows] = await db.execute<RowDataPacket[]>(
             `SELECT * FROM demographic_templates WHERE is_active = 1 ORDER BY category, sort_order`
         );
-        // @ts-ignore – rows comes back as any[] when using RowDataPacket
+        // @ts-expect-error – rows comes back as any[] when using RowDataPacket
         return rows.map(mapTemplate);
     },
 
@@ -57,7 +57,7 @@ export const DemographicsRepo = {
             [surveyId]
         );
         if (!rows[0]) return null;
-        // @ts-ignore
+        // @ts-expect-error - rows comes back as any[] when using RowDataPacket
         return mapConfig(rows[0]);
     },
 
