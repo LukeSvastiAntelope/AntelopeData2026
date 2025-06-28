@@ -47,12 +47,33 @@ export const SurveyRepo = {
                 }
             }
             
-            // Insert survey meta
-            const [surveyResult] = await connection.execute<ResultSetHeader>(
-                `INSERT INTO surveys (title, description, slug, created_by, is_public, status, start_at, end_at) 
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-                [data.title, data.description, slug, createdBy, data.isPublic, status, startAt, endAt]
+            // Check if source tracking columns exist
+            const [sourceColumns] = await connection.execute<RowDataPacket[]>(
+                `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS 
+                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'surveys' AND COLUMN_NAME = 'source'`
             );
+            
+            const hasSourceTracking = sourceColumns.length > 0;
+            
+            // Insert survey meta with optional source tracking
+            let surveyResult: ResultSetHeader;
+            
+            if (hasSourceTracking) {
+                const source = data.source || 'native';
+                const sourceMetadata = data.sourceMetadata ? JSON.stringify(data.sourceMetadata) : null;
+                
+                [surveyResult] = await connection.execute<ResultSetHeader>(
+                    `INSERT INTO surveys (title, description, slug, created_by, is_public, status, start_at, end_at, source, source_metadata) 
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                    [data.title, data.description, slug, createdBy, data.isPublic, status, startAt, endAt, source, sourceMetadata]
+                );
+            } else {
+                [surveyResult] = await connection.execute<ResultSetHeader>(
+                    `INSERT INTO surveys (title, description, slug, created_by, is_public, status, start_at, end_at) 
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+                    [data.title, data.description, slug, createdBy, data.isPublic, status, startAt, endAt]
+                );
+            }
             
             const surveyId = surveyResult.insertId;
             
@@ -83,12 +104,12 @@ export const SurveyRepo = {
         }
     },
 
-    // Fetch survey only if currently active
+    // Fetch survey only if currently active or published
     getSurveyBySlug: async (slug: string) => {
         const db = await getMySQLConnection();
         
         const [rows] = await db.execute<RowDataPacket[]>(
-            "SELECT * FROM surveys WHERE slug = ? AND status = 'active'",
+            "SELECT * FROM surveys WHERE slug = ? AND status IN ('active', 'published')",
             [slug]
         );
         
@@ -129,12 +150,31 @@ export const SurveyRepo = {
         try {
             await connection.beginTransaction();
             
-            // Insert survey response
-            const [responseResult] = await connection.execute<ResultSetHeader>(
-                `INSERT INTO survey_responses (survey_id, demographics, ip_address, user_agent) 
-                 VALUES (?, ?, ?, ?)`,
-                [data.surveyId, JSON.stringify(data.demographics), ipAddress, userAgent]
+            // Check if source tracking columns exist in survey_responses
+            const [responseSourceColumns] = await connection.execute<RowDataPacket[]>(
+                `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS 
+                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'survey_responses' AND COLUMN_NAME = 'source'`
             );
+            
+            const hasResponseSourceTracking = responseSourceColumns.length > 0;
+            
+            // Insert survey response with optional source tracking
+            let responseResult: ResultSetHeader;
+            
+            if (hasResponseSourceTracking) {
+                const source = data.source || 'native';
+                [responseResult] = await connection.execute<ResultSetHeader>(
+                    `INSERT INTO survey_responses (survey_id, demographics, ip_address, user_agent, source) 
+                     VALUES (?, ?, ?, ?, ?)`,
+                    [data.surveyId, JSON.stringify(data.demographics), ipAddress, userAgent, source]
+                );
+            } else {
+                [responseResult] = await connection.execute<ResultSetHeader>(
+                    `INSERT INTO survey_responses (survey_id, demographics, ip_address, user_agent) 
+                     VALUES (?, ?, ?, ?)`,
+                    [data.surveyId, JSON.stringify(data.demographics), ipAddress, userAgent]
+                );
+            }
             
             const responseId = responseResult.insertId;
             
@@ -151,7 +191,21 @@ export const SurveyRepo = {
             let agentToken;
             let isExistingTwin = false;
             
-            if (email) {
+            // Check if agent_token column exists in survey_responses
+            const [agentTokenColumns] = await connection.execute<RowDataPacket[]>(
+                `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS 
+                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'survey_responses' AND COLUMN_NAME = 'agent_token'`
+            );
+            const hasAgentTokenColumn = agentTokenColumns.length > 0;
+            
+            // Check if email column exists in responder_agents
+            const [emailColumns] = await connection.execute<RowDataPacket[]>(
+                `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS 
+                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'responder_agents' AND COLUMN_NAME = 'email'`
+            );
+            const hasEmailColumn = emailColumns.length > 0;
+            
+            if (email && hasEmailColumn) {
                 const [existingAgents] = await connection.execute<RowDataPacket[]>(
                     'SELECT agent_token FROM responder_agents WHERE email = ?',
                     [email]
@@ -162,33 +216,45 @@ export const SurveyRepo = {
                     agentToken = existingAgents[0].agent_token;
                     isExistingTwin = true;
                     
-                    // Update the survey_response to include the agent_token
-                    await connection.execute(
-                        'UPDATE survey_responses SET agent_token = ? WHERE id = ?',
-                        [agentToken, responseId]
-                    );
+                    // Update the survey_response to include the agent_token (if column exists)
+                    if (hasAgentTokenColumn) {
+                        await connection.execute(
+                            'UPDATE survey_responses SET agent_token = ? WHERE id = ?',
+                            [agentToken, responseId]
+                        );
+                    }
                     
                     console.log(`🔄 Using existing digital twin for ${email}: ${agentToken}, linked to response ${responseId}`);
                 } else {
                     // Create new responder agent
                     agentToken = `agent_${responseId}_${Date.now()}`;
                     
-                    await connection.execute(
-                        `INSERT INTO responder_agents (created_from_response_id, agent_token, email, base_profile) 
-                         VALUES (?, ?, ?, ?)`,
-                        [responseId, agentToken, email, JSON.stringify({ demographics: data.demographics, status: 'initial' })]
-                    );
+                    if (hasEmailColumn) {
+                        await connection.execute(
+                            `INSERT INTO responder_agents (created_from_response_id, agent_token, email, base_profile) 
+                             VALUES (?, ?, ?, ?)`,
+                            [responseId, agentToken, email, JSON.stringify({ demographics: data.demographics, status: 'initial' })]
+                        );
+                    } else {
+                        await connection.execute(
+                            `INSERT INTO responder_agents (created_from_response_id, agent_token, base_profile) 
+                             VALUES (?, ?, ?)`,
+                            [responseId, agentToken, JSON.stringify({ demographics: data.demographics, status: 'initial' })]
+                        );
+                    }
                     
-                    // Update the survey_response to include the agent_token
-                    await connection.execute(
-                        'UPDATE survey_responses SET agent_token = ? WHERE id = ?',
-                        [agentToken, responseId]
-                    );
+                    // Update the survey_response to include the agent_token (if column exists)
+                    if (hasAgentTokenColumn) {
+                        await connection.execute(
+                            'UPDATE survey_responses SET agent_token = ? WHERE id = ?',
+                            [agentToken, responseId]
+                        );
+                    }
                     
                     console.log(`✅ Created new digital twin for ${email}: ${agentToken}`);
                 }
             } else {
-                // No email provided, create anonymous agent
+                // No email provided or email column doesn't exist, create anonymous agent
                 agentToken = `agent_${responseId}_${Date.now()}`;
                 
                 await connection.execute(
@@ -197,11 +263,13 @@ export const SurveyRepo = {
                     [responseId, agentToken, JSON.stringify({ demographics: data.demographics, status: 'initial' })]
                 );
                 
-                // Update the survey_response to include the agent_token
-                await connection.execute(
-                    'UPDATE survey_responses SET agent_token = ? WHERE id = ?',
-                    [agentToken, responseId]
-                );
+                // Update the survey_response to include the agent_token (if column exists)
+                if (hasAgentTokenColumn) {
+                    await connection.execute(
+                        'UPDATE survey_responses SET agent_token = ? WHERE id = ?',
+                        [agentToken, responseId]
+                    );
+                }
             }
             
             await connection.commit();
@@ -219,31 +287,69 @@ export const SurveyRepo = {
     getSurveysByCreator: async (createdBy: number) => {
         const db = await getMySQLConnection();
         
-        const [rows] = await db.execute<RowDataPacket[]>(
-            `SELECT s.*, COUNT(sr.id) as response_count 
-             FROM surveys s 
-             LEFT JOIN survey_responses sr ON s.id = sr.survey_id 
-             WHERE s.created_by = ? 
-             GROUP BY s.id 
-             ORDER BY s.created_at DESC`,
-            [createdBy]
+        // Check if source columns exist
+        const [sourceColumns] = await db.execute<RowDataPacket[]>(
+            `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS 
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'surveys' AND COLUMN_NAME = 'source'`
         );
         
-        return rows;
+        const hasSourceTracking = sourceColumns.length > 0;
+        
+        if (hasSourceTracking) {
+            const [rows] = await db.execute<RowDataPacket[]>(
+                `SELECT s.*, COUNT(sr.id) as response_count 
+                 FROM surveys s 
+                 LEFT JOIN survey_responses sr ON s.id = sr.survey_id 
+                 WHERE s.created_by = ? 
+                 GROUP BY s.id 
+                 ORDER BY s.created_at DESC`,
+                [createdBy]
+            );
+            return rows;
+        } else {
+            const [rows] = await db.execute<RowDataPacket[]>(
+                `SELECT s.*, COUNT(sr.id) as response_count, 'native' as source, NULL as source_metadata
+                 FROM surveys s 
+                 LEFT JOIN survey_responses sr ON s.id = sr.survey_id 
+                 WHERE s.created_by = ? 
+                 GROUP BY s.id 
+                 ORDER BY s.created_at DESC`,
+                [createdBy]
+            );
+            return rows;
+        }
     },
 
     getAllSurveys: async () => {
         const db = await getMySQLConnection();
         
-        const [rows] = await db.execute<RowDataPacket[]>(
-            `SELECT s.*, COUNT(sr.id) as response_count 
-             FROM surveys s 
-             LEFT JOIN survey_responses sr ON s.id = sr.survey_id 
-             GROUP BY s.id 
-             ORDER BY s.created_at DESC`
+        // Check if source columns exist
+        const [sourceColumns] = await db.execute<RowDataPacket[]>(
+            `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS 
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'surveys' AND COLUMN_NAME = 'source'`
         );
         
-        return rows;
+        const hasSourceTracking = sourceColumns.length > 0;
+        
+        if (hasSourceTracking) {
+            const [rows] = await db.execute<RowDataPacket[]>(
+                `SELECT s.*, COUNT(sr.id) as response_count 
+                 FROM surveys s 
+                 LEFT JOIN survey_responses sr ON s.id = sr.survey_id 
+                 GROUP BY s.id 
+                 ORDER BY s.created_at DESC`
+            );
+            return rows;
+        } else {
+            const [rows] = await db.execute<RowDataPacket[]>(
+                `SELECT s.*, COUNT(sr.id) as response_count, 'native' as source, NULL as source_metadata
+                 FROM surveys s 
+                 LEFT JOIN survey_responses sr ON s.id = sr.survey_id 
+                 GROUP BY s.id 
+                 ORDER BY s.created_at DESC`
+            );
+            return rows;
+        }
     },
 
     getResponderAgentByToken: async (token: string) => {
@@ -677,5 +783,199 @@ export const SurveyRepo = {
              WHERE end_at IS NOT NULL AND end_at < NOW() AND status IN ('scheduled','published','active')`
         );
         return (result as ResultSetHeader).affectedRows;
+    },
+
+    // Delete a survey and all related data
+    deleteSurvey: async (surveyId: number, createdBy: number) => {
+        const db = await getMySQLConnection();
+        const connection = await db.getConnection();
+        
+        try {
+            await connection.beginTransaction();
+            
+            // Verify survey exists and belongs to user
+            const [surveyRows] = await connection.execute<RowDataPacket[]>(
+                "SELECT id FROM surveys WHERE id = ? AND created_by = ?",
+                [surveyId, createdBy]
+            );
+            
+            if (!surveyRows[0]) {
+                await connection.rollback();
+                connection.release();
+                return false;
+            }
+            
+            // Delete in order of dependencies:
+            // 1. Delete survey answers
+            await connection.execute(
+                `DELETE sa FROM survey_answers sa 
+                 INNER JOIN survey_responses sr ON sa.response_id = sr.id 
+                 WHERE sr.survey_id = ?`,
+                [surveyId]
+            );
+            
+            // 2. Delete survey responses
+            await connection.execute(
+                'DELETE FROM survey_responses WHERE survey_id = ?',
+                [surveyId]
+            );
+            
+            // 3. Delete survey questions
+            await connection.execute(
+                'DELETE FROM survey_questions WHERE survey_id = ?',
+                [surveyId]
+            );
+            
+            // 4. Finally delete the survey itself
+            await connection.execute(
+                'DELETE FROM surveys WHERE id = ?',
+                [surveyId]
+            );
+            
+            await connection.commit();
+            connection.release();
+            return true;
+            
+        } catch (error) {
+            await connection.rollback();
+            connection.release();
+            throw error;
+        }
+    },
+
+    // Clone a survey with all its questions and settings
+    cloneSurvey: async (surveyId: number, createdBy: number) => {
+        const db = await getMySQLConnection();
+        const connection = await db.getConnection();
+        
+        try {
+            await connection.beginTransaction();
+            
+            // Get the original survey with all questions
+            const originalSurvey = await SurveyRepo.getSurveyById(surveyId, createdBy) as any;
+            if (!originalSurvey) {
+                await connection.rollback();
+                connection.release();
+                return null;
+            }
+
+            // Generate new title with "Copy of" prefix
+            const newTitle = `Copy of ${originalSurvey.title}`;
+            
+            // Generate unique slug
+            const baseSlug = newTitle
+                .toLowerCase()
+                .replace(/[^a-z0-9]+/g, '-')
+                .replace(/^-+|-+$/g, '')
+                .substring(0, 50);
+            
+            const uniqueId = randomUUID().split('-')[0];
+            const newSlug = `${baseSlug}-${uniqueId}`;
+
+            // Check if cloning columns exist
+            const [cloningColumns] = await connection.execute<RowDataPacket[]>(
+                `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS 
+                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'surveys' 
+                 AND COLUMN_NAME IN ('parent_survey_id', 'clone_count', 'cloned_at')`
+            );
+            
+            const hasCloningSupport = cloningColumns.length >= 3;
+
+            // Create the cloned survey
+            let clonedSurveyResult: ResultSetHeader;
+            
+            if (hasCloningSupport) {
+                // Use new cloning columns
+                [clonedSurveyResult] = await connection.execute<ResultSetHeader>(
+                    `INSERT INTO surveys (
+                        title, description, slug, created_by, is_public, status, 
+                        start_at, end_at, source, source_metadata, parent_survey_id, cloned_at
+                    ) VALUES (?, ?, ?, ?, ?, 'draft', ?, ?, 'clone', ?, ?, NOW())`,
+                    [
+                        newTitle,
+                        originalSurvey.description,
+                        newSlug,
+                        createdBy,
+                        originalSurvey.is_public,
+                        null, // start_at - reset to null so user can set new schedule
+                        null, // end_at - reset to null so user can set new schedule
+                        JSON.stringify({
+                            originalSurveyId: surveyId,
+                            originalTitle: originalSurvey.title,
+                            clonedAt: new Date().toISOString(),
+                            clonedBy: createdBy
+                        }),
+                        surveyId
+                    ]
+                );
+            } else {
+                // Fallback for systems without cloning columns
+                [clonedSurveyResult] = await connection.execute<ResultSetHeader>(
+                    `INSERT INTO surveys (
+                        title, description, slug, created_by, is_public, status, 
+                        start_at, end_at, source, source_metadata
+                    ) VALUES (?, ?, ?, ?, ?, 'draft', ?, ?, 'clone', ?)`,
+                    [
+                        newTitle,
+                        originalSurvey.description,
+                        newSlug,
+                        createdBy,
+                        originalSurvey.is_public,
+                        null, // start_at - reset to null so user can set new schedule
+                        null, // end_at - reset to null so user can set new schedule
+                        JSON.stringify({
+                            originalSurveyId: surveyId,
+                            originalTitle: originalSurvey.title,
+                            clonedAt: new Date().toISOString(),
+                            clonedBy: createdBy
+                        })
+                    ]
+                );
+            }
+
+            const clonedSurveyId = clonedSurveyResult.insertId;
+
+            // Clone all questions
+            if (originalSurvey.questions && originalSurvey.questions.length > 0) {
+                for (const question of originalSurvey.questions) {
+                    await connection.execute(
+                        `INSERT INTO survey_questions (
+                            survey_id, type, prompt, options, is_required, question_order
+                        ) VALUES (?, ?, ?, ?, ?, ?)`,
+                        [
+                            clonedSurveyId,
+                            question.type,
+                            question.prompt,
+                            question.options ? JSON.stringify(question.options) : null,
+                            question.is_required,
+                            question.question_order
+                        ]
+                    );
+                }
+            }
+
+            // Update clone count on original survey (if supported)
+            if (hasCloningSupport) {
+                await connection.execute(
+                    'UPDATE surveys SET clone_count = clone_count + 1 WHERE id = ?',
+                    [surveyId]
+                );
+            }
+
+            await connection.commit();
+            connection.release();
+
+            return {
+                surveyId: clonedSurveyId,
+                slug: newSlug,
+                title: newTitle,
+                originalSurveyId: surveyId
+            };
+            
+        } catch (error) {
+            await connection.rollback();
+            connection.release();
+            throw error;
+        }
     }
 }; 

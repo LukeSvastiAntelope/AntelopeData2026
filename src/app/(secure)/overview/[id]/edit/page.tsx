@@ -39,6 +39,8 @@ interface Survey {
   status: 'draft' | 'published' | 'closed'
   is_public: boolean
   created_at: string
+  start_at?: string
+  end_at?: string
   questions: SurveyQuestion[]
 }
 
@@ -56,6 +58,8 @@ const EditSurveyPage = () => {
   const [description, setDescription] = useState('')
   const [isPublic, setIsPublic] = useState(true)
   const [questions, setQuestions] = useState<SurveyQuestion[]>([])
+  const [startAt, setStartAt] = useState('')
+  const [endAt, setEndAt] = useState('')
 
   useEffect(() => {
     if (surveyId) {
@@ -79,6 +83,8 @@ const EditSurveyPage = () => {
         setDescription(surveyData.description || '')
         setIsPublic(surveyData.is_public)
         setQuestions(surveyData.questions || [])
+        setStartAt(surveyData.start_at ? new Date(surveyData.start_at).toISOString().slice(0, 16) : '')
+        setEndAt(surveyData.end_at ? new Date(surveyData.end_at).toISOString().slice(0, 16) : '')
       } else {
         setError('Failed to load survey')
       }
@@ -163,6 +169,8 @@ const EditSurveyPage = () => {
           title,
           description,
           isPublic,
+          startAt: startAt || null,
+          endAt: endAt || null,
           questions: questions.map((q, index) => ({
             ...q,
             order: index + 1
@@ -209,6 +217,8 @@ const EditSurveyPage = () => {
           title,
           description,
           isPublic,
+          startAt: startAt || null,
+          endAt: endAt || null,
           questions: questions.map((q, index) => ({
             ...q,
             order: index + 1
@@ -356,6 +366,62 @@ const EditSurveyPage = () => {
                   onCheckedChange={(checked) => setIsPublic(checked as boolean)}
                 />
                 <Label htmlFor="isPublic">Make this survey publicly accessible</Label>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Scheduling */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Settings className="h-5 w-5" />
+                Survey Scheduling
+              </CardTitle>
+              <CardDescription>
+                Set when your survey should be active (optional)
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="startAt">Start Date & Time</Label>
+                  <Input
+                    id="startAt"
+                    type="datetime-local"
+                    value={startAt}
+                    onChange={(e) => setStartAt(e.target.value)}
+                    className="mt-1"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    When the survey should become available
+                  </p>
+                </div>
+                
+                <div>
+                  <Label htmlFor="endAt">End Date & Time</Label>
+                  <Input
+                    id="endAt"
+                    type="datetime-local"
+                    value={endAt}
+                    onChange={(e) => setEndAt(e.target.value)}
+                    className="mt-1"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    When the survey should close automatically
+                  </p>
+                </div>
+              </div>
+              
+              <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+                <p className="text-sm text-blue-700 dark:text-blue-300">
+                  <strong>Scheduling Notes:</strong>
+                </p>
+                <ul className="text-xs text-blue-600 dark:text-blue-400 mt-1 ml-4 list-disc">
+                  <li>Leave both fields empty to publish immediately</li>
+                  <li>Set only start time to schedule publication</li>
+                  <li>Set both to create a time-limited survey</li>
+                  <li>Times are in your local timezone</li>
+                </ul>
               </div>
             </CardContent>
           </Card>

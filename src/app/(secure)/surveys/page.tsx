@@ -16,10 +16,15 @@ import {
   Plus,
   Clock,
   X,
-  Play
+  Play,
+  Upload,
+  Database,
+  Trash2,
+  Copy
 } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import { toast } from "react-hot-toast"
 
 // Charts & table utilities
 import { AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, CartesianGrid, XAxis, YAxis, LabelList } from "recharts"
@@ -38,6 +43,12 @@ interface Survey {
   response_count: number
   start_at?: string
   end_at?: string
+  source?: 'native' | 'csv_import' | 'excel_import' | 'surveymonkey_import' | 'typeform_import' | 'google_forms_import' | 'google_sheets_import' | 'clone'
+  source_metadata?: any
+  parent_survey_id?: number
+  is_template?: boolean
+  clone_count?: number
+  cloned_at?: string
 }
 
 const SurveysPage = () => {
@@ -147,6 +158,59 @@ const SurveysPage = () => {
     }
   }
 
+  const getSourceInfo = (source?: string, sourceMetadata?: any) => {
+    switch (source) {
+      case 'csv_import': 
+        return { 
+          label: 'CSV', 
+          icon: <Database className="h-3 w-3" />,
+          tooltip: sourceMetadata?.originalFileName || 'Imported from CSV'
+        }
+      case 'excel_import': 
+        return { 
+          label: 'Excel', 
+          icon: <Database className="h-3 w-3" />,
+          tooltip: sourceMetadata?.originalFileName || 'Imported from Excel'
+        }
+      case 'surveymonkey_import': 
+        return { 
+          label: 'SurveyMonkey', 
+          icon: <Database className="h-3 w-3" />,
+          tooltip: 'Imported from SurveyMonkey'
+        }
+      case 'typeform_import': 
+        return { 
+          label: 'Typeform', 
+          icon: <Database className="h-3 w-3" />,
+          tooltip: 'Imported from Typeform'
+        }
+      case 'google_forms_import': 
+        return { 
+          label: 'Google Forms', 
+          icon: <Database className="h-3 w-3" />,
+          tooltip: 'Imported from Google Forms'
+        }
+      case 'google_sheets_import': 
+        return { 
+          label: 'Google Sheets', 
+          icon: <Database className="h-3 w-3" />,
+          tooltip: 'Imported from Google Sheets'
+        }
+      case 'clone': 
+        return { 
+          label: 'Clone', 
+          icon: <FileText className="h-3 w-3" />,
+          tooltip: sourceMetadata?.originalTitle ? `Cloned from "${sourceMetadata.originalTitle}"` : 'Cloned from another survey'
+        }
+      default: 
+        return { 
+          label: 'Native', 
+          icon: <FileText className="h-3 w-3" />,
+          tooltip: 'Created with Antelope'
+        }
+    }
+  }
+
   const getTimeRemaining = (endAt: string) => {
     const end = new Date(endAt)
     const now = new Date()
@@ -195,6 +259,65 @@ const SurveysPage = () => {
     }
   }
 
+  const deleteSurvey = async (surveyId: number, surveyTitle: string, responseCount: number) => {
+    const hasResponses = responseCount > 0
+    const message = hasResponses 
+      ? `Are you sure you want to delete "${surveyTitle}"? This survey has ${responseCount} response${responseCount > 1 ? 's' : ''}. This action cannot be undone.`
+      : `Are you sure you want to delete "${surveyTitle}"? This action cannot be undone.`
+    
+    if (!confirm(message)) return
+
+    try {
+      const url = hasResponses 
+        ? `/api/surveys/${surveyId}/delete?force=true`
+        : `/api/surveys/${surveyId}/delete`
+        
+      const res = await fetch(url, {
+        method: 'DELETE',
+        headers: { 
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      })
+      
+      const data = await res.json()
+      
+      if (res.ok && data.status) {
+        toast.success('Survey deleted successfully')
+        loadSurveys() // Reload to show updated list
+      } else {
+        toast.error(data.message || 'Failed to delete survey')
+      }
+    } catch (error) {
+      console.error('Error deleting survey:', error)
+      toast.error('Failed to delete survey')
+    }
+  }
+
+  const cloneSurvey = async (surveyId: number, surveyTitle: string) => {
+    try {
+      const res = await fetch(`/api/surveys/${surveyId}/clone`, {
+        method: 'POST',
+        headers: { 
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      })
+      
+      const data = await res.json()
+      
+      if (res.ok && data.status) {
+        toast.success(`Survey "${surveyTitle}" cloned successfully as "${data.result.title}"`)
+        loadSurveys() // Reload to show the new cloned survey
+        // Optionally redirect to edit the cloned survey
+        router.push(`/overview/${data.result.surveyId}/edit`)
+      } else {
+        toast.error(data.message || 'Failed to clone survey')
+      }
+    } catch (error) {
+      console.error('Error cloning survey:', error)
+      toast.error('Failed to clone survey')
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex-1 p-2 w-full bg-background">
@@ -219,19 +342,28 @@ const SurveysPage = () => {
     <div className="flex-1 p-2 w-full bg-background">
       <div className="mx-auto rounded-lg bg-card text-card-foreground shadow-lg">
         {/* Header */}
-        <div className="px-6 py-4">
+        <div className="px-6 py-2">
           <div className="flex items-center justify-between">
             <div className="flex items-center">
               <SidebarTrigger className="-ml-0.5 h-5 w-5 text-muted-foreground hover:text-foreground" />
               <div className="h-4 border-l border-border mx-4" />
               <h1 className="text-base font-medium text-card-foreground">Surveys</h1>
             </div>
-            <Link href="/create">
-              <Button>
-                <Plus className="h-4 w-4 mr-2" />
-                Create Survey
+            <div className="flex gap-2">
+              <Button 
+                variant="outline"
+                onClick={() => router.push('/surveys/import')}
+              >
+                <Upload className="h-4 w-4 mr-2" />
+                Import Survey
               </Button>
-            </Link>
+              <Link href="/create">
+                <Button>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create Survey
+                </Button>
+              </Link>
+            </div>
           </div>
         </div>
         
@@ -427,6 +559,7 @@ const SurveysPage = () => {
                         <TableRow>
                           <TableHead>Title</TableHead>
                           <TableHead>Status</TableHead>
+                          <TableHead>Source</TableHead>
                           <TableHead>Visibility</TableHead>
                           <TableHead>Responses</TableHead>
                           <TableHead>Created</TableHead>
@@ -466,6 +599,19 @@ const SurveysPage = () => {
                               )}
                             </TableCell>
                             <TableCell>
+                              {(() => {
+                                const sourceInfo = getSourceInfo(survey.source, survey.source_metadata);
+                                return (
+                                  <Badge variant="secondary" title={sourceInfo.tooltip}>
+                                    <span className="flex items-center gap-1">
+                                      {sourceInfo.icon}
+                                      {sourceInfo.label}
+                                    </span>
+                                  </Badge>
+                                );
+                              })()}
+                            </TableCell>
+                            <TableCell>
                               <Badge variant={survey.is_public ? "default" : "secondary"}>
                                 {survey.is_public ? "Public" : "Private"}
                               </Badge>
@@ -498,6 +644,14 @@ const SurveysPage = () => {
                                     </Button>
                                   </Link>
                                 )}
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm"
+                                  onClick={() => cloneSurvey(survey.id, survey.title)}
+                                  title="Clone survey"
+                                >
+                                  <Copy className="h-4 w-4" />
+                                </Button>
                                 {(survey.status === 'active' || survey.status === 'scheduled') && (
                                   <Button 
                                     variant="ghost" 
@@ -518,6 +672,15 @@ const SurveysPage = () => {
                                     <Play className="h-4 w-4" />
                                   </Button>
                                 )}
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm"
+                                  onClick={() => deleteSurvey(survey.id, survey.title, survey.response_count)}
+                                  title="Delete survey"
+                                  className="text-destructive hover:text-destructive"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
                               </div>
                             </TableCell>
                           </TableRow>

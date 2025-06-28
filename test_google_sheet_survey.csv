@@ -1,0 +1,16 @@
+Name,Email,Age,Gender,Location,Education,Income,Job Title,Product Rating,Feedback,Would Recommend,Satisfaction Score,Contact Preference
+John Smith,john.smith@email.com,28,Male,New York,Bachelor's Degree,$50000-75000,Software Engineer,5,Great product overall,Yes,9,Email
+Sarah Johnson,sarah.j@email.com,34,Female,California,Master's Degree,$75000-100000,Product Manager,4,Good but could improve,Yes,8,Phone
+Mike Chen,mike.chen@email.com,45,Male,Texas,High School,$25000-50000,Technician,3,Average experience,No,6,Email
+Lisa Williams,lisa.w@email.com,29,Female,Florida,Bachelor's Degree,$50000-75000,Designer,5,Excellent service,Yes,10,Email
+David Brown,david.brown@email.com,52,Male,Illinois,Master's Degree,$100000+,Director,4,Very satisfied,Yes,9,Phone
+Emma Davis,emma.davis@email.com,26,Female,Washington,Bachelor's Degree,$50000-75000,Developer,5,Love the features,Yes,9,Email
+James Wilson,james.w@email.com,38,Male,Oregon,PhD,$75000-100000,Researcher,3,Needs improvement,No,5,Email
+Maria Garcia,maria.garcia@email.com,31,Female,Arizona,Associate Degree,$25000-50000,Analyst,4,Pretty good,Yes,7,Phone
+Robert Taylor,robert.t@email.com,42,Male,Nevada,Bachelor's Degree,$75000-100000,Manager,5,Outstanding,Yes,10,Email
+Jennifer Lee,jennifer.lee@email.com,27,Female,Colorado,Master's Degree,$50000-75000,Consultant,4,Solid product,Yes,8,Email
+Kevin Martinez,kevin.m@email.com,33,Male,Utah,Bachelor's Degree,$50000-75000,Engineer,3,Could be better,No,6,Email
+Amanda White,amanda.white@email.com,29,Female,Montana,Bachelor's Degree,$25000-50000,Coordinator,4,Good value,Yes,7,Email
+Christopher Clark,chris.clark@email.com,36,Male,Idaho,High School,$25000-50000,Technician,5,Exceeded expectations,Yes,9,Phone
+Michelle Rodriguez,michelle.r@email.com,25,Female,Wyoming,Bachelor's Degree,$50000-75000,Specialist,4,Satisfied overall,Yes,8,Email
+Daniel Lewis,daniel.lewis@email.com,40,Male,Alaska,Master's Degree,$75000-100000,Senior Manager,3,Room for improvement,No,6,Email 
