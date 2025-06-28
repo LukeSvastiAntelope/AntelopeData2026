@@ -32,7 +32,9 @@ import {
   GripVertical,
   Trash2,
   Plus,
-  Copy
+  Copy,
+  Calendar,
+  Clock
 } from "lucide-react"
 
 interface GeneratedQuestion {
@@ -65,6 +67,11 @@ const AISurveyBuilderPage = () => {
   const [editableTitle, setEditableTitle] = useState('')
   const [editableDescription, setEditableDescription] = useState('')
   const [editableQuestions, setEditableQuestions] = useState<GeneratedQuestion[]>([])
+
+  // Scheduling state
+  const [startAt, setStartAt] = useState('')
+  const [endAt, setEndAt] = useState('')
+  const [autoPublish, setAutoPublish] = useState(false)
 
   // Load saved model preference on mount
   useEffect(() => {
@@ -231,6 +238,9 @@ const AISurveyBuilderPage = () => {
           title: editableTitle,
           description: editableDescription,
           isPublic: true,
+          startAt: startAt || null,
+          endAt: endAt || null,
+          autoPublish,
           questions: editableQuestions.map((q, index) => ({
             type: q.type,
             prompt: q.prompt,
@@ -457,6 +467,79 @@ const AISurveyBuilderPage = () => {
                       <p className="text-sm text-muted-foreground mt-1">{generatedSurvey.purpose}</p>
                     </div>
                   )}
+
+                  {/* Scheduling Section */}
+                  <div className="border-t pt-4">
+                    <div className="flex items-center gap-2 mb-4">
+                      <Calendar className="h-4 w-4" />
+                      <Label className="text-sm font-medium">Schedule Survey</Label>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="startAt">Start Date & Time</Label>
+                        <input
+                          id="startAt"
+                          type="datetime-local"
+                          value={startAt}
+                          onChange={(e) => setStartAt(e.target.value)}
+                          className="mt-1 w-full px-3 py-2 border border-input bg-background rounded-md text-sm"
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">
+                          When should this survey become available?
+                        </p>
+                      </div>
+                      
+                      <div>
+                        <Label htmlFor="endAt">End Date & Time</Label>
+                        <input
+                          id="endAt"
+                          type="datetime-local"
+                          value={endAt}
+                          onChange={(e) => setEndAt(e.target.value)}
+                          className="mt-1 w-full px-3 py-2 border border-input bg-background rounded-md text-sm"
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">
+                          When should this survey automatically close?
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center space-x-2 mt-4">
+                      <Checkbox
+                        id="autoPublish"
+                        checked={autoPublish}
+                        onCheckedChange={(checked) => setAutoPublish(checked as boolean)}
+                      />
+                      <Label htmlFor="autoPublish" className="text-sm">
+                        Auto-publish at start time
+                      </Label>
+                      <p className="text-xs text-muted-foreground ml-2">
+                        (Survey will automatically become active at the start time)
+                      </p>
+                    </div>
+
+                    {/* Schedule Preview */}
+                    {(startAt || endAt) && (
+                      <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Clock className="h-4 w-4 text-blue-600" />
+                          <Label className="text-sm font-medium text-blue-700 dark:text-blue-300">Schedule Preview</Label>
+                        </div>
+                        <div className="text-sm text-blue-600 dark:text-blue-400 space-y-1">
+                          {startAt && (
+                            <p>• Survey will {autoPublish ? 'automatically become active' : 'be available to publish'} on {new Date(startAt).toLocaleString()}</p>
+                          )}
+                          {endAt && (
+                            <p>• Survey will automatically close on {new Date(endAt).toLocaleString()}</p>
+                          )}
+                          {!startAt && !endAt && (
+                            <p>• No scheduling configured - survey will be created as draft</p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
 

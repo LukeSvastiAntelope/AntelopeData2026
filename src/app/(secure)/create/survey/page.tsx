@@ -20,7 +20,9 @@ import {
   Wand2,
   ArrowLeft,
   Settings,
-  Brain
+  Brain,
+  Calendar,
+  Clock
 } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from 'next/navigation'
@@ -40,6 +42,9 @@ interface Survey {
   description: string
   isPublic: boolean
   questions: SurveyQuestion[]
+  startAt?: string
+  endAt?: string
+  autoPublish?: boolean
 }
 
 const CreateSurveyPage = () => {
@@ -48,7 +53,8 @@ const CreateSurveyPage = () => {
     title: '',
     description: '',
     isPublic: true,
-    questions: []
+    questions: [],
+    autoPublish: false
   })
   const [isLoading, setIsLoading] = useState(false)
   const [showPreview, setShowPreview] = useState(false)
@@ -242,6 +248,73 @@ const CreateSurveyPage = () => {
                       Each survey response will automatically create a digital twin agent that can be queried for insights. 
                       These agents will have the same capabilities as betting agents in the future.
                     </p>
+                  </div>
+
+                  {/* Schedule Section */}
+                  <div className="border-t pt-4 space-y-4">
+                    <div className="flex items-center gap-2">
+                      <Calendar className="h-5 w-5 text-primary" />
+                      <h3 className="font-medium">Schedule & Expiration</h3>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="startAt">Start Date & Time (Optional)</Label>
+                        <Input
+                          id="startAt"
+                          type="datetime-local"
+                          value={survey.startAt || ''}
+                          onChange={(e) => setSurvey(prev => ({ ...prev, startAt: e.target.value }))}
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Survey will become active at this time
+                        </p>
+                      </div>
+                      
+                      <div>
+                        <Label htmlFor="endAt">End Date & Time (Optional)</Label>
+                        <Input
+                          id="endAt"
+                          type="datetime-local"
+                          value={survey.endAt || ''}
+                          onChange={(e) => setSurvey(prev => ({ ...prev, endAt: e.target.value }))}
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Survey will automatically close at this time
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <Label htmlFor="autoPublish">Auto-publish when start time arrives</Label>
+                        <p className="text-sm text-muted-foreground">
+                          Automatically activate the survey at the scheduled start time
+                        </p>
+                      </div>
+                      <Switch
+                        id="autoPublish"
+                        checked={survey.autoPublish}
+                        onCheckedChange={(checked) => setSurvey(prev => ({ ...prev, autoPublish: checked }))}
+                      />
+                    </div>
+
+                    {(survey.startAt || survey.endAt) && (
+                      <div className="bg-blue-50 dark:bg-blue-950/20 p-3 rounded-lg">
+                        <div className="flex items-start gap-2">
+                          <Clock className="h-4 w-4 text-blue-600 mt-0.5" />
+                          <div className="text-xs text-blue-700 dark:text-blue-300">
+                            <p className="font-medium mb-1">Scheduled Survey</p>
+                            {survey.startAt && (
+                              <p>Starts: {new Date(survey.startAt).toLocaleString()}</p>
+                            )}
+                            {survey.endAt && (
+                              <p>Ends: {new Date(survey.endAt).toLocaleString()}</p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>

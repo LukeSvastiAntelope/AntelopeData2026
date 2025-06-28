@@ -50,6 +50,35 @@ const normaliseText=(txt:string)=>{
     .replace(/\b(\w+)\s+\1\b/gi,'$1'); // remove duplicated words
 };
 
+// Normalize markdown structure for consistent rendering across AI models
+const normalizeMarkdown = (text: string): string => {
+  let normalized = text;
+  
+  // Ensure proper spacing around headings
+  normalized = normalized.replace(/\n(#{1,6}\s[^\n]+)\n/g, '\n\n$1\n\n');
+  normalized = normalized.replace(/^(#{1,6}\s[^\n]+)\n/g, '$1\n\n');
+  
+  // Ensure proper spacing around lists
+  normalized = normalized.replace(/\n(\s*[-*+]\s[^\n]+)/g, '\n\n$1');
+  normalized = normalized.replace(/(\s*[-*+]\s[^\n]+)\n([^\s-*+\n])/g, '$1\n\n$2');
+  
+  // Ensure proper spacing around numbered lists
+  normalized = normalized.replace(/\n(\s*\d+\.\s[^\n]+)/g, '\n\n$1');
+  normalized = normalized.replace(/(\s*\d+\.\s[^\n]+)\n([^\s\d\n])/g, '$1\n\n$2');
+  
+  // Clean up excessive whitespace but preserve intentional spacing
+  normalized = normalized.replace(/\n{3,}/g, '\n\n');
+  
+  // Move citations to more natural positions (after punctuation)
+  normalized = normalized.replace(/(\[\d+\])([.,:;!?])/g, '$2$1');
+  normalized = normalized.replace(/([.,:;!?])(\s*)(\[\d+\])/g, '$1$3$2');
+  
+  // Ensure citations don't break paragraph flow
+  normalized = normalized.replace(/(\[\d+\])\s*\n\s*([A-Z])/g, '$1 $2');
+  
+  return normalized.trim();
+};
+
 export default function CohortChatPage() {
   const [cohorts, setCohorts] = useState<Cohort[]>([]);
   const [selectedCohortId, setSelectedCohortId] = useState<number | null>(null);
@@ -169,13 +198,25 @@ export default function CohortChatPage() {
     setIsLoading(true);
 
     const token = typeof window !== 'undefined' ? localStorage.getItem('token') ?? '' : '';
+    
+    // Enhance system prompt with formatting instructions for consistent markdown
+    const enhancedSystemPrompt = `${systemPrompt}
+
+FORMATTING REQUIREMENTS:
+- Use clear heading hierarchy (## for main sections, ### for subsections)
+- Add blank lines before and after headings
+- Use consistent bullet point formatting with proper spacing
+- Place citations at natural sentence/paragraph boundaries
+- Ensure proper spacing around lists and paragraphs
+- Structure your response with clear sections and subsections`;
+
     const payload = {
       cohort: selectedCohortId ? { id: selectedCohortId } : undefined,
       question,
       surveyId: selectedSurveyId || undefined,
       model: selectedModel,
       sources,
-      systemPrompt,
+      systemPrompt: enhancedSystemPrompt,
     };
 
     const res = await fetch('/api/cohort/query', {
@@ -341,7 +382,7 @@ export default function CohortChatPage() {
 
   const renderWithCitations=(text:string,citations?:Record<string,string>)=> {
     if(!citations || Object.keys(citations).length===0) {
-      text = normaliseText(text);
+      text = normalizeMarkdown(normaliseText(text));
       return (
         <div className="prose prose-sm max-w-none prose-headings:text-foreground prose-headings:font-semibold prose-p:text-foreground prose-p:leading-relaxed prose-strong:text-foreground prose-strong:font-semibold prose-a:text-primary prose-a:no-underline hover:prose-a:underline prose-ul:text-foreground prose-ol:text-foreground prose-li:text-foreground prose-li:my-1 prose-blockquote:text-foreground prose-blockquote:border-l-primary">
           <ReactMarkdown
@@ -369,7 +410,7 @@ export default function CohortChatPage() {
     }
     
     // Split text by citation markers and render each part
-    const normalizedText = normaliseText(text);
+    const normalizedText = normalizeMarkdown(normaliseText(text));
     const parts = normalizedText.split(/(\[\d+\])/);
     
     const renderedParts = parts.map((part, index) => {
@@ -381,8 +422,8 @@ export default function CohortChatPage() {
         return (
           <Tooltip key={`citation-${index}-${num}`}>
             <TooltipTrigger asChild>
-              <span className="inline-block px-1.5 py-0.5 mx-0.5 rounded bg-blue-100 underline cursor-help text-blue-700 hover:bg-blue-200 font-medium text-xs border border-blue-200">
-                [{num}]
+              <span className="inline-flex items-baseline px-1 py-0 mx-0.5 rounded bg-blue-100 cursor-default text-blue-700 hover:bg-blue-200 font-medium text-xs border border-blue-200 leading-none align-baseline">
+                {num}
               </span>
             </TooltipTrigger>
             <TooltipContent 

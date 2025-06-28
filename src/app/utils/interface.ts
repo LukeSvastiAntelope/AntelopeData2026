@@ -438,7 +438,7 @@ export interface IAgentContext {
 // ===== SURVEY & DIGITAL-TWIN INTERFACES =====
 
 export type QuestionType = 'text' | 'single-choice' | 'multi-choice' | 'scale' | 'email' | 'number';
-export type SurveyStatus = 'draft' | 'published' | 'closed';
+export type SurveyStatus = 'draft' | 'scheduled' | 'active' | 'published' | 'closed' | 'archived';
 export type EnrichmentStatus = 'pending' | 'processing' | 'completed' | 'failed';
 
 export interface SurveyDB {
@@ -450,6 +450,9 @@ export interface SurveyDB {
     is_public: boolean;
     created_at: string;
     updated_at: string;
+    start_at?: string | null;
+    end_at?: string | null;
+    archived_at?: string | null;
     status: SurveyStatus;
 }
 
@@ -514,6 +517,9 @@ export interface Survey {
     isPublic: boolean;
     createdAt: string;
     updatedAt: string;
+    startAt?: string;
+    endAt?: string;
+    archivedAt?: string;
     status: SurveyStatus;
     questions?: SurveyQuestion[];
     responseCount?: number;
@@ -622,4 +628,76 @@ export interface CohortFilterRule {
     field: string;
     op: '=' | 'IN' | 'CONTAINS';
     value: string | string[];
+}
+
+export interface DemographicTemplateDB {
+    id: number;
+    field_name: string;
+    field_type: 'text' | 'select' | 'multi-select' | 'number' | 'date' | 'boolean' | 'scale';
+    field_label: string;
+    field_options: any | null; // JSON parsed array or null
+    validation_rules: any | null; // JSON parsed rules
+    category: 'basic' | 'professional' | 'personal' | 'social';
+    sort_order: number;
+    is_active: boolean;
+    help_text?: string;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface DemographicTemplate {
+    id: number;
+    fieldName: string;
+    fieldType: 'text' | 'select' | 'multi-select' | 'number' | 'date' | 'boolean' | 'scale';
+    fieldLabel: string;
+    fieldOptions?: any[];
+    validationRules?: Record<string, any>;
+    category: 'basic' | 'professional' | 'personal' | 'social';
+    sortOrder: number;
+    isActive: boolean;
+    helpText?: string;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface SurveyDemographicsConfigDB {
+    id: number;
+    survey_id: number;
+    demographic_type: 'simple' | 'advanced';
+    selected_fields: any; // JSON parsed array or config
+    is_required: boolean;
+    consent_text?: string | null;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface SurveyDemographicsConfig {
+    surveyId: number;
+    demographicType: 'simple' | 'advanced';
+    selectedFields: number[] | any; // IDs or full field config
+    isRequired: boolean;
+    consentText?: string | null;
+}
+
+export interface CustomDemographicFieldDB {
+    id: number;
+    survey_id: number;
+    field_name: string;
+    field_type: 'text' | 'select' | 'multi-select' | 'number' | 'date' | 'boolean' | 'scale';
+    field_label: string;
+    field_options: any | null;
+    validation_rules: any | null;
+    sort_order: number;
+    is_required: boolean;
+    help_text?: string;
+    created_at: string;
+}
+
+export interface SurveyDemographicResponseDB {
+    id: number;
+    survey_response_id: number;
+    field_name: string;
+    field_value: any; // JSON parsed value
+    field_type: 'text' | 'select' | 'multi-select' | 'number' | 'date' | 'boolean' | 'scale';
+    created_at: string;
 }

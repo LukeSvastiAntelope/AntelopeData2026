@@ -13,7 +13,10 @@ import {
   Eye,
   Edit,
   ExternalLink,
-  Plus
+  Plus,
+  Clock,
+  X,
+  Play
 } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
@@ -29,10 +32,12 @@ interface Survey {
   title: string
   description: string
   slug: string
-  status: 'draft' | 'published' | 'closed'
+  status: 'draft' | 'scheduled' | 'active' | 'published' | 'closed' | 'archived'
   is_public: boolean
   created_at: string
   response_count: number
+  start_at?: string
+  end_at?: string
 }
 
 const SurveysPage = () => {
@@ -54,8 +59,11 @@ const SurveysPage = () => {
   const aggregation = useMemo(() => {
     const statusCounts: Record<string, number> = {
       draft: 0,
+      scheduled: 0,
+      active: 0,
       published: 0,
-      closed: 0
+      closed: 0,
+      archived: 0
     }
 
     const monthlyData: Record<string, number> = {}
@@ -129,10 +137,61 @@ const SurveysPage = () => {
 
   const getStatusColor = (status: string) => {
     switch (status) {
+      case 'active': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
       case 'published': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
+      case 'scheduled': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300'
       case 'draft': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300'
       case 'closed': return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300'
+      case 'archived': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300'
       default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300'
+    }
+  }
+
+  const getTimeRemaining = (endAt: string) => {
+    const end = new Date(endAt)
+    const now = new Date()
+    const diff = end.getTime() - now.getTime()
+    
+    if (diff <= 0) return null
+    
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24))
+    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))
+    
+    if (days > 0) return `${days} day${days > 1 ? 's' : ''}`
+    return `${hours} hour${hours > 1 ? 's' : ''}`
+  }
+
+  const closeSurvey = async (surveyId: number) => {
+    try {
+      const res = await fetch(`/api/surveys/${surveyId}/close`, {
+        method: 'POST',
+        headers: { 
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      })
+      
+      if (res.ok) {
+        loadSurveys() // Reload to show updated status
+      }
+    } catch (error) {
+      console.error('Error closing survey:', error)
+    }
+  }
+
+  const reopenSurvey = async (surveyId: number) => {
+    try {
+      const res = await fetch(`/api/surveys/${surveyId}/reopen`, {
+        method: 'POST',
+        headers: { 
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      })
+      
+      if (res.ok) {
+        loadSurveys() // Reload to show updated status
+      }
+    } catch (error) {
+      console.error('Error reopening survey:', error)
     }
   }
 
@@ -393,6 +452,18 @@ const SurveysPage = () => {
                               <Badge className={getStatusColor(survey.status)}>
                                 {survey.status.charAt(0).toUpperCase() + survey.status.slice(1)}
                               </Badge>
+                              {survey.status === 'active' && survey.end_at && (
+                                <div className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
+                                  <Clock className="h-3 w-3" />
+                                  Ends in {getTimeRemaining(survey.end_at)}
+                                </div>
+                              )}
+                              {survey.status === 'scheduled' && survey.start_at && (
+                                <div className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
+                                  <Clock className="h-3 w-3" />
+                                  Starts {formatDistanceToNow(new Date(survey.start_at), { addSuffix: true })}
+                                </div>
+                              )}
                             </TableCell>
                             <TableCell>
                               <Badge variant={survey.is_public ? "default" : "secondary"}>
@@ -420,12 +491,32 @@ const SurveysPage = () => {
                                     <BarChart3 className="h-4 w-4" />
                                   </Button>
                                 </Link>
-                                {survey.status === 'published' && (
+                                {(survey.status === 'active' || survey.status === 'published') && (
                                   <Link href={`/survey/${survey.slug}`} target="_blank">
                                     <Button variant="ghost" size="sm">
                                       <ExternalLink className="h-4 w-4" />
                                     </Button>
                                   </Link>
+                                )}
+                                {(survey.status === 'active' || survey.status === 'scheduled') && (
+                                  <Button 
+                                    variant="ghost" 
+                                    size="sm"
+                                    onClick={() => closeSurvey(survey.id)}
+                                    title="Close survey"
+                                  >
+                                    <X className="h-4 w-4" />
+                                  </Button>
+                                )}
+                                {survey.status === 'closed' && (
+                                  <Button 
+                                    variant="ghost" 
+                                    size="sm"
+                                    onClick={() => reopenSurvey(survey.id)}
+                                    title="Reopen survey"
+                                  >
+                                    <Play className="h-4 w-4" />
+                                  </Button>
                                 )}
                               </div>
                             </TableCell>
