@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import { 
-  ArrowLeft,
   Users,
   BarChart3,
   Calendar,
@@ -16,6 +15,7 @@ import {
   Briefcase
 } from "lucide-react"
 import Link from "next/link"
+import { Breadcrumb, BreadcrumbList, BreadcrumbItem, BreadcrumbLink, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb"
 
 // Charts & table utilities
 import { AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, CartesianGrid, XAxis, YAxis, LabelList } from "recharts"
@@ -195,18 +195,17 @@ const SurveyResultsPage = () => {
             <div className="flex items-center">
               <SidebarTrigger className="-ml-0.5 h-5 w-5 text-muted-foreground hover:text-foreground" />
               <div className="h-4 border-l border-border mx-4" />
-              <Link href="/surveys" className="text-muted-foreground hover:text-foreground">
-                <ArrowLeft className="h-4 w-4" />
-              </Link>
-              <div className="h-4 border-l border-border mx-4" />
-              <div>
-                <h1 className="text-base font-medium text-card-foreground">
-                  {survey?.title || 'Survey Results'}
-                </h1>
-                <p className="text-sm text-muted-foreground">
-                  {responses.length} responses
-                </p>
-              </div>
+              <Breadcrumb>
+                <BreadcrumbList>
+                  <BreadcrumbItem>
+                    <BreadcrumbLink href="/surveys">Surveys</BreadcrumbLink>
+                  </BreadcrumbItem>
+                  <BreadcrumbSeparator />
+                  <BreadcrumbItem>
+                    <BreadcrumbPage>{survey?.title || 'Survey'}</BreadcrumbPage>
+                  </BreadcrumbItem>
+                </BreadcrumbList>
+              </Breadcrumb>
             </div>
           </div>
         </div>
