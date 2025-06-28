@@ -12,7 +12,7 @@ echo "=== DB Migration ==="
 npx prisma generate
 
 echo "=== Building Project ==="
-npm run build
+NODE_OPTIONS="--max-old-space-size=4096" npm run build
 
 echo "=== Restarting Application ==="
 pm2 restart 4
