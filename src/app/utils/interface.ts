@@ -609,6 +609,7 @@ export interface CohortDB {
     filter_json: Record<string, any>[]; // JSON parsed array of filter rules
     visibility: 'private' | 'org' | 'public';
     created_by: number;
+    survey_id?: number; // Optional survey association
     created_at: string;
     updated_at: string;
 }
@@ -620,6 +621,7 @@ export interface Cohort {
     filter: CohortFilterRule[];
     visibility: 'private' | 'org' | 'public';
     createdBy: number;
+    surveyId?: number; // Optional survey association
     createdAt: string;
     updatedAt: string;
 }

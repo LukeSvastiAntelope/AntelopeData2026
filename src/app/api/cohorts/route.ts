@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
 // POST /api/cohorts - create a new cohort
 export async function POST(req: NextRequest) {
   try {
-    const { name, description, filter, visibility = 'private' } = await req.json();
+    const { name, description, filter, visibility = 'private', surveyId } = await req.json();
 
     if (!name || !Array.isArray(filter) || filter.length === 0) {
       return NextResponse.json({ status: false, message: 'Name and filter are required' }, { status: 400 });
@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
     const userIdHeader = req.headers.get('x-user-id');
     const createdBy = userIdHeader ? parseInt(userIdHeader, 10) : 1;
 
-    const id = await CohortRepo.createCohort({ name, description, filter, visibility, createdBy });
+    const id = await CohortRepo.createCohort({ name, description, filter, visibility, createdBy, surveyId });
 
     return NextResponse.json({ status: true, id });
   } catch (error) {

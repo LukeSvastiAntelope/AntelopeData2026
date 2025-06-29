@@ -7,11 +7,11 @@ const AuthLayout = ({ children }: { children: React.ReactNode }) => {
     const pathname = usePathname();
     
     useEffect(() => {
-        // Only redirect to dashboard if we're on an auth page and have a token
+        // Only redirect to cohort-chat if we're on an auth page and have a token
         if (typeof window !== 'undefined' && 
             localStorage.getItem("token") && 
             (pathname === '/login' || pathname === '/register')) {
-            route.push("/overview");
+            route.push("/cohort-chat");
         }
     }, [route, pathname]);
 

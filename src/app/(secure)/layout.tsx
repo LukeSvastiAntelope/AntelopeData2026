@@ -110,7 +110,7 @@ const SecureLayout = ({ children }: { children: React.ReactNode }) => {
                 await fetchAgentProfile();
                 setIsAgentNameOpen(false);
                 toast.success("Welcome! Your account has been set up successfully.");
-                router.push('/overview');
+                router.push('/cohort-chat');
             } else {
                 toast.error(data.message || "Failed to save your name. Please try again.");
             }
@@ -274,7 +274,7 @@ const SecureLayout = ({ children }: { children: React.ReactNode }) => {
             if (response.status) {
                 toast.success("Wager principles saved! Onboarding complete.");
                 await fetchAgentProfile();
-                router.push('/overview');
+                router.push('/cohort-chat');
             } else {
                 toast.error(response.message || "Failed to save principles.");
             }
@@ -304,7 +304,7 @@ const SecureLayout = ({ children }: { children: React.ReactNode }) => {
                 setIsSubmittingProfile(false);
             }
         }
-        router.push('/overview');
+        router.push('/cohort-chat');
     };
 
     useEffect(() => {
