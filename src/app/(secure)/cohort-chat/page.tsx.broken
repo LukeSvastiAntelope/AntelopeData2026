@@ -8,10 +8,11 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
+import { Badge } from '@/components/ui/badge';
 import { Select, SelectTrigger, SelectItem, SelectContent, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
-import { ChevronLeft, ChevronRight, Send, PanelLeft, PanelRight, Upload, FileText, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Send, Upload, FileText, X, PanelLeft } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import toast from 'react-hot-toast';
@@ -20,10 +21,10 @@ import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import ChartRenderer from '@/components/ChartRenderer'
 import { getAllModels } from '@/app/utils/models'
 import remarkSmart from 'remark-smartypants'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 
 // Optional markdown plugins – if not installed, fall back gracefully
 let smart: any = null;
@@ -84,7 +85,7 @@ export default function CohortChatPage() {
   const [cohorts, setCohorts] = useState<Cohort[]>([]);
   const [selectedCohortId, setSelectedCohortId] = useState<number | null>(null);
   const [input, setInput] = useState('');
-  type ChatMessage = { role:'user'|'agent'; content:string; citations?: Record<string,string>; chartSpec?: any; isUpload?: boolean };
+  type ChatMessage = { role:'user'|'agent'; content:string; citations?: Record<string,string>; chartSpec?: any };
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [filterRules, setFilterRules] = useState<CohortFilterRule[]>([]);
@@ -94,15 +95,13 @@ export default function CohortChatPage() {
   const [selectedSurveyId, setSelectedSurveyId] = useState<number | null>(null);
   const [selectedSurveyData, setSelectedSurveyData] = useState<any>(null);
   const [dynamicPrompts, setDynamicPrompts] = useState<string[]>([]);
-  const [availableFields, setAvailableFields] = useState<{name: string, label: string, type: string}[]>([]);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [selectedModel, setSelectedModel] = useState('gpt-4o');
   const [sources, setSources] = useState<{survey: boolean; twins: boolean; web: boolean}>({survey: true, twins: true, web: false});
   const [systemPrompt, setSystemPrompt] = useState('You are an expert analyst summarising the perspectives of a group of survey respondents.');
-
-  const [showCohortCreator, setShowCohortCreator] = useState(false);
+  const [rightPanelView, setRightPanelView] = useState<'cohort' | 'agent'>('cohort');
   
-  // Upload functionality state
+  // File upload states
   const [showUploadDialog, setShowUploadDialog] = useState(false);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploadLoading, setUploadLoading] = useState(false);
@@ -116,6 +115,11 @@ export default function CohortChatPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isLoading]);
 
+  // Debug effect to log state changes
+  useEffect(() => {
+    console.log('Upload dialog state changed:', showUploadDialog);
+  }, [showUploadDialog]);
+
   useEffect(() => {
     const token = typeof window !== 'undefined' ? localStorage.getItem('token') ?? '' : '';
     // Fetch surveys belonging to the current user
@@ -126,21 +130,17 @@ export default function CohortChatPage() {
           console.log('Surveys data:', data);
           if (data.surveys) {
             setSurveys(data.surveys);
-            // Only auto-select if no saved survey preference exists
-            const savedSurveyId = localStorage.getItem('cohort-chat-selected-survey');
-            if (!savedSurveyId || savedSurveyId === 'null') {
-              // Auto-select the latest survey (most recent created_at)
-              if (data.surveys.length > 0) {
-                const latestSurvey = data.surveys.reduce((latest: any, current: any) => 
-                  new Date(current.created_at) > new Date(latest.created_at) ? current : latest
-                );
-                handleSurveyChange(latestSurvey.id);
-              }
+            // Auto-select the latest survey (most recent created_at)
+            if (data.surveys.length > 0) {
+              const latestSurvey = data.surveys.reduce((latest: any, current: any) => 
+                new Date(current.created_at) > new Date(latest.created_at) ? current : latest
+              );
+              setSelectedSurveyId(latestSurvey.id);
             }
           }
         });
     }
-    // Fetch cohorts on mount (will be filtered by survey selection later)
+    // Fetch cohorts on mount
     if (token) {
       fetch('/api/cohorts', { headers: { 'Authorization': `Bearer ${token}` } })
         .then((res) => res.json())
@@ -164,8 +164,6 @@ export default function CohortChatPage() {
               setSelectedSurveyData(data.survey);
               const prompts = generateDynamicPrompts(data.survey);
               setDynamicPrompts(prompts);
-              const fields = extractAvailableFields(data.survey);
-              setAvailableFields(fields);
             }
           })
           .catch(error => {
@@ -180,7 +178,6 @@ export default function CohortChatPage() {
       }
     } else {
       setSelectedSurveyData(null);
-      setAvailableFields([]);
       setDynamicPrompts([
         "What are the key trends in responses?",
         "How do demographics affect answers?", 
@@ -189,21 +186,11 @@ export default function CohortChatPage() {
     }
   }, [selectedSurveyId]);
 
-  // Load saved preferences on mount
+  // Load saved model preference on mount
   useEffect(() => {
     const savedModel = localStorage.getItem('cohort-chat-selected-model');
     if (savedModel) {
       setSelectedModel(savedModel);
-    }
-    
-    const savedSystemPrompt = localStorage.getItem('cohort-chat-system-prompt');
-    if (savedSystemPrompt) {
-      setSystemPrompt(savedSystemPrompt);
-    }
-    
-    const savedSurveyId = localStorage.getItem('cohort-chat-selected-survey');
-    if (savedSurveyId && savedSurveyId !== 'null') {
-      setSelectedSurveyId(Number(savedSurveyId));
     }
   }, []);
   
@@ -212,30 +199,120 @@ export default function CohortChatPage() {
     setSelectedModel(model);
     localStorage.setItem('cohort-chat-selected-model', model);
   };
-  
-  // Save system prompt when it changes
-  const handleSystemPromptChange = (prompt: string) => {
-    setSystemPrompt(prompt);
-    localStorage.setItem('cohort-chat-system-prompt', prompt);
-  };
-  
-  // Save survey selection when it changes
-  const handleSurveyChange = (surveyId: number | null) => {
-    setSelectedSurveyId(surveyId);
-    localStorage.setItem('cohort-chat-selected-survey', surveyId ? String(surveyId) : 'null');
-    
-    // Clear cohort selection when changing surveys to prevent cross-survey cohort usage
-    if (selectedCohortId) {
-      const currentCohort = cohorts.find(c => c.id === selectedCohortId);
-      if (!currentCohort || currentCohort.surveyId !== surveyId) {
-        setSelectedCohortId(null);
+
+  // Handle file upload for survey import
+  const handleFileUpload = async (file: File) => {
+    if (!file) return;
+
+    setUploadFile(file);
+    setUploadLoading(true);
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const token = typeof window !== 'undefined' ? localStorage.getItem('token') ?? '' : '';
+      const response = await fetch('/api/surveys/import', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
+      });
+
+      const data = await response.json();
+
+      if (data.status && data.preview) {
+        setUploadPreview(data.preview);
+        toast.success('File uploaded and analyzed successfully!');
+      } else {
+        toast.error(data.message || 'Failed to process file');
+        setShowUploadDialog(false);
       }
+    } catch (error) {
+      console.error('Upload error:', error);
+      toast.error('Failed to upload file');
+      setShowUploadDialog(false);
+    } finally {
+      setUploadLoading(false);
     }
-    
-    // Close cohort creator if open
-    setShowCohortCreator(false);
-    setFilterRules([]);
-    setNewCohortName('');
+  };
+
+  // Execute survey import
+  const handleExecuteImport = async () => {
+    if (!uploadFile || !uploadPreview) return;
+
+    setUploadLoading(true);
+
+    try {
+      const formData = new FormData();
+      formData.append('file', uploadFile);
+      formData.append('config', JSON.stringify({
+        fileName: uploadPreview.fileName,
+        surveyTitle: uploadPreview.suggestedTitle,
+        surveyDescription: `Imported survey from ${uploadPreview.fileName}`,
+        isPublic: true,
+        columnMappings: uploadPreview.columns.map((col: any) => ({
+          originalName: col.name,
+          mappedName: col.name,
+          questionType: col.type,
+          isDemographic: col.isDemographic,
+          demographicField: col.demographicField,
+          isRequired: col.isRequired,
+          includeInSurvey: !col.isDemographic
+        })),
+        createDigitalTwins: true
+      }));
+
+      const token = typeof window !== 'undefined' ? localStorage.getItem('token') ?? '' : '';
+      const response = await fetch('/api/surveys/import/execute', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
+      });
+
+      const data = await response.json();
+
+      if (data.status && data.result) {
+        toast.success(`Survey imported successfully! ${data.result.responsesCreated} responses created.`);
+        
+        // Refresh surveys list
+        fetch('/api/surveys', { headers: { 'Authorization': `Bearer ${token}` } })
+          .then(res => res.json())
+          .then(surveyData => { 
+            if (surveyData.surveys) {
+              setSurveys(surveyData.surveys);
+              // Auto-select the newly imported survey
+              const newSurvey = surveyData.surveys.find((s: any) => s.title === uploadPreview.suggestedTitle);
+              if (newSurvey) {
+                setSelectedSurveyId(newSurvey.id);
+              }
+            }
+          });
+
+        // Reset upload state
+        setShowUploadDialog(false);
+        setUploadFile(null);
+        setUploadPreview(null);
+      } else {
+        toast.error(data.message || 'Failed to import survey');
+      }
+    } catch (error) {
+      console.error('Import error:', error);
+      toast.error('Failed to import survey');
+    } finally {
+      setUploadLoading(false);
+    }
+  };
+
+  // Reset upload dialog
+  const resetUploadDialog = () => {
+    setShowUploadDialog(false);
+    setUploadFile(null);
+    setUploadPreview(null);
+    setUploadLoading(false);
   };
 
   const handleSend = async () => {
@@ -317,28 +394,13 @@ FORMATTING REQUIREMENTS:
           const citationsBlock = match? match[1].trim():'';
           const citations:Record<string,string>={};
           if (citationsBlock) {
-            console.log('Citations block:', citationsBlock);
             citationsBlock.split('\n').forEach(line=>{
-              console.log('Processing citation line:', line);
-              // Handle format: [1] Q: "question" | A: "answer"
+              // Updated regex to handle new format: [1] Q: "question" | A: "answer"
               const m=line.match(/\[(\d+)\]\s+(.+)/);
               if(m) {
-                const citationText = m[2];
-                console.log('Citation text:', citationText);
-                // Extract the question and answer parts for better display
-                const qaParts = citationText.match(/Q:\s*"([^"]+)"\s*\|\s*A:\s*"([^"]+)"/);
-                if (qaParts) {
-                  // Format as "Question: answer" for cleaner tooltip display
-                  citations[m[1]] = `${qaParts[1]}: "${qaParts[2]}"`;
-                  console.log('Formatted citation:', citations[m[1]]);
-                } else {
-                  // Fallback to the full text if format doesn't match
-                  citations[m[1]] = citationText;
-                  console.log('Using fallback citation:', citations[m[1]]);
-                }
+                citations[m[1]] = m[2];
               }
             });
-            console.log('Final citations object:', citations);
           }
           // extract chart spec fenced block
           if(chartMatchFull){
@@ -367,32 +429,19 @@ FORMATTING REQUIREMENTS:
   };
 
   const handleSaveCohort = async () => {
-    if (!newCohortName.trim() || filterRules.length === 0 || !selectedSurveyId) return;
+    if (!newCohortName.trim() || filterRules.length === 0) return;
     setSaving(true);
     const token = typeof window !== 'undefined' ? localStorage.getItem('token') ?? '' : '';
     const res = await fetch('/api/cohorts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...(token ? { 'Authorization': `Bearer ${token}` } : {}) },
-      body: JSON.stringify({ 
-        name: newCohortName, 
-        filter: filterRules, 
-        visibility: 'private',
-        surveyId: selectedSurveyId 
-      }),
+      body: JSON.stringify({ name: newCohortName, filter: filterRules, visibility: 'private' }),
     });
     const data = await res.json();
     if (data.status) {
-      const newCohort = { id: data.id, name: newCohortName, filter: filterRules, visibility: 'private', description: '', createdBy: 1, createdAt: '', updatedAt: '' } as any;
-      setCohorts([...cohorts, newCohort]);
-      // Auto-select the newly created cohort
-      setSelectedCohortId(data.id);
-      // Close the creator and reset form
-      setShowCohortCreator(false);
+      setCohorts([...cohorts, { id: data.id, name: newCohortName, filter: filterRules, visibility: 'private', description: '', createdBy: 1, createdAt: '', updatedAt: '' } as any]);
       setNewCohortName('');
       setFilterRules([]);
-      toast.success(`Cohort "${newCohortName}" created successfully!`);
-    } else {
-      toast.error(data.message || 'Failed to create cohort');
     }
     setSaving(false);
   };
@@ -411,171 +460,6 @@ FORMATTING REQUIREMENTS:
   // helper to update filter rule
   const updateRule = (idx:number, key: keyof CohortFilterRule, value:string) => {
     setFilterRules(prev => prev.map((r,i)=> i===idx? { ...r, [key]: value }: r));
-  };
-
-  // Upload functionality handlers
-  const handleFileUpload = async (file: File) => {
-    console.log('Upload button clicked, file:', file.name, 'type:', file.type, 'size:', file.size);
-    setUploadFile(file);
-    setUploadLoading(true);
-    
-    const formData = new FormData();
-    formData.append('file', file);
-    
-    try {
-      const token = typeof window !== 'undefined' ? localStorage.getItem('token') ?? '' : '';
-      console.log('Making request to /api/surveys/import with token:', token ? 'present' : 'missing');
-      
-      const response = await fetch('/api/surveys/import', {
-        method: 'POST',
-        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
-        body: formData,
-      });
-      
-      console.log('Response status:', response.status);
-      const result = await response.json();
-      console.log('Response result:', result);
-      
-      if (result.status) {
-        setUploadPreview(result.preview);
-        toast.success('File analyzed successfully!');
-        
-        // Add upload message to chat
-        setMessages(prev => [...prev, {
-          role: 'agent',
-          content: `📤 Uploaded: ${file.name}\n\n✅ Ready to import`,
-          citations: {},
-          isUpload: true
-        }]);
-      } else {
-        console.error('Upload failed:', result.message);
-        toast.error(result.message || 'Failed to analyze file');
-        setShowUploadDialog(false);
-      }
-    } catch (error) {
-      console.error('Upload error:', error);
-      toast.error('Failed to upload file');
-      setShowUploadDialog(false);
-    } finally {
-      setUploadLoading(false);
-    }
-  };
-
-  const handleExecuteImport = async () => {
-    if (!uploadPreview || !uploadFile) return;
-    
-    setUploadLoading(true);
-    try {
-      const token = typeof window !== 'undefined' ? localStorage.getItem('token') ?? '' : '';
-      
-      // Create column mappings from the preview data
-      const columnMappings = uploadPreview.columns.map(col => ({
-        originalName: col.name,
-        mappedName: col.name,
-        questionType: col.type,
-        isDemographic: col.isDemographic,
-        demographicField: col.demographicField,
-        isRequired: col.isRequired,
-        includeInSurvey: !col.isDemographic // Include non-demographic columns by default
-      }));
-      
-      const formData = new FormData();
-      formData.append('file', uploadFile);
-      formData.append('config', JSON.stringify({
-        fileName: uploadPreview.fileName,
-        surveyTitle: uploadPreview.suggestedTitle,
-        surveyDescription: `Imported survey from ${uploadPreview.fileName}`,
-        isPublic: false,
-        columnMappings,
-        createDigitalTwins: uploadPreview.detectedDemographics.length > 0
-      }));
-      
-      const response = await fetch('/api/surveys/import/execute', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        },
-        body: formData,
-      });
-      
-      const result = await response.json();
-      if (result.status && result.result) {
-        toast.success(`Survey imported successfully! ${result.result.responsesCreated} responses created.`);
-        setShowUploadDialog(false);
-        resetUploadDialog();
-        
-        // Update the last message (the upload message) to show completion
-        setMessages(prev => {
-          const newMessages = [...prev];
-          if (newMessages.length > 0 && newMessages[newMessages.length - 1].content.includes('📤 Uploaded:')) {
-            newMessages[newMessages.length - 1].content = `📤 Uploaded: ${uploadFile?.name}\n\n✅ Import complete! Survey "${uploadPreview?.suggestedTitle}" imported with ${result.result.responsesCreated} responses. You can now ask questions about this data.`;
-          }
-          return newMessages;
-        });
-        
-        // Refresh surveys list
-        const surveysResponse = await fetch('/api/surveys', { 
-          headers: { 'Authorization': `Bearer ${token}` } 
-        });
-        const surveysData = await surveysResponse.json();
-        if (surveysData.surveys) {
-          setSurveys(surveysData.surveys);
-          // Auto-select the newly imported survey
-          if (result.result.surveyId) {
-            handleSurveyChange(result.result.surveyId);
-          }
-        }
-      } else {
-        toast.error(result.message || 'Failed to import survey');
-      }
-    } catch (error) {
-      console.error('Import error:', error);
-      toast.error('Failed to import survey');
-    } finally {
-      setUploadLoading(false);
-    }
-  };
-
-  const resetUploadDialog = () => {
-    setUploadFile(null);
-    setUploadPreview(null);
-    setUploadLoading(false);
-  };
-
-  // Extract available fields from survey data for cohort filtering
-  const extractAvailableFields = (surveyData: any) => {
-    if (!surveyData) return [];
-    
-    const fields: {name: string, label: string, type: string}[] = [];
-    
-    // Add common demographic fields
-    const commonDemographics = [
-      { name: 'age', label: 'Age', type: 'demographic' },
-      { name: 'gender', label: 'Gender', type: 'demographic' },
-      { name: 'location', label: 'Location', type: 'demographic' },
-      { name: 'occupation', label: 'Occupation', type: 'demographic' },
-      { name: 'education', label: 'Education', type: 'demographic' },
-      { name: 'income', label: 'Income', type: 'demographic' }
-    ];
-    
-    fields.push(...commonDemographics);
-    
-    // Add survey questions as filterable fields
-    if (surveyData.questions) {
-      surveyData.questions.forEach((question: any, index: number) => {
-        const fieldName = question.field_name || `question_${index + 1}`;
-        const label = question.prompt || question.title || `Question ${index + 1}`;
-        const shortLabel = label.length > 30 ? label.substring(0, 30) + '...' : label;
-        
-        fields.push({
-          name: fieldName,
-          label: shortLabel,
-          type: question.type || 'question'
-        });
-      });
-    }
-    
-    return fields;
   };
 
   // Generate dynamic prompts based on survey data
@@ -624,24 +508,10 @@ FORMATTING REQUIREMENTS:
     return prompts.slice(0, 3); // Return max 3 prompts
   };
 
-  const renderWithCitations=(text:string,citations?:Record<string,string>,isUpload?:boolean)=> {
-    const normalizedText = isUpload ? text : normalizeMarkdown(normaliseText(text));
+  const renderWithCitations=(text:string,citations?:Record<string,string>)=> {
+    const normalizedText = normalizeMarkdown(normaliseText(text));
     
     if(!citations || Object.keys(citations).length===0) {
-      // Handle upload messages with simple paragraph splitting
-      if (isUpload) {
-        const paragraphs = normalizedText.split('\n\n').filter(p => p.trim());
-        return (
-          <div className="space-y-2">
-            {paragraphs.map((paragraph, index) => (
-              <div key={index} className="text-foreground">
-                {paragraph.trim()}
-              </div>
-            ))}
-          </div>
-        );
-      }
-      
       return (
         <div className="prose prose-sm max-w-none prose-headings:text-foreground prose-headings:font-semibold prose-p:text-foreground prose-p:leading-relaxed prose-strong:text-foreground prose-strong:font-semibold prose-a:text-primary prose-a:no-underline hover:prose-a:underline prose-ul:text-foreground prose-ol:text-foreground prose-li:text-foreground prose-li:my-1 prose-blockquote:text-foreground prose-blockquote:border-l-primary">
           <ReactMarkdown
@@ -652,8 +522,8 @@ FORMATTING REQUIREMENTS:
               h2: ({ children }) => <h2 className="text-lg font-semibold mb-3 mt-5 first:mt-0 text-foreground">{children}</h2>,
               h3: ({ children }) => <h3 className="text-base font-medium mb-2 mt-4 first:mt-0 text-foreground">{children}</h3>,
               p: ({ children }) => <p className="mb-3 leading-relaxed text-foreground">{children}</p>,
-              ul: ({ children }) => <ul className="list-disc ml-0 mb-4 space-y-1">{children}</ul>,
-              ol: ({ children }) => <ol className="list-decimal ml-0 mb-4 space-y-1">{children}</ol>,
+              ul: ({ children }) => <ul className="list-disc ml-6 mb-4 space-y-1">{children}</ul>,
+              ol: ({ children }) => <ol className="list-decimal ml-6 mb-4 space-y-1">{children}</ol>,
               li: ({ children }) => <li className="text-foreground leading-relaxed">{children}</li>,
               strong: ({ children }) => <strong className="font-semibold text-foreground">{children}</strong>,
               em: ({ children }) => <em className="italic text-foreground">{children}</em>,
@@ -669,47 +539,9 @@ FORMATTING REQUIREMENTS:
     }
     
     // Custom component to handle inline citations within markdown
-    const CitationMarkdown = ({ children }: { children: React.ReactNode }) => {
-      // Recursive function to extract text from any React node structure
-      const extractText = (node: React.ReactNode): string => {
-        if (typeof node === 'string') return node;
-        if (typeof node === 'number') return String(node);
-        if (node === null || node === undefined) return '';
-        if (typeof node === 'boolean') return '';
-        
-        if (Array.isArray(node)) {
-          return node.map(extractText).join('');
-        }
-        
-        if (React.isValidElement(node)) {
-          // Handle React elements by extracting their children
-          const props = node.props as any;
-          if (props && props.children) {
-            return extractText(props.children);
-          }
-          return '';
-        }
-        
-        // For any other object types, try to stringify safely
-        if (typeof node === 'object') {
-          try {
-            // If it has a toString method that's not the default Object.toString
-            if (node.toString && node.toString !== Object.prototype.toString) {
-              return node.toString();
-            }
-          } catch (e) {
-            // Ignore errors
-          }
-          return '';
-        }
-        
-        return String(node);
-      };
-      
-      const textContent = extractText(children);
-      
+    const CitationMarkdown = ({ children }: { children: string }) => {
       // Split text by citation markers but keep them in the result
-      const parts = textContent.split(/(\[\d+\])/);
+      const parts = children.split(/(\[\d+\])/);
       
       return (
         <>
@@ -734,7 +566,7 @@ FORMATTING REQUIREMENTS:
                     <div className="space-y-1">
                       {quote ? (
                         <div className="whitespace-pre-wrap break-words text-gray-900">
-                          {String(quote)}
+                          {quote}
                         </div>
                       ) : (
                         <div className="text-gray-500">Quote not found for [{num}]</div>
@@ -762,24 +594,24 @@ FORMATTING REQUIREMENTS:
             h3: ({ children }) => <h3 className="text-base font-medium mb-2 mt-4 first:mt-0 text-foreground">{children}</h3>,
             p: ({ children }) => (
               <p className="mb-3 leading-relaxed text-foreground">
-                <CitationMarkdown>{children}</CitationMarkdown>
+                <CitationMarkdown>{String(children)}</CitationMarkdown>
               </p>
             ),
-            ul: ({ children }) => <ul className="list-disc ml-0 mb-4 space-y-1">{children}</ul>,
-            ol: ({ children }) => <ol className="list-decimal ml-0 mb-4 space-y-1">{children}</ol>,
+            ul: ({ children }) => <ul className="list-disc ml-6 mb-4 space-y-1">{children}</ul>,
+            ol: ({ children }) => <ol className="list-decimal ml-6 mb-4 space-y-1">{children}</ol>,
             li: ({ children }) => (
               <li className="text-foreground leading-relaxed">
-                <CitationMarkdown>{children}</CitationMarkdown>
+                <CitationMarkdown>{String(children)}</CitationMarkdown>
               </li>
             ),
             strong: ({ children }) => (
               <strong className="font-semibold text-foreground">
-                <CitationMarkdown>{children}</CitationMarkdown>
+                <CitationMarkdown>{String(children)}</CitationMarkdown>
               </strong>
             ),
             em: ({ children }) => (
               <em className="italic text-foreground">
-                <CitationMarkdown>{children}</CitationMarkdown>
+                <CitationMarkdown>{String(children)}</CitationMarkdown>
               </em>
             ),
             blockquote: ({ children }) => <blockquote className="border-l-4 border-primary pl-4 my-4 italic text-muted-foreground">{children}</blockquote>,
@@ -800,36 +632,24 @@ FORMATTING REQUIREMENTS:
         <div className="h-full rounded-lg bg-card text-card-foreground shadow-lg">
           {/* Header */}
           <div className="px-6 py-2">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <SidebarTrigger className="-ml-0.5 h-5 w-5 text-muted-foreground hover:text-foreground" />
-                <div className="h-4 border-l border-border mx-4" />
-                <h1 className="text-base font-medium text-card-foreground">Cohort Chat</h1>
-              </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="-mr-0.5 h-5 w-5 text-muted-foreground hover:text-foreground"
-                onClick={()=>setIsCollapsed(!isCollapsed)}
-              >
-                {isCollapsed ? <PanelRight /> : <PanelLeft />}
-                <span className="sr-only">Toggle Right Panel</span>
-              </Button>
+            <div className="flex items-center">
+              <SidebarTrigger className="-ml-0.5 h-5 w-5 text-muted-foreground hover:text-foreground" />
+              <div className="h-4 border-l border-border mx-4" />
+              <h1 className="text-base font-medium text-card-foreground">Cohort Chat</h1>
             </div>
           </div>
 
           <div className="border-b border-border" />
 
           <div className="p-2">
-
-          {/* Chat Area - No more tabs, just clean chat */}
-          <div className="flex flex-col h-[calc(100vh-80px)]">
+            {/* Chat Area - No more tabs, just clean chat */}
+            <div className="flex flex-col h-[calc(100vh-80px)]">
             {messages.length===0 ? (
               <div className="flex flex-col items-center justify-center flex-1 gap-6">
                 <h1 className="text-2xl font-bold">Ask Questions.</h1>
                 <div className="relative w-full max-w-xl">
                   <Textarea 
-                    className="flex-1 min-h-[80px] pr-24 resize-none" 
+                    className="flex-1 min-h-[80px] pr-20 resize-none" 
                     placeholder="Ask the cohort…" 
                     value={input} 
                     onChange={e=>setInput(e.target.value)} 
@@ -843,51 +663,84 @@ FORMATTING REQUIREMENTS:
                           size="icon" 
                           variant="ghost" 
                           className="h-8 w-8" 
-                          title="Upload survey file"
+                          disabled={isLoading}
+                          onClick={() => {
+                            console.log('Upload button clicked (main), current state:', showUploadDialog);
+                            setShowUploadDialog(true);
+                          }}
+                          title="Import CSV/Excel survey data"
                         >
                           <Upload className="h-4 w-4"/>
                         </Button>
                       </DialogTrigger>
-                      <DialogContent className="max-w-2xl">
+                      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
                         <DialogHeader>
                           <DialogTitle>Import Survey Data</DialogTitle>
+                          <DialogDescription>
+                            Upload CSV or Excel files to import survey data for analysis
+                          </DialogDescription>
                         </DialogHeader>
+                        
                         {!uploadPreview ? (
                           <div className="space-y-4">
-                            <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
+                            <div className="border-2 border-dashed border-border rounded-lg p-8 text-center">
                               <input
                                 type="file"
                                 accept=".csv,.xlsx,.xls"
                                 onChange={(e) => {
-                                  const file = e.target.files?.[0];
-                                  if (file) handleFileUpload(file);
+                                  const selectedFile = e.target.files?.[0]
+                                  if (selectedFile) handleFileUpload(selectedFile)
                                 }}
                                 className="hidden"
-                                id="file-upload-initial"
+                                id="chat-file-upload-main"
+                                disabled={uploadLoading}
                               />
-                              <label htmlFor="file-upload-initial" className="cursor-pointer">
-                                <FileText className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-                                <p className="text-lg font-medium mb-2">Drop your survey file here</p>
-                                <p className="text-sm text-gray-500">or click to browse (CSV, Excel)</p>
-                                <p className="text-xs text-gray-400 mt-2">Max file size: 10MB</p>
+                              <label htmlFor="chat-file-upload-main" className="cursor-pointer">
+                                <div className="space-y-2">
+                                  <FileText className="h-8 w-8 mx-auto text-muted-foreground" />
+                                  <p className="text-sm font-medium">
+                                    {uploadLoading ? 'Processing file...' : 'Click to upload or drag and drop'}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground">CSV, Excel files up to 10MB</p>
+                                </div>
                               </label>
+                            </div>
+                            
+                            <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                              <h4 className="font-medium text-blue-900 dark:text-blue-100 mb-2">Supported Formats</h4>
+                              <ul className="text-sm text-blue-700 dark:text-blue-300 space-y-1">
+                                <li>• CSV files with headers in the first row</li>
+                                <li>• Excel files (.xlsx, .xls) using the first sheet</li>
+                                <li>• Survey responses in subsequent rows</li>
+                                <li>• Demographic fields (age, gender, location) will be auto-detected</li>
+                              </ul>
                             </div>
                           </div>
                         ) : (
                           <div className="space-y-4">
-                                                          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                                <h3 className="font-medium text-green-800 mb-2">File Analysis Complete</h3>
-                                <div className="space-y-2 text-sm">
-                                  <p><strong>Title:</strong> {uploadPreview.suggestedTitle}</p>
-                                  <p><strong>Responses:</strong> {uploadPreview.totalRows || 0}</p>
-                                  <p><strong>Questions:</strong> {uploadPreview.columns?.length || 0}</p>
-                                  {uploadPreview.detectedDemographics && uploadPreview.detectedDemographics.length > 0 && (
-                                    <p><strong>Demographics:</strong> {uploadPreview.detectedDemographics.join(', ')}</p>
-                                  )}
+                            <div className="bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
+                              <h4 className="font-medium text-green-900 dark:text-green-100 mb-2">File Preview</h4>
+                              <div className="text-sm text-green-700 dark:text-green-300 space-y-1">
+                                <p><strong>File:</strong> {uploadPreview.fileName}</p>
+                                <p><strong>Rows:</strong> {uploadPreview.totalRows}</p>
+                                <p><strong>Columns:</strong> {uploadPreview.columns.length}</p>
+                                <p><strong>Survey Title:</strong> {uploadPreview.suggestedTitle}</p>
+                              </div>
+                            </div>
+                            
+                            {uploadPreview.detectedDemographics.length > 0 && (
+                              <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                                <h4 className="font-medium text-blue-900 dark:text-blue-100 mb-2">Detected Demographics</h4>
+                                <div className="flex flex-wrap gap-2">
+                                  {uploadPreview.detectedDemographics.map((demo: string) => (
+                                    <Badge key={demo} variant="secondary">{demo}</Badge>
+                                  ))}
                                 </div>
                               </div>
+                            )}
+                            
                             <div className="flex gap-2 justify-end">
-                              <Button variant="outline" onClick={() => { setShowUploadDialog(false); resetUploadDialog(); }}>
+                              <Button variant="outline" onClick={resetUploadDialog} disabled={uploadLoading}>
                                 Cancel
                               </Button>
                               <Button onClick={handleExecuteImport} disabled={uploadLoading}>
@@ -897,17 +750,19 @@ FORMATTING REQUIREMENTS:
                           </div>
                         )}
                       </DialogContent>
-                    </Dialog>
-                    <Button 
-                      size="icon" 
-                      variant="ghost" 
-                      className="h-8 w-8" 
-                      onClick={handleSend} 
-                      disabled={isLoading}
-                    >
-                      <Send className="h-4 w-4"/>
-                    </Button>
-                  </div>
+                      </Dialog>
+                      
+                      <Button 
+                        size="icon" 
+                        variant="ghost" 
+                        className="h-8 w-8" 
+                        onClick={handleSend} 
+                        disabled={isLoading}
+                        title="Send message"
+                      >
+                        <Send className="h-4 w-4"/>
+                      </Button>
+                    </div>
                 </div>
                 <div className="text-xs text-center max-w-xl space-y-2">
                   <p className="font-medium text-muted-foreground">
@@ -948,7 +803,7 @@ FORMATTING REQUIREMENTS:
                           {m.role==='agent' ? (
                             <TooltipProvider delayDuration={150}>
                               <div className="space-y-1">
-                                {renderWithCitations(m.content, m.citations, m.isUpload)}
+                                {renderWithCitations(m.content, m.citations)}
                               </div>
                             </TooltipProvider>
                           ): (
@@ -986,7 +841,7 @@ FORMATTING REQUIREMENTS:
                 <div className="sticky bottom-0 p-4 bg-card">
                   <div className="relative">
                     <Textarea 
-                      className="flex-1 min-h-[80px] pr-24 resize-none" 
+                      className="flex-1 min-h-[80px] pr-20 resize-none" 
                       placeholder="Ask the cohort…" 
                       value={input} 
                       onChange={e=>setInput(e.target.value)} 
@@ -1001,51 +856,84 @@ FORMATTING REQUIREMENTS:
                             size="icon" 
                             variant="ghost" 
                             className="h-8 w-8" 
-                            title="Upload survey file"
+                            disabled={isLoading}
+                            onClick={() => {
+                              console.log('Upload button clicked, current state:', showUploadDialog);
+                              setShowUploadDialog(true);
+                            }}
+                            title="Import CSV/Excel survey data"
                           >
                             <Upload className="h-4 w-4"/>
                           </Button>
                         </DialogTrigger>
-                        <DialogContent className="max-w-2xl">
+                        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
                           <DialogHeader>
                             <DialogTitle>Import Survey Data</DialogTitle>
+                            <DialogDescription>
+                              Upload CSV or Excel files to import survey data for analysis
+                            </DialogDescription>
                           </DialogHeader>
+                          
                           {!uploadPreview ? (
                             <div className="space-y-4">
-                              <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
+                              <div className="border-2 border-dashed border-border rounded-lg p-8 text-center">
                                 <input
                                   type="file"
                                   accept=".csv,.xlsx,.xls"
                                   onChange={(e) => {
-                                    const file = e.target.files?.[0];
-                                    if (file) handleFileUpload(file);
+                                    const selectedFile = e.target.files?.[0]
+                                    if (selectedFile) handleFileUpload(selectedFile)
                                   }}
                                   className="hidden"
-                                  id="file-upload-bottom"
+                                  id="chat-file-upload"
+                                  disabled={uploadLoading}
                                 />
-                                <label htmlFor="file-upload-bottom" className="cursor-pointer">
-                                  <FileText className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-                                  <p className="text-lg font-medium mb-2">Drop your survey file here</p>
-                                  <p className="text-sm text-gray-500">or click to browse (CSV, Excel)</p>
-                                  <p className="text-xs text-gray-400 mt-2">Max file size: 10MB</p>
+                                <label htmlFor="chat-file-upload" className="cursor-pointer">
+                                  <div className="space-y-2">
+                                    <FileText className="h-8 w-8 mx-auto text-muted-foreground" />
+                                    <p className="text-sm font-medium">
+                                      {uploadLoading ? 'Processing file...' : 'Click to upload or drag and drop'}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">CSV, Excel files up to 10MB</p>
+                                  </div>
                                 </label>
+                              </div>
+                              
+                              <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                                <h4 className="font-medium text-blue-900 dark:text-blue-100 mb-2">Supported Formats</h4>
+                                <ul className="text-sm text-blue-700 dark:text-blue-300 space-y-1">
+                                  <li>• CSV files with headers in the first row</li>
+                                  <li>• Excel files (.xlsx, .xls) using the first sheet</li>
+                                  <li>• Survey responses in subsequent rows</li>
+                                  <li>• Demographic fields (age, gender, location) will be auto-detected</li>
+                                </ul>
                               </div>
                             </div>
                           ) : (
                             <div className="space-y-4">
-                              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                                <h3 className="font-medium text-green-800 mb-2">File Analysis Complete</h3>
-                                <div className="space-y-2 text-sm">
-                                  <p><strong>Title:</strong> {uploadPreview.suggestedTitle}</p>
-                                  <p><strong>Responses:</strong> {uploadPreview.totalRows || 0}</p>
-                                  <p><strong>Questions:</strong> {uploadPreview.columns?.length || 0}</p>
-                                  {uploadPreview.detectedDemographics && uploadPreview.detectedDemographics.length > 0 && (
-                                    <p><strong>Demographics:</strong> {uploadPreview.detectedDemographics.join(', ')}</p>
-                                  )}
+                              <div className="bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
+                                <h4 className="font-medium text-green-900 dark:text-green-100 mb-2">File Preview</h4>
+                                <div className="text-sm text-green-700 dark:text-green-300 space-y-1">
+                                  <p><strong>File:</strong> {uploadPreview.fileName}</p>
+                                  <p><strong>Rows:</strong> {uploadPreview.totalRows}</p>
+                                  <p><strong>Columns:</strong> {uploadPreview.columns.length}</p>
+                                  <p><strong>Survey Title:</strong> {uploadPreview.suggestedTitle}</p>
                                 </div>
                               </div>
+                              
+                              {uploadPreview.detectedDemographics.length > 0 && (
+                                <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                                  <h4 className="font-medium text-blue-900 dark:text-blue-100 mb-2">Detected Demographics</h4>
+                                  <div className="flex flex-wrap gap-2">
+                                    {uploadPreview.detectedDemographics.map((demo: string) => (
+                                      <Badge key={demo} variant="secondary">{demo}</Badge>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                              
                               <div className="flex gap-2 justify-end">
-                                <Button variant="outline" onClick={() => { setShowUploadDialog(false); resetUploadDialog(); }}>
+                                <Button variant="outline" onClick={resetUploadDialog} disabled={uploadLoading}>
                                   Cancel
                                 </Button>
                                 <Button onClick={handleExecuteImport} disabled={uploadLoading}>
@@ -1055,17 +943,19 @@ FORMATTING REQUIREMENTS:
                             </div>
                           )}
                         </DialogContent>
-                      </Dialog>
-                      <Button 
-                        size="icon" 
-                        variant="ghost" 
-                        className="h-8 w-8" 
-                        onClick={handleSend} 
-                        disabled={isLoading}
-                      >
-                        <Send className="h-4 w-4"/>
-                      </Button>
-                    </div>
+                        </Dialog>
+                        
+                        <Button 
+                          size="icon" 
+                          variant="ghost" 
+                          className="h-8 w-8" 
+                          onClick={handleSend} 
+                          disabled={isLoading}
+                          title="Send message"
+                        >
+                          <Send className="h-4 w-4"/>
+                        </Button>
+                      </div>
                   </div>
                   {/* Only show suggestions when there are no messages */}
                   {messages.length === 0 && (
@@ -1087,223 +977,136 @@ FORMATTING REQUIREMENTS:
                 </div>
               </>
             )}
-          </div>
-
+            </div>
           </div>
         </div>
       </div>
       
       {/* Right Sidebar */}
       <div className="relative">
-        <div className={cn('h-full bg-background transition-all duration-300 ease-in-out', isCollapsed? 'w-0':'w-[350px] overflow-y-auto px-4 py-2')}>
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          className="absolute -left-3 top-3 h-7 w-7 z-10" 
+          onClick={()=>setIsCollapsed(!isCollapsed)}
+        >
+          <PanelLeft className={cn("h-4 w-4", isCollapsed ? "" : "rotate-180")} />
+          <span className="sr-only">Toggle Right Panel</span>
+        </Button>
+        <div className={cn('h-full bg-sidebar border-l', isCollapsed? 'w-[50px]':'w-[350px] overflow-y-auto p-6 space-y-6')}>
           {!isCollapsed && (
-            <Tabs defaultValue="cohort" className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="cohort">Cohort</TabsTrigger>
-                <TabsTrigger value="agent">Agent</TabsTrigger>
-              </TabsList>
+              <>
+                {/* Panel Toggle */}
+                <div className="flex rounded-md bg-sidebar-accent p-0.5">
+                  <Button
+                    variant={rightPanelView === 'cohort' ? 'secondary' : 'ghost'}
+                    size="sm"
+                    className="flex-1 h-7 text-xs font-medium text-sidebar-foreground"
+                    onClick={() => setRightPanelView('cohort')}
+                  >
+                    Cohort
+                  </Button>
+                  <Button
+                    variant={rightPanelView === 'agent' ? 'secondary' : 'ghost'}
+                    size="sm"
+                    className="flex-1 h-7 text-xs font-medium text-sidebar-foreground"
+                    onClick={() => setRightPanelView('agent')}
+                  >
+                    Agent
+                  </Button>
+                </div>
 
-              <TabsContent value="cohort" className="space-y-4 mt-4">
-                <div className="space-y-4">
-                  {/* Survey select */}
-                  <div className="space-y-2">
-                    <Label>Survey</Label>
-                    <Select value={selectedSurveyId? String(selectedSurveyId):'all'} onValueChange={val=>handleSurveyChange(val==='all'? null: Number(val))}>
-                      <SelectTrigger><SelectValue placeholder="All"/></SelectTrigger>
-                      <SelectContent className="z-50">
-                        <SelectItem value="all">All</SelectItem>
-                        {surveys.map(s=> <SelectItem key={s.id} value={String(s.id)}>{s.title}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  {/* Cohort select */}
-                  <div className="space-y-2">
-                    <Label>Cohort (Filter Respondents)</Label>
-                    <Select 
-                      value={showCohortCreator ? 'create-new' : (selectedCohortId? String(selectedCohortId):'all')} 
-                      onValueChange={val=> {
-                        if (val === 'create-new') {
-                          setShowCohortCreator(true);
-                          setSelectedCohortId(null);
-                          // Initialize with one empty rule if none exist
-                          if (filterRules.length === 0) {
-                            setFilterRules([{ field: '', op: '=', value: '' }]);
-                          }
-                        } else {
-                          setShowCohortCreator(false);
-                          setSelectedCohortId(val==='all'? null: Number(val));
-                        }
-                      }}
-                    >
-                      <SelectTrigger><SelectValue placeholder="All Respondents"/></SelectTrigger>
-                      <SelectContent className="z-50">
-                        <SelectItem value="all">All Respondents</SelectItem>
-                        {cohorts
-                          .filter(c => !selectedSurveyId || c.surveyId === selectedSurveyId)
-                          .map(c=> <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>)
-                        }
-                        {selectedSurveyId && (
-                          <SelectItem value="create-new" className="text-primary font-medium">
-                            + Create New Cohort
-                          </SelectItem>
-                        )}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  {/* Cohort Creator */}
-                  {showCohortCreator && (
+                {rightPanelView === 'cohort' ? (
+                  <>
+                    {/* Cohort select */}
+                    <div className="space-y-2">
+                      <Label className="text-sidebar-foreground">Cohort</Label>
+                      <Select value={selectedCohortId? String(selectedCohortId):'all'} onValueChange={val=>setSelectedCohortId(val==='all'? null: Number(val))}>
+                        <SelectTrigger><SelectValue placeholder="All"/></SelectTrigger>
+                        <SelectContent className="z-50">
+                          <SelectItem value="all">All</SelectItem>
+                          {cohorts.map(c=> <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {/* Survey select */}
+                    <div className="space-y-2">
+                      <Label className="text-sidebar-foreground">Survey</Label>
+                      <Select value={selectedSurveyId? String(selectedSurveyId):'all'} onValueChange={val=>setSelectedSurveyId(val==='all'? null: Number(val))}>
+                        <SelectTrigger><SelectValue placeholder="All"/></SelectTrigger>
+                        <SelectContent className="z-50">
+                          <SelectItem value="all">All</SelectItem>
+                          {surveys.map(s=> <SelectItem key={s.id} value={String(s.id)}>{s.title}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {/* Filter Builder */}
                     <div className="space-y-4 mt-4">
-                      <div className="flex items-center justify-between">
-                        <div className="space-y-1">
-                          <h3 className="text-sm font-medium">Create New Cohort</h3>
-                          <p className="text-xs text-muted-foreground">
-                            {selectedSurveyId 
-                              ? "Select fields from your survey to create filter rules"
-                              : "Select a survey above to create cohorts for that specific survey"
-                            }
-                          </p>
-                        </div>
-                        <Button 
-                          size="sm" 
-                          variant="ghost" 
-                          onClick={() => {
-                            setShowCohortCreator(false);
-                            setFilterRules([]);
-                            setNewCohortName('');
-                          }}
-                          className="h-8 w-8 p-0"
-                        >
-                          ×
-                        </Button>
-                      </div>
-                      
+                      <h3 className="text-sm font-medium text-sidebar-foreground">Ad-hoc Filter</h3>
                       {filterRules.map((rule, idx) => (
-                        <div key={idx} className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <Select value={rule.field} onValueChange={val=>updateRule(idx,'field',val)}>
-                              <SelectTrigger className="w-full text-left">
-                                <SelectValue placeholder="Select field" className="text-left"/>
-                              </SelectTrigger>
-                              <SelectContent className="z-50">
-                                {!selectedSurveyId && (
-                                  <SelectItem value="" disabled>
-                                    Select a survey first
-                                  </SelectItem>
-                                )}
-                                {availableFields.map(field => (
-                                  <SelectItem key={field.name} value={field.name}>
-                                    <div className="flex flex-col">
-                                      <span className="font-medium">{field.label}</span>
-                                      <span className="text-xs text-muted-foreground">
-                                        {field.type === 'demographic' ? 'Demographics' : 'Survey Question'}
-                                      </span>
-                                    </div>
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            {filterRules.length > 1 && (
-                              <Button 
-                                size="sm" 
-                                variant="ghost" 
-                                onClick={() => setFilterRules(filterRules.filter((_, i) => i !== idx))}
-                                className="h-8 w-8 p-0 ml-2 flex-shrink-0"
-                              >
-                                ×
-                              </Button>
-                            )}
-                          </div>
-                          <div className="flex gap-2">
-                            <select value={rule.op} onChange={e=>updateRule(idx,'op',e.target.value as any)} className="h-8 rounded-md border border-input bg-background px-2 text-xs w-24">
-                              <option value="=">=</option>
-                              <option value="IN">IN</option>
-                              <option value="CONTAINS">CONTAINS</option>
-                            </select>
-                            <Input placeholder="value" value={Array.isArray(rule.value)? rule.value.join(','): rule.value as string} onChange={e=>updateRule(idx,'value',e.target.value)} className="flex-1 text-left" />
-                          </div>
+                        <div key={idx} className="flex gap-2 items-center">
+                          <Input placeholder="field" value={rule.field} onChange={e=>updateRule(idx,'field',e.target.value)} className="w-28" />
+                          <select value={rule.op} onChange={e=>updateRule(idx,'op',e.target.value as any)} className="h-8 rounded-md border border-input bg-background px-2 text-xs">
+                            <option value="=">=</option>
+                            <option value="IN">IN</option>
+                            <option value="CONTAINS">CONTAINS</option>
+                          </select>
+                          <Input placeholder="value" value={Array.isArray(rule.value)? rule.value.join(','): rule.value as string} onChange={e=>updateRule(idx,'value',e.target.value)} className="flex-1" />
                         </div>
                       ))}
-                      
-                      <Button 
-                        size="sm" 
-                        variant="secondary" 
-                        onClick={() => setFilterRules([...filterRules,{ field:'', op:'=', value:''}])}
-                        disabled={!selectedSurveyId}
-                        className="w-full"
-                      >
-                        + Add Filter Rule
-                      </Button>
-                      
+                      <Button size="sm" variant="secondary" onClick={() => setFilterRules([...filterRules,{ field:'', op:'=', value:''}])}>+ Add Rule</Button>
+                    </div>
+                    {/* Save Cohort */}
+                    <div className="flex gap-2 items-center mt-2">
+                      <Input placeholder="Cohort name" value={newCohortName} onChange={e=>setNewCohortName(e.target.value)} className="flex-1" />
+                      <Button size="sm" onClick={handleSaveCohort} disabled={saving || !newCohortName.trim() || filterRules.length===0}>Save Cohort</Button>
+                    </div>
+                    <Separator className="my-4"/>
+                    {messages.length>0 && selectedCohortId && (<Button variant="destructive" onClick={handleDeleteCohort}>Delete</Button>)}
+                  </>
+                ) : (
+                  <>
+                    {/* Agent Setup */}
+                    <div className="space-y-6">
+                      {/* Model select */}
                       <div className="space-y-2">
-                        <Input placeholder="Enter cohort name (e.g., 'Young Males')" value={newCohortName} onChange={e=>setNewCohortName(e.target.value)} />
-                        <div className="flex gap-2">
-                          <Button 
-                            size="sm" 
-                            variant="outline" 
-                            onClick={() => {
-                              setShowCohortCreator(false);
-                              setFilterRules([]);
-                              setNewCohortName('');
-                            }}
-                            className="flex-1"
-                          >
-                            Cancel
-                          </Button>
-                          <Button 
-                            size="sm" 
-                            onClick={handleSaveCohort} 
-                            disabled={saving || !newCohortName.trim() || filterRules.length===0 || !selectedSurveyId} 
-                            className="flex-1"
-                          >
-                            {saving ? 'Saving...' : 'Save Cohort'}
-                          </Button>
-                        </div>
+                        <Label className="text-sidebar-foreground">Model</Label>
+                        <Select value={selectedModel} onValueChange={handleModelChange}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent className="z-50">
+                            {getAllModels().map((model) => (
+                              <SelectItem key={model.id} value={model.id}>
+                                {model.name} ({model.provider})
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
-                                          </div>
-                    )}
-                  {messages.length>0 && selectedCohortId && (<Button variant="destructive" onClick={handleDeleteCohort}>Delete</Button>)}
-                </div>
-              </TabsContent>
-              
-              <TabsContent value="agent" className="space-y-4 mt-4">
-                <div className="space-y-4">
-                  {/* Model select */}
-                  <div className="space-y-2">
-                    <Label>Model</Label>
-                    <Select value={selectedModel} onValueChange={handleModelChange}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent className="z-50">
-                        {getAllModels().map((model) => (
-                          <SelectItem key={model.id} value={model.id}>
-                            {model.name} ({model.provider})
-                          </SelectItem>
+
+                      {/* Sources */}
+                      <div className="space-y-2">
+                        <Label className="text-sidebar-foreground">Sources</Label>
+                        {['survey','twins','web'].map(src=> (
+                                                      <div key={src} className="flex items-center gap-2">
+                              <Checkbox checked={sources[src as keyof typeof sources]} onCheckedChange={val=>setSources({...sources,[src]:!!val})}/>
+                              <span className="text-sm capitalize text-sidebar-foreground">{src}</span>
+                            </div>
                         ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {/* Sources */}
-                  <div className="space-y-2">
-                    <Label>Sources</Label>
-                    {['survey','twins','web'].map(src=> (
-                      <div key={src} className="flex items-center gap-2">
-                        <Checkbox checked={sources[src as keyof typeof sources]} onCheckedChange={val=>setSources({...sources,[src]:!!val})}/>
-                        <span className="text-sm capitalize">{src}</span>
                       </div>
-                    ))}
-                  </div>
 
-                  {/* Prompt Editor */}
-                  <div className="space-y-2">
-                    <Label>Agent Instructions</Label>
-                    <Textarea value={systemPrompt} onChange={e=>handleSystemPromptChange(e.target.value)} className="min-h-32"/>
-                  </div>
-                </div>
-              </TabsContent>
-            </Tabs>
-          )}
+                      {/* Prompt Editor */}
+                      <div className="space-y-2">
+                        <Label className="text-sidebar-foreground">Agent Instructions</Label>
+                        <Textarea value={systemPrompt} onChange={e=>setSystemPrompt(e.target.value)} className="min-h-32"/>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </>
+            )}
+          </div>
         </div>
       </div>
     </div>
   );
-} 
+}
