@@ -54,9 +54,9 @@ export const AgentProvider = ({ children }: { children: React.ReactNode }) => {
     useEffect(() => {
         const token = localStorage.getItem("token");
         
-        // If we're on an auth page and have a token, redirect to dashboard
+        // If we're on an auth page and have a token, redirect to cohort-chat
         if (token && isAuthPage) {
-            router.push("/overview");
+            router.push("/cohort-chat");
             return;
         }
         
