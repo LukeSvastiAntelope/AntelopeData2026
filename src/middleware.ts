@@ -105,8 +105,8 @@ export default async function middleware(req: NextRequest) {
                 // and trying to access a route that should trigger a redirect (e.g. /login, /register when already logged in)
                 // This part may need to be more granular based on which non-API public pages should redirect.
                 if (path === '/login' || path === '/register') { // Example: redirect from login/register if already logged in
-                    const dashboardUrl = new URL('/dashboard', req.url);
-                    return NextResponse.redirect(dashboardUrl);
+                    const cohortChatUrl = new URL('/cohort-chat', req.url);
+                    return NextResponse.redirect(cohortChatUrl);
                 }
             }
         }

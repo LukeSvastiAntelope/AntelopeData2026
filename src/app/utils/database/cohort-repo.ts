@@ -25,18 +25,23 @@ export const CohortRepo = {
 
     const [rows] = await db.execute<RowDataPacket[]>(query, params);
 
-    return rows as CohortDB[];
+    // Map database columns to interface
+    return rows.map(row => ({
+      ...row,
+      survey_id: row.survey_id,
+      filter_json: typeof row.filter_json === 'string' ? JSON.parse(row.filter_json) : row.filter_json
+    })) as CohortDB[];
   },
 
   /**
    * Create a new cohort. Returns inserted ID.
    */
-  createCohort: async (input: { name: string; description?: string; filter: CohortFilterRule[]; visibility: 'private'|'org'|'public'; createdBy: number; }) => {
+  createCohort: async (input: { name: string; description?: string; filter: CohortFilterRule[]; visibility: 'private'|'org'|'public'; createdBy: number; surveyId?: number; }) => {
     const db = await getMySQLConnection();
-    const { name, description, filter, visibility, createdBy } = input;
+    const { name, description, filter, visibility, createdBy, surveyId } = input;
     const [result]: any = await db.execute(
-      `INSERT INTO cohorts (name, description, filter_json, visibility, created_by) VALUES (?, ?, ?, ?, ?)` ,
-      [name, description || null, JSON.stringify(filter), visibility, createdBy]
+      `INSERT INTO cohorts (name, description, filter_json, visibility, created_by, survey_id) VALUES (?, ?, ?, ?, ?, ?)` ,
+      [name, description || null, JSON.stringify(filter), visibility, createdBy, surveyId || null]
     );
     return result.insertId as number;
   },
