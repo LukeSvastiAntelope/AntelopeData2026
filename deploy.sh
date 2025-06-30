@@ -6,7 +6,7 @@ echo "=== Checking Node Version ==="
 node -v
 
 echo "=== Installing Dependencies ==="
-npm ci
+npm install
 
 echo "=== DB Migration ==="
 npx prisma generate
