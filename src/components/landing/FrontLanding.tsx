@@ -3,14 +3,86 @@
 import { Button } from "@/components/ui/button"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import { Card, CardContent } from "@/components/ui/card"
-import { Lightbulb as LightbulbIcon, MessageCircle as MessageCircleIcon, Rocket, Brain as BrainIcon } from "lucide-react"
+import { Textarea } from "@/components/ui/textarea"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Lightbulb as LightbulbIcon, MessageCircle as MessageCircleIcon, Rocket, Brain as BrainIcon, Send, Upload, FileText } from "lucide-react"
 import { useRouter } from "next/navigation"
+import { useState } from "react"
 import Link from "next/link"
 import LogoText from "@/components/logo-text"
 // Background hero now uses the public/hero.jpg asset
+import toast from "react-hot-toast"
 
 export default function FrontLanding() {
   const router = useRouter()
+  const [input, setInput] = useState('')
+  const [showUploadDialog, setShowUploadDialog] = useState(false)
+  const [uploadFile, setUploadFile] = useState<File | null>(null)
+  const [uploadLoading, setUploadLoading] = useState(false)
+  const [uploadPreview, setUploadPreview] = useState<any>(null)
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      // For now, just redirect to register - later we can add demo functionality
+      router.push("/register")
+    }
+  }
+
+  const handleSend = () => {
+    // For now, just redirect to register - later we can add demo functionality
+    router.push("/register")
+  }
+
+  const handleFileUpload = async (file: File) => {
+    console.log('Upload button clicked, file:', file.name, 'type:', file.type, 'size:', file.size);
+    setUploadFile(file);
+    setUploadLoading(true);
+    
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    try {
+      console.log('Making request to /api/public/surveys/preview for demo upload');
+      
+      // Use a public endpoint for demo uploads (no auth required)
+      const response = await fetch('/api/public/surveys/preview', {
+        method: 'POST',
+        body: formData,
+      });
+      
+      console.log('Response status:', response.status);
+      const result = await response.json();
+      console.log('Response result:', result);
+      
+      if (result.status) {
+        setUploadPreview(result.preview);
+        toast.success(`Found ${result.preview.totalRows} responses and ${result.preview.detectedDemographics?.length || 0} digital twin profiles!`);
+      } else {
+        console.error('Upload failed:', result.message);
+        toast.error(result.message || 'Failed to analyze file');
+        setShowUploadDialog(false);
+      }
+    } catch (error) {
+      console.error('Upload error:', error);
+      toast.error('Failed to upload file');
+      setShowUploadDialog(false);
+    } finally {
+      setUploadLoading(false);
+    }
+  };
+
+  const handleGetStarted = () => {
+    // Close dialog and redirect to register
+    setShowUploadDialog(false);
+    router.push("/register");
+  };
+
+  const resetUploadDialog = () => {
+    setUploadFile(null);
+    setUploadPreview(null);
+    setUploadLoading(false);
+  };
 
   return (
     <>
@@ -40,30 +112,151 @@ export default function FrontLanding() {
         {/* Main content space-y-16 */}
         <div className="p-6 ">
           {/* Hero Section */}
-          <section
-            className="relative w-full h-[50vh] md:h-[75vh] rounded-lg overflow-hidden flex items-start justify-center"
-            style={{ backgroundImage: "url('/hero.jpg')", backgroundSize: 'contain', backgroundPosition: 'center 140px', backgroundRepeat: 'no-repeat' }}
-          >
-            {/* Overlay for readability bg-background/60 */}
-            <div className="absolute inset-0 " />
-
+          <section className="relative w-full h-[50vh] md:h-[75vh] rounded-lg overflow-hidden flex items-start justify-center">
             {/* Content */}
             <div className="relative z-10 flex flex-col items-center text-center max-w-3xl px-4 gap-y-6">
               <h2 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-card-foreground">
-              Turn Your Surveys Into a Living Network of Synthetic Personas.
+              Turn Your Surveys Into a Live Network of Synthetic Personas.
               </h2>
-              <p className="text-muted-foreground">
+              <p className="text-muted-foreground mb-6">
                 Antelope lets you generate AI-powered surveys, build anonymised Digital Twins, and understand your audience in minutes—not weeks.
               </p>
-              <Button size="lg" onClick={() => router.push("/register")}>Get started — it&apos;s free</Button>
+              
+              {/* Chat Input Field */}
+              <div className="relative w-full max-w-xl">
+                <Textarea 
+                  className="flex-1 min-h-[80px] pr-24 resize-none" 
+                  placeholder="Ask the cohort… or upload your survey to get started" 
+                  value={input} 
+                  onChange={e => setInput(e.target.value)} 
+                  onKeyDown={handleKeyDown}
+                  rows={2}
+                />
+                <div className="absolute right-2 bottom-2 flex gap-1">
+                  <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
+                    <DialogTrigger asChild>
+                      <Button 
+                        size="icon" 
+                        variant="ghost" 
+                        className="h-8 w-8" 
+                        title="Upload survey file to see the magic"
+                      >
+                        <Upload className="h-4 w-4"/>
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-2xl">
+                      <DialogHeader>
+                        <DialogTitle>Try Antelope with Your Survey Data</DialogTitle>
+                      </DialogHeader>
+                      {!uploadPreview ? (
+                        <div className="space-y-4">
+                          <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
+                            <input
+                              type="file"
+                              accept=".csv,.xlsx,.xls"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) handleFileUpload(file);
+                              }}
+                              className="hidden"
+                              id="file-upload-demo"
+                              disabled={uploadLoading}
+                            />
+                            <label htmlFor="file-upload-demo" className="cursor-pointer">
+                              <FileText className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+                              <p className="text-lg font-medium mb-2">
+                                {uploadLoading ? 'Analyzing your survey...' : 'Drop your survey file here'}
+                              </p>
+                              <p className="text-sm text-gray-500">
+                                {uploadLoading ? 'Please wait while we process your data' : 'or click to browse (CSV, Excel)'}
+                              </p>
+                              <p className="text-xs text-gray-400 mt-2">Max file size: 10MB</p>
+                            </label>
+                          </div>
+                          <div className="text-center text-sm text-muted-foreground">
+                            <p>See how Antelope transforms your survey responses into queryable digital twins</p>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                            <h3 className="font-medium text-green-800 mb-2">🎉 Survey Analysis Complete!</h3>
+                            <div className="space-y-2 text-sm">
+                              <p><strong>Survey:</strong> {uploadPreview.suggestedTitle}</p>
+                              <p><strong>Responses:</strong> {uploadPreview.totalRows || 0} survey responses</p>
+                              <p><strong>Questions:</strong> {uploadPreview.columns?.length || 0} survey questions</p>
+                              {uploadPreview.detectedDemographics && uploadPreview.detectedDemographics.length > 0 && (
+                                <p><strong>Digital Twins:</strong> {uploadPreview.detectedDemographics.length} demographic profiles detected</p>
+                              )}
+                            </div>
+                          </div>
+                          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                            <h4 className="font-medium text-blue-800 mb-2">What you can do next:</h4>
+                            <ul className="text-sm text-blue-700 space-y-1">
+                              <li>• Ask questions like &quot;What are the main trends?&quot;</li>
+                              <li>• Filter by demographics: &quot;Show me responses from users 25-35&quot;</li>
+                              <li>• Get insights: &quot;How do different age groups respond differently?&quot;</li>
+                              <li>• Export charts and summaries for presentations</li>
+                            </ul>
+                          </div>
+                          <div className="flex gap-2 justify-end">
+                            <Button variant="outline" onClick={() => { setShowUploadDialog(false); resetUploadDialog(); }}>
+                              Try Another File
+                            </Button>
+                            <Button onClick={handleGetStarted} className="bg-primary">
+                              Sign Up to Continue →
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </DialogContent>
+                  </Dialog>
+                  <Button 
+                    size="icon" 
+                    variant="ghost" 
+                    className="h-8 w-8" 
+                    onClick={handleSend}
+                  >
+                    <Send className="h-4 w-4"/>
+                  </Button>
+                </div>
+              </div>
+              
+              <div className="text-xs text-center max-w-xl space-y-2">
+                <p className="font-medium text-muted-foreground">Try asking:</p>
+                <div className="flex flex-wrap gap-2 justify-center">
+                  {[
+                    "What are the key trends in responses?",
+                    "How do demographics affect answers?", 
+                    "Show response patterns"
+                  ].map((prompt, index) => (
+                    <div 
+                      key={index}
+                      className="px-3 py-1.5 border border-border rounded-md bg-background/50 text-muted-foreground hover:bg-background/80 transition-colors cursor-pointer"
+                      onClick={() => setInput(prompt)}
+                    >
+                      &quot;{prompt}&quot;
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           </section>
 
            {/* Final CTA */}
-           <section className=" rounded-lg bg-primary/5 p-8 text-center space-y-4 max-w-8xl mx-auto">
-            <h3 className="text-3xl font-semibold text-card-foreground">Ready to get insights that move the needle?</h3>
-            <p className="text-muted-foreground">Join Antelope today and start understanding your audience.</p>
-            <Button size="lg" onClick={() => router.push("/register")}>Get Started</Button>
+           <section 
+            className="relative rounded-lg p-8 text-center space-y-4 max-w-8xl mx-auto h-[400px] flex flex-col items-center justify-center overflow-hidden"
+            style={{ backgroundImage: "url('/hero.jpg')", backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat' }}
+          >
+            {/* Overlay for readability */}
+            <div className="absolute inset-0 bg-background/60" />
+            
+            {/* Content */}
+            <div className="relative z-10 space-y-4">
+              <h3 className="text-3xl font-semibold text-card-foreground">Ready to get insights that move the needle?</h3>
+              <p className="text-muted-foreground">Join Antelope today and start understanding your audience.</p>
+              <Button size="lg" onClick={() => router.push("/register")}>Get Started</Button>
+            </div>
           </section>
 
           {/* Feature Grid */}

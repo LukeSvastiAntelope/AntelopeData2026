@@ -7,12 +7,14 @@ const connectionParams = {
     password: process.env.MYSQL_PASSWORD,
     database: process.env.MYSQL_DATABASE,
     waitForConnections: true,
-    connectionLimit: 10,
+    connectionLimit: 50,
     queueLimit: 0,
     maxIdle: 10,
-    idleTimeout: 60000,
+    idleTimeout: 30000,
     enableKeepAlive: true,
-    keepAliveInitialDelay: 0
+    keepAliveInitialDelay: 0,
+    acquireTimeout: 60000,
+    timeout: 60000
 }
 
 // Create a single pool instance

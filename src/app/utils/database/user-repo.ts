@@ -13,6 +13,8 @@ export const UserRepo = {
     verifyAccount,
     getUserById,
     getUserByUsername,
+    getUserByEmail,
+    updateUserDisplayName,
     getAgentByUserId,
     getAgentById,
     createAgent,
@@ -318,21 +320,26 @@ async function updatePassword(id: number, newPassword: string) {
     await db.execute('UPDATE users SET password = ? WHERE id = ?', [hashedPassword, id]);
 }
 
-async function authenticate({ username, password }: { username: string, password: string }) {
+async function authenticate({ email, password }: { email: string, password: string }) {
     const pool = await getMySQLConnection();
     try {
+        console.log('Getting user by email:', email);
         const [rows] = await pool.execute<(UserDB & RowDataPacket)[]>(
-            'SELECT * FROM users WHERE username = ?',
-            [username]
+            'SELECT * FROM users WHERE email = ?',
+            [email]
         );
         const user = rows[0];
 
-        if (!(user && bcrypt.compareSync(password, user.password))) {
-            throw new Error('Username or password is incorrect');
+        if (!user) {
+            throw new Error('Email not found');
+        }
+
+        if (!bcrypt.compareSync(password, user.password)) {
+            throw new Error('Password is incorrect');
         }
 
         if (user.is_verified == 0) {
-            throw new Error('User is not verified yet. Pls check your telegram for the confirmation link.');
+            throw new Error('User is not verified yet. Please check your email for the confirmation link.');
         }
 
         const token = await generateConfirmationToken(user.id.toString(), user.role);
@@ -342,22 +349,25 @@ async function authenticate({ username, password }: { username: string, password
             token
         }
     } catch (error) {
-        // Handle or rethrow the error as needed
+        console.error('Auth error:', error);
         throw error;
     }
 }
 
-async function registerPassword({ username, password }: { username: string, password: string }) {
+async function registerPassword({ email, password, displayName }: { email: string, password: string, displayName: string }) {
     const db = await getMySQLConnection();
-    const [rows] = await db.execute<(UserDB & RowDataPacket)[]>('SELECT * FROM users WHERE username = ?', [username]);
+    const [rows] = await db.execute<(UserDB & RowDataPacket)[]>('SELECT * FROM users WHERE email = ?', [email]);
     const user = rows[0];
 
     if (user) {
-        throw new Error('Username "' + username + '" is already registered.');
+        throw new Error('Email "' + email + '" is already registered.');
     }
 
     const hashedPassword = bcrypt.hashSync(password, 10);
-    await db.execute('INSERT INTO users (username, password, is_verified) VALUES (?, ?, 1)', [username, hashedPassword]);
+    await db.execute(
+        'INSERT INTO users (email, display_name, password, is_verified, is_first_login) VALUES (?, ?, ?, 1, 0)', 
+        [email, displayName, hashedPassword]
+    );
 }
 
 async function verifyAccount(username: string) {
@@ -389,6 +399,39 @@ async function getUserByUsername(username: string) {
         ...userRows[0],
         platform_accounts: platformRows
     };
+}
+
+async function getUserByEmail(email: string) {
+    const db = await getMySQLConnection();
+    try {
+        const [userRows] = await db.execute<(UserDB & RowDataPacket)[]>(
+            'SELECT * FROM users WHERE email = ?',
+            [email]
+        );
+
+        if (!userRows[0]) return null;
+
+        const [platformRows] = await db.execute<RowDataPacket[]>(
+            'SELECT * FROM platform_accounts WHERE user_id = ?',
+            [userRows[0].id]
+        );
+
+        return {
+            ...userRows[0],
+            platform_accounts: platformRows
+        };
+    } catch (error) {
+        console.error('Error in getUserByEmail:', error);
+        throw error;
+    }
+}
+
+async function updateUserDisplayName(userId: number, displayName: string) {
+    const db = await getMySQLConnection();
+    await db.execute(
+        'UPDATE users SET display_name = ?, is_first_login = 0 WHERE id = ?',
+        [displayName, userId]
+    );
 }
 
 async function getAgentByUserId(id: string) {

@@ -90,7 +90,7 @@ Return a JSON object with this exact structure:
   "questions": [
     {
       "type": "text|single-choice|multiple-choice|rating|yes-no",
-      "prompt": "The question text",
+      "prompt": "The question text WITHOUT any numbers",
       "options": ["option1", "option2"] // only for single-choice and multiple-choice
       "isRequired": true/false,
       "reasoning": "Why this question is important for the survey"
@@ -107,7 +107,8 @@ Guidelines:
 - Use rating scales (1-5) for satisfaction/agreement questions
 - Include reasoning for each question
 - Ensure questions flow logically
-- Make critical questions required`;
+- Make critical questions required
+- IMPORTANT: Do NOT include question numbers (like "1.", "2.", etc.) in the prompt field - the system will add numbering automatically`;
 
         let aiResponse: string | undefined;
 
@@ -170,14 +171,26 @@ Guidelines:
             }, { status: 500 });
         }
 
-        // Ensure all questions have required fields
-        surveyData.questions = surveyData.questions.map((q: any, index: number) => ({
-            type: q.type || 'text',
-            prompt: q.prompt || `Question ${index + 1}`,
-            options: q.options || undefined,
-            isRequired: q.isRequired !== false, // Default to true
-            reasoning: q.reasoning || ''
-        }));
+        // Ensure all questions have required fields and clean up any numbering
+        surveyData.questions = surveyData.questions.map((q: any, index: number) => {
+            let cleanPrompt = q.prompt || `Question ${index + 1}`;
+            
+            // Remove any leading question numbers (e.g., "1. ", "2.", "Q1:", etc.)
+            cleanPrompt = cleanPrompt.replace(/^(\d+\.?\s*|\w+\d+[:\.]?\s*)/i, '').trim();
+            
+            // If the prompt is empty after cleaning, use a default
+            if (!cleanPrompt) {
+                cleanPrompt = `Question ${index + 1}`;
+            }
+            
+            return {
+                type: q.type || 'text',
+                prompt: cleanPrompt,
+                options: q.options || undefined,
+                isRequired: q.isRequired !== false, // Default to true
+                reasoning: q.reasoning || ''
+            };
+        });
 
         return NextResponse.json({ 
             status: true, 
