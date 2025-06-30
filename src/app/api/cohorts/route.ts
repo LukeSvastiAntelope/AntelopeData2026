@@ -1,15 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { CohortRepo } from "@/app/utils/database/cohort-repo";
+import { UserRepo } from "@/app/utils/database/user-repo";
 
 // GET /api/cohorts - list cohorts visible to the current user
 export async function GET(req: NextRequest) {
   try {
     // Middleware is expected to set these headers
     const userIdHeader = req.headers.get("x-user-id");
-    const userRoleHeader = req.headers.get("x-user-role");
-
     const userId = userIdHeader ? parseInt(userIdHeader, 10) : null;
-    const userRole = userRoleHeader === "admin" ? "admin" as const : "user" as const;
+
+    if (!userId) {
+      return NextResponse.json({ status: false, message: "Unauthorized" }, { status: 401 });
+    }
+
+    // Fetch user role from database
+    const user = await UserRepo.getUserById(userId.toString());
+    const userRole = user?.role === "admin" ? "admin" as const : "user" as const;
 
     const cohorts = await CohortRepo.listVisibleCohorts(userId, userRole);
 

@@ -276,11 +276,14 @@ export interface UserDB {
     id: number;
     telegram_id: string;
     username: string;
+    email: string;
+    display_name: string;
     wallet_balance: number;
     total_winnings: number;
     escrow_balance: number;
     password: string;
     is_verified: number;
+    is_first_login: number;
     role: "user" | "admin";
 }
 

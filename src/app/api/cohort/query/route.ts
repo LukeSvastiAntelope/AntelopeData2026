@@ -100,13 +100,12 @@ function getIntentSpecificSystemMessage(analysisType: string): string {
 
 export async function POST(req: NextRequest) {
   try {
-    // Verify JWT token and get user ID
-    const token = req.headers.get('Authorization')?.split(' ')[1];
-    const jwtPayload = await verifyConfirmationToken(token as string);
-    if (!jwtPayload) {
+    // Get user ID from NextAuth middleware
+    const userIdHeader = req.headers.get('x-user-id');
+    if (!userIdHeader) {
       return NextResponse.json({ status: false, message: "Unauthorized" }, { status: 401 });
     }
-    const userId = jwtPayload.email as string;
+    const userId = userIdHeader;
 
     const body = (await req.json()) as CohortQueryPayload;
     const { cohort, question, topK = 50, surveyId, model = 'gpt-4o', sources, systemPrompt } = body;

@@ -110,13 +110,13 @@ const CreatePage = () => {
             </p>
             <div className="flex flex-wrap justify-center gap-2">
               <Button variant="outline" size="sm" asChild>
-                <Link href="/overview">View Overview</Link>
+                <Link href="/surveys">View Surveys</Link>
               </Button>
               <Button variant="outline" size="sm" asChild>
                 <Link href="/about">Learn More</Link>
               </Button>
               <Button variant="outline" size="sm" asChild>
-                <Link href="/overview">View Dashboard</Link>
+                <Link href="/surveys">View Dashboard</Link>
               </Button>
             </div>
           </div>

@@ -117,67 +117,66 @@ export default function CohortChatPage() {
   }, [messages, isLoading]);
 
   useEffect(() => {
-    const token = typeof window !== 'undefined' ? localStorage.getItem('token') ?? '' : '';
-    // Fetch surveys belonging to the current user
-    if (token) {
-      fetch('/api/surveys', { headers: { 'Authorization': `Bearer ${token}` } })
-        .then(res => res.json())
-        .then(data => { 
-          console.log('Surveys data:', data);
-          if (data.surveys) {
-            setSurveys(data.surveys);
-            // Only auto-select if no saved survey preference exists
-            const savedSurveyId = localStorage.getItem('cohort-chat-selected-survey');
-            if (!savedSurveyId || savedSurveyId === 'null') {
-              // Auto-select the latest survey (most recent created_at)
-              if (data.surveys.length > 0) {
-                const latestSurvey = data.surveys.reduce((latest: any, current: any) => 
-                  new Date(current.created_at) > new Date(latest.created_at) ? current : latest
-                );
-                handleSurveyChange(latestSurvey.id);
-              }
+    // Fetch surveys belonging to the current user (NextAuth handles authentication)
+    fetch('/api/surveys')
+      .then(res => res.json())
+      .then(data => { 
+        console.log('Surveys data:', data);
+        console.log('Number of surveys:', data.surveys?.length || 0);
+        console.log('Survey titles:', data.surveys?.map((s: any) => s.title) || []);
+        if (data.surveys) {
+          setSurveys(data.surveys);
+          // Only auto-select if no saved survey preference exists
+          const savedSurveyId = localStorage.getItem('cohort-chat-selected-survey');
+          if (!savedSurveyId || savedSurveyId === 'null') {
+            // Auto-select the latest survey (most recent created_at)
+            if (data.surveys.length > 0) {
+              const latestSurvey = data.surveys.reduce((latest: any, current: any) => 
+                new Date(current.created_at) > new Date(latest.created_at) ? current : latest
+              );
+              handleSurveyChange(latestSurvey.id);
             }
           }
-        });
-    }
+        }
+      })
+      .catch(error => {
+        console.error('Error fetching surveys:', error);
+      });
+    
     // Fetch cohorts on mount (will be filtered by survey selection later)
-    if (token) {
-      fetch('/api/cohorts', { headers: { 'Authorization': `Bearer ${token}` } })
-        .then((res) => res.json())
-        .then((data) => {
-          if (data.cohorts) setCohorts(data.cohorts);
-        });
-    }
+    fetch('/api/cohorts')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.cohorts) setCohorts(data.cohorts);
+      })
+      .catch(error => {
+        console.error('Error fetching cohorts:', error);
+      });
   }, []);
 
   // Fetch survey details when selectedSurveyId changes
   useEffect(() => {
     if (selectedSurveyId) {
-      const token = typeof window !== 'undefined' ? localStorage.getItem('token') ?? '' : '';
-      if (token) {
-        fetch(`/api/surveys/${selectedSurveyId}`, { 
-          headers: { 'Authorization': `Bearer ${token}` } 
+      fetch(`/api/surveys/${selectedSurveyId}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.status && data.survey) {
+            setSelectedSurveyData(data.survey);
+            const prompts = generateDynamicPrompts(data.survey);
+            setDynamicPrompts(prompts);
+            const fields = extractAvailableFields(data.survey);
+            setAvailableFields(fields);
+          }
         })
-          .then(res => res.json())
-          .then(data => {
-            if (data.status && data.survey) {
-              setSelectedSurveyData(data.survey);
-              const prompts = generateDynamicPrompts(data.survey);
-              setDynamicPrompts(prompts);
-              const fields = extractAvailableFields(data.survey);
-              setAvailableFields(fields);
-            }
-          })
-          .catch(error => {
-            console.error('Error fetching survey details:', error);
-            // Fallback to default prompts
-            setDynamicPrompts([
-              "What are the key trends in responses?",
-              "How do demographics affect answers?", 
-              "Show response patterns"
-            ]);
-          });
-      }
+        .catch(error => {
+          console.error('Error fetching survey details:', error);
+          // Fallback to default prompts
+          setDynamicPrompts([
+            "What are the key trends in responses?",
+            "How do demographics affect answers?", 
+            "Show response patterns"
+          ]);
+        });
     } else {
       setSelectedSurveyData(null);
       setAvailableFields([]);
@@ -248,8 +247,6 @@ export default function CohortChatPage() {
     setMessages(prev=>[...prev,{role:'user',content:question}]);
     setIsLoading(true);
 
-    const token = typeof window !== 'undefined' ? localStorage.getItem('token') ?? '' : '';
-    
     // Enhance system prompt with formatting instructions for consistent markdown
     const enhancedSystemPrompt = `${systemPrompt}
 
@@ -272,7 +269,7 @@ FORMATTING REQUIREMENTS:
 
     const res = await fetch('/api/cohort/query', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...(token ? { 'Authorization': `Bearer ${token}` } : {}) },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
 
@@ -369,10 +366,9 @@ FORMATTING REQUIREMENTS:
   const handleSaveCohort = async () => {
     if (!newCohortName.trim() || filterRules.length === 0 || !selectedSurveyId) return;
     setSaving(true);
-    const token = typeof window !== 'undefined' ? localStorage.getItem('token') ?? '' : '';
     const res = await fetch('/api/cohorts', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...(token ? { 'Authorization': `Bearer ${token}` } : {}) },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ 
         name: newCohortName, 
         filter: filterRules, 
@@ -399,10 +395,8 @@ FORMATTING REQUIREMENTS:
 
   const handleDeleteCohort = async () => {
     if (!selectedCohortId) return;
-    const token = typeof window !== 'undefined' ? localStorage.getItem('token') ?? '' : '';
     await fetch(`/api/cohorts/${selectedCohortId}`, {
       method: 'DELETE',
-      headers: token? { 'Authorization': `Bearer ${token}` } : undefined,
     });
     setCohorts(cohorts.filter(c=>c.id!==selectedCohortId));
     setSelectedCohortId(null);
@@ -423,12 +417,10 @@ FORMATTING REQUIREMENTS:
     formData.append('file', file);
     
     try {
-      const token = typeof window !== 'undefined' ? localStorage.getItem('token') ?? '' : '';
-      console.log('Making request to /api/surveys/import with token:', token ? 'present' : 'missing');
+      console.log('Making request to /api/surveys/import');
       
       const response = await fetch('/api/surveys/import', {
         method: 'POST',
-        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
         body: formData,
       });
       
@@ -466,8 +458,6 @@ FORMATTING REQUIREMENTS:
     
     setUploadLoading(true);
     try {
-      const token = typeof window !== 'undefined' ? localStorage.getItem('token') ?? '' : '';
-      
       // Create column mappings from the preview data
       const columnMappings = uploadPreview.columns.map(col => ({
         originalName: col.name,
@@ -492,9 +482,6 @@ FORMATTING REQUIREMENTS:
       
       const response = await fetch('/api/surveys/import/execute', {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        },
         body: formData,
       });
       
@@ -514,9 +501,7 @@ FORMATTING REQUIREMENTS:
         });
         
         // Refresh surveys list
-        const surveysResponse = await fetch('/api/surveys', { 
-          headers: { 'Authorization': `Bearer ${token}` } 
-        });
+        const surveysResponse = await fetch('/api/surveys');
         const surveysData = await surveysResponse.json();
         if (surveysData.surveys) {
           setSurveys(surveysData.surveys);

@@ -1,18 +1,18 @@
 import { NextRequest } from "next/server";
 import { UserRepo } from "@/app/utils/database/user-repo";
-import { verifyConfirmationToken } from "@/app/utils/api/token";
+import { auth } from "@/auth";
 
 export async function GET(req: NextRequest) {
-    const token = req.headers.get('Authorization')?.split(' ')[1];
     try {
-        const jwtPayload = await verifyConfirmationToken(token as string);
-        if (!jwtPayload) {
-            return Response.json({ error: 'Invalid token' }, { status: 401 });
+        const session = await auth();
+        if (!session?.user?.id) {
+            return Response.json({ error: 'Not authenticated' }, { status: 401 });
         }
-        const user = await UserRepo.getUserById(jwtPayload.email as string);
-        let agent = await UserRepo.getAgentByUserId(jwtPayload.email as string);
+        
+        const user = await UserRepo.getUserById(session.user.id);
+        let agent = await UserRepo.getAgentByUserId(session.user.id);
         if (!agent) {
-            agent = await UserRepo.createAgent(jwtPayload.email as string);
+            agent = await UserRepo.createAgent(session.user.id);
         }
         if (agent) {
             agent.interests = agent?.interests ? agent?.interests : [];

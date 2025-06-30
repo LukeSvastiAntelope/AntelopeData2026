@@ -41,11 +41,11 @@ export function AppSidebar({ className, collapsible = "offcanvas", ...props }: S
   const { agent, user } = useAgent()
 
   const mainNavItems = [
-    {
-      title: "Overview",
-      href: "/overview",
-      icon: LayoutDashboard
-    },
+    // {
+    //   title: "Overview",
+    //   href: "/overview",
+    //   icon: LayoutDashboard
+    // },
     // {
     //   title: "Markets",
     //   href: "/markets",
@@ -69,18 +69,17 @@ export function AppSidebar({ className, collapsible = "offcanvas", ...props }: S
   ]
 
   // Conditional secondary navigation based on user role
-  const secondaryNavItems = user?.role === "admin" ? [
-    {
-      title: "Admin",
-      href: "/admin",
-      icon: Shield
-    }
-  ] : [
+  const secondaryNavItems = [
     {
       title: "Settings",
       href: "/profile",
       icon: Settings
-    }
+    },
+    ...(user?.role === "admin" ? [{
+      title: "Admin",
+      href: "/admin",
+      icon: Shield
+    }] : [])
   ]
 
   const footerNavItems = [
@@ -110,7 +109,7 @@ export function AppSidebar({ className, collapsible = "offcanvas", ...props }: S
     >
       <SidebarHeader className="flex flex-col gap-4 pb-4">
         <div className="flex items-center px-4">
-          <Link href="/overview" className="flex items-center px-4">
+          <Link href="/surveys" className="flex items-center px-4">
             <LogoText 
               className="text-zinc-900 dark:text-zinc-100 transition-opacity group-data-[collapsible=offcanvas]:opacity-0"
               width={120} 
@@ -154,7 +153,7 @@ export function AppSidebar({ className, collapsible = "offcanvas", ...props }: S
           ))}
         </SidebarMenu>
         
-        {user && secondaryNavItems.length > 0 && (
+        {secondaryNavItems.length > 0 && (
           <SidebarMenu className="px-4">
             {secondaryNavItems.map((item) => (
               <SidebarMenuItem key={item.href}>
@@ -192,22 +191,22 @@ export function AppSidebar({ className, collapsible = "offcanvas", ...props }: S
           ))}
         </SidebarMenu>
         
-        {agent && (
+        {user && (
           <div className="px-4 pt-4">
             <div className="flex items-center justify-between px-4">
               <div className="flex items-center min-w-0 flex-1">
-                {agent && agent.image ? (
-                  <div className="h-8 w-8 rounded-full overflow-hidden flex-shrink-0">
-                    <img src={agent.image} alt={agent.name || "Agent"} className="w-full h-full object-cover" />
-                  </div>
-                ) : (
-                  <div className="h-8 w-8 rounded-full bg-blue-500 flex items-center justify-center text-white overflow-hidden flex-shrink-0">
-                    <span className="font-medium">{agent?.name?.charAt(0) || "A"}</span>
-                  </div>
-                )}
+                <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground overflow-hidden flex-shrink-0">
+                  <span className="font-medium text-sm">
+                    {(user.display_name || user.email)?.charAt(0)?.toUpperCase() || "U"}
+                  </span>
+                </div>
                 <div className="ml-2 overflow-hidden group-data-[collapsible=offcanvas]:hidden min-w-0 flex-1">
-                  <div className="font-medium text-sm truncate text-sidebar-foreground">{agent?.name || "Agent"}</div>
-                  <div className="text-xs text-muted-foreground truncate">Balance: {agent?.wallet_balance || 0} ANML</div>
+                  <div className="font-medium text-sm truncate text-sidebar-foreground">
+                    {user.display_name || user.email?.split('@')[0] || 'User'}
+                  </div>
+                  <div className="text-xs text-muted-foreground truncate">
+                    {agent ? `Balance: ${agent.wallet_balance || 0} ANML` : 'No agent'}
+                  </div>
                 </div>
               </div>
               <div className="flex-shrink-0 group-data-[collapsible=offcanvas]:hidden">
