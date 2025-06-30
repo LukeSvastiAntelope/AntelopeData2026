@@ -73,6 +73,10 @@ const SurveyPage = () => {
   const [agentToken, setAgentToken] = useState<string | null>(null)
   const [isExistingTwin, setIsExistingTwin] = useState(false)
   
+  // Progressive disclosure step: 'demographics' | 'questions'
+  const [currentStep, setCurrentStep] = useState<'demographics' | 'questions'>('demographics')
+  const [demographicsCompleted, setDemographicsCompleted] = useState(false)
+  
   const [demographics, setDemographics] = useState<Demographics>({
     name: '',
     email: '',
@@ -93,8 +97,8 @@ const SurveyPage = () => {
   })
   
   const [answers, setAnswers] = useState<Answer[]>([])
-  const [modalOpen, setModalOpen] = useState<boolean>(true)
-  const [modalShouldClose, setModalShouldClose] = useState<boolean>(false)
+  const [modalOpen, setModalOpen] = useState<boolean>(true) // Start with modal open
+  const [shouldCheckExistingTwin, setShouldCheckExistingTwin] = useState<boolean>(false)
 
   useEffect(() => {
     const fetchSurvey = async () => {
@@ -133,16 +137,9 @@ const SurveyPage = () => {
   }
 
   const handleModalOpenChange = (open: boolean) => {
-    // Only allow closing if we have valid name and email, or if explicitly requested to close
+    setModalOpen(open)
     if (!open) {
-      if (modalShouldClose || (demographics.name.trim() && demographics.email.trim())) {
-        setModalOpen(false)
-        setModalShouldClose(false)
-      }
-      // If we don't have valid data and not explicitly closing, keep modal open
-    } else {
-      setModalOpen(true)
-      setModalShouldClose(false)
+      setShouldCheckExistingTwin(true) // Mark that we've checked
     }
   }
 
@@ -152,6 +149,9 @@ const SurveyPage = () => {
       ...prev,
       ...existingDemographics
     }))
+    setIsExistingTwin(true)
+    setShouldCheckExistingTwin(true)
+    setModalOpen(false)
   }
 
   const updateDemographics = useCallback((field: keyof Demographics | string, value: string) => {
@@ -167,36 +167,11 @@ const SurveyPage = () => {
     } else {
       setDemographics(prev => ({ ...prev, [field as keyof Demographics]: value }))
     }
-    
-    // If we have valid name and email, allow modal to close
-    if ((field === 'name' || field === 'email') && 
-        ((field === 'name' && value.trim() && demographics.email.trim()) ||
-         (field === 'email' && value.trim() && demographics.name.trim()))) {
-      setModalShouldClose(true)
-    }
-  }, [demographics.name, demographics.email])
+  }, [])
 
   const validateForm = () => {
-    // Check required demographics
-    if (!demographics.name.trim()) {
-      setError('Name is required')
-      return false
-    }
-    
-    if (!demographics.email.trim()) {
-      setError('Email is required')
-      return false
-    }
-    
-    // Basic email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    if (!emailRegex.test(demographics.email)) {
-      setError('Please enter a valid email address')
-      return false
-    }
-    
-    if (!demographics.age.trim()) {
-      setError('Age is required')
+    // Validate demographics (should already be done, but double-check)
+    if (!validateDemographics()) {
       return false
     }
 
@@ -254,6 +229,47 @@ const SurveyPage = () => {
     }
   }
 
+  const validateDemographics = () => {
+    if (!demographics.name.trim()) {
+      setError('Name is required')
+      return false
+    }
+    
+    if (!demographics.email.trim()) {
+      setError('Email is required')
+      return false
+    }
+    
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(demographics.email)) {
+      setError('Please enter a valid email address')
+      return false
+    }
+    
+    if (!demographics.age.trim()) {
+      setError('Age is required')
+      return false
+    }
+
+    return true
+  }
+
+  const proceedToQuestions = () => {
+    if (!validateDemographics()) {
+      return
+    }
+    
+    setError(null)
+    setDemographicsCompleted(true)
+    setCurrentStep('questions')
+  }
+
+  const backToDemographics = () => {
+    setCurrentStep('demographics')
+    setError(null)
+  }
+
   const handleMultipleChoiceChange = (questionId: number, option: string, checked: boolean) => {
     const currentAnswer = answers.find(a => a.questionId === questionId)
     const currentValues = Array.isArray(currentAnswer?.value) ? currentAnswer.value : []
@@ -293,21 +309,9 @@ const SurveyPage = () => {
     )
   }
 
-  // Prepare responder modal once demographics available
-  const responderModal = (
-    <ResponderInfoModal
-      open={modalOpen}
-      onOpenChange={handleModalOpenChange}
-      demographics={{ name: demographics.name, email: demographics.email }}
-      updateDemographics={updateDemographics}
-      onExistingTwinFound={handleExistingTwinFound}
-    />
-  )
-
   if (submitted) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        {responderModal}
         <Card className="w-full max-w-2xl">
           <CardContent className="pt-6 text-center">
             <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-6" />
@@ -364,7 +368,6 @@ const SurveyPage = () => {
 
   return (
     <div className="min-h-screen bg-background py-8">
-      {responderModal}
       <div className="container mx-auto px-4 max-w-4xl">
         {/* Survey Header */}
         <Card className="mb-8">
@@ -377,11 +380,50 @@ const SurveyPage = () => {
             <CardDescription className="text-lg">
               {survey?.description}
             </CardDescription>
+            
+            {/* Progress Indicator */}
+            <div className="mt-6 flex items-center justify-center gap-4">
+              <div className="flex items-center gap-2">
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
+                  currentStep === 'demographics' ? 'bg-primary text-primary-foreground' : 
+                  demographicsCompleted ? 'bg-green-500 text-white' : 'bg-muted text-muted-foreground'
+                }`}>
+                  {demographicsCompleted ? <CheckCircle className="h-4 w-4" /> : '1'}
+                </div>
+                <span className={`text-sm ${currentStep === 'demographics' ? 'font-medium' : 'text-muted-foreground'}`}>
+                  About You
+                </span>
+              </div>
+              <div className={`w-8 h-0.5 ${demographicsCompleted ? 'bg-green-500' : 'bg-muted'}`} />
+              <div className="flex items-center gap-2">
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
+                  currentStep === 'questions' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
+                }`}>
+                  2
+                </div>
+                <span className={`text-sm ${currentStep === 'questions' ? 'font-medium' : 'text-muted-foreground'}`}>
+                  Survey Questions
+                </span>
+              </div>
+            </div>
           </CardHeader>
         </Card>
 
-        {/* Demographics Section */}
-        <Card className="mb-8">
+        {/* Error Display */}
+        {error && (
+          <Card className="mb-6 border-destructive">
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-2 text-destructive">
+                <AlertCircle className="h-4 w-4" />
+                <span className="text-sm font-medium">{error}</span>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Step 1: Demographics Section */}
+        {currentStep === 'demographics' && (
+          <Card className="mb-8">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Users className="h-5 w-5" />
@@ -595,9 +637,38 @@ const SurveyPage = () => {
               </div>
             </div>
           </CardContent>
+          <CardContent className="pt-0">
+            <div className="flex justify-end">
+              <Button onClick={proceedToQuestions} size="lg">
+                Continue to Survey Questions
+              </Button>
+            </div>
+          </CardContent>
         </Card>
+        )}
 
-        {/* Questions */}
+        {/* Step 2: Questions Section */}
+        {currentStep === 'questions' && (
+          <>
+            {/* Demographics Summary */}
+            <Card className="mb-6">
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="font-medium text-sm text-muted-foreground mb-1">Your Information</h3>
+                    <p className="text-sm">
+                      {demographics.name} • {demographics.email} • Age {demographics.age}
+                      {demographics.location && ` • ${demographics.location}`}
+                    </p>
+                  </div>
+                  <Button variant="outline" size="sm" onClick={backToDemographics}>
+                    Edit Info
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Questions */}
         <div className="space-y-6">
           {survey?.questions?.map((question, index) => {
             const answer = answers.find(a => a.questionId === question.id)
@@ -691,49 +762,48 @@ const SurveyPage = () => {
               </Card>
             )
           })}
-        </div>
-
-        {/* Error Display */}
-        {error && (
-          <Card className="mt-6 border-destructive">
-            <CardContent className="pt-4">
-              <div className="flex items-center gap-2 text-destructive">
-                <AlertCircle className="h-4 w-4" />
-                <span className="text-sm">{error}</span>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Submit Button */}
-        <Card className="mt-8">
-          <CardContent className="pt-6">
-            <div className="text-center">
-              <Button 
-                onClick={submitSurvey} 
-                disabled={submitting}
-                size="lg"
-                className="w-full md:w-auto"
-              >
-                {submitting ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Creating Digital Twin...
-                  </>
-                ) : (
-                  <>
-                    <Send className="h-4 w-4 mr-2" />
-                    Submit Survey
-                  </>
-                )}
-              </Button>
-              <p className="text-sm text-muted-foreground mt-4">
-                By submitting, you agree to have your responses used to create a digital twin for research purposes.
-              </p>
             </div>
-          </CardContent>
-        </Card>
+
+            {/* Submit Button */}
+            <Card className="mt-8">
+              <CardContent className="pt-6">
+                <div className="text-center">
+                  <Button 
+                    onClick={submitSurvey} 
+                    disabled={submitting}
+                    size="lg"
+                    className="w-full md:w-auto"
+                  >
+                    {submitting ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Creating Digital Twin...
+                      </>
+                    ) : (
+                      <>
+                        <Send className="h-4 w-4 mr-2" />
+                        Submit Survey
+                      </>
+                    )}
+                  </Button>
+                  <p className="text-sm text-muted-foreground mt-4">
+                    By submitting, you agree to have your responses used to create a digital twin for research purposes.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </>
+        )}
       </div>
+
+      {/* Modal should always be available, regardless of current step */}
+      <ResponderInfoModal
+        open={modalOpen}
+        onOpenChange={handleModalOpenChange}
+        demographics={demographics}
+        updateDemographics={updateDemographics}
+        onExistingTwinFound={handleExistingTwinFound}
+      />
     </div>
   )
 }

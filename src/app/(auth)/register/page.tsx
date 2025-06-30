@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { toast } from "react-hot-toast";
 import { useState } from "react";
-import { validateUserName, validatePassword } from "@/app/utils/validation";
+import { validateEmail, validatePassword, validateDisplayName } from "@/app/utils/validation";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,8 +11,9 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Loader2 } from "lucide-react";
 
 const RegisterPage = () => {
-    const [formData, setFormData] = useState<{ username: string; password: string }>({
-        username: '',
+    const [formData, setFormData] = useState<{ email: string; displayName: string; password: string }>({
+        email: '',
+        displayName: '',
         password: '',
     });
     const [isLoading, setIsLoading] = useState(false);
@@ -21,9 +22,14 @@ const RegisterPage = () => {
 
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
-        const usernameCheck = validateUserName(formData.username);
-        if (usernameCheck) {
-            toast.error(usernameCheck);
+        const emailCheck = validateEmail(formData.email);
+        if (emailCheck) {
+            toast.error(emailCheck);
+            return;
+        }
+        const displayNameCheck = validateDisplayName(formData.displayName);
+        if (displayNameCheck) {
+            toast.error(displayNameCheck);
             return;
         }
         const passwordCheck = validatePassword(formData.password);
@@ -42,7 +48,13 @@ const RegisterPage = () => {
             const data = await result.json();
             if (data.status) {
                 toast.success(data.message);
-                router.push("/login");
+                if (data.autoLoggedIn) {
+                    // User was automatically logged in, redirect to main app
+                    router.push("/cohort-chat");
+                } else {
+                    // User needs to login manually
+                    router.push("/login");
+                }
             } else {
                 toast.error(data.message.toString());
             }
@@ -80,11 +92,24 @@ const RegisterPage = () => {
                         <form onSubmit={handleSubmit} className="space-y-4">
                             <div className="space-y-2">
                                 <Input
-                                    id="username"
-                                    name="username"
+                                    id="email"
+                                    name="email"
+                                    type="email"
+                                    placeholder="Email"
+                                    value={formData.email}
+                                    onChange={handleChange}
+                                    required
+                                    className="bg-background"
+                                    disabled={isLoading}
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Input
+                                    id="displayName"
+                                    name="displayName"
                                     type="text"
-                                    placeholder="Username"
-                                    value={formData.username}
+                                    placeholder="Display Name"
+                                    value={formData.displayName}
                                     onChange={handleChange}
                                     required
                                     className="bg-background"
