@@ -20,7 +20,9 @@ import {
   Upload,
   Database,
   Trash2,
-  Copy
+  Copy,
+  Brain,
+  TrendingUp
 } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
@@ -51,8 +53,17 @@ interface Survey {
   cloned_at?: string
 }
 
+interface DashboardStats {
+  total_surveys: number
+  published_surveys: number
+  draft_surveys: number
+  total_responses: number
+  total_digital_twins: number
+}
+
 const SurveysPage = () => {
   const [surveys, setSurveys] = useState<Survey[]>([])
+  const [stats, setStats] = useState<DashboardStats | null>(null)
   const [loading, setLoading] = useState(true)
   const router = useRouter()
 
@@ -124,16 +135,12 @@ const SurveysPage = () => {
   // Load all surveys on component mount
   useEffect(() => {
     loadSurveys()
+    fetchDashboardStats()
   }, [])
 
   const loadSurveys = async () => {
-    setLoading(true)
     try {
-      const res = await fetch('/api/surveys', {
-        headers: { 
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      })
+      const res = await fetch('/api/surveys')
       
       const data = await res.json()
       if (data.status) {
@@ -141,6 +148,22 @@ const SurveysPage = () => {
       }
     } catch (error) {
       console.error('Error loading surveys:', error)
+    }
+  }
+
+  const fetchDashboardStats = async () => {
+    try {
+      // Fetch dashboard stats
+      const dashboardResponse = await fetch('/api/surveys/dashboard')
+      
+      if (dashboardResponse.ok) {
+        const data = await dashboardResponse.json()
+        if (data.overview) {
+          setStats(data.overview)
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching dashboard stats:', error)
     } finally {
       setLoading(false)
     }
@@ -228,10 +251,7 @@ const SurveysPage = () => {
   const closeSurvey = async (surveyId: number) => {
     try {
       const res = await fetch(`/api/surveys/${surveyId}/close`, {
-        method: 'POST',
-        headers: { 
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
+        method: 'POST'
       })
       
       if (res.ok) {
@@ -245,10 +265,7 @@ const SurveysPage = () => {
   const reopenSurvey = async (surveyId: number) => {
     try {
       const res = await fetch(`/api/surveys/${surveyId}/reopen`, {
-        method: 'POST',
-        headers: { 
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
+        method: 'POST'
       })
       
       if (res.ok) {
@@ -273,10 +290,7 @@ const SurveysPage = () => {
         : `/api/surveys/${surveyId}/delete`
         
       const res = await fetch(url, {
-        method: 'DELETE',
-        headers: { 
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
+        method: 'DELETE'
       })
       
       const data = await res.json()
@@ -296,10 +310,7 @@ const SurveysPage = () => {
   const cloneSurvey = async (surveyId: number, surveyTitle: string) => {
     try {
       const res = await fetch(`/api/surveys/${surveyId}/clone`, {
-        method: 'POST',
-        headers: { 
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
+        method: 'POST'
       })
       
       const data = await res.json()
@@ -308,7 +319,7 @@ const SurveysPage = () => {
         toast.success(`Survey "${surveyTitle}" cloned successfully as "${data.result.title}"`)
         loadSurveys() // Reload to show the new cloned survey
         // Optionally redirect to edit the cloned survey
-        router.push(`/overview/${data.result.surveyId}/edit`)
+        router.push(`/surveys/${data.result.surveyId}/edit`)
       } else {
         toast.error(data.message || 'Failed to clone survey')
       }
@@ -406,6 +417,76 @@ const SurveysPage = () => {
 
               {/* Dashboard Overview */}
               <section className="space-y-4">
+                                 {/* Overview Stats Cards */}
+                 {stats && (
+                   <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                     <Card>
+                       <CardContent className="p-4">
+                         <div className="flex items-center">
+                           <FileText className="h-6 w-6 text-blue-600" />
+                           <div className="ml-3">
+                             <p className="text-sm font-medium text-muted-foreground">Total Surveys</p>
+                             <p className="text-xl font-bold">{stats.total_surveys}</p>
+                           </div>
+                         </div>
+                       </CardContent>
+                     </Card>
+
+                     <Card>
+                       <CardContent className="p-4">
+                         <div className="flex items-center">
+                           <TrendingUp className="h-6 w-6 text-green-600" />
+                           <div className="ml-3">
+                             <p className="text-sm font-medium text-muted-foreground">Published</p>
+                             <p className="text-xl font-bold">{stats.published_surveys}</p>
+                           </div>
+                         </div>
+                       </CardContent>
+                     </Card>
+
+                     <Card>
+                       <CardContent className="p-4">
+                         <div className="flex items-center">
+                           <Users className="h-6 w-6 text-purple-600" />
+                           <div className="ml-3">
+                             <p className="text-sm font-medium text-muted-foreground">Total Responses</p>
+                             <p className="text-xl font-bold">{stats.total_responses}</p>
+                           </div>
+                         </div>
+                       </CardContent>
+                     </Card>
+
+                     <Card>
+                       <CardContent className="p-4">
+                         <div className="flex items-center">
+                           <Brain className="h-6 w-6 text-pink-600" />
+                           <div className="ml-3">
+                             <p className="text-sm font-medium text-muted-foreground">Digital Twins</p>
+                             <p className="text-xl font-bold">{stats.total_digital_twins}</p>
+                           </div>
+                         </div>
+                       </CardContent>
+                     </Card>
+
+                     <Card>
+                       <CardContent className="p-4">
+                         <div className="flex items-center">
+                           <BarChart3 className="h-6 w-6 text-orange-600" />
+                           <div className="ml-3">
+                             <p className="text-sm font-medium text-muted-foreground">Avg per Survey</p>
+                             <p className="text-xl font-bold">
+                               {stats.total_surveys > 0 
+                                 ? Math.round(stats.total_responses / stats.total_surveys)
+                                 : 0
+                               }
+                             </p>
+                           </div>
+                         </div>
+                       </CardContent>
+                     </Card>
+                   </div>
+                 )}
+
                 {/* Charts Grid */}
                 <div className="grid gap-4 md:grid-cols-3">
                   {/* Survey Status Distribution */}
@@ -627,12 +708,12 @@ const SurveysPage = () => {
                             </TableCell>
                             <TableCell>
                               <div className="flex items-center gap-2">
-                                <Link href={`/overview/${survey.id}/edit`}>
+                                <Link href={`/surveys/${survey.id}/edit`}>
                                   <Button variant="ghost" size="sm">
                                     <Edit className="h-4 w-4" />
                                   </Button>
                                 </Link>
-                                <Link href={`/overview/${survey.id}/analytics`}>
+                                <Link href={`/surveys/${survey.id}/analytics`}>
                                   <Button variant="ghost" size="sm">
                                     <BarChart3 className="h-4 w-4" />
                                   </Button>

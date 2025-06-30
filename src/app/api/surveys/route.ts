@@ -9,8 +9,11 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ status:false, message:'Unauthorized' }, { status:401 });
   }
   const userId = Number(userIdHeader);
+  console.log('Fetching surveys for user ID:', userId);
   try {
     const surveys = await SurveyRepo.getSurveysByCreator(userId);
+    console.log('Found surveys for user:', surveys.length);
+    console.log('Survey titles:', surveys.map((s: any) => s.title));
     // Return all surveys with full data that the frontend expects
     const surveysWithFullData = surveys.map((s:any) => ({
       id: s.id,

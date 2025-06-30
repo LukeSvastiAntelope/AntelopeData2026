@@ -3,16 +3,18 @@
 import Link from "next/link";
 import { toast } from "react-hot-toast";
 import { useState } from "react";
-import { validateUserName, validatePassword } from "@/app/utils/validation";
+import { validateEmail, validatePassword } from "@/app/utils/validation";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2 } from "lucide-react";
+import { signIn, signOut } from "next-auth/react";
+import { authenticate } from "@/app/actions/auth";
 
 const LoginPage = () => {
-    const [formData, setFormData] = useState<{ username: string; password: string }>({
-        username: '',
+    const [formData, setFormData] = useState<{ email: string; password: string }>({
+        email: '',
         password: '',
     });
     const [isLoading, setIsLoading] = useState(false);
@@ -22,9 +24,9 @@ const LoginPage = () => {
 
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
-        const usernameCheck = validateUserName(formData.username);
-        if (usernameCheck) {
-            toast.error(usernameCheck);
+        const emailCheck = validateEmail(formData.email);
+        if (emailCheck) {
+            toast.error(emailCheck);
             return;
         }
         const passwordCheck = validatePassword(formData.password);
@@ -35,25 +37,56 @@ const LoginPage = () => {
 
         setIsLoading(true);
         try {
-            const result = await fetch("/api/signin", {
-                method: "POST",
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(formData),
-            });
-            const data = await result.json();
-            if (data.status) {
-                toast.success(data.message);
-                if (typeof window !== 'undefined') {
-                    localStorage.setItem("token", data.token);
-                    localStorage.setItem("userId", data.user.id);
-                }
-                router.push("/cohort-chat");
-            } else {
-                toast.error(data.message.toString());
+            console.log('Attempting authentication with server action...');
+            
+            // Try server action first
+            const error = await authenticate(formData.email, formData.password);
+            
+            if (error) {
+                console.error('Server action auth error:', error);
+                toast.error(error);
+                return;
             }
+            
+            // If no error, authentication was successful
+            toast.success("Signed in successfully!");
+            
+            // Always redirect to cohort-chat since users set display name during registration
+            router.push("/cohort-chat");
+            
         } catch (error) {
-            console.error("An error occurred:", error);
-            toast.error("An unexpected error occurred.");
+            console.error("Authentication error:", error);
+            
+            // Fallback to client-side signIn if server action fails
+            console.log('Falling back to client-side signIn...');
+            try {
+                // Force sign out first to clear any existing session
+                console.log('Clearing existing session before client-side login...');
+                try {
+                    await signOut({ redirect: false });
+                    // Add a small delay to ensure signout completes
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                } catch (signOutError) {
+                    console.log('Client sign out error (may be expected):', signOutError);
+                }
+                
+                const result = await signIn('credentials', {
+                    email: formData.email,
+                    password: formData.password,
+                    redirect: false,
+                    callbackUrl: '/cohort-chat'
+                });
+
+                if (result?.error) {
+                    toast.error(result.error);
+                } else if (result?.ok) {
+                    toast.success("Signed in successfully!");
+                    router.push("/cohort-chat");
+                }
+            } catch (fallbackError) {
+                console.error("Fallback auth error:", fallbackError);
+                toast.error("Authentication failed: " + (fallbackError as Error).message);
+            }
         } finally {
             setIsLoading(false);
         }
@@ -64,15 +97,15 @@ const LoginPage = () => {
     };
 
     const handleForgotPassword = async () => {
-        const username = formData.username;
-        if (!username) {
-            toast.error("Please enter your username first");
+        const email = formData.email;
+        if (!email) {
+            toast.error("Please enter your email first");
             return;
         }
 
-        const usernameCheck = validateUserName(username);
-        if (usernameCheck) {
-            toast.error(usernameCheck);
+        const emailCheck = validateEmail(email);
+        if (emailCheck) {
+            toast.error(emailCheck);
             return;
         }
 
@@ -81,12 +114,12 @@ const LoginPage = () => {
             const result = await fetch("/api/forgotPassword", {
                 method: "POST",
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username }),
+                body: JSON.stringify({ email }),
             });
             const data = await result.json();
             
             if (data.status) {
-                toast.success("Password reset instructions sent to your telegram");
+                toast.success("Password reset instructions sent to your email");
             } else {
                 toast.error(data.message);
             }
@@ -120,11 +153,11 @@ const LoginPage = () => {
                         <form onSubmit={handleSubmit} className="space-y-4">
                             <div className="space-y-2">
                                 <Input
-                                    id="username"
-                                    name="username"
-                                    type="text"
-                                    placeholder="Username"
-                                    value={formData.username}
+                                    id="email"
+                                    name="email"
+                                    type="email"
+                                    placeholder="Email"
+                                    value={formData.email}
                                     onChange={handleChange}
                                     required
                                     className="bg-background"
@@ -158,6 +191,47 @@ const LoginPage = () => {
                                     "Sign In"
                                 )}
                             </Button>
+                            
+                            {/* TODO: Re-enable Google OAuth when properly configured
+                            <div className="relative">
+                                <div className="absolute inset-0 flex items-center">
+                                    <span className="w-full border-t" />
+                                </div>
+                                <div className="relative flex justify-center text-xs uppercase">
+                                    <span className="bg-background px-2 text-muted-foreground">
+                                        Or continue with
+                                    </span>
+                                </div>
+                            </div>
+                            
+                            <Button
+                                variant="outline"
+                                type="button"
+                                disabled={isLoading}
+                                onClick={() => signIn('google')}
+                                className="w-full"
+                            >
+                                <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24">
+                                    <path
+                                        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                                        fill="#4285F4"
+                                    />
+                                    <path
+                                        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                                        fill="#34A853"
+                                    />
+                                    <path
+                                        d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+                                        fill="#FBBC05"
+                                    />
+                                    <path
+                                        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                                        fill="#EA4335"
+                                    />
+                                </svg>
+                                Continue with Google
+                            </Button>
+                            */}
                         </form>
                     </CardContent>
                     <CardFooter className="flex flex-col space-y-4">

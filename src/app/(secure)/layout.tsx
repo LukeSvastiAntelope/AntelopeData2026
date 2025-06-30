@@ -6,7 +6,7 @@ import { toast } from "react-hot-toast";
 import { useFetch } from "../utils/lib";
 import Link from "next/link";
 import Image from "next/image";
-import AgentNameDialog from "../components/AgentNameDialog";
+// import AgentNameDialog from "../components/AgentNameDialog"; // Removed - no longer needed
 import {
   Tooltip,
   TooltipContent,
@@ -23,7 +23,7 @@ const SecureLayout = ({ children }: { children: React.ReactNode }) => {
     const pathname = usePathname();
     const router = useRouter();
     const [isOpen, setIsOpen] = useState(false);
-    const [isAgentNameOpen, setIsAgentNameOpen] = useState(false);
+    // const [isAgentNameOpen, setIsAgentNameOpen] = useState(false); // Removed - no longer needed
     const [generatedPrinciples, setGeneratedPrinciples] = useState("");
     const [isGeneratingPrinciples, setIsGeneratingPrinciples] = useState(false);
     const [isSubmittingProfile, setIsSubmittingProfile] = useState(false);
@@ -108,7 +108,6 @@ const SecureLayout = ({ children }: { children: React.ReactNode }) => {
             const data = await response.json();
             if (data.status) {
                 await fetchAgentProfile();
-                setIsAgentNameOpen(false);
                 toast.success("Welcome! Your account has been set up successfully.");
                 router.push('/cohort-chat');
             } else {
@@ -307,14 +306,15 @@ const SecureLayout = ({ children }: { children: React.ReactNode }) => {
         router.push('/cohort-chat');
     };
 
-    useEffect(() => {
-        if (agent && !isAgentProfileLoading) {
-            const onboarded = Boolean(agent.is_onboarded);
-            if (!onboarded) {
-                setIsAgentNameOpen(true);
-            }
-        }
-    }, [agent, isAgentProfileLoading]);
+    // Removed agent onboarding flow - users now set display name during registration
+    // useEffect(() => {
+    //     if (agent && !isAgentProfileLoading) {
+    //         const onboarded = Boolean(agent.is_onboarded);
+    //         if (!onboarded) {
+    //             setIsAgentNameOpen(true);
+    //         }
+    //     }
+    // }, [agent, isAgentProfileLoading]);
 
     useEffect(() => {
         if (!user) {
@@ -345,7 +345,8 @@ const SecureLayout = ({ children }: { children: React.ReactNode }) => {
                 />
             )}
 
-            {isAgentNameOpen && (
+            {/* Removed AgentNameDialog - users now set display name during registration */}
+            {/* {isAgentNameOpen && (
                 <AgentNameDialog
                     isOpen={isAgentNameOpen}
                     onClose={() => setIsAgentNameOpen(false)}
@@ -354,7 +355,7 @@ const SecureLayout = ({ children }: { children: React.ReactNode }) => {
                     isSubmitting={isSubmittingProfile}
                     userEmail={user?.username || ""}
                 />
-            )}
+            )} */}
         </SidebarProvider>
     );
 }
