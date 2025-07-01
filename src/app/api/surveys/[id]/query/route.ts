@@ -51,13 +51,15 @@ export async function POST(
 
     // Check if user has access to this survey
     const db = await openSql();
-    const [surveyCheck] = await db.execute(`
+    const [surveyCheckRaw] = await db.execute(`
       SELECT s.id, s.title, s.created_by, s.status
       FROM surveys s 
       WHERE s.id = ?
     `, [surveyId]);
 
-    if (!surveyCheck || surveyCheck.length === 0) {
+    const surveyCheck = surveyCheckRaw as any[];
+
+    if (!Array.isArray(surveyCheck) || surveyCheck.length === 0) {
       return NextResponse.json({ error: 'Survey not found' }, { status: 404 });
     }
 

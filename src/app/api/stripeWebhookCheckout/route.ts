@@ -1,6 +1,5 @@
 import Stripe from 'stripe';
 import { NextRequest } from 'next/server';
-import { headers } from 'next/headers';
 import { UserRepo } from "@/app/utils/database/user-repo";
 
 type METADATA = {
@@ -13,7 +12,7 @@ export async function POST(request: NextRequest) {
     console.log("stripe checkout confirm");
     const body = await request.text();
     const endpointSecret = process.env.STRIPE_SECRET_WEBHOOK_KEY!;
-    const sig = (await headers()).get('stripe-signature') as string;
+    const sig = request.headers.get('stripe-signature') as string;
     let event: Stripe.Event;
     try {
         event = stripe.webhooks.constructEvent(body, sig, endpointSecret);
