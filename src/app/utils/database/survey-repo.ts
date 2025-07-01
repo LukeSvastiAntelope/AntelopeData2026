@@ -309,6 +309,89 @@ export const SurveyRepo = {
         }
     },
 
+    // Get surveys for user dashboard - includes their own surveys plus featured examples
+    getSurveysForUser: async (createdBy: number) => {
+        const db = await getMySQLConnection();
+        
+        // Check if source columns exist
+        const [sourceColumns] = await db.execute<RowDataPacket[]>(
+            `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS 
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'surveys' AND COLUMN_NAME = 'source'`
+        );
+        
+        const hasSourceTracking = sourceColumns.length > 0;
+        
+        let userSurveys, featuredSurveys;
+        
+        if (hasSourceTracking) {
+            // Get user's own surveys
+            const [userRows] = await db.execute<RowDataPacket[]>(
+                `SELECT s.*, COUNT(sr.id) as response_count, 'own' as survey_type
+                 FROM surveys s 
+                 LEFT JOIN survey_responses sr ON s.id = sr.survey_id 
+                 WHERE s.created_by = ? 
+                 GROUP BY s.id 
+                 ORDER BY s.created_at DESC`,
+                [createdBy]
+            );
+            userSurveys = userRows;
+            
+            // Get featured example surveys (Pew Research and other examples)
+            const [featuredRows] = await db.execute<RowDataPacket[]>(
+                `SELECT s.*, COUNT(sr.id) as response_count, 'featured' as survey_type
+                 FROM surveys s 
+                 LEFT JOIN survey_responses sr ON s.id = sr.survey_id 
+                 WHERE s.created_by != ? 
+                   AND s.status = 'published' 
+                   AND s.is_public = 1
+                   AND (s.title LIKE '%Pew Research%' 
+                        OR s.title LIKE '%Example%' 
+                        OR s.source = 'pew_research'
+                        OR s.id = 49)
+                 GROUP BY s.id 
+                 ORDER BY s.created_at DESC
+                 LIMIT 3`,
+                [createdBy]
+            );
+            featuredSurveys = featuredRows;
+        } else {
+            // Fallback for databases without source tracking
+            const [userRows] = await db.execute<RowDataPacket[]>(
+                `SELECT s.*, COUNT(sr.id) as response_count, 'native' as source, NULL as source_metadata, 'own' as survey_type
+                 FROM surveys s 
+                 LEFT JOIN survey_responses sr ON s.id = sr.survey_id 
+                 WHERE s.created_by = ? 
+                 GROUP BY s.id 
+                 ORDER BY s.created_at DESC`,
+                [createdBy]
+            );
+            userSurveys = userRows;
+            
+            const [featuredRows] = await db.execute<RowDataPacket[]>(
+                `SELECT s.*, COUNT(sr.id) as response_count, 'native' as source, NULL as source_metadata, 'featured' as survey_type
+                 FROM surveys s 
+                 LEFT JOIN survey_responses sr ON s.id = sr.survey_id 
+                 WHERE s.created_by != ? 
+                   AND s.status = 'published' 
+                   AND s.is_public = 1
+                   AND (s.title LIKE '%Pew Research%' 
+                        OR s.title LIKE '%Example%'
+                        OR s.id = 49)
+                 GROUP BY s.id 
+                 ORDER BY s.created_at DESC
+                 LIMIT 3`,
+                [createdBy]
+            );
+            featuredSurveys = featuredRows;
+        }
+        
+        return {
+            userSurveys,
+            featuredSurveys,
+            allSurveys: [...userSurveys, ...featuredSurveys]
+        };
+    },
+
     getAllSurveys: async () => {
         const db = await getMySQLConnection();
         
