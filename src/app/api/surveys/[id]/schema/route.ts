@@ -2,7 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { openSql } from '@/app/utils/database/db';
 
 // Import the schema analysis functions
-const { analyzeSurveySchema } = require('../../../../../../scripts/analyze-survey-schema.js');
+// Import the schema analysis functions
+async function importAnalyzeSurveySchema() {
+  const schemaModule = await import('../../../../../../scripts/analyze-survey-schema.js');
+  return schemaModule.analyzeSurveySchema;
+}
 
 interface SurveySchemaResponse {
   survey_meta: {
@@ -82,6 +86,7 @@ export async function GET(
     console.log(`🔍 Analyzing schema for survey ${surveyId}: "${survey.title}"`);
 
     // Perform schema analysis using existing database connection
+    const analyzeSurveySchema = await importAnalyzeSurveySchema();
     const schema: SurveySchemaResponse = await analyzeSurveySchema(surveyId, db);
 
     // Add some additional metadata and chart-ready data
@@ -325,6 +330,7 @@ export async function POST(
     console.log(`🔄 Re-analyzing schema for survey ${surveyId}`);
 
     // Perform fresh schema analysis using existing database connection
+    const analyzeSurveySchema = await importAnalyzeSurveySchema();
     const schema = await analyzeSurveySchema(surveyId, db);
 
     // TODO: In production, you might want to cache this result

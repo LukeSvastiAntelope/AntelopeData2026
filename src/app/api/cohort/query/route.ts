@@ -212,7 +212,7 @@ export async function POST(req: NextRequest) {
     let factSheet = null;
     if (surveyId) {
       try {
-        const { analyzeSurveySchema } = require('../../../../../scripts/analyze-survey-schema.js');
+        const { analyzeSurveySchema } = await import('../../../../../scripts/analyze-survey-schema.js');
         const schema = await analyzeSurveySchema(surveyId, db);
         factSheet = schema.fact_sheet;
         console.log(`📊 Loaded fact sheet with ${Object.keys(factSheet.question_stats || {}).length} question stats`);
@@ -225,7 +225,7 @@ export async function POST(req: NextRequest) {
     console.log('🔍 Attempting to load FactSheetQueryResolver...');
     let factSheetResult;
     try {
-      const { FactSheetQueryResolver } = require('../../../utils/survey/fact-sheet-query-resolver');
+      const { FactSheetQueryResolver } = await import('../../../utils/survey/fact-sheet-query-resolver');
       const factSheetResolver = new FactSheetQueryResolver();
       console.log('✅ FactSheetQueryResolver loaded successfully');
       factSheetResult = factSheetResolver.resolveFromFactSheet(question, factSheet);
