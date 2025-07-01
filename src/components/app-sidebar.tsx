@@ -90,7 +90,7 @@ export function AppSidebar({ className, collapsible = "offcanvas", ...props }: S
     },
     {
       title: "Community",
-      href: "/community",
+      href: "https://t.me/+F5F2ah0bBzU0ZDAx",
       icon: Users
     },
     {

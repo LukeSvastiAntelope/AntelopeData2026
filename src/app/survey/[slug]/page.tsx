@@ -102,6 +102,13 @@ const SurveyPage = () => {
         const response = await fetch(`/api/public/surveys/${slug}`)
         if (response.ok) {
           const data = await response.json()
+          
+          // Check if survey is stopped - redirect to completed page
+          if (data.survey && data.survey.status === 'stopped') {
+            window.location.href = `/survey/${slug}/completed`
+            return
+          }
+          
           setSurvey(data.survey)
           // Initialize answers array
           if (data.survey && data.survey.questions) {

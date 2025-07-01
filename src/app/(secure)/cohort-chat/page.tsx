@@ -84,7 +84,7 @@ export default function CohortChatPage() {
   const [cohorts, setCohorts] = useState<Cohort[]>([]);
   const [selectedCohortId, setSelectedCohortId] = useState<number | null>(null);
   const [input, setInput] = useState('');
-  type ChatMessage = { role:'user'|'agent'; content:string; citations?: Record<string,string>; chartSpec?: any; isUpload?: boolean };
+  type ChatMessage = { role:'user'|'agent'; content:string; citations?: Record<string,string>; chartSpec?: any; dataCards?: any[]; isUpload?: boolean };
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [filterRules, setFilterRules] = useState<CohortFilterRule[]>([]);
@@ -97,6 +97,7 @@ export default function CohortChatPage() {
   const [availableFields, setAvailableFields] = useState<{name: string, label: string, type: string}[]>([]);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [selectedModel, setSelectedModel] = useState('gpt-4o');
+  const [temperature, setTemperature] = useState(0.0);
   const [sources, setSources] = useState<{survey: boolean; twins: boolean; web: boolean}>({survey: true, twins: true, web: false});
   const [systemPrompt, setSystemPrompt] = useState('You are an expert analyst summarising the perspectives of a group of survey respondents.');
 
@@ -200,6 +201,11 @@ export default function CohortChatPage() {
       setSystemPrompt(savedSystemPrompt);
     }
     
+    const savedTemperature = localStorage.getItem('cohort-chat-temperature');
+    if (savedTemperature) {
+      setTemperature(Number(savedTemperature));
+    }
+    
     const savedSurveyId = localStorage.getItem('cohort-chat-selected-survey');
     if (savedSurveyId && savedSurveyId !== 'null') {
       setSelectedSurveyId(Number(savedSurveyId));
@@ -216,6 +222,12 @@ export default function CohortChatPage() {
   const handleSystemPromptChange = (prompt: string) => {
     setSystemPrompt(prompt);
     localStorage.setItem('cohort-chat-system-prompt', prompt);
+  };
+  
+  // Save temperature when it changes
+  const handleTemperatureChange = (temp: number) => {
+    setTemperature(temp);
+    localStorage.setItem('cohort-chat-temperature', String(temp));
   };
   
   // Save survey selection when it changes
@@ -263,6 +275,7 @@ FORMATTING REQUIREMENTS:
       question,
       surveyId: selectedSurveyId || undefined,
       model: selectedModel,
+      temperature,
       sources,
       systemPrompt: enhancedSystemPrompt,
     };
@@ -305,6 +318,7 @@ FORMATTING REQUIREMENTS:
       const last=updated[updated.length-1];
       if(last && last.role==='agent') {
         const chartMatchFull = last.content.match(/```chart[\s\S]*?```/);
+        const dataCardsMatchFull = last.content.match(/```data-cards[\s\S]*?```/);
         const parts = last.content.split('\n---\n');
         if(parts.length>1) {
           const answerTxt=parts[0];
@@ -337,16 +351,32 @@ FORMATTING REQUIREMENTS:
             });
             console.log('Final citations object:', citations);
           }
+          
+          // Start with the answer text
+          let cleanContent = answerTxt;
+          
           // extract chart spec fenced block
           if(chartMatchFull){
             try {
               const jsonPart=chartMatchFull[0].replace(/```chart|```/g,'').trim();
               last.chartSpec=JSON.parse(jsonPart);
-              last.content=answerTxt.replace(chartMatchFull[0],'').trim();
+              cleanContent = cleanContent.replace(chartMatchFull[0],'').trim();
             } catch{}
-          } else {
-            last.content=answerTxt.trim();
           }
+          
+          // extract data-cards fenced block  
+          if(dataCardsMatchFull){
+            try {
+              const jsonPart=dataCardsMatchFull[0].replace(/```data-cards|```/g,'').trim();
+              last.dataCards=JSON.parse(jsonPart);
+              cleanContent = cleanContent.replace(dataCardsMatchFull[0],'').trim();
+              console.log('Extracted data cards:', last.dataCards);
+            } catch(error){
+              console.warn('Failed to parse data cards:', error);
+            }
+          }
+          
+          last.content = cleanContent;
           last.citations=citations;
           updated[updated.length-1]=last;
         }
@@ -563,50 +593,157 @@ FORMATTING REQUIREMENTS:
     return fields;
   };
 
-  // Generate dynamic prompts based on survey data
+  // Generate dynamic prompts based on survey data and advanced analytics
   const generateDynamicPrompts = (surveyData: any) => {
     if (!surveyData || !surveyData.questions) return [];
     
     const prompts: string[] = [];
-    const questions = surveyData.questions;
     
-    // Analyze question types and content to generate relevant prompts
-    const hasRatingQuestions = questions.some((q: any) => q.type === 'rating' || q.type === 'scale');
-    const hasChoiceQuestions = questions.some((q: any) => q.type === 'single-choice' || q.type === 'multiple-choice');
-    const hasTextQuestions = questions.some((q: any) => q.type === 'text');
-    
-    // Get first few question prompts for specific analysis
-    const sampleQuestions = questions.slice(0, 3);
-    
-    if (hasRatingQuestions) {
-      prompts.push("What are the average ratings across different demographics?");
-    }
-    
-    if (hasChoiceQuestions) {
-      prompts.push("Show the distribution of responses for multiple choice questions");
-    }
-    
-    if (hasTextQuestions) {
-      prompts.push("What are the common themes in open-ended responses?");
-    }
-    
-    // Add survey-specific prompts based on question content
-    if (sampleQuestions.length > 0) {
-      const firstQuestion = sampleQuestions[0];
-      if (firstQuestion.prompt) {
-        // Create a prompt about the first question
-        const questionSnippet = firstQuestion.prompt.length > 50 
-          ? firstQuestion.prompt.substring(0, 50) + "..." 
-          : firstQuestion.prompt;
-        prompts.push(`Analyze responses to: "${questionSnippet}"`);
+    // Fetch survey-specific insights from advanced analytics
+    const fetchAnalyticsPrompts = async () => {
+      try {
+        const response = await fetch(`/api/surveys/${surveyData.id}/schema`);
+        if (response.ok) {
+          const schemaData = await response.json();
+          const analyticsPrompts: string[] = [];
+          
+          // Extract suggested queries from usage recommendations
+          if (schemaData.usage_recommendations) {
+            schemaData.usage_recommendations.forEach((rec: any) => {
+              if (rec.suggested_queries && rec.suggested_queries.length > 0) {
+                // Add the first 2 suggested queries from each recommendation
+                analyticsPrompts.push(...rec.suggested_queries.slice(0, 2));
+              }
+            });
+          }
+          
+          // If we have analytics-based prompts, use those first
+          if (analyticsPrompts.length > 0) {
+            setDynamicPrompts(analyticsPrompts.slice(0, 3));
+            return;
+          }
+        }
+      } catch (error) {
+        console.log('Could not fetch analytics prompts, using fallback:', error);
       }
-    }
+      
+      // Fallback to basic prompts if analytics fetch fails
+      generateBasicPrompts();
+    };
     
-    // Add general analysis prompts
-    prompts.push(`Summarize key insights from "${surveyData.title}"`);
-    prompts.push("Compare responses across age groups");
+    const generateBasicPrompts = () => {
+      const questions = surveyData.questions;
+      
+      // Analyze question types and content to generate relevant prompts
+      const hasRatingQuestions = questions.some((q: any) => q.type === 'rating' || q.type === 'scale');
+      const hasChoiceQuestions = questions.some((q: any) => q.type === 'single-choice' || q.type === 'multiple-choice');
+      const hasTextQuestions = questions.some((q: any) => q.type === 'text');
+      
+      // Get first few question prompts for specific analysis
+      const sampleQuestions = questions.slice(0, 3);
+      
+      if (hasRatingQuestions) {
+        prompts.push("What are the average ratings across different demographics?");
+      }
+      
+      if (hasChoiceQuestions) {
+        prompts.push("Show the distribution of responses for multiple choice questions");
+      }
+      
+      if (hasTextQuestions) {
+        prompts.push("What are the common themes in open-ended responses?");
+      }
+      
+      // Add survey-specific prompts based on question content
+      if (sampleQuestions.length > 0) {
+        const firstQuestion = sampleQuestions[0];
+        if (firstQuestion.prompt) {
+          // Create a prompt about the first question
+          const questionSnippet = firstQuestion.prompt.length > 50 
+            ? firstQuestion.prompt.substring(0, 50) + "..." 
+            : firstQuestion.prompt;
+          prompts.push(`Analyze responses to: "${questionSnippet}"`);
+        }
+      }
+      
+      // Add general analysis prompts
+      prompts.push(`Summarize key insights from "${surveyData.title}"`);
+      prompts.push("Compare responses across age groups");
+      
+      setDynamicPrompts(prompts.slice(0, 3));
+    };
     
-    return prompts.slice(0, 3); // Return max 3 prompts
+    // Start with basic prompts immediately, then try to enhance with analytics
+    generateBasicPrompts();
+    
+    // Asynchronously try to get better prompts from analytics
+    fetchAnalyticsPrompts();
+    
+    return prompts.slice(0, 3); // Return initial basic prompts
+  };
+
+  // Render data cards (Perplexity-style visualizations)
+  const renderDataCards = (dataCards: any[]) => {
+    if (!dataCards || dataCards.length === 0) return null;
+    
+    return (
+      <div className="grid gap-4 mt-4 mb-4">
+        {dataCards.map((card, index) => (
+          <div key={index} className="bg-muted/30 rounded-lg p-4 border">
+            <h4 className="font-medium text-sm text-foreground mb-3">{card.title}</h4>
+            
+            {card.chart_type === 'horizontal_bar' && (
+              <div className="space-y-2">
+                {card.data.map((item: any, i: number) => (
+                  <div key={i} className="flex items-center gap-3">
+                    <div className="w-20 text-xs text-muted-foreground truncate">
+                      {item.label}
+                    </div>
+                    <div className="flex-1 bg-muted rounded-full h-2 relative">
+                      <div 
+                        className="bg-primary h-2 rounded-full" 
+                        style={{ width: `${Math.min(item.value, 100)}%` }}
+                      />
+                    </div>
+                    <div className="text-xs font-medium w-12 text-right">
+                      {item.value}%
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            
+            {card.chart_type === 'metric_card' && (
+              <div className="grid grid-cols-3 gap-4 text-center">
+                <div>
+                  <div className="text-lg font-bold text-foreground">{card.data.average}</div>
+                  <div className="text-xs text-muted-foreground">Average</div>
+                </div>
+                <div>
+                  <div className="text-lg font-bold text-foreground">{card.data.median}</div>
+                  <div className="text-xs text-muted-foreground">Median</div>
+                </div>
+                <div>
+                  <div className="text-lg font-bold text-foreground">{card.data.range}</div>
+                  <div className="text-xs text-muted-foreground">Range</div>
+                </div>
+              </div>
+            )}
+            
+            {card.chart_type === 'pie' && (
+              <div className="space-y-1">
+                {card.data.map((item: any, i: number) => (
+                  <div key={i} className="flex justify-between items-center text-sm">
+                    <span className="text-foreground">{item.label}</span>
+                    <span className="font-medium">{item.value}%</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    );
   };
 
   const renderWithCitations=(text:string,citations?:Record<string,string>,isUpload?:boolean)=> {
@@ -933,6 +1070,7 @@ FORMATTING REQUIREMENTS:
                           {m.role==='agent' ? (
                             <TooltipProvider delayDuration={150}>
                               <div className="space-y-1">
+                                {m.dataCards && renderDataCards(m.dataCards)}
                                 {renderWithCitations(m.content, m.citations, m.isUpload)}
                               </div>
                             </TooltipProvider>
@@ -1265,6 +1403,35 @@ FORMATTING REQUIREMENTS:
                         ))}
                       </SelectContent>
                     </Select>
+                  </div>
+
+                  {/* Temperature control */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label>Temperature</Label>
+                      <span className="text-xs text-muted-foreground">{temperature}</span>
+                    </div>
+                    <div className="space-y-2">
+                      <input
+                        type="range"
+                        min="0"
+                        max="1"
+                        step="0.1"
+                        value={temperature}
+                        onChange={(e) => handleTemperatureChange(Number(e.target.value))}
+                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                      />
+                      <div className="flex justify-between text-xs text-muted-foreground">
+                        <span>0.0 (Precise)</span>
+                        <span>1.0 (Creative)</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {temperature === 0.0 && "Maximum precision for data analysis"}
+                        {temperature > 0.0 && temperature <= 0.3 && "Low creativity, focused on facts"}
+                        {temperature > 0.3 && temperature <= 0.7 && "Balanced creativity and accuracy"}
+                        {temperature > 0.7 && "High creativity, more interpretive"}
+                      </p>
+                    </div>
                   </div>
 
                   {/* Sources */}

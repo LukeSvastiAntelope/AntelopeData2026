@@ -18,7 +18,7 @@ const options = {
   },
 };
 
-console.log('🔄 Running survey expiration check...');
+console.log('🔄 Running campaign management check...');
 
 const req = http.request(options, (res) => {
   let data = '';
@@ -31,9 +31,16 @@ const req = http.request(options, (res) => {
     try {
       const response = JSON.parse(data);
       if (response.status) {
-        console.log(`✅ Auto-close complete – ${response.closedCount} survey(s) closed.`);
+        console.log(`✅ Campaign management complete – ${response.message}`);
+        if (response.results) {
+          const r = response.results;
+          if (r.campaigns_activated > 0) console.log(`   🚀 ${r.campaigns_activated} campaign(s) activated`);
+          if (r.campaigns_stopped > 0) console.log(`   🛑 ${r.campaigns_stopped} campaign(s) stopped`);
+          if (r.legacy_closed > 0) console.log(`   📅 ${r.legacy_closed} legacy survey(s) closed`);
+          if (r.total_changes === 0) console.log(`   ✨ No campaigns needed updates`);
+        }
       } else {
-        console.error('❌ Failed to auto-close expired surveys:', response.message);
+        console.error('❌ Failed to run campaign management:', response.message);
       }
     } catch (error) {
       console.error('❌ Error parsing response:', error);

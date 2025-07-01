@@ -977,5 +977,144 @@ export const SurveyRepo = {
             connection.release();
             throw error;
         }
+    },
+
+    // Campaign Management Methods
+
+    // Start a campaign (set status to active)
+    startCampaign: async (surveyId: number, userId: number) => {
+        const db = await getMySQLConnection();
+        
+        const [result] = await db.execute<ResultSetHeader>(
+            `UPDATE surveys 
+             SET status = 'active', campaign_start_at = NOW()
+             WHERE id = ? AND created_by = ? AND status IN ('draft', 'scheduled', 'stopped')`,
+            [surveyId, userId]
+        );
+        
+        return (result as ResultSetHeader).affectedRows > 0;
+    },
+
+    // Stop a campaign (set status to stopped)
+    stopCampaign: async (surveyId: number, userId: number, reason?: string) => {
+        const db = await getMySQLConnection();
+        
+        const [result] = await db.execute<ResultSetHeader>(
+            `UPDATE surveys 
+             SET status = 'stopped', 
+                 stopped_at = NOW(), 
+                 stopped_by = ?,
+                 stop_reason = ?
+             WHERE id = ? AND created_by = ? AND status = 'active'`,
+            [userId, reason || null, surveyId, userId]
+        );
+        
+        return (result as ResultSetHeader).affectedRows > 0;
+    },
+
+    // Schedule a campaign
+    scheduleCampaign: async (surveyId: number, userId: number, startAt: string, endAt?: string) => {
+        const db = await getMySQLConnection();
+        
+        // Determine status based on start time
+        const startDate = new Date(startAt);
+        const now = new Date();
+        const status = startDate > now ? 'scheduled' : 'active';
+        
+        const [result] = await db.execute<ResultSetHeader>(
+            `UPDATE surveys 
+             SET status = ?, 
+                 campaign_start_at = ?,
+                 campaign_end_at = ?
+             WHERE id = ? AND created_by = ?`,
+            [status, startAt, endAt || null, surveyId, userId]
+        );
+        
+        return (result as ResultSetHeader).affectedRows > 0;
+    },
+
+    // Get campaign status and details
+    getCampaignStatus: async (surveyId: number, userId: number) => {
+        const db = await getMySQLConnection();
+        
+        const [rows] = await db.execute<RowDataPacket[]>(
+            `SELECT 
+                id, title, status, is_public,
+                campaign_start_at, campaign_end_at,
+                stopped_at, stopped_by, stop_reason,
+                created_at, updated_at
+             FROM surveys 
+             WHERE id = ? AND created_by = ?`,
+            [surveyId, userId]
+        );
+        
+        if (!rows[0]) return null;
+        
+        const survey = rows[0];
+        
+        // Get response count
+        const [countRows] = await db.execute<RowDataPacket[]>(
+            'SELECT COUNT(*) as response_count FROM survey_responses WHERE survey_id = ?',
+            [surveyId]
+        );
+        
+        return {
+            ...survey,
+            response_count: countRows[0].response_count,
+            can_start: ['draft', 'scheduled', 'stopped'].includes(survey.status),
+            can_stop: survey.status === 'active',
+            can_schedule: ['draft', 'stopped'].includes(survey.status)
+        };
+    },
+
+    // Auto-activate scheduled campaigns that have reached their start time
+    autoActivateScheduled: async () => {
+        const db = await getMySQLConnection();
+        
+        const [result] = await db.execute<ResultSetHeader>(
+            `UPDATE surveys 
+             SET status = 'active' 
+             WHERE status = 'scheduled' 
+             AND campaign_start_at IS NOT NULL 
+             AND campaign_start_at <= NOW()`
+        );
+        
+        return (result as ResultSetHeader).affectedRows;
+    },
+
+    // Auto-stop campaigns that have reached their end time
+    autoStopExpired: async () => {
+        const db = await getMySQLConnection();
+        
+        const [result] = await db.execute<ResultSetHeader>(
+            `UPDATE surveys 
+             SET status = 'stopped', 
+                 stopped_at = NOW(),
+                 stop_reason = 'Campaign end time reached'
+             WHERE status = 'active' 
+             AND campaign_end_at IS NOT NULL 
+             AND campaign_end_at <= NOW()`
+        );
+        
+        return (result as ResultSetHeader).affectedRows;
+    },
+
+    // Get survey by slug (any status) - for status checking
+    getSurveyBySlugAny: async (slug: string) => {
+        const db = await getMySQLConnection();
+        
+        const [rows] = await db.execute<RowDataPacket[]>(
+            `SELECT 
+                s.id, s.title, s.description, s.slug, s.status, s.is_public,
+                s.campaign_start_at, s.campaign_end_at, s.stopped_at, s.stop_reason,
+                s.created_at, s.updated_at, s.created_by
+             FROM surveys s 
+             WHERE s.slug = ?`,
+            [slug]
+        );
+        
+        if (!rows[0]) return null;
+        
+        return rows[0] as any;
     }
 }; 

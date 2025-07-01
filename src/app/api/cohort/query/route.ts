@@ -14,6 +14,7 @@ interface CohortQueryPayload {
   topK?: number;
   surveyId?: number;
   model?: string;
+  temperature?: number;
   sources?: { survey: boolean; twins: boolean; web: boolean };
   systemPrompt?: string;
 }
@@ -98,8 +99,82 @@ function getIntentSpecificSystemMessage(analysisType: string): string {
   }
 }
 
+// Generate Perplexity-style data cards from fact sheet
+function generateDataCards(factSheet: any, question: string): any[] {
+  if (!factSheet || !factSheet.question_stats) return [];
+  
+  const cards = [];
+  const questionLower = question.toLowerCase();
+  
+  // Platform adoption card
+  const platformStats = Object.values(factSheet.question_stats).find((stats: any) => 
+    stats.adoption_rates && Object.keys(stats.adoption_rates).length > 0
+  ) as any;
+  
+  if (platformStats && (questionLower.includes('platform') || questionLower.includes('popular') || questionLower.includes('social'))) {
+    const topPlatforms = Object.entries(platformStats.adoption_rates)
+      .sort(([,a]: any, [,b]: any) => b.percentage - a.percentage)
+      .slice(0, 5);
+    
+    cards.push({
+      type: 'platform_adoption',
+      title: 'Top Platforms',
+      data: topPlatforms.map(([platform, stats]: any) => ({
+        label: platform,
+        value: stats.percentage,
+        count: stats.users
+      })),
+      chart_type: 'horizontal_bar'
+    });
+  }
+  
+  // Usage statistics card
+  const usageStats = Object.values(factSheet.question_stats).find((stats: any) => 
+    stats.statistics && stats.statistics.mean !== undefined
+  ) as any;
+  
+  if (usageStats && (questionLower.includes('hour') || questionLower.includes('time') || questionLower.includes('usage'))) {
+    cards.push({
+      type: 'usage_stats',
+      title: 'Usage Statistics',
+      data: {
+        average: `${usageStats.statistics.mean} hours/day`,
+        median: `${usageStats.statistics.median} hours/day`,
+        range: `${usageStats.statistics.min}-${usageStats.statistics.max} hours`
+      },
+      chart_type: 'metric_card'
+    });
+  }
+  
+  // Demographics card
+  if (factSheet.core_stats && factSheet.core_stats.demographic_distribution) {
+    const demographics = factSheet.core_stats.demographic_distribution;
+    
+    if (questionLower.includes('age') || questionLower.includes('demographic')) {
+      if (demographics.age) {
+        const ageData = Object.entries(demographics.age).map(([group, stats]: any) => ({
+          label: group,
+          value: stats.percentage,
+          count: stats.count
+        }));
+        
+        cards.push({
+          type: 'age_distribution',
+          title: 'Age Distribution',
+          data: ageData,
+          chart_type: 'pie'
+        });
+      }
+    }
+  }
+  
+  return cards;
+}
+
 export async function POST(req: NextRequest) {
   try {
+    console.log('🚀 COHORT QUERY ROUTE STARTED - NEW VERSION WITH FACT SHEET FIRST');
+    
     // Get user ID from NextAuth middleware
     const userIdHeader = req.headers.get('x-user-id');
     if (!userIdHeader) {
@@ -108,7 +183,10 @@ export async function POST(req: NextRequest) {
     const userId = userIdHeader;
 
     const body = (await req.json()) as CohortQueryPayload;
-    const { cohort, question, topK = 50, surveyId, model = 'gpt-4o', sources, systemPrompt } = body;
+    const { cohort, question, topK = 1000, surveyId, model = 'gpt-4o', temperature = 0.0, sources, systemPrompt } = body;
+    
+    console.log(`📝 Question: "${question}"`);
+    console.log(`📊 Survey ID: ${surveyId}`);
 
     if (!question || question.trim() === "") {
       return NextResponse.json({ status: false, message: "Question is required" }, { status: 400 });
@@ -127,7 +205,77 @@ export async function POST(req: NextRequest) {
       filterRules = cohort.filter;
     }
 
-    // 🎯 NEW: Use Smart Query Builder for intent-aware data fetching
+    // 🎯 STEP 1: Initialize database connection
+    const db = await getMySQLConnection();
+    
+    // 🎯 STEP 2: Get fact sheet for instant statistical insights
+    let factSheet = null;
+    if (surveyId) {
+      try {
+        const { analyzeSurveySchema } = require('../../../../../scripts/analyze-survey-schema.js');
+        const schema = await analyzeSurveySchema(surveyId, db);
+        factSheet = schema.fact_sheet;
+        console.log(`📊 Loaded fact sheet with ${Object.keys(factSheet.question_stats || {}).length} question stats`);
+      } catch (error) {
+        console.warn('Could not load fact sheet:', error.message);
+      }
+    }
+    
+    // 🎯 STEP 3: Try to answer from fact sheet FIRST
+    console.log('🔍 Attempting to load FactSheetQueryResolver...');
+    let factSheetResult;
+    try {
+      const { FactSheetQueryResolver } = require('../../../utils/survey/fact-sheet-query-resolver');
+      const factSheetResolver = new FactSheetQueryResolver();
+      console.log('✅ FactSheetQueryResolver loaded successfully');
+      factSheetResult = factSheetResolver.resolveFromFactSheet(question, factSheet);
+      console.log('🔍 Fact sheet result:', factSheetResult);
+    } catch (error) {
+      console.error('❌ Error loading FactSheetQueryResolver:', error);
+      // Fallback to old behavior
+      factSheetResult = { canAnswer: false, confidence: 0 };
+    }
+    
+    console.log(`📊 Fact Sheet Resolution: ${factSheetResult.canAnswer ? 'SUCCESS' : 'FALLBACK_NEEDED'}`);
+    console.log(`📊 Confidence: ${Math.round(factSheetResult.confidence * 100)}%`);
+    console.log(`📊 Reasoning: ${factSheetResult.reasoning}`);
+    
+    // 🎯 STEP 4: If fact sheet can answer with high confidence, return immediately
+    if (factSheetResult.canAnswer && factSheetResult.confidence >= 0.8) {
+      console.log(`✅ Answering directly from fact sheet (${Math.round(factSheetResult.confidence * 100)}% confidence)`);
+      
+      const encoder = new TextEncoder();
+      const stream = new ReadableStream({
+        start(controller) {
+          controller.enqueue(encoder.encode(factSheetResult.answer || ""));
+          
+          // Add fact sheet source info
+          const sourceInfo = `\n\n---\n📊 SOURCE: Pre-computed statistics from ${factSheet?.survey_metadata?.total_responses || 'all'} survey responses\n✅ CONFIDENCE: ${Math.round(factSheetResult.confidence * 100)}%\n🔍 METHOD: ${factSheetResult.reasoning}`;
+          controller.enqueue(encoder.encode(sourceInfo));
+          
+          // Add data cards for visualization
+          if (factSheetResult.dataCards && factSheetResult.dataCards.length > 0) {
+            controller.enqueue(encoder.encode('\n```data-cards\n' + JSON.stringify(factSheetResult.dataCards, null, 2) + '\n```\n'));
+          }
+          
+          controller.close();
+        }
+      });
+
+      return new NextResponse(stream, {
+        headers: {
+          "Content-Type": "text/plain; charset=utf-8",
+          "Cache-Control": "no-cache",
+          "X-Sample-Size": String(factSheet?.survey_metadata?.total_responses || 0),
+          "X-Source": "fact-sheet",
+          "X-Confidence": String(Math.round(factSheetResult.confidence * 100)),
+        },
+      });
+    }
+    
+    // 🎯 STEP 5: Fallback to raw SQL queries for complex analysis
+    console.log(`⚠️ Falling back to raw data analysis: ${factSheetResult.fallbackNeeded?.reason || 'Complex query needed'}`);
+    
     const smartQueryBuilder = new SmartSurveyQueryBuilder();
     const intentClassifier = new QueryIntentClassifier();
     
@@ -146,7 +294,6 @@ export async function POST(req: NextRequest) {
     console.log(`🔍 Expected Result Type: ${queryResult.expectedResultType}`);
 
     // Execute the smart query
-    const db = await getMySQLConnection();
     const [rows] = await db.execute<any[]>(queryResult.sql, queryResult.params);
 
     if (!rows.length) {
@@ -404,12 +551,44 @@ Survey Topics Overview:
     const intentExplanation = intentClassifier.explainIntent(queryIntent);
     const analysisTypeGuidance = getAnalysisTypeGuidance(queryIntent.analysisType, queryResult.expectedResultType);
     
+    // 🎯 Add fact sheet insights to LLM prompt
+    let factSheetPromptContext = '';
+    if (factSheet && factSheet.question_stats) {
+      const platformStats = Object.values(factSheet.question_stats).find((stats: any) => 
+        stats.adoption_rates && Object.keys(stats.adoption_rates).length > 0
+      ) as any;
+      
+      const usageStats = Object.values(factSheet.question_stats).find((stats: any) => 
+        stats.statistics && stats.statistics.mean !== undefined
+      ) as any;
+      
+      if (platformStats || usageStats) {
+                 factSheetPromptContext = '\n🔢 PRE-COMPUTED STATISTICS FROM FULL DATASET (200 RESPONSES):\n';
+         
+         if (platformStats) {
+           const topPlatforms = Object.entries(platformStats.adoption_rates)
+             .sort(([,a]: any, [,b]: any) => b.percentage - a.percentage)
+             .slice(0, 5);
+           factSheetPromptContext += `📊 Platform Adoption Rates (AUTHORITATIVE - use these exact numbers):\n`;
+           topPlatforms.forEach(([platform, stats]: any) => {
+             factSheetPromptContext += `  • ${platform}: ${stats.percentage}% (${stats.users} out of 200 users)\n`;
+           });
+         }
+         
+         if (usageStats) {
+           factSheetPromptContext += `⏱️ Usage Statistics: Average ${usageStats.statistics.mean}h/day, Median ${usageStats.statistics.median}h/day, Range ${usageStats.statistics.min}-${usageStats.statistics.max}h\n`;
+         }
+         
+         factSheetPromptContext += '\n⚠️ CRITICAL: Use these EXACT percentages for any quantitative claims. The individual response samples below are for qualitative context only.\n';
+      }
+    }
+    
     const prompt = `You are an expert analyst representing the collective voice of survey respondents. Your task is to provide meaningful insights based on the survey data provided.
 
 DETECTED INTENT: ${intentExplanation}
 ANALYSIS TYPE: ${queryIntent.analysisType}
 DATA TYPE: ${queryResult.expectedResultType} responses
-
+${factSheetPromptContext}
 ${analysisTypeGuidance}
 
 CONTEXTUAL INTELLIGENCE GUIDELINES:
@@ -422,12 +601,13 @@ CONTEXTUAL INTELLIGENCE GUIDELINES:
 - Only claim insufficient data if the question is completely unrelated to any survey content
 
 RESPONSE REQUIREMENTS:
-- Always ground your analysis in the actual survey responses provided
-- Cite specific quotes using [1], [2], [3] format frequently throughout your response
+- PRIORITIZE pre-computed statistics from the fact sheet for quantitative claims
+- Use individual responses to illustrate patterns and provide qualitative insights
+- When stating percentages or adoption rates, use the EXACT numbers from the fact sheet
+- Cite specific quotes using [1], [2], [3] format to support qualitative insights
+- Never claim "all responses" unless the fact sheet shows 100%
 - Explain your reasoning and how you connected the data to the question
-- If making inferences, clearly indicate this while showing your evidence
 - Include demographic context when relevant
-- Use citations liberally to support every major point you make
 
 ${surveyTopicsContext}
 Demographics of the cohort: ${fullDemographicSummary}
@@ -452,9 +632,9 @@ ${quotesForPrompt}`;
 
 
 
-    // update completion call - use more tokens for o3 models due to reasoning overhead
+    // update completion call - use maximum tokens for testing
     const isO3Model = model.startsWith('o3') || model.startsWith('o1');
-    const maxTokens = isO3Model ? 3000 : 500;
+    const maxTokens = isO3Model ? 8000 : 4000;
     
     const completion = await createCompletion({
       model: model,
@@ -462,9 +642,9 @@ ${quotesForPrompt}`;
         { role: "system", content: systemMessage },
         { role: "user", content: demographicSentence + "\n\n" + prompt }
       ],
-      temperature: 0.25,
-      frequencyPenalty: 0.2,
-      presencePenalty: 0.2,
+      temperature: temperature,  // Use user-controlled temperature
+      frequencyPenalty: 0.0,  // No creativity penalties needed
+      presencePenalty: 0.0,   // Focus on accuracy
       maxTokens: maxTokens,
     });
 
@@ -473,17 +653,57 @@ ${quotesForPrompt}`;
     
     const fullAnswer = completion.content || "I apologize, but I couldn't generate a response. Please try again or switch to a different model.";
 
+    // 🎯 Generate data cards from fact sheet (Perplexity-style)
+    const dataCards = factSheet ? generateDataCards(factSheet, question) : [];
+    
+    // 🎯 Add fact sheet insights to prompt context
+    let factSheetContext = '';
+    if (factSheet && factSheet.question_stats) {
+      const quickStats = [];
+      
+      // Add platform adoption insights
+      const platformStats = Object.values(factSheet.question_stats).find((stats: any) => 
+        stats.adoption_rates && Object.keys(stats.adoption_rates).length > 0
+      ) as any;
+      
+      if (platformStats) {
+        const topPlatform = Object.entries(platformStats.adoption_rates)[0] as any;
+        quickStats.push(`Most popular platform: ${topPlatform[0]} (${topPlatform[1].percentage}%)`);
+      }
+      
+      // Add usage statistics
+      const usageStats = Object.values(factSheet.question_stats).find((stats: any) => 
+        stats.statistics && stats.statistics.mean !== undefined
+      ) as any;
+      
+      if (usageStats) {
+        quickStats.push(`Average usage: ${usageStats.statistics.mean} hours/day`);
+      }
+      
+      if (quickStats.length > 0) {
+        factSheetContext = `\n\nFACT SHEET INSIGHTS:\n${quickStats.join('\n')}\n`;
+      }
+    }
+
     // 🎯 Add intent detection info to response for debugging
-    const intentDebugInfo = `\n\n---\n🎯 QUERY ANALYSIS:\nDetected Intent: ${queryIntent.intent} (${Math.round(queryIntent.confidence * 100)}% confidence)\nAnalysis Type: ${queryIntent.analysisType}\nData Type: ${queryResult.expectedResultType}\nStrategy: ${queryResult.explanation}`;
+    const intentDebugInfo = `\n\n---\n🎯 QUERY ANALYSIS:\nDetected Intent: ${queryIntent.intent} (${Math.round(queryIntent.confidence * 100)}% confidence)\nAnalysis Type: ${queryIntent.analysisType}\nData Type: ${queryResult.expectedResultType}\nStrategy: ${queryResult.explanation}${factSheetContext}`;
 
     const stream = new ReadableStream({
       start(controller) {
         controller.enqueue(encoder.encode(fullAnswer));
         controller.enqueue(encoder.encode(statsAppendix));
         controller.enqueue(encoder.encode(intentDebugInfo));
+        
+        // Add data cards for visualization
+        if (dataCards.length > 0) {
+          controller.enqueue(encoder.encode('\n```data-cards\n' + JSON.stringify(dataCards, null, 2) + '\n```\n'));
+        }
+        
+        // Add chart if requested
         if (question.toLowerCase().match(/chart|graph|distribution|histogram/)) {
           controller.enqueue(encoder.encode('\n```chart\n' + JSON.stringify(chartSpec) + '\n```\n'));
         }
+        
         controller.close();
       }
     });
@@ -493,6 +713,8 @@ ${quotesForPrompt}`;
         "Content-Type": "text/plain; charset=utf-8",
         "Cache-Control": "no-cache",
         "X-Sample-Size": String(rows.length),
+        "X-Source": "raw-data-analysis",
+        "X-Confidence": String(Math.round(queryIntent.confidence * 100)),
       },
     });
   } catch (error) {
