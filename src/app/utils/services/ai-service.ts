@@ -117,7 +117,7 @@ async function createOpenAICompletion(options: AICompletionOptions): Promise<AIC
     requestParams.max_completion_tokens = options.maxTokens ? Math.max(options.maxTokens, 2000) : 2000;
   } else {
     // Older models use max_tokens and support all parameters
-    requestParams.temperature = options.temperature || 0.25;
+    requestParams.temperature = options.temperature !== undefined ? options.temperature : 0.25;
     requestParams.max_tokens = options.maxTokens || 500;
     requestParams.frequency_penalty = options.frequencyPenalty || 0.2;
     requestParams.presence_penalty = options.presencePenalty || 0.2;
@@ -158,7 +158,7 @@ async function createDeepSeekCompletion(options: AICompletionOptions): Promise<A
       role: msg.role,
       content: msg.content
     })),
-    temperature: options.temperature || 0.25,
+    temperature: options.temperature !== undefined ? options.temperature : 0.25,
     max_tokens: options.maxTokens || 500,
     stream: false,
   });
@@ -182,7 +182,7 @@ async function createGeminiCompletion(options: AICompletionOptions): Promise<AIC
       role: msg.role,
       content: msg.content
     })),
-    temperature: options.temperature || 0.25,
+    temperature: options.temperature !== undefined ? options.temperature : 0.25,
     max_tokens: options.maxTokens || 500,
     stream: false,
   });

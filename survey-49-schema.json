@@ -1,0 +1,2879 @@
+🔍 Starting schema analysis for survey 49...
+📊 Survey: "Social Media Use in 2021 (Pew Research - Synthetic)" with 200 respondents
+   🔍 Analyzing question: "Which social media platforms do you use?"
+   🔍 Analyzing question: "How many hours per day do you spend on social media?"
+   🔍 Analyzing question: "What are your primary activities on social media?"
+   🔍 Analyzing question: "Do you have concerns about privacy on social media platforms?"
+   🔍 Analyzing question: "Have you encountered misinformation on social media in the past year?"
+❓ Analyzed 5 questions
+👥 Analyzed 6 demographic fields
+📊 Generating statistical fact sheet...
+   📈 Generating stats for: Which social media platforms do you use?...
+   📈 Generating stats for: How many hours per day do you spend on social medi...
+   📈 Generating stats for: What are your primary activities on social media?...
+   📈 Generating stats for: Do you have concerns about privacy on social media...
+   📈 Generating stats for: Have you encountered misinformation on social medi...
+📈 Generated fact sheet with 5 question analyses
+
+🎉 Schema analysis completed!
+📋 Summary:
+   - Questions analyzed: 5
+   - Demographics: 6
+   - Statistical insights: 5
+   - Cross-tabulations: 0
+
+📄 Complete Schema Analysis:
+{
+  "survey_meta": {
+    "id": 49,
+    "title": "Social Media Use in 2021 (Pew Research - Synthetic)",
+    "description": "Synthetic dataset based on Pew Research Center findings about American social media usage patterns in 2021. This data represents typical usage patterns across different demographics.",
+    "total_respondents": 200,
+    "question_count": 5,
+    "demographics_available": [
+      "age",
+      "name",
+      "race",
+      "email",
+      "gender",
+      "source",
+      "location",
+      "education"
+    ],
+    "response_completion_rate": 100,
+    "data_quality_score": 0.95,
+    "status": "published",
+    "created_at": "2025-07-01T17:03:57.000Z"
+  },
+  "questions": [
+    {
+      "id": 404,
+      "type": "text",
+      "prompt": "Which social media platforms do you use?",
+      "options": [
+        "YouTube",
+        "Facebook",
+        "Instagram",
+        "Pinterest",
+        "LinkedIn",
+        "Snapchat",
+        "Twitter",
+        "WhatsApp",
+        "TikTok",
+        "Reddit"
+      ],
+      "detected_type": "multi_select",
+      "detection_confidence": 0.9,
+      "unique_values": [
+        "Facebook",
+        "YouTube",
+        "Snapchat",
+        "Reddit",
+        "Instagram",
+        "Twitter",
+        "Pinterest",
+        "TikTok",
+        "LinkedIn",
+        "WhatsApp"
+      ],
+      "value_count": 10,
+      "response_patterns": {
+        "array_responses": 200,
+        "numeric_responses": 7,
+        "string_responses": 0,
+        "null_responses": 0
+      },
+      "analysis_potential": {
+        "adoption_rates": true,
+        "platform_combinations": true,
+        "demographic_breakdowns": true,
+        "usage_intensity": false,
+        "usage_segmentation": false,
+        "demographic_correlations": true,
+        "behavioral_patterns": true
+      },
+      "statistical_summary": {}
+    },
+    {
+      "id": 405,
+      "type": "text",
+      "prompt": "How many hours per day do you spend on social media?",
+      "options": null,
+      "detected_type": "numeric",
+      "detection_confidence": 0.9,
+      "unique_values": [
+        8,
+        3,
+        7,
+        1,
+        2,
+        4,
+        6,
+        5
+      ],
+      "value_count": 8,
+      "response_patterns": {
+        "array_responses": 0,
+        "numeric_responses": 200,
+        "string_responses": 0,
+        "null_responses": 0
+      },
+      "analysis_potential": {
+        "adoption_rates": false,
+        "platform_combinations": false,
+        "demographic_breakdowns": true,
+        "usage_intensity": true,
+        "usage_segmentation": true,
+        "demographic_correlations": true,
+        "behavioral_patterns": true
+      },
+      "statistical_summary": {
+        "mean": 4.66,
+        "median": 5,
+        "min": 1,
+        "max": 8,
+        "std_dev": 2.24
+      }
+    },
+    {
+      "id": 406,
+      "type": "text",
+      "prompt": "What are your primary activities on social media?",
+      "options": [
+        "Watching videos",
+        "Sharing photos",
+        "Reading news",
+        "Messaging friends",
+        "Following brands",
+        "Shopping",
+        "Gaming",
+        "Live streaming",
+        "Creating content"
+      ],
+      "detected_type": "multi_select",
+      "detection_confidence": 0.9,
+      "unique_values": [
+        "Following brands",
+        "Shopping",
+        "Watching videos",
+        "Reading news",
+        "Live streaming",
+        "Gaming",
+        "Creating content",
+        "Messaging friends",
+        "Sharing photos"
+      ],
+      "value_count": 9,
+      "response_patterns": {
+        "array_responses": 200,
+        "numeric_responses": 0,
+        "string_responses": 0,
+        "null_responses": 0
+      },
+      "analysis_potential": {
+        "adoption_rates": true,
+        "platform_combinations": true,
+        "demographic_breakdowns": true,
+        "usage_intensity": false,
+        "usage_segmentation": false,
+        "demographic_correlations": true,
+        "behavioral_patterns": true
+      },
+      "statistical_summary": {}
+    },
+    {
+      "id": 407,
+      "type": "text",
+      "prompt": "Do you have concerns about privacy on social media platforms?",
+      "options": [
+        "Yes",
+        "No"
+      ],
+      "detected_type": "binary",
+      "detection_confidence": 0.9,
+      "unique_values": [
+        "No",
+        "Yes"
+      ],
+      "value_count": 2,
+      "response_patterns": {
+        "array_responses": 0,
+        "numeric_responses": 0,
+        "string_responses": 200,
+        "null_responses": 0
+      },
+      "analysis_potential": {
+        "adoption_rates": true,
+        "platform_combinations": false,
+        "demographic_breakdowns": true,
+        "usage_intensity": false,
+        "usage_segmentation": false,
+        "demographic_correlations": true,
+        "behavioral_patterns": true
+      },
+      "statistical_summary": {}
+    },
+    {
+      "id": 408,
+      "type": "text",
+      "prompt": "Have you encountered misinformation on social media in the past year?",
+      "options": [
+        "Yes",
+        "No"
+      ],
+      "detected_type": "binary",
+      "detection_confidence": 0.9,
+      "unique_values": [
+        "No",
+        "Yes"
+      ],
+      "value_count": 2,
+      "response_patterns": {
+        "array_responses": 0,
+        "numeric_responses": 0,
+        "string_responses": 200,
+        "null_responses": 0
+      },
+      "analysis_potential": {
+        "adoption_rates": true,
+        "platform_combinations": false,
+        "demographic_breakdowns": true,
+        "usage_intensity": false,
+        "usage_segmentation": false,
+        "demographic_correlations": true,
+        "behavioral_patterns": true
+      },
+      "statistical_summary": {}
+    }
+  ],
+  "demographics": {
+    "age": {
+      "type": "numeric",
+      "sample_size": 200,
+      "unique_count": 65,
+      "analysis_value": "high",
+      "range": [
+        18,
+        85
+      ],
+      "distribution": {
+        "18-29": {
+          "count": 35,
+          "percentage": 17.5
+        },
+        "30-49": {
+          "count": 53,
+          "percentage": 26.5
+        },
+        "50-64": {
+          "count": 59,
+          "percentage": 29.5
+        },
+        "65+": {
+          "count": 53,
+          "percentage": 26.5
+        }
+      }
+    },
+    "name": {
+      "type": "categorical",
+      "sample_size": 200,
+      "unique_count": 200,
+      "analysis_value": "high",
+      "distribution": {
+        "Anonymous Respondent 1": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 2": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 3": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 4": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 5": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 6": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 7": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 8": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 9": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 10": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 11": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 12": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 13": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 14": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 15": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 16": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 17": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 18": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 19": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 20": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 21": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 22": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 23": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 24": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 25": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 26": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 27": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 28": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 29": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 30": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 31": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 32": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 33": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 34": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 35": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 36": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 37": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 38": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 39": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 40": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 41": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 42": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 43": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 44": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 45": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 46": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 47": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 48": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 49": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 50": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 51": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 52": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 53": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 54": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 55": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 56": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 57": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 58": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 59": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 60": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 61": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 62": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 63": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 64": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 65": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 66": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 67": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 68": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 69": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 70": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 71": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 72": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 73": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 74": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 75": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 76": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 77": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 78": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 79": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 80": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 81": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 82": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 83": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 84": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 85": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 86": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 87": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 88": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 89": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 90": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 91": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 92": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 93": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 94": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 95": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 96": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 97": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 98": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 99": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 100": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 101": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 102": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 103": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 104": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 105": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 106": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 107": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 108": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 109": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 110": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 111": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 112": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 113": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 114": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 115": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 116": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 117": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 118": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 119": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 120": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 121": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 122": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 123": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 124": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 125": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 126": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 127": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 128": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 129": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 130": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 131": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 132": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 133": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 134": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 135": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 136": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 137": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 138": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 139": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 140": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 141": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 142": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 143": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 144": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 145": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 146": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 147": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 148": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 149": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 150": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 151": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 152": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 153": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 154": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 155": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 156": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 157": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 158": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 159": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 160": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 161": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 162": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 163": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 164": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 165": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 166": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 167": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 168": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 169": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 170": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 171": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 172": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 173": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 174": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 175": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 176": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 177": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 178": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 179": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 180": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 181": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 182": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 183": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 184": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 185": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 186": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 187": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 188": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 189": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 190": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 191": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 192": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 193": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 194": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 195": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 196": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 197": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 198": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 199": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Anonymous Respondent 200": {
+          "count": 1,
+          "percentage": 0.5
+        }
+      },
+      "values": [
+        "Anonymous Respondent 1",
+        "Anonymous Respondent 2",
+        "Anonymous Respondent 3",
+        "Anonymous Respondent 4",
+        "Anonymous Respondent 5",
+        "Anonymous Respondent 6",
+        "Anonymous Respondent 7",
+        "Anonymous Respondent 8",
+        "Anonymous Respondent 9",
+        "Anonymous Respondent 10",
+        "Anonymous Respondent 11",
+        "Anonymous Respondent 12",
+        "Anonymous Respondent 13",
+        "Anonymous Respondent 14",
+        "Anonymous Respondent 15",
+        "Anonymous Respondent 16",
+        "Anonymous Respondent 17",
+        "Anonymous Respondent 18",
+        "Anonymous Respondent 19",
+        "Anonymous Respondent 20",
+        "Anonymous Respondent 21",
+        "Anonymous Respondent 22",
+        "Anonymous Respondent 23",
+        "Anonymous Respondent 24",
+        "Anonymous Respondent 25",
+        "Anonymous Respondent 26",
+        "Anonymous Respondent 27",
+        "Anonymous Respondent 28",
+        "Anonymous Respondent 29",
+        "Anonymous Respondent 30",
+        "Anonymous Respondent 31",
+        "Anonymous Respondent 32",
+        "Anonymous Respondent 33",
+        "Anonymous Respondent 34",
+        "Anonymous Respondent 35",
+        "Anonymous Respondent 36",
+        "Anonymous Respondent 37",
+        "Anonymous Respondent 38",
+        "Anonymous Respondent 39",
+        "Anonymous Respondent 40",
+        "Anonymous Respondent 41",
+        "Anonymous Respondent 42",
+        "Anonymous Respondent 43",
+        "Anonymous Respondent 44",
+        "Anonymous Respondent 45",
+        "Anonymous Respondent 46",
+        "Anonymous Respondent 47",
+        "Anonymous Respondent 48",
+        "Anonymous Respondent 49",
+        "Anonymous Respondent 50",
+        "Anonymous Respondent 51",
+        "Anonymous Respondent 52",
+        "Anonymous Respondent 53",
+        "Anonymous Respondent 54",
+        "Anonymous Respondent 55",
+        "Anonymous Respondent 56",
+        "Anonymous Respondent 57",
+        "Anonymous Respondent 58",
+        "Anonymous Respondent 59",
+        "Anonymous Respondent 60",
+        "Anonymous Respondent 61",
+        "Anonymous Respondent 62",
+        "Anonymous Respondent 63",
+        "Anonymous Respondent 64",
+        "Anonymous Respondent 65",
+        "Anonymous Respondent 66",
+        "Anonymous Respondent 67",
+        "Anonymous Respondent 68",
+        "Anonymous Respondent 69",
+        "Anonymous Respondent 70",
+        "Anonymous Respondent 71",
+        "Anonymous Respondent 72",
+        "Anonymous Respondent 73",
+        "Anonymous Respondent 74",
+        "Anonymous Respondent 75",
+        "Anonymous Respondent 76",
+        "Anonymous Respondent 77",
+        "Anonymous Respondent 78",
+        "Anonymous Respondent 79",
+        "Anonymous Respondent 80",
+        "Anonymous Respondent 81",
+        "Anonymous Respondent 82",
+        "Anonymous Respondent 83",
+        "Anonymous Respondent 84",
+        "Anonymous Respondent 85",
+        "Anonymous Respondent 86",
+        "Anonymous Respondent 87",
+        "Anonymous Respondent 88",
+        "Anonymous Respondent 89",
+        "Anonymous Respondent 90",
+        "Anonymous Respondent 91",
+        "Anonymous Respondent 92",
+        "Anonymous Respondent 93",
+        "Anonymous Respondent 94",
+        "Anonymous Respondent 95",
+        "Anonymous Respondent 96",
+        "Anonymous Respondent 97",
+        "Anonymous Respondent 98",
+        "Anonymous Respondent 99",
+        "Anonymous Respondent 100",
+        "Anonymous Respondent 101",
+        "Anonymous Respondent 102",
+        "Anonymous Respondent 103",
+        "Anonymous Respondent 104",
+        "Anonymous Respondent 105",
+        "Anonymous Respondent 106",
+        "Anonymous Respondent 107",
+        "Anonymous Respondent 108",
+        "Anonymous Respondent 109",
+        "Anonymous Respondent 110",
+        "Anonymous Respondent 111",
+        "Anonymous Respondent 112",
+        "Anonymous Respondent 113",
+        "Anonymous Respondent 114",
+        "Anonymous Respondent 115",
+        "Anonymous Respondent 116",
+        "Anonymous Respondent 117",
+        "Anonymous Respondent 118",
+        "Anonymous Respondent 119",
+        "Anonymous Respondent 120",
+        "Anonymous Respondent 121",
+        "Anonymous Respondent 122",
+        "Anonymous Respondent 123",
+        "Anonymous Respondent 124",
+        "Anonymous Respondent 125",
+        "Anonymous Respondent 126",
+        "Anonymous Respondent 127",
+        "Anonymous Respondent 128",
+        "Anonymous Respondent 129",
+        "Anonymous Respondent 130",
+        "Anonymous Respondent 131",
+        "Anonymous Respondent 132",
+        "Anonymous Respondent 133",
+        "Anonymous Respondent 134",
+        "Anonymous Respondent 135",
+        "Anonymous Respondent 136",
+        "Anonymous Respondent 137",
+        "Anonymous Respondent 138",
+        "Anonymous Respondent 139",
+        "Anonymous Respondent 140",
+        "Anonymous Respondent 141",
+        "Anonymous Respondent 142",
+        "Anonymous Respondent 143",
+        "Anonymous Respondent 144",
+        "Anonymous Respondent 145",
+        "Anonymous Respondent 146",
+        "Anonymous Respondent 147",
+        "Anonymous Respondent 148",
+        "Anonymous Respondent 149",
+        "Anonymous Respondent 150",
+        "Anonymous Respondent 151",
+        "Anonymous Respondent 152",
+        "Anonymous Respondent 153",
+        "Anonymous Respondent 154",
+        "Anonymous Respondent 155",
+        "Anonymous Respondent 156",
+        "Anonymous Respondent 157",
+        "Anonymous Respondent 158",
+        "Anonymous Respondent 159",
+        "Anonymous Respondent 160",
+        "Anonymous Respondent 161",
+        "Anonymous Respondent 162",
+        "Anonymous Respondent 163",
+        "Anonymous Respondent 164",
+        "Anonymous Respondent 165",
+        "Anonymous Respondent 166",
+        "Anonymous Respondent 167",
+        "Anonymous Respondent 168",
+        "Anonymous Respondent 169",
+        "Anonymous Respondent 170",
+        "Anonymous Respondent 171",
+        "Anonymous Respondent 172",
+        "Anonymous Respondent 173",
+        "Anonymous Respondent 174",
+        "Anonymous Respondent 175",
+        "Anonymous Respondent 176",
+        "Anonymous Respondent 177",
+        "Anonymous Respondent 178",
+        "Anonymous Respondent 179",
+        "Anonymous Respondent 180",
+        "Anonymous Respondent 181",
+        "Anonymous Respondent 182",
+        "Anonymous Respondent 183",
+        "Anonymous Respondent 184",
+        "Anonymous Respondent 185",
+        "Anonymous Respondent 186",
+        "Anonymous Respondent 187",
+        "Anonymous Respondent 188",
+        "Anonymous Respondent 189",
+        "Anonymous Respondent 190",
+        "Anonymous Respondent 191",
+        "Anonymous Respondent 192",
+        "Anonymous Respondent 193",
+        "Anonymous Respondent 194",
+        "Anonymous Respondent 195",
+        "Anonymous Respondent 196",
+        "Anonymous Respondent 197",
+        "Anonymous Respondent 198",
+        "Anonymous Respondent 199",
+        "Anonymous Respondent 200"
+      ]
+    },
+    "race": {
+      "type": "categorical",
+      "sample_size": 200,
+      "unique_count": 5,
+      "analysis_value": "high",
+      "distribution": {
+        "Other": {
+          "count": 57,
+          "percentage": 28.5
+        },
+        "White": {
+          "count": 29,
+          "percentage": 14.5
+        },
+        "Black": {
+          "count": 36,
+          "percentage": 18
+        },
+        "Hispanic": {
+          "count": 40,
+          "percentage": 20
+        },
+        "Asian": {
+          "count": 38,
+          "percentage": 19
+        }
+      },
+      "values": [
+        "Other",
+        "White",
+        "Black",
+        "Hispanic",
+        "Asian"
+      ]
+    },
+    "gender": {
+      "type": "categorical",
+      "sample_size": 200,
+      "unique_count": 2,
+      "analysis_value": "high",
+      "distribution": {
+        "Male": {
+          "count": 95,
+          "percentage": 47.5
+        },
+        "Female": {
+          "count": 105,
+          "percentage": 52.5
+        }
+      },
+      "values": [
+        "Male",
+        "Female"
+      ]
+    },
+    "location": {
+      "type": "categorical",
+      "sample_size": 200,
+      "unique_count": 49,
+      "analysis_value": "high",
+      "distribution": {
+        "Kentucky": {
+          "count": 3,
+          "percentage": 1.5
+        },
+        "Hawaii": {
+          "count": 4,
+          "percentage": 2
+        },
+        "Louisiana": {
+          "count": 2,
+          "percentage": 1
+        },
+        "Connecticut": {
+          "count": 3,
+          "percentage": 1.5
+        },
+        "Virginia": {
+          "count": 4,
+          "percentage": 2
+        },
+        "Iowa": {
+          "count": 8,
+          "percentage": 4
+        },
+        "Washington": {
+          "count": 6,
+          "percentage": 3
+        },
+        "Michigan": {
+          "count": 5,
+          "percentage": 2.5
+        },
+        "Wyoming": {
+          "count": 3,
+          "percentage": 1.5
+        },
+        "Maryland": {
+          "count": 3,
+          "percentage": 1.5
+        },
+        "Florida": {
+          "count": 8,
+          "percentage": 4
+        },
+        "Ohio": {
+          "count": 6,
+          "percentage": 3
+        },
+        "Kansas": {
+          "count": 4,
+          "percentage": 2
+        },
+        "Nebraska": {
+          "count": 6,
+          "percentage": 3
+        },
+        "New Mexico": {
+          "count": 4,
+          "percentage": 2
+        },
+        "Oklahoma": {
+          "count": 5,
+          "percentage": 2.5
+        },
+        "Oregon": {
+          "count": 3,
+          "percentage": 1.5
+        },
+        "Pennsylvania": {
+          "count": 5,
+          "percentage": 2.5
+        },
+        "West Virginia": {
+          "count": 3,
+          "percentage": 1.5
+        },
+        "Montana": {
+          "count": 8,
+          "percentage": 4
+        },
+        "Indiana": {
+          "count": 6,
+          "percentage": 3
+        },
+        "Tennessee": {
+          "count": 2,
+          "percentage": 1
+        },
+        "Alabama": {
+          "count": 7,
+          "percentage": 3.5
+        },
+        "Delaware": {
+          "count": 3,
+          "percentage": 1.5
+        },
+        "Colorado": {
+          "count": 4,
+          "percentage": 2
+        },
+        "Vermont": {
+          "count": 6,
+          "percentage": 3
+        },
+        "Rhode Island": {
+          "count": 5,
+          "percentage": 2.5
+        },
+        "Maine": {
+          "count": 7,
+          "percentage": 3.5
+        },
+        "North Carolina": {
+          "count": 7,
+          "percentage": 3.5
+        },
+        "Arizona": {
+          "count": 7,
+          "percentage": 3.5
+        },
+        "Massachusetts": {
+          "count": 2,
+          "percentage": 1
+        },
+        "Minnesota": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "Nevada": {
+          "count": 3,
+          "percentage": 1.5
+        },
+        "Utah": {
+          "count": 4,
+          "percentage": 2
+        },
+        "Missouri": {
+          "count": 1,
+          "percentage": 0.5
+        },
+        "New York": {
+          "count": 3,
+          "percentage": 1.5
+        },
+        "South Carolina": {
+          "count": 4,
+          "percentage": 2
+        },
+        "New Hampshire": {
+          "count": 4,
+          "percentage": 2
+        },
+        "South Dakota": {
+          "count": 4,
+          "percentage": 2
+        },
+        "North Dakota": {
+          "count": 2,
+          "percentage": 1
+        },
+        "Wisconsin": {
+          "count": 2,
+          "percentage": 1
+        },
+        "California": {
+          "count": 4,
+          "percentage": 2
+        },
+        "Georgia": {
+          "count": 3,
+          "percentage": 1.5
+        },
+        "Texas": {
+          "count": 3,
+          "percentage": 1.5
+        },
+        "Illinois": {
+          "count": 4,
+          "percentage": 2
+        },
+        "Mississippi": {
+          "count": 3,
+          "percentage": 1.5
+        },
+        "New Jersey": {
+          "count": 2,
+          "percentage": 1
+        },
+        "Arkansas": {
+          "count": 2,
+          "percentage": 1
+        },
+        "Alaska": {
+          "count": 2,
+          "percentage": 1
+        }
+      },
+      "values": [
+        "Kentucky",
+        "Hawaii",
+        "Louisiana",
+        "Connecticut",
+        "Virginia",
+        "Iowa",
+        "Washington",
+        "Michigan",
+        "Wyoming",
+        "Maryland",
+        "Florida",
+        "Ohio",
+        "Kansas",
+        "Nebraska",
+        "New Mexico",
+        "Oklahoma",
+        "Oregon",
+        "Pennsylvania",
+        "West Virginia",
+        "Montana",
+        "Indiana",
+        "Tennessee",
+        "Alabama",
+        "Delaware",
+        "Colorado",
+        "Vermont",
+        "Rhode Island",
+        "Maine",
+        "North Carolina",
+        "Arizona",
+        "Massachusetts",
+        "Minnesota",
+        "Nevada",
+        "Utah",
+        "Missouri",
+        "New York",
+        "South Carolina",
+        "New Hampshire",
+        "South Dakota",
+        "North Dakota",
+        "Wisconsin",
+        "California",
+        "Georgia",
+        "Texas",
+        "Illinois",
+        "Mississippi",
+        "New Jersey",
+        "Arkansas",
+        "Alaska"
+      ]
+    },
+    "education": {
+      "type": "categorical",
+      "sample_size": 200,
+      "unique_count": 4,
+      "analysis_value": "high",
+      "distribution": {
+        "College graduate": {
+          "count": 59,
+          "percentage": 29.5
+        },
+        "Postgraduate": {
+          "count": 47,
+          "percentage": 23.5
+        },
+        "Some college": {
+          "count": 50,
+          "percentage": 25
+        },
+        "High school or less": {
+          "count": 44,
+          "percentage": 22
+        }
+      },
+      "values": [
+        "College graduate",
+        "Postgraduate",
+        "Some college",
+        "High school or less"
+      ]
+    }
+  },
+  "fact_sheet": {
+    "core_stats": {
+      "response_overview": {
+        "total_respondents": 200,
+        "completion_rate": 100,
+        "data_quality_score": 0.95
+      },
+      "demographic_distribution": {
+        "age": {
+          "18-29": {
+            "count": 35,
+            "percentage": 17.5
+          },
+          "30-49": {
+            "count": 53,
+            "percentage": 26.5
+          },
+          "50-64": {
+            "count": 59,
+            "percentage": 29.5
+          },
+          "65+": {
+            "count": 53,
+            "percentage": 26.5
+          }
+        },
+        "name": {
+          "Anonymous Respondent 1": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 2": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 3": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 4": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 5": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 6": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 7": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 8": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 9": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 10": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 11": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 12": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 13": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 14": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 15": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 16": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 17": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 18": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 19": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 20": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 21": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 22": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 23": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 24": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 25": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 26": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 27": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 28": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 29": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 30": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 31": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 32": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 33": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 34": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 35": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 36": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 37": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 38": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 39": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 40": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 41": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 42": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 43": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 44": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 45": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 46": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 47": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 48": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 49": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 50": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 51": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 52": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 53": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 54": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 55": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 56": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 57": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 58": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 59": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 60": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 61": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 62": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 63": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 64": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 65": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 66": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 67": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 68": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 69": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 70": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 71": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 72": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 73": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 74": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 75": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 76": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 77": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 78": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 79": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 80": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 81": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 82": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 83": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 84": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 85": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 86": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 87": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 88": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 89": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 90": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 91": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 92": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 93": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 94": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 95": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 96": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 97": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 98": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 99": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 100": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 101": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 102": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 103": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 104": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 105": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 106": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 107": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 108": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 109": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 110": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 111": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 112": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 113": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 114": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 115": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 116": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 117": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 118": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 119": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 120": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 121": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 122": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 123": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 124": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 125": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 126": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 127": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 128": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 129": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 130": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 131": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 132": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 133": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 134": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 135": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 136": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 137": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 138": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 139": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 140": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 141": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 142": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 143": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 144": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 145": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 146": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 147": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 148": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 149": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 150": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 151": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 152": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 153": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 154": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 155": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 156": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 157": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 158": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 159": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 160": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 161": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 162": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 163": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 164": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 165": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 166": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 167": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 168": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 169": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 170": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 171": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 172": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 173": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 174": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 175": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 176": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 177": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 178": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 179": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 180": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 181": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 182": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 183": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 184": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 185": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 186": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 187": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 188": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 189": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 190": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 191": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 192": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 193": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 194": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 195": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 196": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 197": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 198": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 199": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Anonymous Respondent 200": {
+            "count": 1,
+            "percentage": 0.5
+          }
+        },
+        "race": {
+          "Other": {
+            "count": 57,
+            "percentage": 28.5
+          },
+          "White": {
+            "count": 29,
+            "percentage": 14.5
+          },
+          "Black": {
+            "count": 36,
+            "percentage": 18
+          },
+          "Hispanic": {
+            "count": 40,
+            "percentage": 20
+          },
+          "Asian": {
+            "count": 38,
+            "percentage": 19
+          }
+        },
+        "gender": {
+          "Male": {
+            "count": 95,
+            "percentage": 47.5
+          },
+          "Female": {
+            "count": 105,
+            "percentage": 52.5
+          }
+        },
+        "location": {
+          "Kentucky": {
+            "count": 3,
+            "percentage": 1.5
+          },
+          "Hawaii": {
+            "count": 4,
+            "percentage": 2
+          },
+          "Louisiana": {
+            "count": 2,
+            "percentage": 1
+          },
+          "Connecticut": {
+            "count": 3,
+            "percentage": 1.5
+          },
+          "Virginia": {
+            "count": 4,
+            "percentage": 2
+          },
+          "Iowa": {
+            "count": 8,
+            "percentage": 4
+          },
+          "Washington": {
+            "count": 6,
+            "percentage": 3
+          },
+          "Michigan": {
+            "count": 5,
+            "percentage": 2.5
+          },
+          "Wyoming": {
+            "count": 3,
+            "percentage": 1.5
+          },
+          "Maryland": {
+            "count": 3,
+            "percentage": 1.5
+          },
+          "Florida": {
+            "count": 8,
+            "percentage": 4
+          },
+          "Ohio": {
+            "count": 6,
+            "percentage": 3
+          },
+          "Kansas": {
+            "count": 4,
+            "percentage": 2
+          },
+          "Nebraska": {
+            "count": 6,
+            "percentage": 3
+          },
+          "New Mexico": {
+            "count": 4,
+            "percentage": 2
+          },
+          "Oklahoma": {
+            "count": 5,
+            "percentage": 2.5
+          },
+          "Oregon": {
+            "count": 3,
+            "percentage": 1.5
+          },
+          "Pennsylvania": {
+            "count": 5,
+            "percentage": 2.5
+          },
+          "West Virginia": {
+            "count": 3,
+            "percentage": 1.5
+          },
+          "Montana": {
+            "count": 8,
+            "percentage": 4
+          },
+          "Indiana": {
+            "count": 6,
+            "percentage": 3
+          },
+          "Tennessee": {
+            "count": 2,
+            "percentage": 1
+          },
+          "Alabama": {
+            "count": 7,
+            "percentage": 3.5
+          },
+          "Delaware": {
+            "count": 3,
+            "percentage": 1.5
+          },
+          "Colorado": {
+            "count": 4,
+            "percentage": 2
+          },
+          "Vermont": {
+            "count": 6,
+            "percentage": 3
+          },
+          "Rhode Island": {
+            "count": 5,
+            "percentage": 2.5
+          },
+          "Maine": {
+            "count": 7,
+            "percentage": 3.5
+          },
+          "North Carolina": {
+            "count": 7,
+            "percentage": 3.5
+          },
+          "Arizona": {
+            "count": 7,
+            "percentage": 3.5
+          },
+          "Massachusetts": {
+            "count": 2,
+            "percentage": 1
+          },
+          "Minnesota": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "Nevada": {
+            "count": 3,
+            "percentage": 1.5
+          },
+          "Utah": {
+            "count": 4,
+            "percentage": 2
+          },
+          "Missouri": {
+            "count": 1,
+            "percentage": 0.5
+          },
+          "New York": {
+            "count": 3,
+            "percentage": 1.5
+          },
+          "South Carolina": {
+            "count": 4,
+            "percentage": 2
+          },
+          "New Hampshire": {
+            "count": 4,
+            "percentage": 2
+          },
+          "South Dakota": {
+            "count": 4,
+            "percentage": 2
+          },
+          "North Dakota": {
+            "count": 2,
+            "percentage": 1
+          },
+          "Wisconsin": {
+            "count": 2,
+            "percentage": 1
+          },
+          "California": {
+            "count": 4,
+            "percentage": 2
+          },
+          "Georgia": {
+            "count": 3,
+            "percentage": 1.5
+          },
+          "Texas": {
+            "count": 3,
+            "percentage": 1.5
+          },
+          "Illinois": {
+            "count": 4,
+            "percentage": 2
+          },
+          "Mississippi": {
+            "count": 3,
+            "percentage": 1.5
+          },
+          "New Jersey": {
+            "count": 2,
+            "percentage": 1
+          },
+          "Arkansas": {
+            "count": 2,
+            "percentage": 1
+          },
+          "Alaska": {
+            "count": 2,
+            "percentage": 1
+          }
+        },
+        "education": {
+          "College graduate": {
+            "count": 59,
+            "percentage": 29.5
+          },
+          "Postgraduate": {
+            "count": 47,
+            "percentage": 23.5
+          },
+          "Some college": {
+            "count": 50,
+            "percentage": 25
+          },
+          "High school or less": {
+            "count": 44,
+            "percentage": 22
+          }
+        }
+      }
+    },
+    "question_stats": {
+      "which_social_media_platforms_d": {
+        "adoption_rates": {
+          "YouTube": {
+            "users": 153,
+            "percentage": 76.5,
+            "rank": 1
+          },
+          "Facebook": {
+            "users": 138,
+            "percentage": 69,
+            "rank": 2
+          },
+          "Instagram": {
+            "users": 76,
+            "percentage": 38,
+            "rank": 3
+          },
+          "Pinterest": {
+            "users": 67,
+            "percentage": 33.5,
+            "rank": 4
+          },
+          "WhatsApp": {
+            "users": 50,
+            "percentage": 25,
+            "rank": 5
+          },
+          "Snapchat": {
+            "users": 49,
+            "percentage": 24.5,
+            "rank": 6
+          },
+          "LinkedIn": {
+            "users": 45,
+            "percentage": 22.5,
+            "rank": 7
+          },
+          "Twitter": {
+            "users": 40,
+            "percentage": 20,
+            "rank": 8
+          },
+          "Reddit": {
+            "users": 38,
+            "percentage": 19,
+            "rank": 9
+          },
+          "TikTok": {
+            "users": 34,
+            "percentage": 17,
+            "rank": 10
+          }
+        },
+        "usage_patterns": {
+          "average_selections_per_user": 3.5,
+          "single_selection_users": 27,
+          "multi_selection_users": 166
+        }
+      },
+      "how_many_hours_per_day_do_you_": {
+        "statistics": {
+          "mean": 4.66,
+          "median": 5,
+          "min": 1,
+          "max": 8,
+          "std_dev": 2.24
+        },
+        "distribution": {
+          "1-1_hours": {
+            "count": 18,
+            "percentage": 9
+          },
+          "2-2_hours": {
+            "count": 27,
+            "percentage": 13.5
+          },
+          "3-3_hours": {
+            "count": 23,
+            "percentage": 11.5
+          },
+          "4-8_hours": {
+            "count": 132,
+            "percentage": 66
+          }
+        }
+      },
+      "what_are_your_primary_activiti": {
+        "adoption_rates": {
+          "Watching videos": {
+            "users": 65,
+            "percentage": 32.5,
+            "rank": 1
+          },
+          "Sharing photos": {
+            "users": 65,
+            "percentage": 32.5,
+            "rank": 2
+          },
+          "Live streaming": {
+            "users": 64,
+            "percentage": 32,
+            "rank": 3
+          },
+          "Following brands": {
+            "users": 63,
+            "percentage": 31.5,
+            "rank": 4
+          },
+          "Creating content": {
+            "users": 57,
+            "percentage": 28.5,
+            "rank": 5
+          },
+          "Reading news": {
+            "users": 53,
+            "percentage": 26.5,
+            "rank": 6
+          },
+          "Gaming": {
+            "users": 51,
+            "percentage": 25.5,
+            "rank": 7
+          },
+          "Messaging friends": {
+            "users": 47,
+            "percentage": 23.5,
+            "rank": 8
+          },
+          "Shopping": {
+            "users": 42,
+            "percentage": 21,
+            "rank": 9
+          }
+        },
+        "usage_patterns": {
+          "average_selections_per_user": 2.5,
+          "single_selection_users": 50,
+          "multi_selection_users": 150
+        }
+      },
+      "do_you_have_concerns_about_pri": {
+        "distribution": {
+          "No": {
+            "count": 81,
+            "percentage": 40.5
+          },
+          "Yes": {
+            "count": 119,
+            "percentage": 59.5
+          }
+        }
+      },
+      "have_you_encountered_misinform": {
+        "distribution": {
+          "No": {
+            "count": 57,
+            "percentage": 28.5
+          },
+          "Yes": {
+            "count": 143,
+            "percentage": 71.5
+          }
+        }
+      }
+    }
+  },
+  "analysis_metadata": {
+    "analyzed_at": "2025-07-01T13:53:37.925Z",
+    "version": "1.0",
+    "total_data_points": 1000
+  }
+}

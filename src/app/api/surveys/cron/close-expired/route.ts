@@ -1,15 +1,36 @@
 import { NextRequest, NextResponse } from "next/server";
 import { SurveyRepo } from "@/app/utils/database/survey-repo";
 
-// POST /api/surveys/cron/close-expired - Close expired surveys (called by cron)
+// POST /api/surveys/cron/close-expired - Manage campaign lifecycle (called by cron)
 export async function POST(req: NextRequest) {
     try {
-        const closedCount = await SurveyRepo.autoCloseExpired();
+        // Run both old and new campaign management systems
+        const [
+            oldClosedCount,
+            activatedCount,
+            stoppedCount
+        ] = await Promise.all([
+            SurveyRepo.autoCloseExpired(),        // Legacy system (end_at based)
+            SurveyRepo.autoActivateScheduled(),   // New: Activate scheduled campaigns
+            SurveyRepo.autoStopExpired()          // New: Stop campaigns past campaign_end_at
+        ]);
+
+        const totalChanges = oldClosedCount + activatedCount + stoppedCount;
+        
+        const results = {
+            legacy_closed: oldClosedCount,
+            campaigns_activated: activatedCount,
+            campaigns_stopped: stoppedCount,
+            total_changes: totalChanges
+        };
+
+        console.log(`📊 Campaign cron results:`, results);
         
         return NextResponse.json({ 
             status: true, 
-            closedCount,
-            message: `${closedCount} survey(s) closed`
+            closedCount: totalChanges, // For backward compatibility
+            results,
+            message: `Campaign management: ${activatedCount} activated, ${stoppedCount} stopped, ${oldClosedCount} legacy closed`
         });
 
     } catch (error) {
