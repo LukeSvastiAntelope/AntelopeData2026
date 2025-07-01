@@ -97,6 +97,8 @@ export default function FrontLanding() {
             <div className="flex items-center">
               <SidebarTrigger className="-ml-0.5 h-5 w-5 text-muted-foreground hover:text-foreground" />
               <div className="h-4 border-l border-border mx-4" />
+            </div>
+            <div className="absolute left-1/2 transform -translate-x-1/2">
               <LogoText 
                 className="text-zinc-900 dark:text-zinc-100"
                 width={120} 
@@ -110,23 +112,28 @@ export default function FrontLanding() {
         <div className="border-b border-border" />
 
         {/* Main content space-y-16 */}
-        <div className="p-6 ">
+        <div className="py-16 ">
           {/* Hero Section */}
-          <section className="relative w-full h-[50vh] md:h-[75vh] rounded-lg overflow-hidden flex items-start justify-center">
+          <section className="relative w-full h-[50vh] md:h-[50vh] rounded-lg overflow-hidden flex items-start justify-center">
             {/* Content */}
             <div className="relative z-10 flex flex-col items-center text-center max-w-3xl px-4 gap-y-6">
-              <h2 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-card-foreground">
-              Turn Your Surveys Into a Live Network of Synthetic Personas.
-              </h2>
-              <p className="text-muted-foreground mb-6">
-                Antelope lets you generate AI-powered surveys, build anonymised Digital Twins, and understand your audience in minutes—not weeks.
+              <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-muted/5 border border-primary/10 text-primary font-medium text-xs">
+                <Rocket className="h-3 w-3" />
+                Unlimited surveys &amp; responses
+              </div>
+              <h1 className="leading-none text-4xl sm:text-5xl lg:text-8xl font-bold tracking-tight text-card-foreground">
+              Ready to to take your surveys to the next level?
+              </h1>
+              <p className="font-medium text-2xl mb-6">
+              Chat with your surveys and get insights in real-time.
               </p>
               
               {/* Chat Input Field */}
-              <div className="relative w-full max-w-xl">
+              <div className="relative w-full max-w-2xl shadow-xl">
                 <Textarea 
-                  className="flex-1 min-h-[80px] pr-24 resize-none" 
-                  placeholder="Ask the cohort… or upload your survey to get started" 
+                  className="flex-1 min-h-[100px] pr-24 resize-none" 
+                  style={{ backgroundColor: '#f9f9f9' }}
+                  placeholder="Upload your survey to get started" 
                   value={input} 
                   onChange={e => setInput(e.target.value)} 
                   onKeyDown={handleKeyDown}
@@ -221,8 +228,12 @@ export default function FrontLanding() {
                   </Button>
                 </div>
               </div>
+
+              <p className="text-xs text-muted-foreground text-center mt-2">
+                This is still in beta so expect hiccups.
+              </p>
               
-              <div className="text-xs text-center max-w-xl space-y-2">
+              {/* <div className="text-xs text-center max-w-xl space-y-2">
                 <p className="font-medium text-muted-foreground">Try asking:</p>
                 <div className="flex flex-wrap gap-2 justify-center">
                   {[
@@ -239,62 +250,88 @@ export default function FrontLanding() {
                     </div>
                   ))}
                 </div>
-              </div>
+              </div> */}
             </div>
           </section>
 
            {/* Final CTA */}
-           <section 
-            className="relative rounded-lg p-8 text-center space-y-4 max-w-8xl mx-auto h-[400px] flex flex-col items-center justify-center overflow-hidden"
-            style={{ backgroundImage: "url('/hero.jpg')", backgroundSize: 'cover', backgroundPosition: 'center', backgroundRepeat: 'no-repeat' }}
-          >
+           {/* <section 
+            className="relative rounded-lg py-6 px-0 text-center space-y-4 max-w-8xl mx-auto h-[400px] flex flex-col items-center justify-center overflow-hidden"
+            style={{ backgroundImage: "url('/hero.jpg')", backgroundSize: 'cover', backgroundPosition: 'top', backgroundRepeat: 'no-repeat' }}
+          > */}
             {/* Overlay for readability */}
-            <div className="absolute inset-0 bg-background/60" />
+            {/* <div className="absolute inset-0 bg-background/10" /> */}
             
             {/* Content */}
-            <div className="relative z-10 space-y-4">
+            {/* <div className="relative z-10 space-y-4">
               <h3 className="text-3xl font-semibold text-card-foreground">Ready to get insights that move the needle?</h3>
               <p className="text-muted-foreground">Join Antelope today and start understanding your audience.</p>
               <Button size="lg" onClick={() => router.push("/register")}>Get Started</Button>
-            </div>
-          </section>
+            </div> */}
+          {/* </section> */}
 
           {/* Feature Grid */}
           <section className="mt-16 max-w-6xl mx-auto">
-            <h3 className="text-3xl font-bold text-center mb-8">Key Features</h3>
-            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-              <Card className="bg-card border-border shadow-sm">
-                <CardContent className="p-6 space-y-4">
-                  <LightbulbIcon className="h-6 w-6 text-primary" />
-                  <h3 className="font-semibold text-lg">AI-Powered Builder</h3>
-                  <p className="text-muted-foreground text-sm">
-                    Describe your research goal and let our AI draft engaging questions in seconds.
+            <h3 className="text-4xl font-bold text-center mb-2">Simple, powerful and free</h3>
+            <p className="text-muted-foreground text-center mb-12 text-lg">
+              Ask what you want to know about your survey and Antelope will answer you. No need to read long reports to get the insights.
+            </p>
+            <div className="grid gap-12 lg:grid-cols-3">
+              {/* Create or import any survey */}
+              <div className="text-left space-y-6">
+                <div className="mx-auto w-full max-w-sm">
+                  <img 
+                    src="/web-01.png" 
+                    alt="Create or import surveys illustration" 
+                    className="w-full h-auto "
+                  />
+                </div>
+                <div className="space-y-1">
+                  <h3 className="font-bold text-xl text-gray-900 dark:text-gray-100">Create or import any survey</h3>
+                  <p className="text-gray-600 dark:text-gray-300 leading-relaxed">
+                    Powerful AI builder + csv, xls, Survey Monkey, Google Sheets and Typeform support
                   </p>
-                </CardContent>
-              </Card>
-              <Card className="bg-card border-border shadow-sm">
-                <CardContent className="p-6 space-y-4">
-                  <MessageCircleIcon className="h-6 w-6 text-primary" />
-                  <h3 className="font-semibold text-lg">Instant Analytics</h3>
-                  <p className="text-muted-foreground text-sm">
-                    Real-time dashboards, GPT-powered cohort chat, and exportable charts ready for your deck.
+                </div>
+              </div>
+
+              {/* Chat with survey */}
+              <div className="text-left space-y-6">
+                <div className="mx-auto w-full max-w-sm">
+                  <img 
+                    src="/web-02.png" 
+                    alt="Chat with survey illustration" 
+                    className="w-full h-auto "
+                  />
+                </div>
+                <div className="space-y-1">
+                  <h3 className="font-bold text-xl text-gray-900 dark:text-gray-100">Chat with survey</h3>
+                  <p className="text-gray-600 dark:text-gray-300 leading-relaxed">
+                    No need to read long reports to get the insights. Chat directly with the survey.
                   </p>
-                </CardContent>
-              </Card>
-              <Card className="bg-card border-border shadow-sm">
-                <CardContent className="p-6 space-y-4">
-                  <BrainIcon className="h-6 w-6 text-primary" />
-                  <h3 className="font-semibold text-lg">Personal Digital Twins</h3>
-                  <p className="text-muted-foreground text-sm">
-                    Every respondent gets an anonymised twin that evolves as they share more—boosting engagement &amp; data richness.
+                </div>
+              </div>
+
+              {/* Build Synthetic Personas */}
+              <div className="text-left space-y-6">
+                <div className="mx-auto w-full max-w-sm">
+                  <img 
+                    src="/web-03.png" 
+                    alt="Build synthetic personas illustration" 
+                    className="w-full h-auto "
+                  />
+                </div>
+                <div className="space-y-1">
+                  <h3 className="font-bold text-xl text-gray-900 dark:text-gray-100">Build synthetic personas</h3>
+                  <p className="text-gray-600 dark:text-gray-300 leading-relaxed">
+                    For every responder that answers we build a digital twin you can further enhance
                   </p>
-                </CardContent>
-              </Card>
+                </div>
+              </div>
             </div>
           </section>
 
-          {/* How It Works */}
-          <section className="mt-16 space-y-12 max-w-6xl mx-auto">
+        
+          {/* <section className="mt-16 space-y-12 max-w-6xl mx-auto">
             <h3 className="text-3xl font-bold text-center mb-8">How Antelope Works</h3>
             <div className="grid gap-6 sm:grid-cols-3">
               {[
@@ -322,10 +359,10 @@ export default function FrontLanding() {
                 </Card>
               ))}
             </div>
-          </section>
+          </section> */}
 
           {/* Why Antelope */}
-          <section className="mt-24 max-w-4xl mx-auto text-center space-y-6">
+          {/* <section className="mt-24 max-w-4xl mx-auto text-center space-y-6">
             <h3 className="text-3xl font-bold">Why Choose Antelope?</h3>
             <ul className="list-disc list-inside text-left mx-auto space-y-2 max-w-2xl">
               <li className="text-muted-foreground">Built-in AI removes the grunt work of survey design and analysis.</li>
@@ -333,42 +370,9 @@ export default function FrontLanding() {
               <li className="text-muted-foreground">Real-time cohort chat surfaces insights the moment data lands.</li>
               <li className="text-muted-foreground">Exportable charts ready for decks, reports, and stakeholders.</li>
             </ul>
-          </section>
+          </section> */}
 
-          {/* Testimonials */}
-          <section className="mt-24 space-y-12 max-w-6xl mx-auto">
-            <h3 className="text-3xl font-bold text-center mb-8">What Early Users Say</h3>
-            <div className="grid gap-6 md:grid-cols-3">
-              {[
-                {
-                  quote:
-                    "Antelope cut our research time from weeks to days. The Digital Twin concept is a game-changer.",
-                  name: "Sofia L.",
-                  title: "UX Research Lead",
-                },
-                {
-                  quote:
-                    "We uncovered customer segments we didn't even know existed. The cohort chat feels like magic.",
-                  name: "Ryan K.",
-                  title: "Product Manager",
-                },
-                {
-                  quote:
-                    "The dashboards helped us secure buy-in from stakeholders faster than ever.",
-                  name: "Maya P.",
-                  title: "Growth Strategist",
-                },
-              ].map((t) => (
-                <Card key={t.name} className="bg-card border-border shadow-sm h-full">
-                  <CardContent className="p-6 flex flex-col gap-4">
-                    <p className="italic text-muted-foreground flex-1">&ldquo;{t.quote}&rdquo;</p>
-                    <div className="text-sm font-medium text-card-foreground">{t.name}</div>
-                    <div className="text-xs text-muted-foreground">{t.title}</div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </section>
+          
 
          
         </div>

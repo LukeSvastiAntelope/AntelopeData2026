@@ -34,12 +34,13 @@ import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@/components/ui/table"
 import { formatDistanceToNow } from "date-fns"
 
+
 interface Survey {
   id: number
   title: string
   description: string
   slug: string
-  status: 'draft' | 'scheduled' | 'active' | 'published' | 'closed' | 'archived'
+  status: 'draft' | 'scheduled' | 'active' | 'published' | 'closed' | 'archived' | 'stopped'
   is_public: boolean
   created_at: string
   response_count: number
@@ -175,6 +176,7 @@ const SurveysPage = () => {
       case 'published': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
       case 'scheduled': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300'
       case 'draft': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300'
+      case 'stopped': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300'
       case 'closed': return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300'
       case 'archived': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300'
       default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300'
@@ -329,6 +331,12 @@ const SurveysPage = () => {
     }
   }
 
+  const handleCampaignStatusChange = (surveyId: number, newStatus: string) => {
+    // Reload surveys to reflect the status change
+    loadSurveys()
+    toast.success(`Campaign ${newStatus} successfully`)
+  }
+
   if (loading) {
     return (
       <div className="flex-1 p-2 w-full bg-background">
@@ -353,7 +361,7 @@ const SurveysPage = () => {
     <div className="flex-1 p-2 w-full bg-background">
       <div className="mx-auto rounded-lg bg-card text-card-foreground shadow-lg">
         {/* Header */}
-        <div className="px-6 py-2">
+        <div className="px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center">
               <SidebarTrigger className="-ml-0.5 h-5 w-5 text-muted-foreground hover:text-foreground" />
@@ -363,14 +371,15 @@ const SurveysPage = () => {
             <div className="flex gap-2">
               <Button 
                 variant="outline"
+                size="sm"
                 onClick={() => router.push('/surveys/import')}
               >
-                <Upload className="h-4 w-4 mr-2" />
+                <Upload className="h-3 w-3 mr-1.5" />
                 Import Survey
               </Button>
               <Link href="/create">
-                <Button>
-                  <Plus className="h-4 w-4 mr-2" />
+                <Button size="sm">
+                  <Plus className="h-3 w-3 mr-1.5" />
                   Create Survey
                 </Button>
               </Link>
@@ -401,20 +410,7 @@ const SurveysPage = () => {
               </Link>
             </div>
           ) : (
-            <>
-              {/* Introduction */}
-              <div className="text-center space-y-2">
-                <div className="flex items-center justify-center mb-4">
-                  <div className="p-3 rounded-full bg-primary/10">
-                    <FileText className="h-8 w-8 text-primary" />
-                  </div>
-                </div>
-                <h2 className="text-2xl font-bold">Survey Management</h2>
-                <p className="text-muted-foreground text-base max-w-2xl mx-auto">
-                  Manage all your surveys, track responses, and analyze results in one place.
-                </p>
-              </div>
-
+                        <>
               {/* Dashboard Overview */}
               <section className="space-y-4">
                                  {/* Overview Stats Cards */}
@@ -629,6 +625,8 @@ const SurveysPage = () => {
                   </Card>
                 </div>
 
+
+
                 {/* Surveys Table */}
                 <Card>
                   <CardHeader>
@@ -743,7 +741,7 @@ const SurveysPage = () => {
                                     <X className="h-4 w-4" />
                                   </Button>
                                 )}
-                                {survey.status === 'closed' && (
+                                {(survey.status === 'closed' || survey.status === 'stopped') && (
                                   <Button 
                                     variant="ghost" 
                                     size="sm"

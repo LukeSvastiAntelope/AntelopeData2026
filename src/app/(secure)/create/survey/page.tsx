@@ -181,10 +181,6 @@ const CreateSurveyPage = () => {
                 <Eye className="h-4 w-4 mr-2" />
                 {showPreview ? 'Edit' : 'Preview'}
               </Button>
-              <Button variant="outline" size="sm" onClick={generateWithAI}>
-                <Wand2 className="h-4 w-4 mr-2" />
-                AI Generate
-              </Button>
               <Button onClick={saveSurvey} disabled={isLoading}>
                 <Save className="h-4 w-4 mr-2" />
                 {isLoading ? 'Saving...' : 'Save Survey'}

@@ -28,7 +28,7 @@ export class SmartSurveyQueryBuilder {
     cohortFilters: CohortFilterRule[], 
     userId: string, 
     surveyId?: number, 
-    topK: number = 50
+    topK: number = 1000
   ): Promise<QueryResult> {
     
     // Classify the user's intent
@@ -99,9 +99,8 @@ export class SmartSurveyQueryBuilder {
     }
 
     const orderBy = `ORDER BY 
-      LENGTH(sa.answer_value) DESC, -- Longer responses first for better themes
-      CASE WHEN sq.prompt LIKE '%why%' OR sq.prompt LIKE '%how%' OR sq.prompt LIKE '%what%' THEN 1 ELSE 2 END,
-      sr.id DESC`;
+      sq.question_order ASC,
+      RAND()`;
 
     const sql = `
       SELECT sr.id as rid, sa.answer_value, sq.prompt as question_text, sq.type as question_type,
@@ -122,7 +121,7 @@ export class SmartSurveyQueryBuilder {
       JOIN surveys s ON sr.survey_id = s.id
       WHERE ${whereClause}
       ${orderBy}
-      LIMIT ${Math.min(topK, 1000)}`;
+      LIMIT ${Math.min(topK, 10000)}`;
 
     return {
       sql,
@@ -160,9 +159,8 @@ export class SmartSurveyQueryBuilder {
     whereClause += ` AND sa.answer_value != ''`;
 
     const orderBy = `ORDER BY 
-      CASE WHEN sq.type = 'multiple-choice' THEN 1 ELSE 2 END, -- Multiple choice first for richer patterns
       sq.question_order ASC,
-      sr.id DESC`;
+      RAND()`;
 
     const sql = `
       SELECT sr.id as rid, sa.answer_value, sq.prompt as question_text, sq.type as question_type,
@@ -183,7 +181,7 @@ export class SmartSurveyQueryBuilder {
       JOIN surveys s ON sr.survey_id = s.id
       WHERE ${whereClause}
       ${orderBy}
-      LIMIT ${Math.min(topK, 1000)}`;
+      LIMIT ${Math.min(topK, 10000)}`;
 
     return {
       sql,
@@ -222,12 +220,8 @@ export class SmartSurveyQueryBuilder {
     whereClause += ` AND LENGTH(TRIM(sa.answer_value)) >= ${intent.minResponseLength || 5}`;
 
     const orderBy = `ORDER BY 
-      CASE 
-        WHEN sq.type = 'multiple-choice' THEN 1 
-        WHEN LENGTH(sa.answer_value) > 20 THEN 2 
-        ELSE 3 
-      END,
-      LENGTH(sa.answer_value) DESC`;
+      sq.question_order ASC,
+      RAND()`;
 
     const sql = `
       SELECT sr.id as rid, sa.answer_value, sq.prompt as question_text, sq.type as question_type,
@@ -248,7 +242,7 @@ export class SmartSurveyQueryBuilder {
       JOIN surveys s ON sr.survey_id = s.id
       WHERE ${whereClause}
       ${orderBy}
-      LIMIT ${Math.min(topK, 1000)}`;
+      LIMIT ${Math.min(topK, 10000)}`;
 
     return {
       sql,
@@ -286,8 +280,8 @@ export class SmartSurveyQueryBuilder {
     whereClause += ` AND LENGTH(TRIM(sa.answer_value)) >= ${intent.minResponseLength || 10}`;
 
     const orderBy = `ORDER BY 
-      CASE WHEN sq.type = 'text' THEN 1 ELSE 2 END, -- Text first for sentiment
-      LENGTH(sa.answer_value) DESC`;
+      sq.question_order ASC,
+      RAND()`;
 
     const sql = `
       SELECT sr.id as rid, sa.answer_value, sq.prompt as question_text, sq.type as question_type,
@@ -308,7 +302,7 @@ export class SmartSurveyQueryBuilder {
       JOIN surveys s ON sr.survey_id = s.id
       WHERE ${whereClause}
       ${orderBy}
-      LIMIT ${Math.min(topK, 1000)}`;
+      LIMIT ${Math.min(topK, 10000)}`;
 
     return {
       sql,
@@ -361,12 +355,8 @@ export class SmartSurveyQueryBuilder {
     whereClause += ` AND sa.answer_value != ''`;
 
     const orderBy = `ORDER BY 
-      CASE 
-        WHEN sq.type IN ('single-choice', 'multiple-choice') THEN 1
-        WHEN LENGTH(sa.answer_value) > 50 THEN 2
-        ELSE 3
-      END,
-      LENGTH(sa.answer_value) DESC`;
+      sq.question_order ASC,
+      RAND()`;
 
     const sql = `
       SELECT sr.id as rid, sa.answer_value, sq.prompt as question_text, sq.type as question_type,
@@ -387,7 +377,7 @@ export class SmartSurveyQueryBuilder {
       JOIN surveys s ON sr.survey_id = s.id
       WHERE ${whereClause}
       ${orderBy}
-      LIMIT ${Math.min(topK, 1000)}`;
+      LIMIT ${Math.min(topK, 10000)}`;
 
     return {
       sql,
