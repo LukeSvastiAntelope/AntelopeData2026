@@ -18,9 +18,9 @@ import {
   SidebarMenuSubItem,
 } from "@/components/ui/sidebar"
 import {
-  LayoutDashboard as LayoutDashboardIcon,
-  BarChart3 as BarChart3Icon,
-  LineChart as LineChartIcon,
+  FileText as FileTextIcon,
+  Brain as BrainIcon,
+  MessageCircle as MessageCircleIcon,
   Info as InfoIcon,
   Users as UsersIcon,
   LogIn as LogInIcon,
@@ -37,19 +37,16 @@ export function PublicAppSidebar({ className, collapsible = "offcanvas", ...prop
 
   const mainNavItems = [
     {
-      title: "Overview",
-      href: "/",
-      icon: LayoutDashboardIcon
+      title: "Surveys",
+      href: "/login",
+      icon: FileTextIcon,
+      key: "surveys"
     },
     {
-      title: "Markets",
-      href: "/markets",
-      icon: BarChart3Icon
-    },
-    {
-      title: "Strategy",
-      href: "/strategy",
-      icon: LineChartIcon
+      title: "Digital Twins",
+      href: "/login",
+      icon: BrainIcon,
+      key: "digital-twins"
     }
   ]
 
@@ -61,7 +58,7 @@ export function PublicAppSidebar({ className, collapsible = "offcanvas", ...prop
     },
     {
       title: "Community",
-      href: "/community",
+      href: "https://t.me/+F5F2ah0bBzU0ZDAx",
       icon: UsersIcon
     }
   ]
@@ -90,12 +87,21 @@ export function PublicAppSidebar({ className, collapsible = "offcanvas", ...prop
             </div>
           </Link>
         </div>
+        <div className="px-4">
+          <Link 
+            href="/login" 
+            className="flex items-center gap-2 w-full px-4 py-2 text-sm font-medium rounded-md bg-foreground text-background border border-border hover:bg-foreground/90 transition-colors"
+          >
+            <MessageCircleIcon className="h-4 w-4 group-data-[collapsible=offcanvas]:hidden text-background" />
+            <span className="group-data-[collapsible=offcanvas]:hidden text-background">Chat</span>
+          </Link>
+        </div>
       </SidebarHeader>
       
       <SidebarContent className="flex flex-col gap-2">
         <SidebarMenu className="px-4">
           {mainNavItems.map((item) => (
-            <SidebarMenuItem key={item.href}>
+            <SidebarMenuItem key={item.key || item.href}>
               <SidebarMenuButton
                 asChild
                 isActive={pathname === item.href || pathname.startsWith(`${item.href}/`)}
