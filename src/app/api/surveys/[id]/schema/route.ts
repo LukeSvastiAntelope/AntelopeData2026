@@ -66,13 +66,15 @@ export async function GET(
 
     // Check if user has access to this survey
     const db = await openSql();
-    const [surveyCheck] = await db.execute(`
+    const [surveyCheckRaw] = await db.execute(`
       SELECT s.id, s.title, s.created_by, s.status
       FROM surveys s 
       WHERE s.id = ?
     `, [surveyId]);
 
-    if (!surveyCheck || surveyCheck.length === 0) {
+    const surveyCheck = surveyCheckRaw as any[];
+
+    if (!Array.isArray(surveyCheck) || surveyCheck.length === 0) {
       return NextResponse.json({ error: 'Survey not found' }, { status: 404 });
     }
 
@@ -317,13 +319,15 @@ export async function POST(
 
     // Check if user owns this survey
     const db = await openSql();
-    const [surveyCheck] = await db.execute(`
+    const [surveyCheckRaw] = await db.execute(`
       SELECT s.id, s.title, s.created_by
       FROM surveys s 
       WHERE s.id = ? AND s.created_by = ?
     `, [surveyId, userId]);
 
-    if (!surveyCheck || surveyCheck.length === 0) {
+    const surveyCheck = surveyCheckRaw as any[];
+
+    if (!Array.isArray(surveyCheck) || surveyCheck.length === 0) {
       return NextResponse.json({ error: 'Survey not found or access denied' }, { status: 404 });
     }
 

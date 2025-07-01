@@ -132,17 +132,6 @@ export const SurveyRepo = {
         };
     },
 
-    // Fetch survey regardless of status (used to distinguish 404 vs 410)
-    getSurveyBySlugAny: async (slug: string) => {
-        const db = await getMySQLConnection();
-        
-        const [rows] = await db.execute<RowDataPacket[]>(
-            'SELECT * FROM surveys WHERE slug = ? LIMIT 1',
-            [slug]
-        );
-        return rows[0] || null;
-    },
-
     submitSurveyResponse: async (data: any, ipAddress: string, userAgent: string) => {
         const db = await getMySQLConnection();
         const connection = await db.getConnection();
