@@ -2,7 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { openSql } from '@/app/utils/database/db';
 
 // Import the schema analysis functions
-const { analyzeSurveySchema } = require('../../../../../../scripts/analyze-survey-schema.js');
+// Import the schema analysis functions
+async function importAnalyzeSurveySchema() {
+  const schemaModule = await import('../../../../../../scripts/analyze-survey-schema.js');
+  return schemaModule.analyzeSurveySchema;
+}
 
 interface QueryRequest {
   question: string;
@@ -67,6 +71,7 @@ export async function POST(
     console.log(`🤔 Processing query for survey ${surveyId}: "${body.question}"`);
 
     // Get schema analysis using existing database connection (this should be cached in production)
+    const analyzeSurveySchema = await importAnalyzeSurveySchema();
     const schema = await analyzeSurveySchema(surveyId, db);
     
     // Process the query using our smart query system
