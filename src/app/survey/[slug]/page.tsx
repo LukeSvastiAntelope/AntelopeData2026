@@ -645,7 +645,7 @@ const SurveyPage = () => {
                   <div className="mb-4">
                     <Label className="text-lg font-medium">
                       {index + 1}. {question.prompt}
-                      {question.is_required && <span className="text-destructive ml-1">*</span>}
+                      {Boolean(question.is_required) && <span className="text-destructive ml-1">*</span>}
                     </Label>
                   </div>
 

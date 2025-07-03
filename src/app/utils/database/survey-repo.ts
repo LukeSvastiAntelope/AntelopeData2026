@@ -78,7 +78,9 @@ export const SurveyRepo = {
             const surveyId = surveyResult.insertId;
             
             // Insert questions
-            for (const question of data.questions) {
+            for (let i = 0; i < data.questions.length; i++) {
+                const question = data.questions[i];
+                
                 await connection.execute(
                     `INSERT INTO survey_questions (survey_id, type, prompt, options, is_required, question_order) 
                      VALUES (?, ?, ?, ?, ?, ?)`,
@@ -88,7 +90,7 @@ export const SurveyRepo = {
                         question.prompt || '',
                         question.options ? JSON.stringify(question.options) : null,
                         question.isRequired ? 1 : 0,
-                        question.order || 1
+                        question.order || (i + 1)  // Use index + 1 if order is not provided
                     ]
                 );
             }
@@ -110,6 +112,34 @@ export const SurveyRepo = {
         
         const [rows] = await db.execute<RowDataPacket[]>(
             "SELECT * FROM surveys WHERE slug = ? AND status IN ('active', 'published')",
+            [slug]
+        );
+        
+        if (!rows[0]) return null;
+        
+        const survey = rows[0];
+        
+        // Get questions
+        const [questionRows] = await db.execute<RowDataPacket[]>(
+            'SELECT * FROM survey_questions WHERE survey_id = ? ORDER BY question_order ASC',
+            [survey.id]
+        );
+        
+        return {
+            ...survey,
+            questions: questionRows.map((q: any) => ({
+                ...q,
+                options: q.options // MySQL JSON field already returns parsed data
+            }))
+        };
+    },
+
+    // Fetch survey by slug regardless of status (for preview)
+    getSurveyBySlugAny: async (slug: string) => {
+        const db = await getMySQLConnection();
+        
+        const [rows] = await db.execute<RowDataPacket[]>(
+            "SELECT * FROM surveys WHERE slug = ?",
             [slug]
         );
         
@@ -551,7 +581,9 @@ export const SurveyRepo = {
             );
             
             // Create new questions
-            for (const question of data.questions) {
+            for (let i = 0; i < data.questions.length; i++) {
+                const question = data.questions[i];
+                
                 await connection.execute(
                     `INSERT INTO survey_questions (survey_id, type, prompt, options, is_required, question_order) 
                      VALUES (?, ?, ?, ?, ?, ?)`,
@@ -561,7 +593,7 @@ export const SurveyRepo = {
                         question.prompt || '',
                         question.options ? JSON.stringify(question.options) : null,
                         question.isRequired ? 1 : 0,
-                        question.order || 1
+                        question.order || (i + 1)  // Use index + 1 if order is not provided
                     ]
                 );
             }
@@ -640,7 +672,8 @@ export const SurveyRepo = {
             );
             
             // Create new questions
-            for (const question of data.questions) {
+            for (let i = 0; i < data.questions.length; i++) {
+                const question = data.questions[i];
                 await connection.execute(
                     `INSERT INTO survey_questions (survey_id, type, prompt, options, is_required, question_order) 
                      VALUES (?, ?, ?, ?, ?, ?)`,
@@ -650,7 +683,7 @@ export const SurveyRepo = {
                         question.prompt || '',
                         question.options ? JSON.stringify(question.options) : null,
                         question.isRequired ? 1 : 0,
-                        question.order || 1
+                        question.order || (i + 1)  // Use index + 1 if order is not provided
                     ]
                 );
             }
@@ -1171,22 +1204,4 @@ export const SurveyRepo = {
         return (result as ResultSetHeader).affectedRows;
     },
 
-    // Get survey by slug (any status) - for status checking
-    getSurveyBySlugAny: async (slug: string) => {
-        const db = await getMySQLConnection();
-        
-        const [rows] = await db.execute<RowDataPacket[]>(
-            `SELECT 
-                s.id, s.title, s.description, s.slug, s.status, s.is_public,
-                s.campaign_start_at, s.campaign_end_at, s.stopped_at, s.stop_reason,
-                s.created_at, s.updated_at, s.created_by
-             FROM surveys s 
-             WHERE s.slug = ?`,
-            [slug]
-        );
-        
-        if (!rows[0]) return null;
-        
-        return rows[0] as any;
-    }
 }; 

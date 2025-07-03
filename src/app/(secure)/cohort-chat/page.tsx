@@ -51,6 +51,197 @@ const normaliseText=(txt:string)=>{
     .replace(/\b(\w+)\s+\1\b/gi,'$1'); // remove duplicated words
 };
 
+// Smart buffering - determine when content is ready for rendering
+const isCompleteUnit = (content: string): boolean => {
+  // Always update if content is short (first few words)
+  if (content.length < 50) return true;
+  
+  // Update on complete sentences
+  if (content.match(/[.!?]\s*$/)) return true;
+  
+  // Update on complete markdown blocks
+  if (content.match(/\n\n$/)) return true;
+  
+  // Update on complete list items
+  if (content.match(/\n\s*[-*+]\s+.+$/)) return true;
+  
+  // Update on complete headings
+  if (content.match(/\n#+\s+.+\n/)) return true;
+  
+  // Update every 100 characters as fallback
+  if (content.length % 100 === 0) return true;
+  
+  return false;
+};
+
+// Process partial response during streaming - extract citations as they come in
+const processPartialResponse = (content: string, existingMessage: any) => {
+  // Look for partial citation blocks even if incomplete
+  const parts = content.split('\n---\n');
+  
+  let cleanContent = content;
+  let citations: Record<string, string> = existingMessage?.citations || {};
+  
+  if (parts.length > 1) {
+    const answerTxt = parts[0];
+    const stats = parts.slice(1).join('\n---\n');
+    
+    console.log('Found parts in partial response:', { answerLength: answerTxt.length, statsLength: stats.length });
+    
+    // Only try to extract citations if we have a complete citations section
+    // Look for citations: followed by at least one [number] pattern
+    if (stats.includes('citations:') && stats.match(/\[\d+\]/)) {
+      // Extract citations mapping - be more permissive for partial content
+      const citationMatch = stats.match(/citations:\s*([\s\S]*?)(?=\n---|\n🎯|$)/);
+      const citationsBlock = citationMatch ? citationMatch[1].trim() : '';
+      
+      console.log('Citations block found:', citationsBlock);
+      console.log('Citations block length:', citationsBlock.length);
+      console.log('Citations block lines:', citationsBlock.split('\n'));
+      
+      if (citationsBlock && citationsBlock.length > 10) { // Only process if we have meaningful content
+        const newCitations: Record<string, string> = {};
+        
+        // Process each line that looks like a citation
+        citationsBlock.split('\n').forEach(line => {
+          const trimmed = line.trim();
+          if (!trimmed) return;
+          console.log('Processing citation line:', trimmed);
+          // Handle format: [1] Q: "question" | A: "answer"
+          const m = trimmed.match(/^\[(\d+)\]\s+(.+)/);
+          if (m) {
+            const citationText = m[2];
+            console.log('Citation text:', citationText);
+            // Extract the question and answer parts for better display
+            const qaParts = citationText.match(/Q:\s*"([^"]+)"\s*\|\s*A:\s*"([^"]+)"/);
+            if (qaParts) {
+              // Format as "Question: answer" for cleaner tooltip display
+              newCitations[m[1]] = `${qaParts[1]}: \"${qaParts[2]}\"`;
+              console.log('Formatted citation:', newCitations[m[1]]);
+            } else {
+              // Fallback to the full text if format doesn't match
+              newCitations[m[1]] = citationText;
+              console.log('Using fallback citation:', newCitations[m[1]]);
+            }
+          }
+        });
+        
+        // Only update if we found new citations
+        if (Object.keys(newCitations).length > 0) {
+          citations = { ...citations, ...newCitations };
+          console.log('Updated citations during streaming:', citations);
+        }
+      }
+    } else {
+      console.log('Citations section not complete yet, keeping existing citations');
+    }
+    
+    cleanContent = answerTxt;
+  } else {
+    console.log('No parts found in partial response, using full content');
+  }
+  
+  return {
+    content: normalizeMarkdown(cleanContent),
+    citations
+  };
+};
+
+// Process complete response for citations, charts, and data cards
+const processCompleteResponse = (content: string, existingMessage: any) => {
+  const chartMatchFull = content.match(/```chart[\s\S]*?```/);
+  const dataCardsMatchFull = content.match(/```data-cards[\s\S]*?```/);
+  const parts = content.split('\n---\n');
+  
+  let cleanContent = content;
+  let citations: Record<string, string> = existingMessage?.citations || {};
+  let chartSpec = existingMessage?.chartSpec;
+  let dataCards = existingMessage?.dataCards;
+  
+  if (parts.length > 1) {
+    const answerTxt = parts[0];
+    const stats = parts.slice(1).join('\n---\n');
+    
+    // Extract citations mapping
+    const match = stats.match(/citations:\s*([\s\S]*?)(?=---|\n🎯|$)/);
+    const citationsBlock = match ? match[1].trim() : '';
+    
+    if (citationsBlock) {
+      console.log('Citations block found:', citationsBlock);
+      console.log('Citations block length:', citationsBlock.length);
+      console.log('Citations block lines:', citationsBlock.split('\n'));
+      const newCitations: Record<string, string> = {};
+      
+      citationsBlock.split('\n').forEach(line => {
+        const trimmed = line.trim();
+        if (!trimmed) return;
+        console.log('Processing citation line:', trimmed);
+        // Handle format: [1] Q: "question" | A: "answer"
+        const m = trimmed.match(/^\[(\d+)\]\s+(.+)/);
+        if (m) {
+          const citationText = m[2];
+          console.log('Citation text:', citationText);
+          // Extract the question and answer parts for better display
+          const qaParts = citationText.match(/Q:\s*"([^"]+)"\s*\|\s*A:\s*"([^"]+)"/);
+          if (qaParts) {
+            // Format as "Question: answer" for cleaner tooltip display
+            newCitations[m[1]] = `${qaParts[1]}: \"${qaParts[2]}\"`;
+            console.log('Formatted citation:', newCitations[m[1]]);
+          } else {
+            // Fallback to the full text if format doesn't match
+            newCitations[m[1]] = citationText;
+            console.log('Using fallback citation:', newCitations[m[1]]);
+          }
+        }
+      });
+      
+      // Only update citations if we found new ones, otherwise preserve existing
+      if (Object.keys(newCitations).length > 0) {
+        citations = newCitations;
+        console.log('Updated citations object:', citations);
+      } else {
+        console.log('No new citations found, preserving existing:', citations);
+      }
+    } else {
+      console.log('No citations block found, preserving existing citations:', citations);
+    }
+    
+    cleanContent = answerTxt;
+  } else {
+    console.log('No stats section found, preserving existing citations:', citations);
+  }
+  
+  // Extract chart spec fenced block
+  if (chartMatchFull) {
+    try {
+      const jsonPart = chartMatchFull[0].replace(/```chart|```/g, '').trim();
+      chartSpec = JSON.parse(jsonPart);
+      cleanContent = cleanContent.replace(chartMatchFull[0], '').trim();
+    } catch (error) {
+      console.warn('Failed to parse chart spec:', error);
+    }
+  }
+  
+  // Extract data-cards fenced block
+  if (dataCardsMatchFull) {
+    try {
+      const jsonPart = dataCardsMatchFull[0].replace(/```data-cards|```/g, '').trim();
+      dataCards = JSON.parse(jsonPart);
+      cleanContent = cleanContent.replace(dataCardsMatchFull[0], '').trim();
+      console.log('Extracted data cards:', dataCards);
+    } catch (error) {
+      console.warn('Failed to parse data cards:', error);
+    }
+  }
+  
+  return {
+    content: normalizeMarkdown(cleanContent),
+    citations,
+    chartSpec,
+    dataCards
+  };
+};
+
 // Normalize markdown structure for consistent rendering across AI models
 const normalizeMarkdown = (text: string): string => {
   let normalized = text;
@@ -84,7 +275,16 @@ export default function CohortChatPage() {
   const [cohorts, setCohorts] = useState<Cohort[]>([]);
   const [selectedCohortId, setSelectedCohortId] = useState<number | null>(null);
   const [input, setInput] = useState('');
-  type ChatMessage = { role:'user'|'agent'; content:string; citations?: Record<string,string>; chartSpec?: any; dataCards?: any[]; isUpload?: boolean };
+  type ChatMessage = { 
+    role:'user'|'agent'; 
+    content:string; 
+    citations?: Record<string,string>; 
+    chartSpec?: any; 
+    dataCards?: any[]; 
+    isUpload?: boolean;
+    reportId?: string;
+    reportStatus?: 'initiated' | 'processing' | 'completed' | 'failed';
+  };
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [filterRules, setFilterRules] = useState<CohortFilterRule[]>([]);
@@ -100,6 +300,7 @@ export default function CohortChatPage() {
   const [temperature, setTemperature] = useState(0.0);
   const [sources, setSources] = useState<{survey: boolean; twins: boolean; web: boolean}>({survey: true, twins: true, web: false});
   const [systemPrompt, setSystemPrompt] = useState('You are an expert analyst summarising the perspectives of a group of survey respondents.');
+  const [streamingMode, setStreamingMode] = useState<'off' | 'smart' | 'buffered' | 'instant'>('off');
 
   const [showCohortCreator, setShowCohortCreator] = useState(false);
   
@@ -116,6 +317,54 @@ export default function CohortChatPage() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isLoading]);
+  
+  // Poll for report status updates
+  useEffect(() => {
+    const activeReports = messages.filter(
+      m => m.reportId && (m.reportStatus === 'initiated' || m.reportStatus === 'processing')
+    );
+    
+    if (activeReports.length > 0) {
+      const interval = setInterval(async () => {
+        for (const message of activeReports) {
+          if (message.reportId) {
+            try {
+              const response = await fetch(`/api/reports/${message.reportId}/status`);
+              const data = await response.json();
+              
+              if (data.status === 'completed') {
+                // Update the message with completed status
+                setMessages(prev => prev.map(m => 
+                  m.reportId === message.reportId 
+                    ? { ...m, reportStatus: 'completed' }
+                    : m
+                ));
+                
+                // Add a new message with the report summary
+                setMessages(prev => [...prev, {
+                  role: 'agent',
+                  content: `✅ **Report Complete!**\n\n${data.summary || 'Your comprehensive analysis is ready.'}\n\n[View Full Report →](/reports/${message.reportId})`,
+                  reportId: message.reportId,
+                  reportStatus: 'completed'
+                }]);
+              } else if (data.status === 'failed') {
+                // Update the message with failed status
+                setMessages(prev => prev.map(m => 
+                  m.reportId === message.reportId 
+                    ? { ...m, reportStatus: 'failed' }
+                    : m
+                ));
+              }
+            } catch (error) {
+              console.error('Failed to check report status:', error);
+            }
+          }
+        }
+      }, 10000); // Check every 10 seconds
+      
+      return () => clearInterval(interval);
+    }
+  }, [messages]);
 
   useEffect(() => {
     // Fetch surveys belonging to the current user (NextAuth handles authentication)
@@ -210,6 +459,11 @@ export default function CohortChatPage() {
     if (savedSurveyId && savedSurveyId !== 'null') {
       setSelectedSurveyId(Number(savedSurveyId));
     }
+    
+    const savedStreamingMode = localStorage.getItem('cohort-chat-streaming-mode');
+    if (savedStreamingMode && ['off','smart','buffered','instant'].includes(savedStreamingMode)) {
+      setStreamingMode(savedStreamingMode as 'off' | 'smart' | 'buffered' | 'instant');
+    }
   }, []);
   
   // Save model preference when it changes
@@ -270,7 +524,7 @@ FORMATTING REQUIREMENTS:
 - Ensure proper spacing around lists and paragraphs
 - Structure your response with clear sections and subsections`;
 
-    const payload = {
+    const payload: any = {
       cohort: selectedCohortId ? { id: selectedCohortId } : undefined,
       question,
       surveyId: selectedSurveyId || undefined,
@@ -280,11 +534,41 @@ FORMATTING REQUIREMENTS:
       systemPrompt: enhancedSystemPrompt,
     };
 
+    if (streamingMode === 'off') {
+      payload.stream = false;
+    }
+
     const res = await fetch('/api/cohort/query', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
+
+    if (streamingMode === 'off') {
+      // Non-streaming response (expects JSON { content: string })
+      const json = await res.json();
+      
+      // Check if this is a report generation response
+      if (json.reportId) {
+        // This is a report generation - show immediate response and report status
+        const immediateResponse = json.immediateResponse || 'I\'m generating a comprehensive analysis for you. This will take a moment...';
+        setMessages(prev=>[...prev,{
+          role:'agent',
+          content: immediateResponse + '\n\n📊 **Generating detailed report...**',
+          reportId: json.reportId,
+          reportStatus: 'initiated'
+        }]);
+        setIsLoading(false);
+        return;
+      }
+      
+      // Regular response
+      const finalContent = json.content || json.result || json.text || '';
+      const processed = processCompleteResponse(String(finalContent), {});
+      setMessages(prev=>[...prev,{role:'agent',content:processed.content,citations:processed.citations,chartSpec:processed.chartSpec,dataCards:processed.dataCards}]);
+      setIsLoading(false);
+      return;
+    }
 
     if (!res.body) {
       toast.error('No response');
@@ -297,89 +581,144 @@ FORMATTING REQUIREMENTS:
 
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
+    let buffer = '';
+    let accumulatedContent = '';
 
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
-      const chunk = decoder.decode(value);
-      setMessages(prev=>{
-        const updated=[...prev];
-        const last=updated[updated.length-1];
-        if(last && last.role==='agent') {
-          last.content += chunk;
-          updated[updated.length-1]=last;
-        }
-        return updated;
-      });
-    }
-    // After stream completes, process citations block
-    setMessages(prev=>{
-      const updated=[...prev];
-      const last=updated[updated.length-1];
-      if(last && last.role==='agent') {
-        const chartMatchFull = last.content.match(/```chart[\s\S]*?```/);
-        const dataCardsMatchFull = last.content.match(/```data-cards[\s\S]*?```/);
-        const parts = last.content.split('\n---\n');
-        if(parts.length>1) {
-          const answerTxt=parts[0];
-          const stats=parts.slice(1).join('\n---\n');
-          // extract citations mapping
-          const match = stats.match(/citations:\s*([\s\S]*?)(?=\n---|\n🎯|$)/);
-          const citationsBlock = match? match[1].trim():'';
-          const citations:Record<string,string>={};
-          if (citationsBlock) {
-            console.log('Citations block:', citationsBlock);
-            citationsBlock.split('\n').forEach(line=>{
-              console.log('Processing citation line:', line);
-              // Handle format: [1] Q: "question" | A: "answer"
-              const m=line.match(/\[(\d+)\]\s+(.+)/);
-              if(m) {
-                const citationText = m[2];
-                console.log('Citation text:', citationText);
-                // Extract the question and answer parts for better display
-                const qaParts = citationText.match(/Q:\s*"([^"]+)"\s*\|\s*A:\s*"([^"]+)"/);
-                if (qaParts) {
-                  // Format as "Question: answer" for cleaner tooltip display
-                  citations[m[1]] = `${qaParts[1]}: "${qaParts[2]}"`;
-                  console.log('Formatted citation:', citations[m[1]]);
-                } else {
-                  // Fallback to the full text if format doesn't match
-                  citations[m[1]] = citationText;
-                  console.log('Using fallback citation:', citations[m[1]]);
+      
+      buffer += decoder.decode(value, { stream: true });
+      
+      // Process complete SSE messages
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || ''; // Keep incomplete line in buffer
+      
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          const dataStr = line.slice(6); // Remove 'data: ' prefix
+          
+          if (dataStr === '[DONE]') {
+            // Stream completed
+            continue;
+          }
+          
+          try {
+            const data = JSON.parse(dataStr);
+            
+            // Check if this is a report generation message
+            if (data.reportId) {
+              // Replace the placeholder message with report generation status
+              const immediateResponse = data.immediateResponse || 'I\'m generating a comprehensive analysis for you. This will take a moment...';
+              setMessages(prev => {
+                const updated = [...prev];
+                const last = updated[updated.length - 1];
+                if (last && last.role === 'agent') {
+                  last.content = immediateResponse + '\n\n📊 **Generating detailed report...**';
+                  last.reportId = data.reportId;
+                  last.reportStatus = 'initiated';
+                  updated[updated.length - 1] = last;
                 }
+                return updated;
+              });
+              setIsLoading(false);
+              return; // Exit the streaming loop for report generation
+            }
+            
+            if (data.content) {
+              accumulatedContent += data.content;
+              
+              // Different streaming modes
+              let shouldUpdate = false;
+              
+              if (streamingMode === 'instant') {
+                shouldUpdate = true; // Update on every token
+              } else if (streamingMode === 'smart') {
+                shouldUpdate = isCompleteUnit(accumulatedContent); // Smart buffering
+              } else if (streamingMode === 'buffered') {
+                shouldUpdate = accumulatedContent.length % 200 === 0; // Update every 200 chars
               }
-            });
-            console.log('Final citations object:', citations);
-          }
-          
-          // Start with the answer text
-          let cleanContent = answerTxt;
-          
-          // extract chart spec fenced block
-          if(chartMatchFull){
-            try {
-              const jsonPart=chartMatchFull[0].replace(/```chart|```/g,'').trim();
-              last.chartSpec=JSON.parse(jsonPart);
-              cleanContent = cleanContent.replace(chartMatchFull[0],'').trim();
-            } catch{}
-          }
-          
-          // extract data-cards fenced block  
-          if(dataCardsMatchFull){
-            try {
-              const jsonPart=dataCardsMatchFull[0].replace(/```data-cards|```/g,'').trim();
-              last.dataCards=JSON.parse(jsonPart);
-              cleanContent = cleanContent.replace(dataCardsMatchFull[0],'').trim();
-              console.log('Extracted data cards:', last.dataCards);
-            } catch(error){
-              console.warn('Failed to parse data cards:', error);
+              
+              if (shouldUpdate) {
+                setMessages(prev => {
+                  const updated = [...prev];
+                  const last = updated[updated.length - 1];
+                  if (last && last.role === 'agent') {
+                    // Process partial content for citations during streaming
+                    const partialProcessed = processPartialResponse(accumulatedContent, last);
+                    console.log('Partial processing result:', {
+                      originalContent: accumulatedContent.slice(-100),
+                      processedContent: partialProcessed.content.slice(-100),
+                      citations: partialProcessed.citations
+                    });
+                    last.content = partialProcessed.content;
+                    last.citations = partialProcessed.citations;
+                    // Keep existing chartSpec and dataCards during streaming
+                    updated[updated.length - 1] = last;
+                  }
+                  return updated;
+                });
+              }
+            }
+          } catch (error) {
+            // If not JSON, treat as plain text (fallback for non-streaming responses)
+            if (dataStr.trim()) {
+              accumulatedContent += dataStr;
+              setMessages(prev => {
+                const updated = [...prev];
+                const last = updated[updated.length - 1];
+                if (last && last.role === 'agent') {
+                  const partialProcessed = processPartialResponse(accumulatedContent, last);
+                  last.content = partialProcessed.content;
+                  last.citations = partialProcessed.citations;
+                  updated[updated.length - 1] = last;
+                }
+                return updated;
+              });
             }
           }
-          
-          last.content = cleanContent;
-          last.citations=citations;
-          updated[updated.length-1]=last;
+        } else if (line.trim() && !line.startsWith('data: ')) {
+          // Handle non-SSE content (fallback for plain text responses)
+          accumulatedContent += line + '\n';
+          setMessages(prev => {
+            const updated = [...prev];
+            const last = updated[updated.length - 1];
+            if (last && last.role === 'agent') {
+              const partialProcessed = processPartialResponse(accumulatedContent, last);
+              last.content = partialProcessed.content;
+              last.citations = partialProcessed.citations;
+              updated[updated.length - 1] = last;
+            }
+            return updated;
+          });
         }
+      }
+    }
+    
+    // Final update with complete content and post-processing
+    setMessages(prev => {
+      const updated = [...prev];
+      const last = updated[updated.length - 1];
+      if (last && last.role === 'agent') {
+        // Process the complete content
+        console.log('Final processing - raw content:', accumulatedContent);
+        const processedContent = processCompleteResponse(accumulatedContent, last);
+        console.log('Final processing result:', {
+          content: processedContent.content,
+          citations: processedContent.citations,
+          chartSpec: processedContent.chartSpec,
+          dataCards: processedContent.dataCards
+        });
+        console.log('Setting final message state:', {
+          citationKeys: processedContent.citations ? Object.keys(processedContent.citations) : [],
+          citationCount: processedContent.citations ? Object.keys(processedContent.citations).length : 0,
+          firstCitation: processedContent.citations ? processedContent.citations['1'] : 'none'
+        });
+        last.content = processedContent.content;
+        last.citations = processedContent.citations;
+        last.chartSpec = processedContent.chartSpec;
+        last.dataCards = processedContent.dataCards;
+        updated[updated.length - 1] = last;
       }
       return updated;
     });
@@ -749,6 +1088,14 @@ FORMATTING REQUIREMENTS:
   const renderWithCitations=(text:string,citations?:Record<string,string>,isUpload?:boolean)=> {
     const normalizedText = isUpload ? text : normalizeMarkdown(normaliseText(text));
     
+    console.log('renderWithCitations called with:', {
+      textLength: text.length,
+      textPreview: text.slice(0, 200),
+      citations: citations,
+      citationCount: citations ? Object.keys(citations).length : 0,
+      isUpload
+    });
+    
     if(!citations || Object.keys(citations).length===0) {
       // Handle upload messages with simple paragraph splitting
       if (isUpload) {
@@ -1071,6 +1418,7 @@ FORMATTING REQUIREMENTS:
                             <TooltipProvider delayDuration={150}>
                               <div className="space-y-1">
                                 {m.dataCards && renderDataCards(m.dataCards)}
+
                                 {renderWithCitations(m.content, m.citations, m.isUpload)}
                               </div>
                             </TooltipProvider>
@@ -1432,6 +1780,29 @@ FORMATTING REQUIREMENTS:
                         {temperature > 0.7 && "High creativity, more interpretive"}
                       </p>
                     </div>
+                  </div>
+
+                  {/* Streaming Mode control */}
+                  <div className="space-y-2">
+                    <Label>Streaming Quality</Label>
+                    <Select value={streamingMode} onValueChange={(value: 'off' | 'smart' | 'buffered' | 'instant') => {
+                      setStreamingMode(value);
+                      localStorage.setItem('cohort-chat-streaming-mode', value);
+                    }}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent className="z-50">
+                        <SelectItem value="off">Off (no streaming)</SelectItem>
+                        <SelectItem value="smart">Smart (recommended)</SelectItem>
+                        <SelectItem value="buffered">Buffered</SelectItem>
+                        <SelectItem value="instant">Instant</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      {streamingMode === 'off' && "Waits for full response - safest formatting"}
+                      {streamingMode === 'smart' && "Updates on complete sentences/blocks - best markdown quality"}
+                      {streamingMode === 'buffered' && "Updates every 200 characters - balanced speed/quality"}
+                      {streamingMode === 'instant' && "Updates on every word - fastest but may break formatting"}
+                    </p>
                   </div>
 
                   {/* Sources */}

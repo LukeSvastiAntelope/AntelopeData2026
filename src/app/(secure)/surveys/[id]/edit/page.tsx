@@ -563,9 +563,17 @@ const EditSurveyPage = () => {
                 {isSaving ? 'Saving...' : 'Save Draft'}
               </Button>
               {survey?.status === 'draft' ? (
-                <Button onClick={handlePublish} disabled={isSaving}>
-                  {isSaving ? 'Publishing...' : 'Publish Survey'}
-                </Button>
+                <>
+                  <Button variant="outline" asChild>
+                    <a href={`/survey/${survey.slug}`} target="_blank">
+                      <Eye className="h-4 w-4 mr-2" />
+                      Preview
+                    </a>
+                  </Button>
+                  <Button onClick={handlePublish} disabled={isSaving}>
+                    {isSaving ? 'Publishing...' : 'Publish Survey'}
+                  </Button>
+                </>
               ) : (
                 <Button onClick={handleSave} disabled={isSaving}>
                   <Save className="h-4 w-4 mr-2" />
