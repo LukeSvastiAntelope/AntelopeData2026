@@ -13,7 +13,7 @@ import {
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table'
 import { SidebarTrigger } from '@/components/ui/sidebar'
 import { Button } from '@/components/ui/button'
-
+import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb'
 import { Badge } from '@/components/ui/badge'
 
 import { 
@@ -279,13 +279,17 @@ const SurveyResultsPage = () => {
             <div className="flex items-center">
               <SidebarTrigger className="-ml-0.5 h-5 w-5 text-muted-foreground hover:text-foreground" />
               <div className="h-4 border-l border-border mx-4" />
-              <Link href="/surveys" className="text-muted-foreground hover:text-foreground">
-                <ArrowLeft className="h-4 w-4" />
-              </Link>
-              <div className="h-4 border-l border-border mx-4" />
-              <h1 className="text-base font-medium text-card-foreground">
-                {data.survey?.title ? `${data.survey.title} – Results` : 'Survey Results'}
-              </h1>
+              <Breadcrumb>
+                <BreadcrumbList>
+                  <BreadcrumbItem>
+                    <BreadcrumbLink href="/surveys">Surveys</BreadcrumbLink>
+                  </BreadcrumbItem>
+                  <BreadcrumbSeparator />
+                  <BreadcrumbItem>
+                    <BreadcrumbPage>{data?.survey?.title || 'Results'}</BreadcrumbPage>
+                  </BreadcrumbItem>
+                </BreadcrumbList>
+              </Breadcrumb>
             </div>
             <div className="flex gap-2">
               <Link href={`/surveys/${surveyId}/edit`}>

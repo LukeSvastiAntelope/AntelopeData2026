@@ -11,7 +11,7 @@ import { Separator } from '@/components/ui/separator';
 import { Select, SelectTrigger, SelectItem, SelectContent, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
-import { ChevronLeft, ChevronRight, Send, PanelLeft, PanelRight, Upload, FileText, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Send, PanelLeft, PanelRight, Upload, FileText, X, Plus, MessageCircle, Trash2, ChevronDown, ChevronRight as ChevronRightIcon, FolderOpen, Folder } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import toast from 'react-hot-toast';
@@ -285,8 +285,24 @@ export default function CohortChatPage() {
     reportId?: string;
     reportStatus?: 'initiated' | 'processing' | 'completed' | 'failed';
   };
+
+  interface Conversation {
+    id: string;
+    title: string;
+    messages: ChatMessage[];
+    createdAt: string;
+    updatedAt: string;
+    surveyId?: number | null;
+    cohortId?: number | null;
+  }
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  
+  // Conversation management state
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
+  const [conversationsLoading, setConversationsLoading] = useState(true);
+  const [expandedSurveys, setExpandedSurveys] = useState<Set<number>>(new Set());
   const [filterRules, setFilterRules] = useState<CohortFilterRule[]>([]);
   const [newCohortName, setNewCohortName] = useState('');
   const [saving, setSaving] = useState(false);
@@ -465,6 +481,28 @@ export default function CohortChatPage() {
       setStreamingMode(savedStreamingMode as 'off' | 'smart' | 'buffered' | 'instant');
     }
   }, []);
+
+  // Load conversations on component mount
+  useEffect(() => {
+    loadConversations();
+  }, []);
+
+  // Auto-expand surveys that contain the current conversation
+  useEffect(() => {
+    if (currentConversationId && conversations.length > 0) {
+      const currentConversation = conversations.find(c => c.id === currentConversationId);
+      if (currentConversation?.surveyId) {
+        setExpandedSurveys(prev => new Set([...prev, currentConversation.surveyId!]));
+      }
+    }
+  }, [currentConversationId, conversations]);
+
+  // Save conversation whenever messages change
+  useEffect(() => {
+    if (currentConversationId && messages.length > 0) {
+      saveConversation(currentConversationId, messages);
+    }
+  }, [messages, currentConversationId]);
   
   // Save model preference when it changes
   const handleModelChange = (model: string) => {
@@ -1021,6 +1059,180 @@ FORMATTING REQUIREMENTS:
     return prompts.slice(0, 3); // Return initial basic prompts
   };
 
+  // Conversation management functions
+  const loadConversations = async () => {
+    setConversationsLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('/api/conversations', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setConversations(data.conversations || []);
+        
+        // If no current conversation, create a new one
+        if (!currentConversationId && data.conversations.length === 0) {
+          createNewConversation();
+        } else if (!currentConversationId && data.conversations.length > 0) {
+          // Load the most recent conversation
+          const mostRecent = data.conversations[0];
+          setCurrentConversationId(mostRecent.id);
+          setMessages(mostRecent.messages || []);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading conversations:', error);
+    } finally {
+      setConversationsLoading(false);
+    }
+  };
+
+  const saveConversation = async (conversationId: string, messages: ChatMessage[], title?: string) => {
+    try {
+      const token = localStorage.getItem('token');
+      await fetch('/api/conversations', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          id: conversationId,
+          title: title || generateConversationTitle(messages),
+          messages,
+          surveyId: selectedSurveyId,
+          cohortId: selectedCohortId
+        })
+      });
+      
+      // Update local state
+      setConversations(prev => {
+        const existing = prev.find(c => c.id === conversationId);
+        const updatedConversation = {
+          id: conversationId,
+          title: title || generateConversationTitle(messages),
+          messages,
+          createdAt: existing?.createdAt || new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          surveyId: selectedSurveyId,
+          cohortId: selectedCohortId
+        };
+        
+        if (existing) {
+          return prev.map(c => c.id === conversationId ? updatedConversation : c);
+        } else {
+          return [updatedConversation, ...prev];
+        }
+      });
+    } catch (error) {
+      console.error('Error saving conversation:', error);
+    }
+  };
+
+  const createNewConversation = () => {
+    const newId = `conv_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    setCurrentConversationId(newId);
+    setMessages([]);
+    
+    // Create empty conversation in state with current survey context
+    const newConversation: Conversation = {
+      id: newId,
+      title: 'New Conversation',
+      messages: [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      surveyId: selectedSurveyId,
+      cohortId: selectedCohortId
+    };
+    
+    setConversations(prev => [newConversation, ...prev]);
+    
+    // Auto-expand the survey if one is selected
+    if (selectedSurveyId) {
+      setExpandedSurveys(prev => new Set([...prev, selectedSurveyId]));
+    }
+  };
+
+  const switchConversation = (conversationId: string) => {
+    const conversation = conversations.find(c => c.id === conversationId);
+    if (conversation) {
+      setCurrentConversationId(conversationId);
+      setMessages(conversation.messages || []);
+      setSelectedSurveyId(conversation.surveyId || null);
+      setSelectedCohortId(conversation.cohortId || null);
+    }
+  };
+
+  const deleteConversation = async (conversationId: string) => {
+    try {
+      const token = localStorage.getItem('token');
+      await fetch(`/api/conversations/${conversationId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      setConversations(prev => prev.filter(c => c.id !== conversationId));
+      
+      // If we deleted the current conversation, create a new one
+      if (currentConversationId === conversationId) {
+        createNewConversation();
+      }
+    } catch (error) {
+      console.error('Error deleting conversation:', error);
+    }
+  };
+
+  const generateConversationTitle = (messages: ChatMessage[]): string => {
+    if (messages.length === 0) return 'New Conversation';
+    
+    const firstUserMessage = messages.find(m => m.role === 'user');
+    if (firstUserMessage) {
+      // Take first 40 characters of the first user message for more concise titles
+      return firstUserMessage.content.slice(0, 40) + (firstUserMessage.content.length > 40 ? '...' : '');
+    }
+    
+    return 'New Conversation';
+  };
+
+  // Group conversations by survey
+  const groupConversationsBySurvey = () => {
+    const groups: { [key: string]: Conversation[] } = {};
+    
+    conversations.forEach(conversation => {
+      const key = conversation.surveyId ? `survey-${conversation.surveyId}` : 'no-survey';
+      if (!groups[key]) {
+        groups[key] = [];
+      }
+      groups[key].push(conversation);
+    });
+    
+    // Sort conversations within each group by updatedAt (newest first)
+    Object.keys(groups).forEach(key => {
+      groups[key].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+    });
+    
+    return groups;
+  };
+
+  const toggleSurveyExpansion = (surveyId: number) => {
+    setExpandedSurveys(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(surveyId)) {
+        newSet.delete(surveyId);
+      } else {
+        newSet.add(surveyId);
+      }
+      return newSet;
+    });
+  };
+
   // Render data cards (Perplexity-style visualizations)
   const renderDataCards = (dataCards: any[]) => {
     if (!dataCards || dataCards.length === 0) return null;
@@ -1275,15 +1487,27 @@ FORMATTING REQUIREMENTS:
                 <div className="h-4 border-l border-border mx-4" />
                 <h1 className="text-base font-medium text-card-foreground">Cohort Chat</h1>
               </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="-mr-0.5 h-5 w-5 text-muted-foreground hover:text-foreground"
-                onClick={()=>setIsCollapsed(!isCollapsed)}
-              >
-                {isCollapsed ? <PanelRight /> : <PanelLeft />}
-                <span className="sr-only">Toggle Right Panel</span>
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-5 w-5 text-muted-foreground hover:text-foreground"
+                  onClick={createNewConversation}
+                  title="New Conversation"
+                >
+                  <Plus className="h-4 w-4" />
+                  <span className="sr-only">New Conversation</span>
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="-mr-0.5 h-5 w-5 text-muted-foreground hover:text-foreground"
+                  onClick={()=>setIsCollapsed(!isCollapsed)}
+                >
+                  {isCollapsed ? <PanelRight /> : <PanelLeft />}
+                  <span className="sr-only">Toggle Right Panel</span>
+                </Button>
+              </div>
             </div>
           </div>
 
@@ -1295,7 +1519,15 @@ FORMATTING REQUIREMENTS:
           <div className="flex flex-col h-[calc(100vh-80px)]">
             {messages.length===0 ? (
               <div className="flex flex-col items-center justify-center flex-1 gap-6">
-                <h1 className="text-2xl font-bold">Ask Questions.</h1>
+                {/* Introduction */}
+                <div className="text-center space-y-2 mb-4">
+                  <h1 className="text-5xl font-bold">AI Survey Insights</h1>
+                  <p className="text-muted-foreground text-base max-w-2xl">
+                    Chat with your survey data in real-time. Ask questions, explore patterns, and get instant insights from your responses using natural language.
+                  </p>
+                </div>
+
+               
                 <div className="relative w-full max-w-xl">
                   <Textarea 
                     className="flex-1 min-h-[80px] pr-24 resize-none" 
@@ -1568,11 +1800,156 @@ FORMATTING REQUIREMENTS:
       <div className="relative">
         <div className={cn('h-full bg-background transition-all duration-300 ease-in-out', isCollapsed? 'w-0':'w-[350px] overflow-y-auto px-4 py-2')}>
           {!isCollapsed && (
-            <Tabs defaultValue="cohort" className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
+            <Tabs defaultValue="conversations" className="w-full">
+              <TabsList className="grid w-full grid-cols-3">
+                <TabsTrigger value="conversations">Conversations</TabsTrigger>
                 <TabsTrigger value="cohort">Cohort</TabsTrigger>
                 <TabsTrigger value="agent">Agent</TabsTrigger>
               </TabsList>
+
+              <TabsContent value="conversations" className="space-y-4 mt-4">
+                <div className="space-y-1">
+                  {conversationsLoading ? (
+                    <div className="text-center py-4">
+                      <div className="text-muted-foreground">Loading conversations...</div>
+                    </div>
+                  ) : conversations.length === 0 ? (
+                    <div className="text-center py-8 space-y-2">
+                      <MessageCircle className="h-8 w-8 text-muted-foreground mx-auto" />
+                      <p className="text-muted-foreground text-sm">No conversations yet</p>
+                      <p className="text-xs text-muted-foreground">Start a new conversation to see it here</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-1">
+                      {(() => {
+                        const groupedConversations = groupConversationsBySurvey();
+                        const surveyGroups = Object.keys(groupedConversations).filter(key => key !== 'no-survey');
+                        const noSurveyConversations = groupedConversations['no-survey'] || [];
+                        
+                        return (
+                          <>
+                            {/* Survey-grouped conversations */}
+                            {surveyGroups.map((groupKey) => {
+                              const surveyId = parseInt(groupKey.replace('survey-', ''));
+                              const survey = surveys.find(s => s.id === surveyId);
+                              const groupConversations = groupedConversations[groupKey];
+                              const isExpanded = expandedSurveys.has(surveyId);
+                              
+                              return (
+                                <div key={groupKey} className="space-y-1">
+                                  {/* Survey Header */}
+                                  <div
+                                    className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-muted/50 cursor-pointer group"
+                                    onClick={() => toggleSurveyExpansion(surveyId)}
+                                  >
+                                    <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                                      {isExpanded ? (
+                                        <ChevronDown className="h-3 w-3 text-muted-foreground" />
+                                      ) : (
+                                        <ChevronRightIcon className="h-3 w-3 text-muted-foreground" />
+                                      )}
+                                      {isExpanded ? (
+                                        <FolderOpen className="h-3 w-3 text-muted-foreground" />
+                                      ) : (
+                                        <Folder className="h-3 w-3 text-muted-foreground" />
+                                      )}
+                                      <span className="text-xs font-medium text-foreground truncate">
+                                        {survey?.title || 'Unknown Survey'}
+                                      </span>
+                                    </div>
+                                    <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded-md">
+                                      {groupConversations.length}
+                                    </span>
+                                  </div>
+                                  
+                                  {/* Conversations under this survey */}
+                                  {isExpanded && (
+                                    <div className="ml-6 space-y-1">
+                                      {groupConversations.map((conversation) => (
+                                        <div
+                                          key={conversation.id}
+                                          className={cn(
+                                            "flex items-center gap-2 px-2 py-1 cursor-pointer transition-colors group",
+                                            currentConversationId === conversation.id
+                                              ? "text-primary"
+                                              : "text-foreground hover:text-primary"
+                                          )}
+                                          onClick={() => switchConversation(conversation.id)}
+                                        >
+                                          <MessageCircle className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                                          <div className="flex-1 min-w-0 text-xs truncate">
+                                            {conversation.title}
+                                          </div>
+                                          <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-4 w-4 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              deleteConversation(conversation.id);
+                                            }}
+                                          >
+                                            <Trash2 className="h-3 w-3" />
+                                          </Button>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                            
+                            {/* Conversations without a survey */}
+                            {noSurveyConversations.length > 0 && (
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-2 px-2 py-1.5">
+                                  <Folder className="h-3 w-3 text-muted-foreground" />
+                                  <span className="text-xs font-medium text-muted-foreground">
+                                    General Conversations
+                                  </span>
+                                  <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded-md">
+                                    {noSurveyConversations.length}
+                                  </span>
+                                </div>
+                                <div className="ml-6 space-y-1">
+                                  {noSurveyConversations.map((conversation) => (
+                                    <div
+                                      key={conversation.id}
+                                      className={cn(
+                                        "flex items-center gap-2 px-2 py-1 cursor-pointer transition-colors group",
+                                        currentConversationId === conversation.id
+                                          ? "text-primary"
+                                          : "text-foreground hover:text-primary"
+                                      )}
+                                      onClick={() => switchConversation(conversation.id)}
+                                    >
+                                      <MessageCircle className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                                      <div className="flex-1 min-w-0 text-xs truncate">
+                                        {conversation.title}
+                                      </div>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-4 w-4 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          deleteConversation(conversation.id);
+                                        }}
+                                      >
+                                        <Trash2 className="h-3 w-3" />
+                                      </Button>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </>
+                        );
+                      })()}
+                    </div>
+                  )}
+                </div>
+              </TabsContent>
 
               <TabsContent value="cohort" className="space-y-4 mt-4">
                 <div className="space-y-4">
