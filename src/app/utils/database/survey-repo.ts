@@ -78,7 +78,9 @@ export const SurveyRepo = {
             const surveyId = surveyResult.insertId;
             
             // Insert questions
-            for (const question of data.questions) {
+            for (let i = 0; i < data.questions.length; i++) {
+                const question = data.questions[i];
+                
                 await connection.execute(
                     `INSERT INTO survey_questions (survey_id, type, prompt, options, is_required, question_order) 
                      VALUES (?, ?, ?, ?, ?, ?)`,
@@ -88,7 +90,7 @@ export const SurveyRepo = {
                         question.prompt || '',
                         question.options ? JSON.stringify(question.options) : null,
                         question.isRequired ? 1 : 0,
-                        question.order || 1
+                        question.order || (i + 1)  // Use index + 1 if order is not provided
                     ]
                 );
             }
@@ -110,6 +112,34 @@ export const SurveyRepo = {
         
         const [rows] = await db.execute<RowDataPacket[]>(
             "SELECT * FROM surveys WHERE slug = ? AND status IN ('active', 'published')",
+            [slug]
+        );
+        
+        if (!rows[0]) return null;
+        
+        const survey = rows[0];
+        
+        // Get questions
+        const [questionRows] = await db.execute<RowDataPacket[]>(
+            'SELECT * FROM survey_questions WHERE survey_id = ? ORDER BY question_order ASC',
+            [survey.id]
+        );
+        
+        return {
+            ...survey,
+            questions: questionRows.map((q: any) => ({
+                ...q,
+                options: q.options // MySQL JSON field already returns parsed data
+            }))
+        };
+    },
+
+    // Fetch survey by slug regardless of status (for preview)
+    getSurveyBySlugAny: async (slug: string) => {
+        const db = await getMySQLConnection();
+        
+        const [rows] = await db.execute<RowDataPacket[]>(
+            "SELECT * FROM surveys WHERE slug = ?",
             [slug]
         );
         
@@ -309,6 +339,89 @@ export const SurveyRepo = {
         }
     },
 
+    // Get surveys for user dashboard - includes their own surveys plus featured examples
+    getSurveysForUser: async (createdBy: number) => {
+        const db = await getMySQLConnection();
+        
+        // Check if source columns exist
+        const [sourceColumns] = await db.execute<RowDataPacket[]>(
+            `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS 
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'surveys' AND COLUMN_NAME = 'source'`
+        );
+        
+        const hasSourceTracking = sourceColumns.length > 0;
+        
+        let userSurveys, featuredSurveys;
+        
+        if (hasSourceTracking) {
+            // Get user's own surveys
+            const [userRows] = await db.execute<RowDataPacket[]>(
+                `SELECT s.*, COUNT(sr.id) as response_count, 'own' as survey_type
+                 FROM surveys s 
+                 LEFT JOIN survey_responses sr ON s.id = sr.survey_id 
+                 WHERE s.created_by = ? 
+                 GROUP BY s.id 
+                 ORDER BY s.created_at DESC`,
+                [createdBy]
+            );
+            userSurveys = userRows;
+            
+            // Get featured example surveys (Pew Research and other examples)
+            const [featuredRows] = await db.execute<RowDataPacket[]>(
+                `SELECT s.*, COUNT(sr.id) as response_count, 'featured' as survey_type
+                 FROM surveys s 
+                 LEFT JOIN survey_responses sr ON s.id = sr.survey_id 
+                 WHERE s.created_by != ? 
+                   AND s.status = 'published' 
+                   AND s.is_public = 1
+                   AND (s.title LIKE '%Pew Research%' 
+                        OR s.title LIKE '%Example%' 
+                        OR s.source = 'pew_research'
+                        OR s.id = 49)
+                 GROUP BY s.id 
+                 ORDER BY s.created_at DESC
+                 LIMIT 3`,
+                [createdBy]
+            );
+            featuredSurveys = featuredRows;
+        } else {
+            // Fallback for databases without source tracking
+            const [userRows] = await db.execute<RowDataPacket[]>(
+                `SELECT s.*, COUNT(sr.id) as response_count, 'native' as source, NULL as source_metadata, 'own' as survey_type
+                 FROM surveys s 
+                 LEFT JOIN survey_responses sr ON s.id = sr.survey_id 
+                 WHERE s.created_by = ? 
+                 GROUP BY s.id 
+                 ORDER BY s.created_at DESC`,
+                [createdBy]
+            );
+            userSurveys = userRows;
+            
+            const [featuredRows] = await db.execute<RowDataPacket[]>(
+                `SELECT s.*, COUNT(sr.id) as response_count, 'native' as source, NULL as source_metadata, 'featured' as survey_type
+                 FROM surveys s 
+                 LEFT JOIN survey_responses sr ON s.id = sr.survey_id 
+                 WHERE s.created_by != ? 
+                   AND s.status = 'published' 
+                   AND s.is_public = 1
+                   AND (s.title LIKE '%Pew Research%' 
+                        OR s.title LIKE '%Example%'
+                        OR s.id = 49)
+                 GROUP BY s.id 
+                 ORDER BY s.created_at DESC
+                 LIMIT 3`,
+                [createdBy]
+            );
+            featuredSurveys = featuredRows;
+        }
+        
+        return {
+            userSurveys,
+            featuredSurveys,
+            allSurveys: [...userSurveys, ...featuredSurveys]
+        };
+    },
+
     getAllSurveys: async () => {
         const db = await getMySQLConnection();
         
@@ -468,7 +581,9 @@ export const SurveyRepo = {
             );
             
             // Create new questions
-            for (const question of data.questions) {
+            for (let i = 0; i < data.questions.length; i++) {
+                const question = data.questions[i];
+                
                 await connection.execute(
                     `INSERT INTO survey_questions (survey_id, type, prompt, options, is_required, question_order) 
                      VALUES (?, ?, ?, ?, ?, ?)`,
@@ -478,7 +593,7 @@ export const SurveyRepo = {
                         question.prompt || '',
                         question.options ? JSON.stringify(question.options) : null,
                         question.isRequired ? 1 : 0,
-                        question.order || 1
+                        question.order || (i + 1)  // Use index + 1 if order is not provided
                     ]
                 );
             }
@@ -557,7 +672,8 @@ export const SurveyRepo = {
             );
             
             // Create new questions
-            for (const question of data.questions) {
+            for (let i = 0; i < data.questions.length; i++) {
+                const question = data.questions[i];
                 await connection.execute(
                     `INSERT INTO survey_questions (survey_id, type, prompt, options, is_required, question_order) 
                      VALUES (?, ?, ?, ?, ?, ?)`,
@@ -567,7 +683,7 @@ export const SurveyRepo = {
                         question.prompt || '',
                         question.options ? JSON.stringify(question.options) : null,
                         question.isRequired ? 1 : 0,
-                        question.order || 1
+                        question.order || (i + 1)  // Use index + 1 if order is not provided
                     ]
                 );
             }
@@ -1088,22 +1204,4 @@ export const SurveyRepo = {
         return (result as ResultSetHeader).affectedRows;
     },
 
-    // Get survey by slug (any status) - for status checking
-    getSurveyBySlugAny: async (slug: string) => {
-        const db = await getMySQLConnection();
-        
-        const [rows] = await db.execute<RowDataPacket[]>(
-            `SELECT 
-                s.id, s.title, s.description, s.slug, s.status, s.is_public,
-                s.campaign_start_at, s.campaign_end_at, s.stopped_at, s.stop_reason,
-                s.created_at, s.updated_at, s.created_by
-             FROM surveys s 
-             WHERE s.slug = ?`,
-            [slug]
-        );
-        
-        if (!rows[0]) return null;
-        
-        return rows[0] as any;
-    }
 }; 

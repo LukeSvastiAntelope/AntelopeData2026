@@ -27,7 +27,8 @@ import {
   Shield,
   FileText,
   Brain,
-  MessageCircle
+  MessageCircle,
+  FileBarChart
 } from "lucide-react"
 import LogoText from "@/components/logo-text"; // Added import
 import LogoIcon from "@/components/logo-icon"; // Added import
@@ -65,6 +66,11 @@ export function AppSidebar({ className, collapsible = "offcanvas", ...props }: S
       title: "Digital Twins",
       href: "/digital-twins",
       icon: Brain
+    },
+    {
+      title: "Reports",
+      href: "/reports",
+      icon: FileBarChart
     }
   ]
 
