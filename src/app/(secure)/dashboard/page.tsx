@@ -323,6 +323,16 @@ export default function DashboardPage() {
         <div className="border-b border-border" />
 
         <div className="p-6">
+          {/* Introduction */}
+          <div className="text-left space-y-2 flex">
+            <div className="flex-col mb-4">  
+              <h2 className="text-2xl font-bold">Agent Dashboard</h2>
+              <p className="text-muted-foreground text-base max-w-2xl mx-auto">
+                Monitor your AI agent&apos;s performance, track betting history, and analyze prediction outcomes. Get comprehensive insights into your agent&apos;s decision-making and market activity.
+              </p>
+            </div>
+          </div>
+
           {/* Top metrics cards */}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <SectionCards />

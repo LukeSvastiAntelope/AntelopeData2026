@@ -114,7 +114,7 @@ export function AppSidebar({ className, collapsible = "offcanvas", ...props }: S
       {...props}
     >
       <SidebarHeader className="flex flex-col gap-4 pb-4">
-        <div className="flex items-center px-4">
+        <div className="flex items-center px-2">
           <Link href="/surveys" className="flex items-center px-4">
             <LogoText 
               className="text-zinc-900 dark:text-zinc-100 transition-opacity group-data-[collapsible=offcanvas]:opacity-0"
@@ -197,7 +197,7 @@ export function AppSidebar({ className, collapsible = "offcanvas", ...props }: S
           ))}
         </SidebarMenu>
         
-        {user && (
+        {user ? (
           <div className="px-4 pt-4">
             <div className="flex items-center justify-between px-4">
               <div className="flex items-center min-w-0 flex-1">
@@ -213,6 +213,21 @@ export function AppSidebar({ className, collapsible = "offcanvas", ...props }: S
                   <div className="text-xs text-muted-foreground truncate">
                     {agent ? `Balance: ${agent.wallet_balance || 0} ANML` : 'No agent'}
                   </div>
+                </div>
+              </div>
+              <div className="flex-shrink-0 group-data-[collapsible=offcanvas]:hidden">
+                <MinimalThemeToggle />
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="px-4 pt-4">
+            <div className="flex items-center justify-between px-4">
+              <div className="flex items-center min-w-0 flex-1">
+                <div className="h-8 w-8 rounded-full bg-muted animate-pulse flex-shrink-0"></div>
+                <div className="ml-2 overflow-hidden group-data-[collapsible=offcanvas]:hidden min-w-0 flex-1">
+                  <div className="h-4 bg-muted rounded animate-pulse mb-1"></div>
+                  <div className="h-3 bg-muted rounded animate-pulse w-3/4"></div>
                 </div>
               </div>
               <div className="flex-shrink-0 group-data-[collapsible=offcanvas]:hidden">

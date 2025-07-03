@@ -341,7 +341,7 @@ const SurveysPage = () => {
     return (
       <div className="flex-1 p-2 w-full bg-background">
         <div className="mx-auto rounded-lg bg-card text-card-foreground shadow-lg">
-          <div className="px-6 py-4">
+          <div className="px-6 py-2">
             <div className="flex items-center">
               <SidebarTrigger className="-ml-0.5 h-5 w-5 text-muted-foreground hover:text-foreground" />
               <div className="h-4 border-l border-border mx-4" />
@@ -361,7 +361,7 @@ const SurveysPage = () => {
     <div className="flex-1 p-2 w-full bg-background">
       <div className="mx-auto rounded-lg bg-card text-card-foreground shadow-lg">
         {/* Header */}
-        <div className="px-6 py-4">
+        <div className="px-6 py-2">
           <div className="flex items-center justify-between">
             <div className="flex items-center">
               <SidebarTrigger className="-ml-0.5 h-5 w-5 text-muted-foreground hover:text-foreground" />
@@ -389,7 +389,17 @@ const SurveysPage = () => {
         
         <div className="border-b border-border" />
 
-        <div className="p-4 space-y-4">
+        <div className="p-6 space-y-4">
+          {/* Introduction */}
+          <div className="text-left space-y-2 flex">
+            <div className="flex-col mb-4">  
+              <h2 className="text-3xl font-bold">Survey Management</h2>
+              <p className="text-muted-foreground text-base max-w-2xl mx-auto mt-2">
+                Create, manage, and analyze your surveys in one place. Build engaging surveys with AI assistance, import from popular platforms, and get real-time insights from your responses.
+              </p>
+            </div>
+          </div>
+
           {surveys.length === 0 ? (
             /* Empty State */
             <div className="text-center space-y-4 py-12">
@@ -399,7 +409,7 @@ const SurveysPage = () => {
                 </div>
               </div>
               <h2 className="text-2xl font-bold">No Surveys Yet</h2>
-              <p className="text-muted-foreground text-base max-w-2xl mx-auto">
+              <p className="text-muted-foreground text-base max-w-2xl mx-auto mt-2">
                 Create your first survey to start collecting responses and insights from your audience.
               </p>
               <Link href="/create">
@@ -483,147 +493,7 @@ const SurveysPage = () => {
                    </div>
                  )}
 
-                {/* Charts Grid */}
-                <div className="grid gap-4 md:grid-cols-3">
-                  {/* Survey Status Distribution */}
-                  <Card>
-                    <CardHeader className="px-6 pt-6 pb-0">
-                      <CardTitle>Survey Status</CardTitle>
-                      <CardDescription>Distribution by status</CardDescription>
-                    </CardHeader>
-                    <CardContent className="px-0 pt-2 pb-4 sm:px-0 sm:pt-2 flex flex-col items-center justify-center">
-                      <div className="flex flex-row items-center justify-start gap-2 w-full px-4">
-                        <div className="w-3/5 flex justify-end">
-                          <ChartContainer config={{ visitors: { label: "Count" } }} className="aspect-square w-[200px]">
-                            <PieChart>
-                              <Pie
-                                data={aggregation.statusData.map((d, i) => ({ ...d, fill: grayscalePalette[i % grayscalePalette.length] }))}
-                                dataKey="count"
-                                nameKey="status"
-                                outerRadius={85}
-                                innerRadius={35}
-                                paddingAngle={2}
-                              >
-                                {aggregation.statusData.map((_, index) => (
-                                  <Cell key={`cell-${index}`} fill={grayscalePalette[index % grayscalePalette.length]} />
-                                ))}
-                              </Pie>
-                              <ChartTooltip content={<ChartTooltipContent />} />
-                            </PieChart>
-                          </ChartContainer>
-                        </div>
-                        {/* Legend */}
-                        <div className="w-2/5 flex flex-col gap-1 text-xs">
-                          {aggregation.statusData.map((d, i) => (
-                            <div key={d.status} className="flex items-center gap-1">
-                              <span
-                                className="inline-block h-2 w-2 rounded-sm"
-                                style={{ backgroundColor: grayscalePalette[i % grayscalePalette.length] }}
-                              />
-                              <span className="text-muted-foreground">{d.status}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
 
-                  {/* Monthly Creation Trend */}
-                  <Card>
-                    <CardHeader className="px-6 pt-6 pb-0">
-                      <CardTitle>Creation Trend</CardTitle>
-                      <CardDescription>Surveys created over time</CardDescription>
-                    </CardHeader>
-                    <CardContent className="px-0 pt-2 pb-4 sm:px-0 sm:pt-2">
-                      <ChartContainer config={{ count: { color: "hsl(var(--zinc-600))" } }} className="aspect-auto h-[220px] w-full">
-                        <AreaChart 
-                          data={aggregation.monthlyCreationData}
-                          margin={{
-                            left: -20,
-                            right: 20,
-                            top: 12,
-                            bottom: 12,
-                          }}
-                        >
-                          <defs>
-                            <linearGradient id="fillCreation" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="5%" stopColor="hsl(0, 0%, 40%)" stopOpacity={0.8} />
-                              <stop offset="95%" stopColor="hsl(0, 0%, 40%)" stopOpacity={0.1} />
-                            </linearGradient>
-                          </defs>
-                          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted))" />
-                          <XAxis dataKey="month" tickLine={false} axisLine={false} stroke="hsl(var(--muted-foreground))" />
-                          <YAxis allowDecimals={false} tickLine={false} axisLine={false} />
-                          <ChartTooltip content={<ChartTooltipContent />} />
-                          <Area type="monotone" dataKey="count" stroke="hsl(0, 0%, 40%)" strokeWidth={2} fill="url(#fillCreation)" />
-                        </AreaChart>
-                      </ChartContainer>
-                    </CardContent>
-                  </Card>
-
-                  {/* Response Distribution */}
-                  <Card>
-                    <CardHeader className="px-6 pt-6 pb-0">
-                      <CardTitle>Response Distribution</CardTitle>
-                      <CardDescription>Surveys by response count</CardDescription>
-                    </CardHeader>
-                    <CardContent className="px-6 pt-2 pb-4">
-                      <ChartContainer config={{ 
-                        count: { label: "Count", color: "hsl(0, 0%, 40%)" },
-                        label: { color: "var(--background)" }
-                      }} className="aspect-auto h-[220px] w-full">
-                        <BarChart 
-                          data={aggregation.responseDistribution}
-                          layout="vertical"
-                          margin={{
-                            left: 0,
-                            right: 16,
-                            top: 12,
-                            bottom: 12,
-                          }}
-                        >
-                          <CartesianGrid horizontal={false} />
-                          <YAxis
-                            dataKey="range"
-                            type="category"
-                            tickLine={false}
-                            tickMargin={10}
-                            axisLine={false}
-                            hide
-                          />
-                          <XAxis dataKey="count" type="number" hide />
-                          <ChartTooltip
-                            cursor={false}
-                            content={<ChartTooltipContent indicator="line" />}
-                          />
-                          <Bar 
-                            dataKey="count" 
-                            layout="vertical"
-                            radius={4}
-                          >
-                            {aggregation.responseDistribution.map((_, index) => (
-                              <Cell key={`cell-${index}`} fill={grayscalePalette[index % grayscalePalette.length]} />
-                            ))}
-                            <LabelList
-                              dataKey="range"
-                              position="insideLeft"
-                              offset={8}
-                              fill="white"
-                              fontSize={12}
-                            />
-                            <LabelList
-                              dataKey="count"
-                              position="right"
-                              offset={8}
-                              fill="hsl(var(--foreground))"
-                              fontSize={12}
-                            />
-                          </Bar>
-                        </BarChart>
-                      </ChartContainer>
-                    </CardContent>
-                  </Card>
-                </div>
 
 
 

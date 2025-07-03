@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { toast } from "react-hot-toast";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { validateEmail, validatePassword } from "@/app/utils/validation";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Loader2 } from "lucide-react";
 import { signIn, signOut } from "next-auth/react";
 import { authenticate } from "@/app/actions/auth";
+import { useSession } from "next-auth/react";
 
 const LoginPage = () => {
     const [formData, setFormData] = useState<{ email: string; password: string }>({
@@ -19,8 +20,16 @@ const LoginPage = () => {
     });
     const [isLoading, setIsLoading] = useState(false);
     const [isResetting, setIsResetting] = useState(false);
+    const { data: session, status } = useSession();
 
     const router = useRouter();
+
+    // Redirect if already authenticated and session is loaded
+    useEffect(() => {
+        if (status === "authenticated" && session) {
+            router.push("/cohort-chat");
+        }
+    }, [status, session, router]);
 
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
@@ -51,8 +60,8 @@ const LoginPage = () => {
             // If no error, authentication was successful
             toast.success("Signed in successfully!");
             
-            // Always redirect to cohort-chat since users set display name during registration
-            router.push("/cohort-chat");
+            // Don't redirect immediately - let the useEffect handle it after session is established
+            // The redirect will happen automatically when session updates
             
         } catch (error) {
             console.error("Authentication error:", error);
@@ -81,7 +90,7 @@ const LoginPage = () => {
                     toast.error(result.error);
                 } else if (result?.ok) {
                     toast.success("Signed in successfully!");
-                    router.push("/cohort-chat");
+                    // Don't redirect immediately - let the useEffect handle it
                 }
             } catch (fallbackError) {
                 console.error("Fallback auth error:", fallbackError);

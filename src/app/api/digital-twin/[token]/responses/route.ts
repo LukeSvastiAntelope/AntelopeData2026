@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { openSql as getMySQLConnection } from "@/app/utils/database/db";
+import { auth } from "@/auth";
 
-// GET /api/digital-twin/[token]/responses – list surveys answered by this responder
+// GET /api/digital-twin/[token]/responses – list surveys answered by this responder (for surveys created by current user)
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ token: string }> }
 ) {
   try {
@@ -12,9 +13,15 @@ export async function GET(
       return NextResponse.json({ status: false, message: 'Missing token' }, { status: 400 });
     }
 
+    // Get current user session
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ status: false, message: 'Unauthorized' }, { status: 401 });
+    }
+
     const db = await getMySQLConnection();
     
-    // Get all survey responses for this digital twin using the new agent_token relationship
+    // Get survey responses for this digital twin, but only for surveys created by the current user
     const [rows] = await db.execute<any[]>(
       `SELECT 
         s.id, 
@@ -25,9 +32,9 @@ export async function GET(
         sr.demographics
        FROM survey_responses sr
        JOIN surveys s ON sr.survey_id = s.id
-       WHERE sr.agent_token = ?
+       WHERE sr.agent_token = ? AND s.created_by = ?
        ORDER BY sr.submitted_at DESC`,
-      [token]
+      [token, session.user.id]
     );
 
     return NextResponse.json({ 

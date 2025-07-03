@@ -7,7 +7,9 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { ArrowLeft, Download, Share2, Clock, FileText, BarChart2 } from 'lucide-react';
+import { SidebarTrigger } from '@/components/ui/sidebar';
+import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb';
+import { ArrowLeft, Download, Share2, Clock, FileText, BarChart2, Trash2 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import toast from 'react-hot-toast';
@@ -130,12 +132,54 @@ ${report.full_content}
     }
   };
 
+  const handleDelete = async () => {
+    if (!report) return;
+    
+    const confirmed = confirm(`Are you sure you want to delete this report? This action cannot be undone.`);
+    if (!confirmed) return;
+
+    try {
+      const response = await fetch(`/api/reports/${reportId}`, {
+        method: 'DELETE'
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to delete report');
+      }
+      
+      toast.success('Report deleted successfully');
+      router.push('/reports');
+    } catch (err) {
+      console.error('Error deleting report:', err);
+      toast.error('Failed to delete report');
+    }
+  };
+
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading report...</p>
+      <div className="flex-1 p-2 w-full bg-background">
+        <div className="mx-auto rounded-lg bg-card text-card-foreground shadow-lg">
+          <div className="px-6 py-4">
+            <div className="flex items-center">
+              <SidebarTrigger className="-ml-0.5 h-5 w-5 text-muted-foreground hover:text-foreground" />
+              <div className="h-4 border-l border-border mx-4" />
+              <Breadcrumb>
+                <BreadcrumbList>
+                  <BreadcrumbItem>
+                    <BreadcrumbLink href="/reports">Reports</BreadcrumbLink>
+                  </BreadcrumbItem>
+                  <BreadcrumbSeparator />
+                  <BreadcrumbItem>
+                    <BreadcrumbPage>Loading...</BreadcrumbPage>
+                  </BreadcrumbItem>
+                </BreadcrumbList>
+              </Breadcrumb>
+            </div>
+          </div>
+          <div className="border-b border-border" />
+          <div className="p-4 flex items-center justify-center">
+            <div className="text-muted-foreground">Loading report...</div>
+          </div>
         </div>
       </div>
     );
@@ -143,18 +187,40 @@ ${report.full_content}
 
   if (error || !report) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Card className="max-w-md">
-          <CardContent className="pt-6">
-            <p className="text-center text-muted-foreground mb-4">
-              {error || 'Report not found'}
-            </p>
-            <Button onClick={() => router.push('/cohort-chat')} className="w-full">
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Back to Chat
-            </Button>
-          </CardContent>
-        </Card>
+      <div className="flex-1 p-2 w-full bg-background">
+        <div className="mx-auto rounded-lg bg-card text-card-foreground shadow-lg">
+          <div className="px-6 py-4">
+            <div className="flex items-center">
+              <SidebarTrigger className="-ml-0.5 h-5 w-5 text-muted-foreground hover:text-foreground" />
+              <div className="h-4 border-l border-border mx-4" />
+              <Breadcrumb>
+                <BreadcrumbList>
+                  <BreadcrumbItem>
+                    <BreadcrumbLink href="/reports">Reports</BreadcrumbLink>
+                  </BreadcrumbItem>
+                  <BreadcrumbSeparator />
+                  <BreadcrumbItem>
+                    <BreadcrumbPage>Error</BreadcrumbPage>
+                  </BreadcrumbItem>
+                </BreadcrumbList>
+              </Breadcrumb>
+            </div>
+          </div>
+          <div className="border-b border-border" />
+          <div className="p-4 flex items-center justify-center">
+            <Card className="max-w-md">
+              <CardContent className="pt-6">
+                <p className="text-center text-muted-foreground mb-4">
+                  {error || 'Report not found'}
+                </p>
+                <Button onClick={() => router.push('/reports')} className="w-full">
+                  <ArrowLeft className="mr-2 h-4 w-4" />
+                  Back to Reports
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
       </div>
     );
   }
@@ -164,32 +230,53 @@ ${report.full_content}
     : null;
 
   return (
-    <div className="container mx-auto py-8 max-w-6xl">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <Button
-          variant="ghost"
-          onClick={() => router.push('/cohort-chat')}
-          className="gap-2"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Back to Chat
-        </Button>
-        
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={handleShare}>
-            <Share2 className="h-4 w-4 mr-2" />
-            Share
-          </Button>
-          <Button variant="outline" size="sm" onClick={handleDownload}>
-            <Download className="h-4 w-4 mr-2" />
-            Download
-          </Button>
+    <div className="flex-1 p-2 w-full bg-background">
+      <div className="mx-auto rounded-lg bg-card text-card-foreground shadow-lg">
+        {/* Header */}
+        <div className="px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <SidebarTrigger className="-ml-0.5 h-5 w-5 text-muted-foreground hover:text-foreground" />
+              <div className="h-4 border-l border-border mx-4" />
+              <Breadcrumb>
+                <BreadcrumbList>
+                  <BreadcrumbItem>
+                    <BreadcrumbLink href="/reports">Reports</BreadcrumbLink>
+                  </BreadcrumbItem>
+                  <BreadcrumbSeparator />
+                  <BreadcrumbItem>
+                    <BreadcrumbPage>{report.query.length > 50 ? report.query.substring(0, 50) + '...' : report.query}</BreadcrumbPage>
+                  </BreadcrumbItem>
+                </BreadcrumbList>
+              </Breadcrumb>
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={handleShare}>
+                <Share2 className="h-4 w-4 mr-2" />
+                Share
+              </Button>
+              <Button variant="outline" size="sm" onClick={handleDownload}>
+                <Download className="h-4 w-4 mr-2" />
+                Download
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={handleDelete}
+                className="text-destructive hover:text-destructive"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete
+              </Button>
+            </div>
+          </div>
         </div>
-      </div>
+        
+        <div className="border-b border-border" />
 
-      {/* Report Card */}
-      <Card>
+        <div className="p-6">
+          {/* Report Card */}
+          <Card>
         <CardHeader>
           <div className="flex items-start justify-between">
             <div className="space-y-1">
@@ -267,6 +354,8 @@ ${report.full_content}
           )}
         </CardContent>
       </Card>
+        </div>
+      </div>
     </div>
   );
 } 

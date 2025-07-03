@@ -525,6 +525,16 @@ export default function AgentProfile() {
           <div className="border-b border-border" />
 
           <div className="p-6">
+            {/* Introduction */}
+            <div className="text-left space-y-2 flex">
+              <div className="flex-col mb-4">  
+                <h2 className="text-2xl font-bold">Profile Settings</h2>
+                <p className="text-muted-foreground text-base max-w-2xl mx-auto">
+                  Manage your account information, update your profile details, and configure external platform connections for enhanced functionality.
+                </p>
+              </div>
+            </div>
+
             {renderContent()}
           </div>
         </div>

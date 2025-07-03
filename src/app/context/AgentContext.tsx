@@ -1,17 +1,22 @@
 'use client'
 
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { IAgentProfile, IAgentContext, UserDB } from '../utils/interface';
 import { usePathname, useRouter } from 'next/navigation';
 import { handleAuthError } from '../utils/lib';
 import { useSession } from 'next-auth/react';
 const AgentContext = createContext<IAgentContext | undefined>(undefined);
 
+// Global flag to avoid re-fetching across provider remounts
+let globalAgentFetched = false;
+
 export const AgentProvider = ({ children }: { children: React.ReactNode }) => {
     const [agent, setAgent] = useState<IAgentProfile | null>(null);
     const [user, setUser] = useState<UserDB | null>(null);
     const [isAgentProfileLoading, setIsAgentProfileLoading] = useState(false);
     const [isInitialized, setIsInitialized] = useState(false);
+    const [isUserDataLoaded, setIsUserDataLoaded] = useState(false);
+    const hasFetched = useRef(false);
     const { data: session, status } = useSession();
     const pathname = usePathname();
     const router = useRouter();
@@ -20,7 +25,7 @@ export const AgentProvider = ({ children }: { children: React.ReactNode }) => {
     const isLoginPage = pathname === '/login';
 
     const fetchAgentProfile = async () => {
-        if (isAgentProfileLoading || !session) {
+        if (isAgentProfileLoading || !session || hasFetched.current || globalAgentFetched) {
             return;
         }
         
@@ -36,6 +41,9 @@ export const AgentProvider = ({ children }: { children: React.ReactNode }) => {
             if (data.status) {
                 setAgent({...data.agent, successRate: data.successRate});
                 setUser(data.user);
+                setIsUserDataLoaded(true);
+                hasFetched.current = true;
+                globalAgentFetched = true;
             } else {
                 if (!isAuthPage) {
                     handleAuthError(router, false);
@@ -48,7 +56,6 @@ export const AgentProvider = ({ children }: { children: React.ReactNode }) => {
             }
         } finally {
             setIsAgentProfileLoading(false);
-            setIsInitialized(true);
         }
     };
 
@@ -59,7 +66,10 @@ export const AgentProvider = ({ children }: { children: React.ReactNode }) => {
         
         // Only redirect from login page if user has a session (allow register page even with session)
         if (session && isLoginPage) {
-            router.push("/cohort-chat");
+            // Wait for user data to be loaded before redirecting
+            if (isUserDataLoaded) {
+                router.push("/cohort-chat");
+            }
             return;
         }
         
@@ -72,19 +82,26 @@ export const AgentProvider = ({ children }: { children: React.ReactNode }) => {
         }
 
         // Only fetch profile if we have a session and need to
-        if (session && !agent && !isAgentProfileLoading) {
+        if (session && !agent && !isAgentProfileLoading && !isUserDataLoaded) {
             fetchAgentProfile();
         }
         
-        // Mark as initialized if we have a session or are on auth page
-        if (!isInitialized && (session || isAuthPage)) {
+        // Mark as initialized only after user data is loaded or we're on auth page
+        if (!isInitialized && (isUserDataLoaded || isAuthPage)) {
             setIsInitialized(true);
         }
-    }, [pathname, session, status]);
+    }, [pathname, session, status, isUserDataLoaded]);
 
-    // Don't render children until we've initialized
+    // Don't render children until we've initialized and loaded user data (except for auth pages)
     if (!isInitialized && !isAuthPage) {
-        return <div>Loading...</div>;
+        return (
+            <div className="flex items-center justify-center min-h-screen">
+                <div className="flex flex-col items-center space-y-4">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                    <p className="text-sm text-muted-foreground">Loading your profile...</p>
+                </div>
+            </div>
+        );
     }
 
     return (

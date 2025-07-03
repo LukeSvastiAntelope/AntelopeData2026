@@ -196,18 +196,17 @@ const DigitalTwinsPage = () => {
         
         <div className="border-b border-border" />
 
-        <div className="p-4 space-y-4">
+        <div className="p-6 space-y-4">
           {/* Introduction */}
-          <div className="text-center space-y-2">
-            <div className="flex items-center justify-center mb-4">
-              <div className="p-3 rounded-full bg-primary/10">
-                <Brain className="h-8 w-8 text-primary" />
-              </div>
+          <div className="text-left space-y-2 flex">
+        
+            <div className="flex-col mb-4">  
+              <h2 className="text-3xl font-bold">Digital Twin Explorer</h2>
+              <p className="text-muted-foreground text-base max-w-2xl mx-auto mt-2">
+                Search and interact with digital twins created from survey responses. Each twin represents a real person&apos;s perspectives and can answer questions based on their profile.
+              </p>
             </div>
-            <h2 className="text-2xl font-bold">Digital Twin Explorer</h2>
-            <p className="text-muted-foreground text-base max-w-2xl mx-auto">
-              Search and interact with digital twins created from survey responses. Each twin represents a real person&apos;s perspectives and can answer questions based on their profile.
-            </p>
+           
           </div>
 
           {/* Dashboard Overview */}
@@ -374,7 +373,11 @@ const DigitalTwinsPage = () => {
                   </TableHeader>
                   <TableBody>
                     {allTwins.map((twin) => (
-                      <TableRow key={twin.agentToken} className="cursor-pointer" onClick={() => setSelectedTwin(twin.agentToken)}>
+                      <TableRow 
+                        key={twin.agentToken} 
+                        className="cursor-pointer hover:bg-muted/50" 
+                        onClick={() => window.location.href = `/digital-twins/${twin.agentToken}`}
+                      >
                         <TableCell>{twin.demographics?.name || twin.demographics?.email || 'Anonymous'}</TableCell>
                         <TableCell>{twin.demographics?.age || '—'}</TableCell>
                         <TableCell>{twin.demographics?.location || '—'}</TableCell>

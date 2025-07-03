@@ -51,4 +51,45 @@ export async function GET(
       { status: 500 }
     );
   }
+}
+
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    
+    const { id } = await params;
+    const storageService = new ReportStorageService();
+    
+    // First check if the report exists and belongs to the user
+    const report = await storageService.getReport(id, session.user.id);
+    
+    if (!report) {
+      return NextResponse.json({ error: 'Report not found' }, { status: 404 });
+    }
+    
+    // Delete the report (this should cascade to sections due to foreign key constraints)
+    const success = await storageService.deleteReport(id, session.user.id);
+    
+    if (!success) {
+      return NextResponse.json({ error: 'Failed to delete report' }, { status: 500 });
+    }
+    
+    return NextResponse.json({ 
+      status: true,
+      message: 'Report deleted successfully' 
+    });
+    
+  } catch (error) {
+    console.error('Error deleting report:', error);
+    return NextResponse.json(
+      { error: 'Failed to delete report' },
+      { status: 500 }
+    );
+  }
 } 
