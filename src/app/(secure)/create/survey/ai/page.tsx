@@ -228,6 +228,14 @@ const AISurveyBuilderPage = () => {
     setError(null)
 
     try {
+      const questionsToSave = editableQuestions.map((q, index) => ({
+        type: q.type,
+        prompt: q.prompt,
+        options: q.options,
+        isRequired: q.isRequired,
+        order: index + 1
+      }));
+
       const response = await fetch('/api/surveys', {
         method: 'POST',
         headers: {
@@ -241,13 +249,7 @@ const AISurveyBuilderPage = () => {
           startAt: startAt || null,
           endAt: endAt || null,
           autoPublish,
-          questions: editableQuestions.map((q, index) => ({
-            type: q.type,
-            prompt: q.prompt,
-            options: q.options,
-            isRequired: q.isRequired,
-            order: index + 1
-          }))
+          questions: questionsToSave
         })
       })
 

@@ -23,7 +23,7 @@ export async function GET(
         const db = await (await import("@/app/utils/database/db")).openSql();
         const [countRows] = await db.execute(
             'SELECT COUNT(*) as response_count FROM survey_responses WHERE survey_id = ?',
-            [survey.id]
+            [(survey as any).id]
         );
 
         const responseCount = (countRows as any)[0].response_count;
@@ -32,18 +32,18 @@ export async function GET(
         return NextResponse.json({ 
             status: true,
             survey: {
-                id: survey.id,
-                title: survey.title,
-                description: survey.description,
-                status: survey.status,
-                is_public: survey.is_public,
-                slug: survey.slug,
-                stopped_at: survey.stopped_at,
-                stop_reason: survey.stop_reason,
-                campaign_start_at: survey.campaign_start_at,
-                campaign_end_at: survey.campaign_end_at,
+                id: (survey as any).id,
+                title: (survey as any).title,
+                description: (survey as any).description,
+                status: (survey as any).status,
+                is_public: (survey as any).is_public,
+                slug: (survey as any).slug,
+                stopped_at: (survey as any).stopped_at,
+                stop_reason: (survey as any).stop_reason,
+                campaign_start_at: (survey as any).campaign_start_at,
+                campaign_end_at: (survey as any).campaign_end_at,
                 response_count: responseCount,
-                created_at: survey.created_at
+                created_at: (survey as any).created_at
             }
         });
 

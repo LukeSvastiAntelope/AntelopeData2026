@@ -3,68 +3,47 @@
 const mysql = require('mysql2/promise');
 const fs = require('fs');
 const path = require('path');
-
-// Load environment variables
-require('dotenv').config({ path: '.env 2' });
+require('dotenv').config();
 
 async function runMigration() {
-  let connection;
-  
+  const connection = await mysql.createConnection({
+    host: process.env.MYSQL_HOST,
+    port: parseInt(process.env.MYSQL_PORT || '3306'),
+    user: process.env.MYSQL_USER,
+    password: process.env.MYSQL_PASSWORD,
+    database: process.env.MYSQL_DATABASE,
+    multipleStatements: true
+  });
+
   try {
-    // Create connection
-    connection = await mysql.createConnection({
-      host: process.env.MYSQL_HOST || 'localhost',
-      port: process.env.MYSQL_PORT || 3306,
-      user: process.env.MYSQL_USER || 'root',
-      password: process.env.MYSQL_PASSWORD || '',
-      database: process.env.MYSQL_DATABASE || 'marketmaker',
-      multipleStatements: true // Allow multiple SQL statements
-    });
-
-    console.log('📊 Connected to database');
-
-    // Check current survey status distribution
-    const [beforeResults] = await connection.execute(
-      'SELECT status, COUNT(*) as count FROM surveys GROUP BY status'
-    );
-    console.log('\n📈 Current survey status distribution:');
-    console.table(beforeResults);
-
-    // Read migration file
-    const migrationPath = path.join(__dirname, '..', 'migrations', '20250701_add_schedule_fields_safe.sql');
-    const migrationSQL = fs.readFileSync(migrationPath, 'utf8');
-
-    console.log('\n🔄 Running migration...');
+    const migrationFile = process.argv[2] || '20250123_add_report_generation_tables.sql';
+    const migrationPath = path.join(__dirname, '..', 'migrations', migrationFile);
     
-    // Execute migration
-    await connection.query(migrationSQL);
+    console.log(`📄 Running migration: ${migrationFile}`);
+    console.log(`📁 Path: ${migrationPath}`);
+    
+    const migration = fs.readFileSync(migrationPath, 'utf8');
+    
+    await connection.query(migration);
     
     console.log('✅ Migration completed successfully!');
-
-    // Check results after migration
-    const [afterResults] = await connection.execute(
-      'SELECT status, COUNT(*) as count FROM surveys GROUP BY status'
-    );
-    console.log('\n📊 New survey status distribution:');
-    console.table(afterResults);
-
-    // Show table structure
-    const [columns] = await connection.execute(
-      "SHOW COLUMNS FROM surveys WHERE Field IN ('status', 'start_at', 'end_at', 'archived_at')"
-    );
-    console.log('\n📋 Updated table structure:');
-    console.table(columns);
-
+    
+    // Verify tables were created
+    const [tables] = await connection.query(`
+      SELECT TABLE_NAME 
+      FROM information_schema.TABLES 
+      WHERE TABLE_SCHEMA = ? 
+      AND TABLE_NAME IN ('reports', 'report_sections', 'report_embeddings')
+    `, [process.env.MYSQL_DATABASE]);
+    
+    console.log('📊 Created tables:', tables.map(t => t.TABLE_NAME).join(', '));
+    
   } catch (error) {
     console.error('❌ Migration failed:', error.message);
-    process.exit(1);
+    console.error(error);
   } finally {
-    if (connection) {
-      await connection.end();
-      console.log('\n👋 Database connection closed');
-    }
+    await connection.end();
   }
 }
 
-// Run the migration
 runMigration(); 
