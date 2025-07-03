@@ -25,6 +25,15 @@ export interface AICompletionResponse {
   };
 }
 
+export interface AIStreamingCompletionResponse {
+  stream: ReadableStream<Uint8Array>;
+  usage?: {
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+  };
+}
+
 // Initialize AI clients - only on server side
 let openai: OpenAI | null = null;
 let deepseek: OpenAI | null = null;
@@ -89,6 +98,24 @@ export async function createCompletion(options: AICompletionOptions): Promise<AI
       return createGeminiCompletion(options);
     case 'anthropic':
       return createAnthropicCompletion(options);
+    default:
+      throw new Error(`Unsupported provider for model: ${options.model}`);
+  }
+}
+
+// Streaming completion function
+export async function createStreamingCompletion(options: AICompletionOptions): Promise<AIStreamingCompletionResponse> {
+  const provider = getProvider(options.model);
+  
+  switch (provider) {
+    case 'openai':
+      return createOpenAIStreamingCompletion(options);
+    case 'deepseek':
+      return createDeepSeekStreamingCompletion(options);
+    case 'gemini':
+      return createGeminiStreamingCompletion(options);
+    case 'anthropic':
+      return createAnthropicStreamingCompletion(options);
     default:
       throw new Error(`Unsupported provider for model: ${options.model}`);
   }
@@ -248,4 +275,181 @@ async function createAnthropicCompletion(options: AICompletionOptions): Promise<
       totalTokens: completion.usage.input_tokens + completion.usage.output_tokens,
     } : undefined
   };
+}
+
+// Streaming implementations
+
+// OpenAI streaming completion
+async function createOpenAIStreamingCompletion(options: AICompletionOptions): Promise<AIStreamingCompletionResponse> {
+  const client = getOpenAIClient();
+  
+  // Determine if this is a newer model that uses max_completion_tokens
+  const usesCompletionTokens = options.model.startsWith('o1') || options.model.startsWith('o3');
+  
+  const requestParams: any = {
+    model: options.model,
+    messages: options.messages.map(msg => ({
+      role: msg.role,
+      content: msg.content
+    })),
+    stream: true,
+  };
+
+  // Add parameters based on model type
+  if (usesCompletionTokens) {
+    requestParams.max_completion_tokens = options.maxTokens ? Math.max(options.maxTokens, 2000) : 2000;
+  } else {
+    requestParams.temperature = options.temperature !== undefined ? options.temperature : 0.25;
+    requestParams.max_tokens = options.maxTokens || 500;
+    requestParams.frequency_penalty = options.frequencyPenalty || 0.2;
+    requestParams.presence_penalty = options.presencePenalty || 0.2;
+  }
+
+  const stream = await client.chat.completions.create(requestParams);
+  
+  const encoder = new TextEncoder();
+  const readableStream = new ReadableStream({
+    async start(controller) {
+      try {
+        for await (const chunk of stream as any) {
+          const content = chunk.choices[0]?.delta?.content;
+          if (content) {
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content })}\n\n`));
+          }
+        }
+        controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+        controller.close();
+      } catch (error) {
+        controller.error(error);
+      }
+    }
+  });
+
+  return { stream: readableStream };
+}
+
+// DeepSeek streaming completion
+async function createDeepSeekStreamingCompletion(options: AICompletionOptions): Promise<AIStreamingCompletionResponse> {
+  const client = getDeepSeekClient();
+  
+  const stream = await client.chat.completions.create({
+    model: options.model,
+    messages: options.messages.map(msg => ({
+      role: msg.role,
+      content: msg.content
+    })),
+    temperature: options.temperature !== undefined ? options.temperature : 0.25,
+    max_tokens: options.maxTokens || 500,
+    stream: true,
+  });
+  
+  const encoder = new TextEncoder();
+  const readableStream = new ReadableStream({
+    async start(controller) {
+      try {
+        for await (const chunk of stream as any) {
+          const content = chunk.choices[0]?.delta?.content;
+          if (content) {
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content })}\n\n`));
+          }
+        }
+        controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+        controller.close();
+      } catch (error) {
+        controller.error(error);
+      }
+    }
+  });
+
+  return { stream: readableStream };
+}
+
+// Gemini streaming completion
+async function createGeminiStreamingCompletion(options: AICompletionOptions): Promise<AIStreamingCompletionResponse> {
+  const client = getGeminiClient();
+  
+  const stream = await client.chat.completions.create({
+    model: options.model,
+    messages: options.messages.map(msg => ({
+      role: msg.role,
+      content: msg.content
+    })),
+    temperature: options.temperature !== undefined ? options.temperature : 0.25,
+    max_tokens: options.maxTokens || 500,
+    stream: true,
+  });
+  
+  const encoder = new TextEncoder();
+  const readableStream = new ReadableStream({
+    async start(controller) {
+      try {
+        for await (const chunk of stream as any) {
+          const content = chunk.choices[0]?.delta?.content;
+          if (content) {
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content })}\n\n`));
+          }
+        }
+        controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+        controller.close();
+      } catch (error) {
+        controller.error(error);
+      }
+    }
+  });
+
+  return { stream: readableStream };
+}
+
+// Anthropic streaming completion
+async function createAnthropicStreamingCompletion(options: AICompletionOptions): Promise<AIStreamingCompletionResponse> {
+  const client = getAnthropicClient();
+  
+  // Convert messages to Anthropic format
+  const messages = options.messages.filter(msg => msg.role !== 'system').map(msg => ({
+    role: msg.role as 'user' | 'assistant',
+    content: msg.content
+  }));
+  
+  // Extract system message if present
+  const systemMessage = options.messages.find(msg => msg.role === 'system');
+  
+  const requestParams: any = {
+    model: options.model,
+    max_tokens: options.maxTokens || 500,
+    messages: messages,
+    stream: true,
+  };
+  
+  if (systemMessage) {
+    requestParams.system = systemMessage.content;
+  }
+  
+  // Add optional parameters
+  if (options.temperature !== undefined) {
+    requestParams.temperature = options.temperature;
+  }
+
+  const stream = await client.messages.create(requestParams);
+  
+  const encoder = new TextEncoder();
+  const readableStream = new ReadableStream({
+    async start(controller) {
+      try {
+        for await (const chunk of stream as any) {
+          if (chunk.type === 'content_block_delta' && chunk.delta.type === 'text_delta') {
+            const content = chunk.delta.text;
+            if (content) {
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content })}\n\n`));
+            }
+          }
+        }
+        controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+        controller.close();
+      } catch (error) {
+        controller.error(error);
+      }
+    }
+  });
+
+  return { stream: readableStream };
 } 

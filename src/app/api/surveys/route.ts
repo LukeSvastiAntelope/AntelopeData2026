@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { SurveyRepo } from "@/app/utils/database/survey-repo";
 import { verifyConfirmationToken } from "@/app/utils/api/token";
 
-// GET /api/surveys - surveys created by current user
+// GET /api/surveys - surveys created by current user + featured examples
 export async function GET(req: NextRequest) {
   const userIdHeader = req.headers.get('x-user-id');
   if (!userIdHeader) {
@@ -10,26 +10,106 @@ export async function GET(req: NextRequest) {
   }
   const userId = Number(userIdHeader);
   console.log('Fetching surveys for user ID:', userId);
+  
   try {
-    const surveys = await SurveyRepo.getSurveysByCreator(userId);
-    console.log('Found surveys for user:', surveys.length);
-    console.log('Survey titles:', surveys.map((s: any) => s.title));
-    // Return all surveys with full data that the frontend expects
-    const surveysWithFullData = surveys.map((s:any) => ({
-      id: s.id,
-      title: s.title,
-      description: s.description,
-      slug: s.slug,
-      status: s.status,
-      is_public: s.is_public,
-      created_at: s.created_at,
-      response_count: s.response_count || 0,
-      source: s.source || 'native',
-      source_metadata: s.source_metadata || null,
-      start_at: s.start_at,
-      end_at: s.end_at
-    }));
-    return NextResponse.json({ status:true, surveys: surveysWithFullData });
+    // Check if user wants only their own surveys or all (including featured)
+    const { searchParams } = new URL(req.url);
+    const includeFeatures = searchParams.get('featured') !== 'false'; // Default to true
+    
+    if (includeFeatures) {
+      // Get user surveys + featured examples
+      const { userSurveys, featuredSurveys, allSurveys } = await SurveyRepo.getSurveysForUser(userId);
+      
+      console.log('Found surveys for user:', userSurveys.length);
+      console.log('Found featured surveys:', featuredSurveys.length);
+      console.log('User survey titles:', userSurveys.map((s: any) => s.title));
+      console.log('Featured survey titles:', featuredSurveys.map((s: any) => s.title));
+      
+      // Format all surveys with proper categorization
+      const surveysWithFullData = allSurveys.map((s: any) => ({
+        id: s.id,
+        title: s.title,
+        description: s.description,
+        slug: s.slug,
+        status: s.status,
+        is_public: s.is_public,
+        created_at: s.created_at,
+        response_count: s.response_count || 0,
+        source: s.source || 'native',
+        source_metadata: s.source_metadata || null,
+        start_at: s.start_at,
+        end_at: s.end_at,
+        survey_type: s.survey_type, // 'own' or 'featured'
+        is_featured: s.survey_type === 'featured',
+        is_editable: s.survey_type === 'own' // Only user's own surveys are editable
+      }));
+      
+      return NextResponse.json({ 
+        status: true, 
+        surveys: surveysWithFullData,
+        categorized: {
+          userSurveys: userSurveys.map((s: any) => ({
+            id: s.id,
+            title: s.title,
+            description: s.description,
+            slug: s.slug,
+            status: s.status,
+            is_public: s.is_public,
+            created_at: s.created_at,
+            response_count: s.response_count || 0,
+            source: s.source || 'native',
+            source_metadata: s.source_metadata || null,
+            start_at: s.start_at,
+            end_at: s.end_at,
+            survey_type: 'own',
+            is_featured: false,
+            is_editable: true
+          })),
+          featuredSurveys: featuredSurveys.map((s: any) => ({
+            id: s.id,
+            title: s.title,
+            description: s.description,
+            slug: s.slug,
+            status: s.status,
+            is_public: s.is_public,
+            created_at: s.created_at,
+            response_count: s.response_count || 0,
+            source: s.source || 'native',
+            source_metadata: s.source_metadata || null,
+            start_at: s.start_at,
+            end_at: s.end_at,
+            survey_type: 'featured',
+            is_featured: true,
+            is_editable: false
+          }))
+        }
+      });
+    } else {
+      // Original behavior - only user's own surveys
+      const surveys = await SurveyRepo.getSurveysByCreator(userId);
+      console.log('Found surveys for user:', surveys.length);
+      console.log('Survey titles:', surveys.map((s: any) => s.title));
+      
+      const surveysWithFullData = surveys.map((s:any) => ({
+        id: s.id,
+        title: s.title,
+        description: s.description,
+        slug: s.slug,
+        status: s.status,
+        is_public: s.is_public,
+        created_at: s.created_at,
+        response_count: s.response_count || 0,
+        source: s.source || 'native',
+        source_metadata: s.source_metadata || null,
+        start_at: s.start_at,
+        end_at: s.end_at,
+        survey_type: 'own',
+        is_featured: false,
+        is_editable: true
+      }));
+      
+      return NextResponse.json({ status:true, surveys: surveysWithFullData });
+    }
   } catch (err) {
     console.error('Error fetching user surveys', err);
     return NextResponse.json({ status:false, message:'Internal error' }, { status:500 });

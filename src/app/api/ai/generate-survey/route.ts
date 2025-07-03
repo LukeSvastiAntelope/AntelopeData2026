@@ -131,15 +131,27 @@ Guidelines:
                 .join('');
         } else {
             // Use OpenAI-compatible API
-            const completion = await (aiClient as OpenAI).chat.completions.create({
+            // Newer OpenAI models (o1, o3, gpt-4o) require max_completion_tokens
+            // Older models and other providers still use max_tokens
+            const useNewTokenParam = modelConfig.type === "openai" && 
+                (modelConfig.model.includes('o1') || modelConfig.model.includes('o3') || modelConfig.model.includes('gpt-4o'));
+            
+            const requestParams: any = {
                 model: modelConfig.model,
                 messages: [
                     { role: "system", content: systemPrompt },
                     { role: "user", content: prompt }
                 ],
                 temperature: 0.7,
-                max_tokens: 2000,
-            });
+            };
+            
+            if (useNewTokenParam) {
+                requestParams.max_completion_tokens = 2000;
+            } else {
+                requestParams.max_tokens = 2000;
+            }
+            
+            const completion = await (aiClient as OpenAI).chat.completions.create(requestParams);
 
             aiResponse = completion.choices[0]?.message?.content;
         }

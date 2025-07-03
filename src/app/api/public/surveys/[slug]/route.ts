@@ -14,9 +14,18 @@ export async function GET(
             return NextResponse.json({ status: true, survey });
         }
 
-        // Not active – check if survey exists but is inactive to decide 410 vs 404
+        // Not active – check if survey exists but is inactive
         const existsAny = await SurveyRepo.getSurveyBySlugAny(slug);
         if (existsAny) {
+            // Allow preview of draft surveys
+            if ((existsAny as any).status === 'draft') {
+                return NextResponse.json({ 
+                    status: true, 
+                    survey: existsAny,
+                    preview: true 
+                });
+            }
+            
             return NextResponse.json(
                 { error: 'Survey is not active' },
                 { status: 410 }
