@@ -2,7 +2,6 @@
 
 import { signIn, signOut } from "@/auth"
 import { AuthError } from "next-auth"
-import { redirect } from "next/navigation"
 
 export async function authenticate(
   email: string,
@@ -10,14 +9,14 @@ export async function authenticate(
 ) {
   try {
     // Force sign out first to clear any existing session
-    console.log('Clearing existing session before login...');
-    try {
-      await signOut({ redirect: false });
-      // Add a small delay to ensure signout completes
-      await new Promise(resolve => setTimeout(resolve, 100));
-    } catch (signOutError) {
-      console.log('Sign out error (may be expected if no session):', signOutError);
-    }
+    // console.log('Clearing existing session before login...');
+    // try {
+    //   await signOut({ redirect: false });
+    //   // Add a small delay to ensure signout completes
+    //   await new Promise(resolve => setTimeout(resolve, 100));
+    // } catch (signOutError) {
+    //   console.log('Sign out error (may be expected if no session):', signOutError);
+    // }
     
     console.log('Attempting sign in for:', email);
     const result = await signIn('credentials', {
@@ -28,22 +27,22 @@ export async function authenticate(
     
     console.log('Server action signIn result:', result);
     
-    // If signIn was successful, redirect to cohort-chat
+    // Return success - let client handle redirect
     if (result) {
-      redirect('/cohort-chat');
+      return { success: true };
     }
     
-    return null; // Success
-  } catch (error) {
+    return { success: false, error: 'Invalid credentials.' };
+  } catch (error: any) {
     console.error('Server action error:', error);
     if (error instanceof AuthError) {
       switch (error.type) {
         case 'CredentialsSignin':
-          return 'Invalid credentials.'
+          return { success: false, error: 'Invalid credentials.' };
         default:
-          return 'Something went wrong.'
+          return { success: false, error: 'Something went wrong.' };
       }
     }
-    return 'Authentication failed.'
+    return { success: false, error: 'Authentication failed.' };
   }
 } 

@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2 } from "lucide-react";
-import { signIn, signOut } from "next-auth/react";
+import { signIn, signOut, getSession } from "next-auth/react";
 import { authenticate } from "@/app/actions/auth";
 import { useSession } from "next-auth/react";
 
@@ -26,7 +26,9 @@ const LoginPage = () => {
 
     // Redirect if already authenticated and session is loaded
     useEffect(() => {
+        console.log('Login page useEffect - status:', status, 'session:', !!session);
         if (status === "authenticated" && session) {
+            console.log('Redirecting to cohort-chat from login page');
             router.push("/cohort-chat");
         }
     }, [status, session, router]);
@@ -48,18 +50,27 @@ const LoginPage = () => {
         try {
             console.log('Attempting authentication with server action...');
             
-            // Use server action - it will redirect on success
-            const error = await authenticate(formData.email, formData.password);
+            // Use server action
+            const result = await authenticate(formData.email, formData.password);
             
-            if (error) {
-                console.error('Server action auth error:', error);
-                toast.error(error);
-            } else {
-                // Success - server action should have redirected us
+            console.log('Authentication result:', result);
+            
+            if (result.success) {
+                console.log('Authentication successful, showing toast and redirecting...');
                 toast.success("Signed in successfully!");
+                
+                // Force session refresh before redirecting
+                console.log('Forcing session refresh...');
+                await getSession(); // This will trigger a session refresh
+                
+                // Use router.push after session refresh
+                router.push("/cohort-chat");
+            } else {
+                console.error('Server action auth error:', result.error);
+                toast.error(result.error);
             }
             
-        } catch (error) {
+        } catch (error: any) {
             console.error("Authentication error:", error);
             toast.error("Authentication failed. Please try again.");
         } finally {
