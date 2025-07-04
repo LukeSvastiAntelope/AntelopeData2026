@@ -1116,10 +1116,8 @@ FORMATTING REQUIREMENTS:
   const loadConversations = async () => {
     setConversationsLoading(true);
     try {
-      const token = localStorage.getItem('token');
       const response = await fetch('/api/conversations', {
         headers: {
-          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         }
       });
@@ -1147,11 +1145,9 @@ FORMATTING REQUIREMENTS:
 
   const saveConversation = async (conversationId: string, messages: ChatMessage[], title?: string) => {
     try {
-      const token = localStorage.getItem('token');
       await fetch('/api/conversations', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
@@ -1223,11 +1219,10 @@ FORMATTING REQUIREMENTS:
 
   const deleteConversation = async (conversationId: string) => {
     try {
-      const token = localStorage.getItem('token');
       await fetch(`/api/conversations/${conversationId}`, {
         method: 'DELETE',
         headers: {
-          'Authorization': `Bearer ${token}`
+          'Content-Type': 'application/json'
         }
       });
       
