@@ -147,27 +147,40 @@ export class FactSheetQueryResolver {
    */
   private generateAnswerFromStats(question: string, relevantStats: Array<{key: string, stats: any, type: string}>, factSheet: any): FactSheetQueryResult {
     const primaryStat = relevantStats[0];
+    console.log('🎯 Generating answer from stats for question:', question);
+    console.log('📊 Primary stat:', primaryStat.key, 'Type:', primaryStat.type);
+    console.log('📈 Stat data structure:', Object.keys(primaryStat.stats));
+    
     let answer = "";
     const dataCards: any[] = [];
     let confidence = 0.8;
     
     // Generate answer based on the type of data available
     if (primaryStat.type === 'multi_select' && primaryStat.stats.adoption_rates) {
+      console.log('🔍 Processing multi-select data...');
       const result = this.generateMultiSelectAnswer(question, primaryStat, factSheet);
       answer = result.answer;
       dataCards.push(...result.dataCards);
       confidence = result.confidence;
     } else if (primaryStat.type === 'numeric' && primaryStat.stats.statistics) {
+      console.log('🔍 Processing numeric data...');
       const result = this.generateNumericAnswer(question, primaryStat, factSheet);
       answer = result.answer;
       dataCards.push(...result.dataCards);
       confidence = result.confidence;
     } else if (primaryStat.type === 'categorical' && primaryStat.stats.distribution) {
+      console.log('🔍 Processing categorical data...');
       const result = this.generateCategoricalAnswer(question, primaryStat, factSheet);
       answer = result.answer;
       dataCards.push(...result.dataCards);
       confidence = result.confidence;
     } else {
+      console.log('❌ No matching data type found for answer generation');
+      console.log('📊 Available stat types:', {
+        hasAdoptionRates: !!primaryStat.stats.adoption_rates,
+        hasStatistics: !!primaryStat.stats.statistics,
+        hasDistribution: !!primaryStat.stats.distribution
+      });
       return {
         canAnswer: false,
         confidence: 0,
@@ -178,6 +191,9 @@ export class FactSheetQueryResolver {
         }
       };
     }
+    
+    console.log('✅ Final answer generated:', answer);
+    console.log('🎯 Final confidence:', confidence);
     
     return {
       canAnswer: true,
@@ -193,8 +209,13 @@ export class FactSheetQueryResolver {
    */
   private generateMultiSelectAnswer(question: string, stat: {key: string, stats: any, type: string}, factSheet: any): {answer: string, dataCards: any[], confidence: number} {
     const adoptionRates = stat.stats.adoption_rates;
+    console.log('🔍 Generating multi-select answer for:', question);
+    console.log('📊 Adoption rates data:', adoptionRates);
+    
     const sortedOptions = Object.entries(adoptionRates)
       .sort(([,a]: any, [,b]: any) => b.percentage - a.percentage);
+    
+    console.log('📈 Sorted options:', sortedOptions);
     
     let answer = "";
     let confidence = 0.9;
@@ -218,6 +239,9 @@ export class FactSheetQueryResolver {
       answer = `Response breakdown: ${sortedOptions.map(([name, stats]: [string, any]) => `"${name}" was selected by ${stats.percentage}% of respondents (${stats.users} users)`).join(', ')}.`;
       confidence = 0.85;
     }
+    
+    console.log('✅ Generated answer:', answer);
+    console.log('🎯 Confidence:', confidence);
     
     // Create data card
     const dataCards = [{

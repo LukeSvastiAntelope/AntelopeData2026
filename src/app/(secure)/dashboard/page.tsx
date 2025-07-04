@@ -12,7 +12,7 @@ import {
 import { SectionCards } from "@/components/section-cards";
 import { useFetch } from "@/app/utils/lib";
 import { useAgent } from "@/app/context/AgentContext";
-import toast from "react-hot-toast";
+import { toast } from "@/components/ui/sonner";
 import { ModeToggle } from "@/components/mode-toggle";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 

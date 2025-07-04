@@ -2,7 +2,7 @@
 
 import "./globals.css";
 import { Noto_Sans } from 'next/font/google';
-import { Toaster } from "react-hot-toast";
+import { Toaster } from "@/components/ui/sonner";
 import { Providers } from "./components/provider/mainProvider";
 // import { SolProvider } from "./components/provider/solProvider";
 import Script from "next/script";
@@ -39,10 +39,7 @@ export default function RootLayout({
             </head>
             <body className={`${notoSans.className} antialiased bg-background text-foreground transition-colors duration-300`}>
                 <ThemeProvider>
-                    <Toaster
-                        position="top-right"
-                        reverseOrder={true}
-                    />
+                    <Toaster />
                     <Providers>
                         {/* <SolProvider> */}
                             <main className="min-h-screen">

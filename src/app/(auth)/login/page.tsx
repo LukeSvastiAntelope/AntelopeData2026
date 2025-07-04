@@ -1,7 +1,7 @@
 'use client';
 
 import Link from "next/link";
-import { toast } from "react-hot-toast";
+import { toast } from "@/components/ui/sonner";
 import { useState, useEffect } from "react";
 import { validateEmail, validatePassword } from "@/app/utils/validation";
 import { useRouter } from "next/navigation";
@@ -48,54 +48,20 @@ const LoginPage = () => {
         try {
             console.log('Attempting authentication with server action...');
             
-            // Try server action first
+            // Use server action - it will redirect on success
             const error = await authenticate(formData.email, formData.password);
             
             if (error) {
                 console.error('Server action auth error:', error);
                 toast.error(error);
-                return;
+            } else {
+                // Success - server action should have redirected us
+                toast.success("Signed in successfully!");
             }
-            
-            // If no error, authentication was successful
-            toast.success("Signed in successfully!");
-            
-            // Don't redirect immediately - let the useEffect handle it after session is established
-            // The redirect will happen automatically when session updates
             
         } catch (error) {
             console.error("Authentication error:", error);
-            
-            // Fallback to client-side signIn if server action fails
-            console.log('Falling back to client-side signIn...');
-            try {
-                // Force sign out first to clear any existing session
-                console.log('Clearing existing session before client-side login...');
-                try {
-                    await signOut({ redirect: false });
-                    // Add a small delay to ensure signout completes
-                    await new Promise(resolve => setTimeout(resolve, 100));
-                } catch (signOutError) {
-                    console.log('Client sign out error (may be expected):', signOutError);
-                }
-                
-                const result = await signIn('credentials', {
-                    email: formData.email,
-                    password: formData.password,
-                    redirect: false,
-                    callbackUrl: '/cohort-chat'
-                });
-
-                if (result?.error) {
-                    toast.error(result.error);
-                } else if (result?.ok) {
-                    toast.success("Signed in successfully!");
-                    // Don't redirect immediately - let the useEffect handle it
-                }
-            } catch (fallbackError) {
-                console.error("Fallback auth error:", fallbackError);
-                toast.error("Authentication failed: " + (fallbackError as Error).message);
-            }
+            toast.error("Authentication failed. Please try again.");
         } finally {
             setIsLoading(false);
         }

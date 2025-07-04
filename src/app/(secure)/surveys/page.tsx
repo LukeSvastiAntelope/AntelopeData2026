@@ -26,7 +26,7 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { toast } from "react-hot-toast"
+import { toast } from "@/components/ui/sonner"
 
 // Charts & table utilities
 import { AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, CartesianGrid, XAxis, YAxis, LabelList } from "recharts"
