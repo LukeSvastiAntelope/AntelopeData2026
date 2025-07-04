@@ -18,13 +18,16 @@ export default function AboutPage() {
 
         <div className="border-b border-border" />
 
-                <div className="p-6">
-         <h1 className="text-2xl font-bold text-foreground mt-1 w-fit mb-4">About Antelope</h1>
-        <p className="text-muted-foreground leading-relaxed">
-          Antelope is a revolutionary survey platform that transforms your survey responses into a live network of synthetic personas. 
-          Our AI-powered platform enables you to chat with your survey data in real-time, getting instant insights without the need 
-          to read through long reports or manually analyze spreadsheets.
-        </p>
+        <div className="p-6">
+          {/* Introduction */}
+          <div className="text-left space-y-2 flex">
+            <div className="flex-col mb-4">  
+              <h2 className="text-2xl font-bold">About Antelope</h2>
+              <p className="text-muted-foreground text-base max-w-2xl mx-auto">
+                Antelope is a revolutionary survey platform that transforms your survey responses into a live network of synthetic personas. Chat with your data in real-time and get instant insights without complex analysis.
+              </p>
+            </div>
+          </div>
 
         <h2 className="text-xl font-semibold mt-8 mb-4 text-foreground">Why Antelope?</h2>
         <p className="text-muted-foreground leading-relaxed">

@@ -2,6 +2,7 @@
 
 import { signIn, signOut } from "@/auth"
 import { AuthError } from "next-auth"
+import { redirect } from "next/navigation"
 
 export async function authenticate(
   email: string,
@@ -26,6 +27,12 @@ export async function authenticate(
     })
     
     console.log('Server action signIn result:', result);
+    
+    // If signIn was successful, redirect to cohort-chat
+    if (result) {
+      redirect('/cohort-chat');
+    }
+    
     return null; // Success
   } catch (error) {
     console.error('Server action error:', error);

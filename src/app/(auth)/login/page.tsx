@@ -1,8 +1,8 @@
 'use client';
 
 import Link from "next/link";
-import { toast } from "react-hot-toast";
-import { useState } from "react";
+import { toast } from "@/components/ui/sonner";
+import { useState, useEffect } from "react";
 import { validateEmail, validatePassword } from "@/app/utils/validation";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Loader2 } from "lucide-react";
 import { signIn, signOut } from "next-auth/react";
 import { authenticate } from "@/app/actions/auth";
+import { useSession } from "next-auth/react";
 
 const LoginPage = () => {
     const [formData, setFormData] = useState<{ email: string; password: string }>({
@@ -19,8 +20,16 @@ const LoginPage = () => {
     });
     const [isLoading, setIsLoading] = useState(false);
     const [isResetting, setIsResetting] = useState(false);
+    const { data: session, status } = useSession();
 
     const router = useRouter();
+
+    // Redirect if already authenticated and session is loaded
+    useEffect(() => {
+        if (status === "authenticated" && session) {
+            router.push("/cohort-chat");
+        }
+    }, [status, session, router]);
 
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
@@ -39,54 +48,20 @@ const LoginPage = () => {
         try {
             console.log('Attempting authentication with server action...');
             
-            // Try server action first
+            // Use server action - it will redirect on success
             const error = await authenticate(formData.email, formData.password);
             
             if (error) {
                 console.error('Server action auth error:', error);
                 toast.error(error);
-                return;
+            } else {
+                // Success - server action should have redirected us
+                toast.success("Signed in successfully!");
             }
-            
-            // If no error, authentication was successful
-            toast.success("Signed in successfully!");
-            
-            // Always redirect to cohort-chat since users set display name during registration
-            router.push("/cohort-chat");
             
         } catch (error) {
             console.error("Authentication error:", error);
-            
-            // Fallback to client-side signIn if server action fails
-            console.log('Falling back to client-side signIn...');
-            try {
-                // Force sign out first to clear any existing session
-                console.log('Clearing existing session before client-side login...');
-                try {
-                    await signOut({ redirect: false });
-                    // Add a small delay to ensure signout completes
-                    await new Promise(resolve => setTimeout(resolve, 100));
-                } catch (signOutError) {
-                    console.log('Client sign out error (may be expected):', signOutError);
-                }
-                
-                const result = await signIn('credentials', {
-                    email: formData.email,
-                    password: formData.password,
-                    redirect: false,
-                    callbackUrl: '/cohort-chat'
-                });
-
-                if (result?.error) {
-                    toast.error(result.error);
-                } else if (result?.ok) {
-                    toast.success("Signed in successfully!");
-                    router.push("/cohort-chat");
-                }
-            } catch (fallbackError) {
-                console.error("Fallback auth error:", fallbackError);
-                toast.error("Authentication failed: " + (fallbackError as Error).message);
-            }
+            toast.error("Authentication failed. Please try again.");
         } finally {
             setIsLoading(false);
         }

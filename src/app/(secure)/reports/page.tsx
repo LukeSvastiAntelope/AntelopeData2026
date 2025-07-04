@@ -7,7 +7,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { FileText, Search, Filter, Clock, BarChart2, ChevronRight } from 'lucide-react';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { SidebarTrigger } from '@/components/ui/sidebar';
+import { FileText, Search, Filter, Clock, BarChart2, Plus } from 'lucide-react';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 
@@ -115,136 +117,187 @@ export default function ReportsListPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading reports...</p>
+      <div className="flex-1 p-2 w-full bg-background">
+        <div className="mx-auto rounded-lg bg-card text-card-foreground shadow-lg">
+          <div className="px-6 py-4">
+            <div className="flex items-center">
+              <SidebarTrigger className="-ml-0.5 h-5 w-5 text-muted-foreground hover:text-foreground" />
+              <div className="h-4 border-l border-border mx-4" />
+              <h1 className="text-base font-medium text-card-foreground">Reports</h1>
+            </div>
+          </div>
+          <div className="border-b border-border" />
+          <div className="p-4 flex items-center justify-center">
+            <div className="text-muted-foreground">Loading reports...</div>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto py-8 max-w-6xl">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">Analysis Reports</h1>
-        <p className="text-muted-foreground">
-          View and manage your generated survey analysis reports
-        </p>
-      </div>
-
-      {/* Filters */}
-      <Card className="mb-6">
-        <CardContent className="pt-6">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search reports..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
-              />
+    <div className="flex-1 p-2 w-full bg-background">
+      <div className="mx-auto rounded-lg bg-card text-card-foreground shadow-lg">
+        {/* Header */}
+        <div className="px-6 py-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <SidebarTrigger className="-ml-0.5 h-5 w-5 text-muted-foreground hover:text-foreground" />
+              <div className="h-4 border-l border-border mx-4" />
+              <h1 className="text-base font-medium text-card-foreground">Reports</h1>
             </div>
-            
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger>
-                <SelectValue placeholder="All statuses" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All statuses</SelectItem>
-                <SelectItem value="completed">Completed</SelectItem>
-                <SelectItem value="processing">Processing</SelectItem>
-                <SelectItem value="initiated">Initiated</SelectItem>
-                <SelectItem value="failed">Failed</SelectItem>
-              </SelectContent>
-            </Select>
-            
-            <Select value={typeFilter} onValueChange={setTypeFilter}>
-              <SelectTrigger>
-                <SelectValue placeholder="All types" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All types</SelectItem>
-                <SelectItem value="demographic">Demographic</SelectItem>
-                <SelectItem value="thematic">Thematic</SelectItem>
-                <SelectItem value="comparative">Comparative</SelectItem>
-                <SelectItem value="longitudinal">Longitudinal</SelectItem>
-                <SelectItem value="comprehensive">Comprehensive</SelectItem>
-              </SelectContent>
-            </Select>
-            
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Filter className="h-4 w-4" />
-              {filteredReports.length} of {reports.length} reports
+            <Button size="sm" onClick={() => router.push('/cohort-chat')}>
+              <Plus className="h-3 w-3 mr-1.5" />
+              Generate Report
+            </Button>
+          </div>
+        </div>
+        
+        <div className="border-b border-border" />
+
+        <div className="p-6 space-y-4">
+          {/* Introduction */}
+          <div className="text-left space-y-2 flex">
+            <div className="flex-col mb-4">  
+              <h2 className="text-3xl font-bold">AI Generated Reports</h2>
+              <p className="text-muted-foreground text-base max-w-2xl mx-auto mt-2">
+                View and manage your AI-generated survey analysis reports. Each report provides comprehensive insights, visualizations, and detailed findings from your survey data.
+              </p>
             </div>
           </div>
-        </CardContent>
-      </Card>
 
-      {/* Reports List */}
-      {filteredReports.length === 0 ? (
-        <Card>
-          <CardContent className="py-12 text-center">
-            <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-            <p className="text-muted-foreground mb-4">
-              {searchQuery || statusFilter !== 'all' || typeFilter !== 'all'
-                ? 'No reports match your filters'
-                : 'No reports generated yet'}
-            </p>
-            <Button onClick={() => router.push('/cohort-chat')}>
-              Go to Chat
-            </Button>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="space-y-4">
-          {filteredReports.map((report) => (
-            <Card 
-              key={report.id} 
-              className="cursor-pointer hover:shadow-md transition-shadow"
-              onClick={() => router.push(`/reports/${report.id}`)}
-            >
-              <CardContent className="pt-6">
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex-1">
-                    <h3 className="font-semibold text-lg mb-1">{report.survey_title}</h3>
-                    <p className="text-muted-foreground line-clamp-2">{report.query}</p>
-                  </div>
-                  <ChevronRight className="h-5 w-5 text-muted-foreground mt-1" />
+          {/* Filters */}
+          <Card>
+            <CardContent className="pt-6">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search reports..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-10"
+                  />
                 </div>
                 
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4 text-sm">
-                    <Badge variant={getStatusBadgeVariant(report.status)}>
-                      {report.status}
-                    </Badge>
-                    <Badge variant="outline">
-                      {getTypeLabel(report.query_type)}
-                    </Badge>
-                    <div className="flex items-center gap-1 text-muted-foreground">
-                      <Clock className="h-3 w-3" />
-                      {format(new Date(report.created_at), 'MMM d, yyyy')}
-                    </div>
-                  </div>
-                  
-                  {report.metadata && (
-                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                      <div className="flex items-center gap-1">
-                        <BarChart2 className="h-3 w-3" />
-                        {report.metadata.complexity_score}% complexity
-                      </div>
-                      <div>
-                        {report.metadata.response_count} responses
-                      </div>
-                    </div>
-                  )}
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="All statuses" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All statuses</SelectItem>
+                    <SelectItem value="completed">Completed</SelectItem>
+                    <SelectItem value="processing">Processing</SelectItem>
+                    <SelectItem value="initiated">Initiated</SelectItem>
+                    <SelectItem value="failed">Failed</SelectItem>
+                  </SelectContent>
+                </Select>
+                
+                <Select value={typeFilter} onValueChange={setTypeFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="All types" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All types</SelectItem>
+                    <SelectItem value="demographic">Demographic</SelectItem>
+                    <SelectItem value="thematic">Thematic</SelectItem>
+                    <SelectItem value="comparative">Comparative</SelectItem>
+                    <SelectItem value="longitudinal">Longitudinal</SelectItem>
+                    <SelectItem value="comprehensive">Comprehensive</SelectItem>
+                  </SelectContent>
+                </Select>
+                
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Filter className="h-4 w-4" />
+                  {filteredReports.length} of {reports.length} reports
                 </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Reports Table */}
+          {filteredReports.length === 0 ? (
+            <div className="text-center space-y-4 py-12">
+              <div className="flex items-center justify-center mb-4">
+                <div className="p-3 rounded-full bg-primary/10">
+                  <FileText className="h-8 w-8 text-primary" />
+                </div>
+              </div>
+              <h2 className="text-2xl font-bold">No Reports Yet</h2>
+              <p className="text-muted-foreground text-base max-w-2xl mx-auto">
+                {searchQuery || statusFilter !== 'all' || typeFilter !== 'all'
+                  ? 'No reports match your filters'
+                  : 'Generate your first report by asking questions about your survey data in the chat.'}
+              </p>
+              <Button onClick={() => router.push('/cohort-chat')} className="mt-4">
+                <Plus className="h-4 w-4 mr-2" />
+                Generate Your First Report
+              </Button>
+            </div>
+          ) : (
+            <Card>
+              <CardHeader>
+                <CardTitle>All Reports ({filteredReports.length})</CardTitle>
+              </CardHeader>
+              <CardContent className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Survey</TableHead>
+                      <TableHead>Query</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Responses</TableHead>
+                      <TableHead>Complexity</TableHead>
+                      <TableHead>Created</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredReports.map((report) => (
+                      <TableRow 
+                        key={report.id}
+                        className="cursor-pointer hover:bg-muted/50 transition-colors"
+                        onClick={() => router.push(`/reports/${report.id}`)}
+                      >
+                        <TableCell>
+                          <div className="font-medium">{report.survey_title}</div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="max-w-xs truncate" title={report.query}>
+                            {report.query}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">
+                            {getTypeLabel(report.query_type)}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={getStatusBadgeVariant(report.status)}>
+                            {report.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {report.metadata?.response_count || 0}
+                        </TableCell>
+                        <TableCell>
+                          {report.metadata?.complexity_score ? `${report.metadata.complexity_score}%` : '-'}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1 text-muted-foreground">
+                            <Clock className="h-3 w-3" />
+                            {format(new Date(report.created_at), 'MMM d, yyyy')}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               </CardContent>
             </Card>
-          ))}
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 } 
