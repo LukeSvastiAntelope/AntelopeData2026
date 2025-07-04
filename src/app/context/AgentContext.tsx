@@ -60,21 +60,23 @@ export const AgentProvider = ({ children }: { children: React.ReactNode }) => {
     };
 
     useEffect(() => {
+        console.log('AgentProvider useEffect - status:', status, 'session:', !!session, 'pathname:', pathname, 'isUserDataLoaded:', isUserDataLoaded);
+        
         if (status === "loading") {
             return; // Still loading session
         }
         
         // Only redirect from login page if user has a session (allow register page even with session)
         if (session && isLoginPage) {
-            // Wait for user data to be loaded before redirecting
-            if (isUserDataLoaded) {
-                router.push("/cohort-chat");
-            }
+            // Redirect immediately when session is available, don't wait for user data
+            console.log('AgentProvider: Redirecting from login page to cohort-chat');
+            router.push("/cohort-chat");
             return;
         }
         
         // If we're not on an auth page and don't have a session, redirect to login
         if (!session && !isAuthPage) {
+            console.log('AgentProvider: No session, redirecting to login');
             router.push("/login");
             // Mark initialization complete so the fallback UI does not hang
             setIsInitialized(true);
@@ -83,11 +85,13 @@ export const AgentProvider = ({ children }: { children: React.ReactNode }) => {
 
         // Only fetch profile if we have a session and need to
         if (session && !agent && !isAgentProfileLoading && !isUserDataLoaded) {
+            console.log('AgentProvider: Fetching agent profile');
             fetchAgentProfile();
         }
         
         // Mark as initialized only after user data is loaded or we're on auth page
         if (!isInitialized && (isUserDataLoaded || isAuthPage)) {
+            console.log('AgentProvider: Marking as initialized');
             setIsInitialized(true);
         }
     }, [pathname, session, status, isUserDataLoaded]);
