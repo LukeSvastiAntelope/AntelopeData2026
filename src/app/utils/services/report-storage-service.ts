@@ -200,6 +200,43 @@ export class ReportStorageService {
     const [reports] = await db.execute<Report[]>(query, params);
     return reports;
   }
+
+  // Delete report and all its sections
+  async deleteReport(reportId: string, userId: string): Promise<boolean> {
+    const pool = await getMySQLConnection();
+    const conn = await pool.getConnection();
+
+    try {
+      await conn.beginTransaction();
+
+      // Delete all sections for the report first (due to FK constraint)
+      await conn.query(
+        `DELETE FROM report_sections WHERE report_id = ?`,
+        [reportId]
+      );
+
+      // Delete the report itself (only if it belongs to the user)
+      const [result] = await conn.query(
+        `DELETE FROM reports WHERE id = ? AND user_id = ?`,
+        [reportId, userId]
+      );
+
+      const affectedRows = (result as any).affectedRows;
+      if (affectedRows === 0) {
+        await conn.rollback();
+        return false;
+      }
+
+      await conn.commit();
+      return true;
+    } catch (error) {
+      await conn.rollback();
+      console.error('Error deleting report:', error);
+      return false;
+    } finally {
+      conn.release();
+    }
+  }
   
   // Helper methods for embeddings (to be implemented with Pinecone integration)
   async createReportEmbeddings(reportId: string, content: string): Promise<void> {

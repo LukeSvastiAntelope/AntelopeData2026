@@ -25,6 +25,8 @@ import {
   Users as UsersIcon,
   LogIn as LogInIcon,
   UserPlus as UserPlusIcon,
+  FileBarChart as FileBarChartIcon,
+  Settings as SettingsIcon,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
@@ -47,6 +49,21 @@ export function PublicAppSidebar({ className, collapsible = "offcanvas", ...prop
       href: "/login",
       icon: BrainIcon,
       key: "digital-twins"
+    },
+    {
+      title: "Reports",
+      href: "/login",
+      icon: FileBarChartIcon,
+      key: "reports"
+    }
+  ]
+
+  const secondaryNavItems = [
+    {
+      title: "Settings",
+      href: "/login",
+      icon: SettingsIcon,
+      key: "settings"
     }
   ]
 
@@ -71,7 +88,7 @@ export function PublicAppSidebar({ className, collapsible = "offcanvas", ...prop
       {...props}
     >
       <SidebarHeader className="flex flex-col gap-4 pb-4">
-        <div className="flex items-center px-4">
+        <div className="flex items-center px-2">
           <Link href="/" className="flex items-center px-4">
             <LogoText 
               className="text-zinc-900 dark:text-zinc-100 transition-opacity group-data-[collapsible=offcanvas]:opacity-0"
@@ -115,6 +132,25 @@ export function PublicAppSidebar({ className, collapsible = "offcanvas", ...prop
             </SidebarMenuItem>
           ))}
         </SidebarMenu>
+        
+        {secondaryNavItems.length > 0 && (
+          <SidebarMenu className="px-4">
+            {secondaryNavItems.map((item) => (
+              <SidebarMenuItem key={item.key || item.href}>
+                <SidebarMenuButton
+                  asChild
+                  isActive={pathname === item.href}
+                  tooltip={item.title}
+                >
+                  <Link href={item.href} className="flex items-center gap-2 px-4 py-2 text-sidebar-foreground">
+                    <item.icon className="h-4 w-4 text-sidebar-foreground group-data-[collapsible=offcanvas]:hidden" />
+                    <span className="text-sidebar-foreground">{item.title}</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            ))}
+          </SidebarMenu>
+        )}
       </SidebarContent>
       
       <SidebarFooter className="py-4 mt-auto">

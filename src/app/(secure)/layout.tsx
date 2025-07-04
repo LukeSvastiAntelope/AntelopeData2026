@@ -38,20 +38,6 @@ const SecureLayout = ({ children }: { children: React.ReactNode }) => {
         setIsOpen(true);
     }
 
-    const fetchAgentProfile = async () => {
-        setIsAgentProfileLoading(true);
-        try {
-            const response = await fetchData.get('/api/getAgentProfile');
-            if (response.status) {
-                setAgent(response.agent);
-            }
-        } catch (error) {
-            throw new Error(error instanceof Error ? error.message : "Failed to fetch agent profile.");
-        } finally {
-            setIsAgentProfileLoading(false);
-        }
-    };
-
     const compressImage = (file: File | Blob): Promise<string> => {
         return new Promise((resolve) => {
             const reader = new FileReader();
@@ -107,7 +93,6 @@ const SecureLayout = ({ children }: { children: React.ReactNode }) => {
             });
             const data = await response.json();
             if (data.status) {
-                await fetchAgentProfile();
                 toast.success("Welcome! Your account has been set up successfully.");
                 router.push('/cohort-chat');
             } else {
@@ -213,7 +198,7 @@ const SecureLayout = ({ children }: { children: React.ReactNode }) => {
             const response = await res.json();
             if (response.status) {
                 toast.success("Content preferences saved!");
-                await fetchAgentProfile();
+                // Removed fetchAgentProfile() call - AgentContext will handle the update
                 triggerGenerateAndShowPrinciplesDialog();
             } else {
                 toast.error(response.message || "Failed to save preferences.");
@@ -227,7 +212,7 @@ const SecureLayout = ({ children }: { children: React.ReactNode }) => {
     };
 
     const handleSkipContentPrefs = async () => {
-        await fetchAgentProfile();
+        // Removed fetchAgentProfile() call - AgentContext will handle the update
         triggerGenerateAndShowPrinciplesDialog();
     };
 
@@ -272,7 +257,7 @@ const SecureLayout = ({ children }: { children: React.ReactNode }) => {
             const response = await res.json();
             if (response.status) {
                 toast.success("Wager principles saved! Onboarding complete.");
-                await fetchAgentProfile();
+                // Removed fetchAgentProfile() call - AgentContext will handle the update
                 router.push('/cohort-chat');
             } else {
                 toast.error(response.message || "Failed to save principles.");
@@ -296,7 +281,7 @@ const SecureLayout = ({ children }: { children: React.ReactNode }) => {
                     body: JSON.stringify({ agent: agentDataToUpdate }),
                     headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
                 });
-                await fetchAgentProfile();
+                // Removed fetchAgentProfile() call - AgentContext will handle the update
             } catch (error) {
                 console.error("Error updating onboarding status on skip:", error);
             } finally {
@@ -315,14 +300,6 @@ const SecureLayout = ({ children }: { children: React.ReactNode }) => {
     //         }
     //     }
     // }, [agent, isAgentProfileLoading]);
-
-    useEffect(() => {
-        if (!user) {
-            router.push('/login');
-        } else {
-            fetchAgentProfile();
-        }
-    }, [user]);
 
     return (
         <SidebarProvider defaultOpen={true}>
@@ -363,9 +340,27 @@ const SecureLayout = ({ children }: { children: React.ReactNode }) => {
 export default function SecureLayoutWrapper({ children }: { children: React.ReactNode }) {
     return (
         <AgentProvider>
-            <SecureLayout>
+            <SecureLayoutContent>
                 {children}
-            </SecureLayout>
+            </SecureLayoutContent>
         </AgentProvider>
     );
+}
+
+function SecureLayoutContent({ children }: { children: React.ReactNode }) {
+    const { user, isAgentProfileLoading } = useAgent();
+    
+    // Show loading state while user data is being fetched
+    if (isAgentProfileLoading || !user) {
+        return (
+            <div className="flex items-center justify-center min-h-screen bg-background">
+                <div className="flex flex-col items-center space-y-4">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                    <p className="text-sm text-muted-foreground">Setting up your workspace...</p>
+                </div>
+            </div>
+        );
+    }
+    
+    return <SecureLayout>{children}</SecureLayout>;
 }

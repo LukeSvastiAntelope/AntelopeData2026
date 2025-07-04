@@ -122,14 +122,14 @@ export default function FrontLanding() {
                 Unlimited surveys &amp; responses
               </div>
               <h1 className="leading-none text-4xl sm:text-5xl lg:text-8xl font-bold tracking-tight text-card-foreground">
-              Ready to to take your surveys to the next level?
+              Turn Your Surveys Into Synthetic Personas.
               </h1>
               <p className="font-medium text-2xl mb-6">
               Chat with your surveys and get insights in real-time.
               </p>
               
               {/* Chat Input Field */}
-              <div className="relative w-full max-w-2xl shadow-xl">
+              <div className="relative w-full max-w-2xl">
                 <Textarea 
                   className="flex-1 min-h-[100px] pr-24 resize-none" 
                   style={{ backgroundColor: '#f9f9f9' }}
@@ -289,7 +289,7 @@ export default function FrontLanding() {
                 <div className="space-y-1">
                   <h3 className="font-bold text-xl text-gray-900 dark:text-gray-100">Create or import any survey</h3>
                   <p className="text-gray-600 dark:text-gray-300 leading-relaxed">
-                    Powerful AI builder + csv, xls, Survey Monkey, Google Sheets and Typeform support
+                    Powerful AI builder + csv, xls, Survey Monkey, Google Sheets and Typeform.
                   </p>
                 </div>
               </div>
@@ -311,19 +311,70 @@ export default function FrontLanding() {
                 </div>
               </div>
 
-              {/* Build Synthetic Personas */}
+              {/* Build powerful reports */}
               <div className="text-left space-y-6">
                 <div className="mx-auto w-full max-w-sm">
                   <img 
                     src="/web-03.png" 
-                    alt="Build synthetic personas illustration" 
+                    alt="Build powerful reports illustration" 
                     className="w-full h-auto "
                   />
                 </div>
                 <div className="space-y-1">
-                  <h3 className="font-bold text-xl text-gray-900 dark:text-gray-100">Build synthetic personas</h3>
+                  <h3 className="font-bold text-xl text-gray-900 dark:text-gray-100">Build powerful reports</h3>
                   <p className="text-gray-600 dark:text-gray-300 leading-relaxed">
-                    For every responder that answers we build a digital twin you can further enhance
+                    Ask the agent for in-depth report about anything and share it with your collagues.
+                  </p>
+                </div>
+              </div>
+
+              {/* AI survey creator */}
+              <div className="text-left space-y-6">
+                <div className="mx-auto w-full max-w-sm">
+                  <img 
+                    src="/web-04.png" 
+                    alt="AI survey creator illustration" 
+                    className="w-full h-auto "
+                  />
+                </div>
+                <div className="space-y-1">
+                  <h3 className="font-bold text-xl text-gray-900 dark:text-gray-100">AI survey creator</h3>
+                  <p className="text-gray-600 dark:text-gray-300 leading-relaxed">
+                  Just type in what you want the survey to be about and the agent will create a first draft for you.
+                  </p>
+                </div>
+              </div>
+
+              {/* Create synthetic personas */}
+              <div className="text-left space-y-6">
+                <div className="mx-auto w-full max-w-sm">
+                  <img 
+                    src="/web-05.png" 
+                    alt="Create synthetic personas illustration" 
+                    className="w-full h-auto "
+                  />
+                </div>
+                <div className="space-y-1">
+                  <h3 className="font-bold text-xl text-gray-900 dark:text-gray-100">Create synthetic personas</h3>
+                  <p className="text-gray-600 dark:text-gray-300 leading-relaxed">
+                    Turn real responders into synthetic personas you can use to further enrich your surveys.
+                  </p>
+                </div>
+              </div>
+
+              {/* Grow survey audience */}
+              <div className="text-left space-y-6">
+                <div className="mx-auto w-full max-w-sm">
+                  <img 
+                    src="/web-06.png" 
+                    alt="Grow survey audience illustration" 
+                    className="w-full h-auto "
+                  />
+                </div>
+                <div className="space-y-1">
+                  <h3 className="font-bold text-xl text-gray-900 dark:text-gray-100">Grow survey audience</h3>
+                  <p className="text-gray-600 dark:text-gray-300 leading-relaxed">
+                    For every responder that answers we build a digital twin you can further enhance and help you in the future.
                   </p>
                 </div>
               </div>

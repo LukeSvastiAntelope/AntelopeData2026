@@ -109,7 +109,7 @@ export class EnhancedQueryClassifier extends QueryIntentClassifier {
     
     // Detect synthesis requirements
     const synthesisIndicators = [
-      'summarize', 'synthesize', 'takeaways', 'take aways', 'conclusions',
+      'summarize', 'synthesize', 'takeaways', 'take a ways', 'conclusions',
       'what does this mean', 'interpret', 'implications', 'significance'
     ];
     
@@ -237,6 +237,16 @@ export class EnhancedQueryClassifier extends QueryIntentClassifier {
   }
   
   private requiresDeepAnalysis(analysis: any, complexityScore: number): boolean {
+    // Quick heuristic: simple extractive queries (e.g. "top 5 ...", "list ...") generally don't
+    // need a full report. If the query is purely extractive, focuses on a single dimension, and
+    // doesn't require synthesis or explicitly ask for a document, treat it as a simple query.
+    if (analysis.primaryAction === 'extractive' &&
+        analysis.activeDimensions <= 1 &&
+        !analysis.requiresSynthesis &&
+        !analysis.isExplicitDocumentRequest) {
+      return false;
+    }
+    
     // Explicit document requests always require deep analysis
     if (analysis.isExplicitDocumentRequest) {
       return true;

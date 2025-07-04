@@ -499,15 +499,10 @@ export default function CohortChatPage() {
 
   // Save conversation whenever messages change
   useEffect(() => {
-    if (currentConversationId && messages.length > 0 && !isLoading) {
-      // Debounce saving to avoid interfering with streaming
-      const timeoutId = setTimeout(() => {
-        saveConversation(currentConversationId, messages);
-      }, 1000); // Wait 1 second after messages stop changing
-      
-      return () => clearTimeout(timeoutId);
+    if (currentConversationId && messages.length > 0) {
+      saveConversation(currentConversationId, messages);
     }
-  }, [messages, currentConversationId, isLoading]);
+  }, [messages, currentConversationId]);
   
   // Save model preference when it changes
   const handleModelChange = (model: string) => {
@@ -587,10 +582,7 @@ FORMATTING REQUIREMENTS:
       body: JSON.stringify(payload),
     });
 
-    const isEventStream = res.headers.get('content-type')?.includes('text/event-stream');
-
-    // Handle non-streaming JSON responses only when we explicitly requested them *and* the server did not return SSE
-    if (streamingMode === 'off' && !isEventStream) {
+    if (streamingMode === 'off') {
       // Non-streaming response (expects JSON { content: string })
       const json = await res.json();
       
@@ -624,56 +616,36 @@ FORMATTING REQUIREMENTS:
 
     // add placeholder agent message
     setMessages(prev=>[...prev,{role:'agent',content:'', citations:{}}]);
-    console.log('🎬 Added placeholder agent message, starting stream processing...');
 
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
     let buffer = '';
     let accumulatedContent = '';
-    console.log('📖 Stream reader initialized');
 
     while (true) {
       const { done, value } = await reader.read();
-      console.log('📥 Stream chunk received:', { done, valueLength: value?.length });
       if (done) break;
       
       buffer += decoder.decode(value, { stream: true });
-      console.log('📝 Buffer updated, total length:', buffer.length);
-      console.log('📝 Buffer content:', JSON.stringify(buffer));
       
       // Process complete SSE messages
       const lines = buffer.split('\n');
       buffer = lines.pop() || ''; // Keep incomplete line in buffer
-      console.log('🔍 Processing lines:', lines.length, 'Remaining buffer:', JSON.stringify(buffer));
-      console.log('🔍 All lines:', lines.map((line, i) => `[${i}]: ${JSON.stringify(line)}`));
       
       for (const line of lines) {
-        console.log('📄 Processing line:', JSON.stringify(line));
         if (line.startsWith('data: ')) {
           const dataStr = line.slice(6); // Remove 'data: ' prefix
-          console.log('📊 SSE data found:', JSON.stringify(dataStr));
           
           if (dataStr === '[DONE]') {
             // Stream completed
-            console.log('✅ Stream completed with [DONE]');
-            continue;
-          }
-          
-          // Skip empty data lines
-          if (!dataStr.trim()) {
-            console.log('⏭️ Skipping empty data line');
             continue;
           }
           
           try {
-            const cleanJsonStr = dataStr.trim();
-            console.log('🔍 Attempting to parse JSON:', JSON.stringify(cleanJsonStr));
-            const data = JSON.parse(cleanJsonStr);
-            console.log('🔧 Parsed JSON data:', data);
+            const data = JSON.parse(dataStr);
             
             // Check if this is a report generation message
             if (data.reportId) {
-              console.log('📋 Report generation detected');
               // Replace the placeholder message with report generation status
               const immediateResponse = data.immediateResponse || 'I\'m generating a comprehensive analysis for you. This will take a moment...';
               setMessages(prev => {
@@ -692,9 +664,7 @@ FORMATTING REQUIREMENTS:
             }
             
             if (data.content) {
-              console.log('📝 Content found in data:', data.content.slice(0, 100));
               accumulatedContent += data.content;
-              console.log('📚 Accumulated content length:', accumulatedContent.length);
               
               // Different streaming modes
               let shouldUpdate = false;
@@ -706,44 +676,32 @@ FORMATTING REQUIREMENTS:
               } else if (streamingMode === 'buffered') {
                 shouldUpdate = accumulatedContent.length % 200 === 0; // Update every 200 chars
               }
-              else {
-                // Default case - always update for fact sheet responses
-                shouldUpdate = true;
-              }
-              
-              console.log('🔄 Should update UI:', shouldUpdate, 'Mode:', streamingMode);
               
               if (shouldUpdate) {
-                console.log('🎨 Updating messages with content:', accumulatedContent.slice(0, 100));
                 setMessages(prev => {
                   const updated = [...prev];
                   const last = updated[updated.length - 1];
                   if (last && last.role === 'agent') {
                     // Process partial content for citations during streaming
                     const partialProcessed = processPartialResponse(accumulatedContent, last);
-                    console.log('🔧 Partial processing result:', {
-                      originalLength: accumulatedContent.length,
-                      processedLength: partialProcessed.content.length,
-                      hasContent: !!partialProcessed.content,
-                      contentPreview: partialProcessed.content.slice(0, 100)
+                    console.log('Partial processing result:', {
+                      originalContent: accumulatedContent.slice(-100),
+                      processedContent: partialProcessed.content.slice(-100),
+                      citations: partialProcessed.citations
                     });
                     last.content = partialProcessed.content;
                     last.citations = partialProcessed.citations;
                     // Keep existing chartSpec and dataCards during streaming
                     updated[updated.length - 1] = last;
                   }
-                  console.log('✅ Messages updated, new length:', updated.length);
                   return updated;
                 });
               }
             }
           } catch (error) {
-            console.error('❌ JSON parse failed for dataStr:', JSON.stringify(dataStr), 'Error:', error);
-            console.error('❌ Original line was:', JSON.stringify(line));
             // If not JSON, treat as plain text (fallback for non-streaming responses)
             if (dataStr.trim()) {
               accumulatedContent += dataStr;
-              console.log('📝 Added plain text to accumulated content');
               setMessages(prev => {
                 const updated = [...prev];
                 const last = updated[updated.length - 1];
@@ -758,7 +716,6 @@ FORMATTING REQUIREMENTS:
             }
           }
         } else if (line.trim() && !line.startsWith('data: ')) {
-          console.log('📄 Non-SSE line found:', line);
           // Handle non-SSE content (fallback for plain text responses)
           accumulatedContent += line + '\n';
           setMessages(prev => {
@@ -776,29 +733,21 @@ FORMATTING REQUIREMENTS:
       }
     }
     
-    // Append any remaining buffered data that wasn't followed by a newline (e.g. single-chunk plain text)
-    if (buffer.trim()) {
-      console.log('📝 Processing remaining buffer:', buffer);
-      accumulatedContent += buffer;
-    }
-    
-    console.log('🏁 Stream processing complete, final accumulated content:', accumulatedContent.length, 'chars');
-    
     // Final update with complete content and post-processing
     setMessages(prev => {
       const updated = [...prev];
       const last = updated[updated.length - 1];
       if (last && last.role === 'agent') {
         // Process the complete content
-        console.log('🎯 Final processing - raw content length:', accumulatedContent.length);
+        console.log('Final processing - raw content:', accumulatedContent);
         const processedContent = processCompleteResponse(accumulatedContent, last);
-        console.log('🎯 Final processing result:', {
+        console.log('Final processing result:', {
           content: processedContent.content,
           citations: processedContent.citations,
           chartSpec: processedContent.chartSpec,
           dataCards: processedContent.dataCards
         });
-        console.log('🎯 Setting final message state:', {
+        console.log('Setting final message state:', {
           citationKeys: processedContent.citations ? Object.keys(processedContent.citations) : [],
           citationCount: processedContent.citations ? Object.keys(processedContent.citations).length : 0,
           firstCitation: processedContent.citations ? processedContent.citations['1'] : 'none'
@@ -809,11 +758,9 @@ FORMATTING REQUIREMENTS:
         last.dataCards = processedContent.dataCards;
         updated[updated.length - 1] = last;
       }
-      console.log('🏆 Final messages array length:', updated.length);
       return updated;
     });
     setIsLoading(false);
-    console.log('🎬 Stream processing finished, isLoading set to false');
   };
 
   const handleKeyDown=(e:React.KeyboardEvent<HTMLTextAreaElement>)=> {
@@ -1615,25 +1562,7 @@ FORMATTING REQUIREMENTS:
                   </p>
                 </div>
 
-                {/* Prompt suggestions */}
-                <div className="text-xs text-center max-w-xl space-y-2">
-                  <p className="font-medium text-muted-foreground">
-                    {selectedSurveyData ? `Try asking about "${selectedSurveyData.title}":` : "Try asking:"}
-                  </p>
-                  <div className="flex flex-wrap gap-2 justify-center">
-                    {dynamicPrompts.map((prompt, index) => (
-                      <div 
-                        key={index}
-                        className="px-3 py-1.5 border border-border rounded-md bg-background/50 text-muted-foreground hover:bg-background/80 transition-colors cursor-pointer"
-                        onClick={() => setInput(prompt)}
-                      >
-                        &quot;{prompt}&quot;
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Chat input (sticky at bottom of empty state) */}
+               
                 <div className="relative w-full max-w-xl">
                   <Textarea 
                     className="flex-1 min-h-[100px] pl-4 pr-4 resize-none text-base" 
@@ -1702,8 +1631,68 @@ FORMATTING REQUIREMENTS:
                       )}
                     </div>
                   </div>
-                  {/* Send button */}
                   <div className="absolute right-2 bottom-2 flex gap-1">
+                    <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
+                      <DialogTrigger asChild>
+                        <Button 
+                          size="icon" 
+                          variant="ghost" 
+                          className="h-8 w-8" 
+                          title="Upload survey file"
+                        >
+                          <Upload className="h-4 w-4"/>
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-2xl">
+                        <DialogHeader>
+                          <DialogTitle>Import Survey Data</DialogTitle>
+                        </DialogHeader>
+                        {!uploadPreview ? (
+                          <div className="space-y-4">
+                            <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
+                              <input
+                                type="file"
+                                accept=".csv,.xlsx,.xls"
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) handleFileUpload(file);
+                                }}
+                                className="hidden"
+                                id="file-upload-initial"
+                              />
+                              <label htmlFor="file-upload-initial" className="cursor-pointer">
+                                <FileText className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+                                <p className="text-lg font-medium mb-2">Drop your survey file here</p>
+                                <p className="text-sm text-gray-500">or click to browse (CSV, Excel)</p>
+                                <p className="text-xs text-gray-400 mt-2">Max file size: 10MB</p>
+                              </label>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="space-y-4">
+                                                          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                                <h3 className="font-medium text-green-800 mb-2">File Analysis Complete</h3>
+                                <div className="space-y-2 text-sm">
+                                  <p><strong>Title:</strong> {uploadPreview.suggestedTitle}</p>
+                                  <p><strong>Responses:</strong> {uploadPreview.totalRows || 0}</p>
+                                  <p><strong>Questions:</strong> {uploadPreview.columns?.length || 0}</p>
+                                  {uploadPreview.detectedDemographics && uploadPreview.detectedDemographics.length > 0 && (
+                                    <p><strong>Demographics:</strong> {uploadPreview.detectedDemographics.join(', ')}</p>
+                                  )}
+                                </div>
+                              </div>
+                            <div className="flex gap-2 justify-end">
+                              <Button variant="outline" onClick={() => { setShowUploadDialog(false); resetUploadDialog(); }}>
+                                Cancel
+                              </Button>
+                              <Button onClick={handleExecuteImport} disabled={uploadLoading}>
+                                {uploadLoading ? 'Importing...' : 'Import Survey'}
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                      </DialogContent>
+                    </Dialog>
                     <Button 
                       size="icon" 
                       variant="ghost" 
@@ -1715,12 +1704,26 @@ FORMATTING REQUIREMENTS:
                     </Button>
                   </div>
                 </div>
+                <div className="text-xs text-center max-w-xl space-y-2">
+                  <p className="font-medium text-muted-foreground">
+                    {selectedSurveyData ? `Try asking about "${selectedSurveyData.title}":` : "Try asking:"}
+                  </p>
+                  <div className="flex flex-wrap gap-2 justify-center">
+                    {dynamicPrompts.map((prompt, index) => (
+                      <div 
+                        key={index}
+                        className="px-3 py-1.5 border border-border rounded-md bg-background/50 text-muted-foreground hover:bg-background/80 transition-colors cursor-pointer"
+                        onClick={() => setInput(prompt)}
+                      >
+                        &quot;{prompt}&quot;
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
-            
-          ) : (
-            
-              <div className="flex flex-col flex-1">
-                <ScrollArea className="flex-1 min-h-0">
+                        ) : (
+              <div className="flex flex-col h-full">
+                <ScrollArea className="flex-1 pb-4">
                   <div className="p-4 space-y-6">
                     {messages.map((m,idx)=>(
                       <div 
@@ -1778,12 +1781,12 @@ FORMATTING REQUIREMENTS:
                   </div>
                 </ScrollArea>
                 
-                {/* Chat input at bottom of screen for active conversations */}
-                <div className="sticky bottom-0 p-4 bg-card">
+                {/* Sticky bottom input */}
+                <div className="border-t border-border bg-card p-4">
                   <div className="relative">
                     <div className="flex items-end gap-2">
                       {/* Plus button for survey selection */}
-                      <div className="relative">
+                      <div className="relative" data-survey-dropdown>
                         <Button
                           size="icon"
                           variant="ghost"
@@ -1845,7 +1848,7 @@ FORMATTING REQUIREMENTS:
                       {/* Textarea */}
                       <div className="flex-1 relative">
                         <Textarea 
-                          className="min-h-[80px] pl-4 pr-4 resize-none" 
+                          className="min-h-[80px] pl-4 pr-20 resize-none" 
                           placeholder="Ask the cohort…" 
                           value={input} 
                           onChange={e=>setInput(e.target.value)} 
@@ -1931,7 +1934,6 @@ FORMATTING REQUIREMENTS:
                 </div>
               </div>
             )}
-          </div>
           </div>
         </div>
       </div>
@@ -2346,4 +2348,4 @@ FORMATTING REQUIREMENTS:
       </div>
     </div>
   );
-}
+} 

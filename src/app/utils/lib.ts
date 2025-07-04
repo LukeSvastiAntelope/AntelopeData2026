@@ -1,6 +1,6 @@
 import { useRouter } from 'next/navigation';
 import CryptoJS from 'crypto-js';
-import { toast } from 'react-hot-toast';
+import { toast } from '@/components/ui/sonner';
 
 const SECRET_KEY = generateDailySecretKey(); // Change this key to something secure
 

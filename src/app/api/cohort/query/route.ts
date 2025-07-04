@@ -315,20 +315,41 @@ export async function POST(req: NextRequest) {
     // 🎯 STEP 5: Use fact sheet ONLY for simple queries with VERY high confidence (95%+)
     if (factSheetResult.canAnswer && factSheetResult.confidence >= 0.95) {
       console.log(`✅ Simple query answered directly from fact sheet (${Math.round(factSheetResult.confidence * 100)}% confidence)`);
+      console.log('🔍 DEBUG: factSheetResult contents:', {
+        canAnswer: factSheetResult.canAnswer,
+        confidence: factSheetResult.confidence,
+        hasAnswer: !!factSheetResult.answer,
+        answerLength: factSheetResult.answer?.length || 0,
+        answerPreview: factSheetResult.answer?.slice(0, 100) || 'NO_ANSWER',
+        reasoning: factSheetResult.reasoning,
+        hasDataCards: !!factSheetResult.dataCards,
+        dataCardsLength: factSheetResult.dataCards?.length || 0
+      });
       
       const encoder = new TextEncoder();
       const stream = new ReadableStream({
         start(controller) {
-          controller.enqueue(encoder.encode(factSheetResult.answer || ""));
+          // Send SSE formatted answer so frontend parser can handle it
+          const sendJson = (obj: any) => {
+            const jsonStr = JSON.stringify(obj);
+            console.log('📤 Sending SSE JSON:', jsonStr);
+            controller.enqueue(encoder.encode(`data: ${jsonStr}\n\n`));
+          };
+          
+          // Send answer as JSON so frontend can parse
+          sendJson({ content: factSheetResult.answer });
           
           // Add fact sheet source info
-          const sourceInfo = `\n\n---\n📊 SOURCE: Pre-computed statistics from ${factSheet?.survey_metadata?.total_responses || 'all'} survey responses\n✅ CONFIDENCE: ${Math.round(factSheetResult.confidence * 100)}%\n🔍 METHOD: ${factSheetResult.reasoning}`;
-          controller.enqueue(encoder.encode(sourceInfo));
-          
+          const metaInfo = `\n---\n📊 SOURCE: Pre-computed statistics from ${factSheet?.survey_metadata?.total_responses || 'all'} survey responses\n✅ CONFIDENCE: ${Math.round(factSheetResult.confidence * 100)}%\n🔍 METHOD: ${factSheetResult.reasoning}`;
+          sendJson({ content: metaInfo });
+
           // Add data cards for visualization
           if (factSheetResult.dataCards && factSheetResult.dataCards.length > 0) {
-            controller.enqueue(encoder.encode('\n```data-cards\n' + JSON.stringify(factSheetResult.dataCards, null, 2) + '\n```\n'));
+            sendJson({ content: '```data-cards\n' + JSON.stringify(factSheetResult.dataCards, null, 2) + '\n```' });
           }
+          // End of stream
+          console.log('📤 Sending [DONE] signal');
+          controller.enqueue(encoder.encode('data: [DONE]\n\n'));
           
           controller.close();
         }
@@ -336,8 +357,9 @@ export async function POST(req: NextRequest) {
 
       return new NextResponse(stream, {
         headers: {
-          "Content-Type": "text/plain; charset=utf-8",
+          "Content-Type": "text/event-stream",
           "Cache-Control": "no-cache",
+          "Connection": "keep-alive",
           "X-Sample-Size": String(factSheet?.survey_metadata?.total_responses || 0),
           "X-Source": "fact-sheet",
           "X-Confidence": String(Math.round(factSheetResult.confidence * 100)),
