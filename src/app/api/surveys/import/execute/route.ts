@@ -2,6 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
 import { SurveyRepo } from "@/app/utils/database/survey-repo";
+import { promises as fs } from 'fs';
+import path from 'path';
+import { tmpdir } from 'os';
+
+// Configure route for longer timeout
+export const runtime = 'nodejs';
+export const maxDuration = 300; // 5 minutes
 
 interface ColumnMapping {
   originalName: string;
@@ -28,6 +35,84 @@ interface ImportResult {
   digitalTwinsCreated: number;
   errors: string[];
   warnings: string[];
+}
+
+interface ChunkData {
+  chunkIndex: number;
+  totalChunks: number;
+  data: any[];
+  fileName: string;
+  userId: string;
+  timestamp: number;
+}
+
+// Helper function to get temp directory for chunks
+function getTempDir(userId: string, fileName: string): string {
+  return path.join(tmpdir(), 'survey-import-chunks', userId, fileName.replace(/[^a-zA-Z0-9.-]/g, '_'));
+}
+
+// Retrieve all chunks for a file
+async function getAllChunks(userId: string, fileName: string): Promise<ChunkData[]> {
+  const tempDir = getTempDir(userId, fileName);
+  
+  try {
+    const files = await fs.readdir(tempDir);
+    const chunks: ChunkData[] = [];
+    
+    for (const file of files) {
+      if (file.startsWith('chunk_') && file.endsWith('.json')) {
+        const chunkPath = path.join(tempDir, file);
+        const chunkDataStr = await fs.readFile(chunkPath, 'utf-8');
+        chunks.push(JSON.parse(chunkDataStr));
+      }
+    }
+    
+    // Sort by chunk index
+    return chunks.sort((a, b) => a.chunkIndex - b.chunkIndex);
+  } catch (error) {
+    return [];
+  }
+}
+
+// Clean up temporary files
+async function cleanupChunks(userId: string, fileName: string): Promise<void> {
+  const tempDir = getTempDir(userId, fileName);
+  
+  try {
+    await fs.rm(tempDir, { recursive: true, force: true });
+  } catch (error) {
+    console.warn('Failed to cleanup temp chunks:', error);
+  }
+}
+
+// Helper function to get data from either chunked upload or direct file
+async function getImportData(file: File, config: ImportConfig, userId: string): Promise<any[]> {
+  // First, check if we have chunked data for this file
+  const chunks = await getAllChunks(userId, config.fileName);
+  
+  if (chunks.length > 0) {
+    console.log(`Found ${chunks.length} chunks for ${config.fileName}, combining data...`);
+    
+    // Combine all chunk data
+    const combinedData: any[] = [];
+    let totalRows = 0;
+    
+    for (const chunk of chunks) {
+      combinedData.push(...chunk.data);
+      totalRows += chunk.data.length;
+    }
+    
+    console.log(`Combined chunked data: ${totalRows} total rows`);
+    
+    // Clean up temporary files after successful combination
+    await cleanupChunks(userId, config.fileName);
+    
+    return combinedData;
+  }
+  
+  // No chunked data found, parse the file directly
+  console.log(`No chunked data found for ${config.fileName}, parsing file directly...`);
+  return await parseFileData(file);
 }
 
 // Helper function to parse file data again (since we don't store it from preview)
@@ -164,7 +249,7 @@ export async function POST(req: NextRequest) {
     // Parse file data
     let rawData: any[];
     try {
-      rawData = await parseFileData(file);
+      rawData = await getImportData(file, config, userId.toString());
     } catch (parseError) {
       return NextResponse.json({ 
         status: false, 
@@ -244,9 +329,23 @@ export async function POST(req: NextRequest) {
     let responsesCreated = 0;
     let digitalTwinsCreated = 0;
     
-    // Process each row as a survey response
-    for (let i = 0; i < rawData.length; i++) {
-      const row = rawData[i];
+    // Process rows in batches to prevent timeouts
+    const BATCH_SIZE = 100; // Process 100 rows at a time
+    const totalBatches = Math.ceil(rawData.length / BATCH_SIZE);
+    
+    console.log(`Processing ${rawData.length} rows in ${totalBatches} batches of ${BATCH_SIZE}`);
+    
+    for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
+      const startIndex = batchIndex * BATCH_SIZE;
+      const endIndex = Math.min(startIndex + BATCH_SIZE, rawData.length);
+      const batch = rawData.slice(startIndex, endIndex);
+      
+      console.log(`Processing batch ${batchIndex + 1}/${totalBatches} (rows ${startIndex + 1}-${endIndex})`);
+      
+      // Process batch
+      for (let i = 0; i < batch.length; i++) {
+        const row = batch[i];
+        const globalRowIndex = startIndex + i;
       
       try {
         // Extract demographics
@@ -294,13 +393,24 @@ export async function POST(req: NextRequest) {
         }
         
       } catch (rowError) {
-        errors.push(`Row ${i + 1}: ${rowError.message}`);
+          errors.push(`Row ${globalRowIndex + 1}: ${rowError.message}`);
         
         // Stop if too many errors
-        if (errors.length > 10) {
-          warnings.push(`Too many errors encountered. Stopped processing at row ${i + 1}.`);
+          if (errors.length > 50) {
+            warnings.push(`Too many errors encountered. Stopped processing at row ${globalRowIndex + 1}.`);
           break;
         }
+        }
+      }
+      
+      // Stop processing if too many errors
+      if (errors.length > 50) {
+        break;
+      }
+      
+      // Add a small delay between batches to prevent overwhelming the database
+      if (batchIndex < totalBatches - 1) {
+        await new Promise(resolve => setTimeout(resolve, 10));
       }
     }
     
@@ -317,9 +427,11 @@ export async function POST(req: NextRequest) {
       surveyId,
       responsesCreated,
       digitalTwinsCreated,
-      errors: errors.slice(0, 10), // Limit error messages
+      errors: errors.slice(0, 20), // Limit error messages
       warnings
     };
+
+    console.log(`Import completed: ${responsesCreated} responses created, ${digitalTwinsCreated} digital twins created`);
 
     return NextResponse.json({ 
       status: true, 

@@ -342,7 +342,7 @@ export async function POST(req: NextRequest) {
           // Add fact sheet source info
           const metaInfo = `\n---\n📊 SOURCE: Pre-computed statistics from ${factSheet?.survey_metadata?.total_responses || 'all'} survey responses\n✅ CONFIDENCE: ${Math.round(factSheetResult.confidence * 100)}%\n🔍 METHOD: ${factSheetResult.reasoning}`;
           sendJson({ content: metaInfo });
-
+          
           // Add data cards for visualization
           if (factSheetResult.dataCards && factSheetResult.dataCards.length > 0) {
             sendJson({ content: '```data-cards\n' + JSON.stringify(factSheetResult.dataCards, null, 2) + '\n```' });

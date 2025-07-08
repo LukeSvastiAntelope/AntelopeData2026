@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
+import { openSql as getMySQLConnection } from '@/app/utils/database/db';
 
 // DELETE - Delete conversation
 export async function DELETE(
@@ -15,9 +16,15 @@ export async function DELETE(
 
     const { id } = await params;
     const conversationId = id;
+    const userId = session.user.id; // Keep as string, MySQL driver handles conversion
     
-    // For now, we'll return success
-    // In production, you'd delete from database
+    const db = await getMySQLConnection();
+    
+    // Delete the conversation, ensuring it belongs to the user
+    const [result] = await db.execute(
+      'DELETE FROM chat_conversations WHERE id = ? AND user_id = ?',
+      [conversationId, userId]
+    );
     
     return NextResponse.json({ 
       status: true, 

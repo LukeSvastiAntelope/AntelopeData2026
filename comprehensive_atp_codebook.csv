@@ -1,0 +1,109 @@
+Variable Name,Question Text,Value Labels
+QKEY,Respondent ID,
+INTERVIEW_START_W142,Interview start time,
+INTERVIEW_END_W142,Interview end time,
+DEVICE_TYPE_W142,What device did you use to take this survey?,1=Desktop computer,2=Mobile phone,3=Tablet
+LANG_W142,What language did you use to take this survey?,1=English,2=Spanish
+FORM_W142,Which survey form did you receive?,1=Form A,2=Form B,3=Form C
+XMARITAL_W142,What is your marital status?,1=Married,2=Single,3=Divorced,4=Widowed,5=Separated
+USBEST_COLLEGE_DK_W142,How would you rate the US higher education system?,1=Excellent,2=Good,3=Fair,4=Poor,5=Don't know
+USBEST_ENTERTAINMENT_DK_W142,How would you rate the US entertainment industry?,1=Excellent,2=Good,3=Fair,4=Poor,5=Don't know
+USBEST_SLIVING_DK_W142,How would you rate the US standard of living?,1=Excellent,2=Good,3=Fair,4=Poor,5=Don't know
+USBEST_MILITARY_DK_W142,How would you rate the US military?,1=Excellent,2=Good,3=Fair,4=Poor,5=Don't know
+USBEST_MEDACHIEVE_DK_W142,How would you rate US medical achievements?,1=Excellent,2=Good,3=Fair,4=Poor,5=Don't know
+USBEST_POLSYSTEM_DK_W142,How would you rate the US political system?,1=Excellent,2=Good,3=Fair,4=Poor,5=Don't know
+USBEST_SCIACHIEVE_DK_W142,How would you rate US scientific achievements?,1=Excellent,2=Good,3=Fair,4=Poor,5=Don't know
+USBEST_STEMEDUK12_DK_W142,How would you rate US K-12 STEM education?,1=Excellent,2=Good,3=Fair,4=Poor,5=Don't know
+SNSRATE_W142,How would you rate social networking sites?,1=Excellent,2=Good,3=Fair,4=Poor
+TECHPOW_W142,How much influence do technology companies have?,1=Too much,2=About right,3=Too little
+TC5_W142,How much do you trust technology companies with your data?,1=A lot,2=Some,3=Not much,4=Not at all
+TC6b_W142,How concerned are you about data privacy?,1=Very concerned,2=Somewhat concerned,3=Not very concerned,4=Not at all concerned
+SM7_W142,How often do you use social media?,1=Daily,2=Weekly,3=Monthly,4=Rarely,5=Never
+EMPLSIT_W142,What is your current employment situation?,1=Employed full-time,2=Employed part-time,3=Unemployed,4=Retired,5=Student
+FACTWELL_a_W142,How much do you trust information from news organizations?,1=A lot,2=Some,3=Not much,4=Not at all
+FACTWELL_b_W142,How much do you trust information from government agencies?,1=A lot,2=Some,3=Not much,4=Not at all
+FACTWELL_c_W142,How much do you trust information from social media?,1=A lot,2=Some,3=Not much,4=Not at all
+FACTWELL_d_W142,How much do you trust information from search engines?,1=A lot,2=Some,3=Not much,4=Not at all
+FACTWELL_e_W142,How much do you trust information from online encyclopedias?,1=A lot,2=Some,3=Not much,4=Not at all
+FACTWELL_f_W142,How much do you trust information from friends and family?,1=A lot,2=Some,3=Not much,4=Not at all
+FACTWELL_g_W142,How much do you trust information from podcasts?,1=A lot,2=Some,3=Not much,4=Not at all
+FACTWELL_h_W142,How much do you trust information from YouTube videos?,1=A lot,2=Some,3=Not much,4=Not at all
+FACTWELL_i_W142,How much do you trust information from online forums?,1=A lot,2=Some,3=Not much,4=Not at all
+FACTWELL_j_W142,How much do you trust information from influencers?,1=A lot,2=Some,3=Not much,4=Not at all
+FACTWELL_k_W142,How much do you trust information from AI chatbots?,1=A lot,2=Some,3=Not much,4=Not at all
+TALKMH_a_W142,How comfortable would you be talking about mental health with a family member?,1=Very comfortable,2=Somewhat comfortable,3=Not very comfortable,4=Not at all comfortable
+TALKMH_b_W142,How comfortable would you be talking about mental health with a friend?,1=Very comfortable,2=Somewhat comfortable,3=Not very comfortable,4=Not at all comfortable
+TALKMH_c_W142,How comfortable would you be talking about mental health with a doctor?,1=Very comfortable,2=Somewhat comfortable,3=Not very comfortable,4=Not at all comfortable
+TALKMH_d_W142,How comfortable would you be talking about mental health with a therapist?,1=Very comfortable,2=Somewhat comfortable,3=Not very comfortable,4=Not at all comfortable
+TALKMH_e_W142,How comfortable would you be talking about mental health with a coworker?,1=Very comfortable,2=Somewhat comfortable,3=Not very comfortable,4=Not at all comfortable
+TALKMH_f_W142,How comfortable would you be talking about mental health with a religious leader?,1=Very comfortable,2=Somewhat comfortable,3=Not very comfortable,4=Not at all comfortable
+TALKMH_g_W142,How comfortable would you be talking about mental health with an AI chatbot?,1=Very comfortable,2=Somewhat comfortable,3=Not very comfortable,4=Not at all comfortable
+FACTWGT_a_W142,How important is accuracy when you get news and information about current events?,1=Extremely important,2=Very important,3=Somewhat important,4=Not very important,5=Not at all important
+FACTWGT_b_W142,How important is speed when you get news and information about current events?,1=Extremely important,2=Very important,3=Somewhat important,4=Not very important,5=Not at all important
+FACTWGT_c_W142,How important is completeness when you get news and information about current events?,1=Extremely important,2=Very important,3=Somewhat important,4=Not very important,5=Not at all important
+FACTWGT_d_W142,How important is convenience when you get news and information about current events?,1=Extremely important,2=Very important,3=Somewhat important,4=Not very important,5=Not at all important
+FACTWGT_e_W142,How important is cost when you get news and information about current events?,1=Extremely important,2=Very important,3=Somewhat important,4=Not very important,5=Not at all important
+WILLPWR_W142,How much willpower do you think people have over their weight?,1=Complete control,2=A lot of control,3=Some control,4=Little control,5=No control
+OZHEARD_W142,Have you heard of Ozempic or similar weight-loss medications?,1=Yes,2=No,3=Not sure
+OZUSE_a_W142,Have you ever used Ozempic for weight loss?,1=Yes,2=No
+OZUSE_b_W142,Have you ever used Ozempic for diabetes?,1=Yes,2=No
+REDUCOBES_W142,How effective do you think these medications are for reducing obesity?,1=Very effective,2=Somewhat effective,3=Not very effective,4=Not at all effective
+COVIDTHREAT_a_W142,How much of a threat is COVID-19 to your personal health?,1=Major threat,2=Minor threat,3=No threat
+COVIDTHREAT_b_W142,How much of a threat is COVID-19 to the US economy?,1=Major threat,2=Minor threat,3=No threat
+COVIDTHREAT_c_W142,How much of a threat is COVID-19 to your local community?,1=Major threat,2=Minor threat,3=No threat
+COVIDTHREAT_d_W142,How much of a threat is COVID-19 to the world?,1=Major threat,2=Minor threat,3=No threat
+COVID_INFECT_a_W142,Have you been infected with COVID-19?,1=Yes,2=No,3=Not sure
+COVID_INFECT_b_W142,Has anyone in your household been infected with COVID-19?,1=Yes,2=No,3=Not sure
+HRDLONGCOV_W142,Have you heard of long COVID?,1=Yes,2=No
+LONGCOVID_W142,Do you think you have had long COVID?,1=Yes,2=No,3=Not sure
+NEWCOVVAX_W142,Would you get an updated COVID-19 vaccine?,1=Definitely would,2=Probably would,3=Probably would not,4=Definitely would not
+USEAI_W142,Do you use artificial intelligence tools in your daily life?,1=Yes regularly,2=Yes occasionally,3=No but interested,4=No and not interested
+GENAICRED_W142,How much do you trust AI-generated content?,1=A lot,2=Some,3=Not much,4=Not at all
+AICOPYRGHT_a_W142,Should AI companies pay for using copyrighted content in training?,1=Yes definitely,2=Yes probably,3=No probably not,4=No definitely not
+AICOPYRGHT_b_W142,Should AI-generated content be labeled as such?,1=Yes definitely,2=Yes probably,3=No probably not,4=No definitely not
+AICOPYRGHT_c_W142,Should there be limits on AI use in creative industries?,1=Yes definitely,2=Yes probably,3=No probably not,4=No definitely not
+AICOPYRGHT_d_W142,Should AI companies be liable for copyright infringement?,1=Yes definitely,2=Yes probably,3=No probably not,4=No definitely not
+AICOPYRGHT_e_W142,Should AI-generated content be eligible for copyright protection?,1=Yes definitely,2=Yes probably,3=No probably not,4=No definitely not
+AICOPYRGHT_f_W142,Should there be new laws specifically for AI and copyright?,1=Yes definitely,2=Yes probably,3=No probably not,4=No definitely not
+AICOPYRGHT_g_W142,How much do you think AI-generated content should be regulated in terms of copyright?,1=Heavily regulated,2=Somewhat regulated,3=Lightly regulated,4=Not regulated at all
+CRYPT1_W142,How familiar are you with cryptocurrency?,1=Very familiar,2=Somewhat familiar,3=Not very familiar,4=Not at all familiar
+CRYPT2_W142,Do you own any cryptocurrency?,1=Yes,2=No
+CRYPTNOW_W142,Are you currently buying or selling cryptocurrency?,1=Yes,2=No
+CRYPTSEC_W142,How secure do you think cryptocurrency is?,1=Very secure,2=Somewhat secure,3=Not very secure,4=Not at all secure,5=Don't know
+CRYPT4_W142,Should cryptocurrency be regulated more by the government?,1=Yes definitely,2=Yes probably,3=No probably not,4=No definitely not
+GPT1_W142,Have you heard of ChatGPT or similar AI chatbots?,1=Yes,2=No
+GPTUSE_W142,Have you ever used ChatGPT or similar AI chatbots?,1=Yes,2=No
+GPT2_a_W142,How often do you use ChatGPT for work tasks?,1=Daily,2=Weekly,3=Monthly,4=Rarely,5=Never
+GPT2_b_W142,How often do you use ChatGPT for personal tasks?,1=Daily,2=Weekly,3=Monthly,4=Rarely,5=Never
+GPT2_c_W142,How often do you use ChatGPT for learning?,1=Daily,2=Weekly,3=Monthly,4=Rarely,5=Never
+GPTPOL1_W142,Should AI chatbots be regulated by the government?,1=Yes definitely,2=Yes probably,3=No probably not,4=No definitely not
+GPTPOL2_W142,Do you trust AI chatbots to provide accurate information?,1=Yes completely,2=Yes mostly,3=No mostly not,4=No not at all
+SCI_FLU1_W142,How much do you trust scientists about flu vaccines?,1=A lot,2=Some,3=Not much,4=Not at all
+SCI_FLU2_W142,How effective do you think flu vaccines are?,1=Very effective,2=Somewhat effective,3=Not very effective,4=Not at all effective
+SELFWGT_W142,How much control do you feel you have over your weight?,1=Complete control,2=A lot of control,3=Some control,4=Little control,5=No control
+F_METRO,Metropolitan area,1=Metropolitan,2=Non-metropolitan
+F_CREGION,Census region,1=Northeast,2=Midwest,3=South,4=West
+F_CDIVISION,Census division,1=New England,2=Middle Atlantic,3=East North Central,4=West North Central,5=South Atlantic,6=East South Central,7=West South Central,8=Mountain,9=Pacific
+F_USR_SELFID,Self-identified race/ethnicity,1=White,2=Black,3=Hispanic,4=Asian,5=Other
+F_HISP,Hispanic origin,1=Yes,2=No
+F_HISP_ORIGIN,Hispanic origin detail,1=Mexican,2=Puerto Rican,3=Cuban,4=Other,99=Not applicable
+F_YEARSINUS_RECODE,Years in US,1=Less than 5,2=5-10,3=11-20,4=More than 20,99=Born in US
+F_RACECMB,Race combined,1=White,2=Black,3=Hispanic,4=Asian,5=Other
+F_RACETHNMOD,Race/ethnicity modified,1=White,2=Black,3=Hispanic,4=Asian,5=Other
+F_BIRTHPLACE,Birthplace,1=US,2=Foreign,99=Not specified
+F_MARITAL,Marital status,1=Married,2=Living with partner,3=Divorced,4=Separated,5=Widowed,6=Never married
+F_RELIG,Religion,1=Protestant,2=Catholic,3=Mormon,4=Orthodox,5=Jewish,6=Muslim,7=Buddhist,8=Hindu,9=Atheist,10=Agnostic,11=Nothing in particular,12=Something else
+F_BORN,Born again Christian,1=Yes,2=No,3=Don't know
+F_RELIGCAT1,Religious category,1=Protestant,2=Catholic,3=Other Christian,4=Non-Christian,5=Unaffiliated
+F_ATTENDPER,Religious attendance,1=More than once a week,2=Once a week,3=Once or twice a month,4=A few times a year,5=Seldom,6=Never
+F_PARTY_FINAL,Party identification,1=Republican,2=Democrat,3=Independent,4=Other,99=No preference
+F_PARTYLN_FINAL,Party lean,1=Republican,2=Democrat,3=Independent,99=No lean
+F_PARTYSUM_FINAL,Party summary,1=Republican,2=Democrat,3=Independent,9=Other
+F_PARTYSUMIDEO_FINAL,Party and ideology,1=Conservative Republican,2=Moderate Republican,3=Liberal Republican,4=Conservative Democrat,5=Moderate Democrat,6=Liberal Democrat,7=Conservative Independent,8=Moderate Independent,9=Liberal Independent
+F_REG,Voter registration,1=Registered,2=Not registered,3=Don't know
+F_INC_SDT1,Income,1=Less than $30k,2=$30k-$50k,3=$50k-$75k,4=$75k-$100k,5=$100k-$150k,6=More than $150k
+F_IDEO,Political ideology,1=Very conservative,2=Conservative,3=Moderate,4=Liberal,5=Very liberal
+F_INTFREQ,Internet frequency,1=Several times a day,2=About once a day,3=3-5 days a week,4=1-2 days a week,5=Every few weeks,6=Less often,7=Never
+F_VOLSUM,Volunteer activity,1=Yes,2=No
+F_INC_TIER2,Income tier,1=Lower,2=Middle,3=Upper
+WEIGHT_W142,Survey weight,
