@@ -106,7 +106,9 @@ export class ReportStorageService {
       
       let finalMetadata = metadata.metadata;
       if (existing.length > 0 && existing[0].metadata) {
-        const existingMetadata = JSON.parse(existing[0].metadata);
+        const existingMetadata = typeof existing[0].metadata === 'string' 
+          ? JSON.parse(existing[0].metadata) 
+          : existing[0].metadata;
         finalMetadata = { ...existingMetadata, ...metadata.metadata };
       }
       
@@ -156,7 +158,9 @@ export class ReportStorageService {
     
     return sections.map(section => ({
       ...section,
-      chart_specs: section.chart_specs ? JSON.parse(section.chart_specs) : null
+      chart_specs: section.chart_specs ? 
+        (typeof section.chart_specs === 'string' ? JSON.parse(section.chart_specs) : section.chart_specs) 
+        : null
     }));
   }
   

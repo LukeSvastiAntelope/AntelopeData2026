@@ -4,42 +4,94 @@ import { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+// import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area } from 'recharts'
-import { TrendingUp, Users, BarChart3, PieChart as PieChartIcon, Activity, Info, Loader2 } from 'lucide-react'
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area, ScatterChart, Scatter } from 'recharts'
+import { TrendingUp, Users, BarChart3, PieChart as PieChartIcon, Activity, Info, Loader2, Brain, Lightbulb, Target, AlertTriangle, CheckCircle, Clock, Zap } from 'lucide-react'
 
 interface SurveyAnalyticsDashboardProps {
   surveyId: number
   className?: string
 }
 
-interface SchemaData {
-  survey_meta: {
-    id: number
-    title: string
-    total_respondents: number
-    question_count: number
-    data_quality_score: number
+interface AIAnalyticsData {
+  hasAnalytics: boolean
+  status?: string
+  message?: string
+  analysis?: {
+    surveyType: string
+    mainThemes: string[]
+    analysisComplexity: string
+    estimatedAnalysisTime: number
   }
-  questions: Array<{
-    id: number
-    prompt: string
-    detected_type: string
-    detection_confidence: number
-  }>
-  demographics: Record<string, any>
-  fact_sheet: {
-    core_stats: any
-    question_stats: Record<string, any>
+  insights?: {
+    executiveSummary: string
+    keyFindings: Array<{
+      title: string
+      description: string
+      confidence: string
+      priority: string
+      statisticalEvidence: string
+      businessImplication: string
+    }>
+    recommendations: Array<{
+      category: string
+      recommendation: string
+      rationale: string
+      priority: string
+      timeframe: string
+    }>
+    dataQuality: {
+      responseRate: number
+      completeness: number
+      reliability: string
+      limitations: string[]
+    }
   }
-  usage_recommendations: Array<{
-    type: string
+  dashboard?: {
     title: string
     description: string
-    confidence?: string
-    suggested_queries?: string[]
-  }>
+    charts: Array<{
+      id: string
+      type: string
+      title: string
+      description: string
+      data: any[]
+      insights: {
+        keyTakeaway: string
+        statisticalSignificance: boolean
+        businessRelevance: string
+        actionableInsight: string
+      }
+      priority: number
+      category: string
+    }>
+  }
+  performance?: {
+    totalTimeMs: number
+    analysisTimeMs: number
+    queryTimeMs: number
+    insightTimeMs: number
+    visualizationTimeMs: number
+  }
+  dataQuality?: {
+    responseCount: number
+    completenessScore: number
+    reliabilityAssessment: string
+    limitations: string[]
+  }
+  metadata?: {
+    modelsUsed: {
+      analysis: string
+      queries: string
+      insights: string
+      visualization: string
+    }
+    generatedAt: string
+    cacheStatus: any
+  }
 }
 
 // Chart color scheme (ShadCN neutral zinc theme)
@@ -53,29 +105,70 @@ const CHART_COLORS = {
 }
 
 export function SurveyAnalyticsDashboard({ surveyId, className }: SurveyAnalyticsDashboardProps) {
-  const [schema, setSchema] = useState<SchemaData | null>(null)
+  const [aiAnalytics, setAiAnalytics] = useState<AIAnalyticsData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [generating, setGenerating] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    fetchSchemaData()
+    fetchAIAnalytics()
   }, [surveyId])
 
-  const fetchSchemaData = async () => {
+  const fetchAIAnalytics = async () => {
     try {
       setLoading(true)
-      const response = await fetch(`/api/surveys/${surveyId}/schema`)
+      const response = await fetch(`/api/surveys/${surveyId}/ai-analytics`)
       
       if (!response.ok) {
-        throw new Error('Failed to fetch survey schema')
+        throw new Error('Failed to fetch AI analytics')
       }
       
       const data = await response.json()
-      setSchema(data)
+      setAiAnalytics(data)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const generateAIAnalytics = async () => {
+    try {
+      setGenerating(true)
+      setError(null)
+      
+      const response = await fetch(`/api/surveys/${surveyId}/ai-analytics`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          analysisModel: 'claude-3-5-sonnet-latest',
+          queryModel: 'gpt-4o-mini',
+          insightModel: 'claude-3-5-sonnet-latest',
+          visualizationModel: 'gpt-4o',
+          maxCharts: 8,
+          includeRawData: true,
+          forceRegenerate: true
+        })
+      })
+      
+      if (!response.ok) {
+        throw new Error('Failed to generate AI analytics')
+      }
+      
+      const data = await response.json()
+      
+      if (data.success) {
+        // Refresh the analytics data
+        await fetchAIAnalytics()
+      } else {
+        throw new Error(data.details || 'Failed to generate analytics')
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unknown error')
+    } finally {
+      setGenerating(false)
     }
   }
 
@@ -85,20 +178,24 @@ export function SurveyAnalyticsDashboard({ surveyId, className }: SurveyAnalytic
         <CardContent className="flex items-center justify-center h-64">
           <div className="flex items-center space-x-2">
             <Loader2 className="h-4 w-4 animate-spin" />
-            <span>Analyzing survey data...</span>
+            <span>Loading AI analytics...</span>
           </div>
         </CardContent>
       </Card>
     )
   }
 
-  if (error || !schema) {
+  if (error) {
     return (
       <Card className={className}>
         <CardContent className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <p className="text-muted-foreground">Failed to load analytics</p>
-            <Button variant="outline" size="sm" onClick={fetchSchemaData} className="mt-2">
+          <div className="text-center space-y-4">
+            <AlertTriangle className="h-8 w-8 text-destructive mx-auto" />
+            <div>
+              <p className="font-medium">Failed to load AI analytics</p>
+              <p className="text-sm text-muted-foreground">{error}</p>
+            </div>
+            <Button variant="outline" size="sm" onClick={fetchAIAnalytics}>
               Try Again
             </Button>
           </div>
@@ -107,19 +204,135 @@ export function SurveyAnalyticsDashboard({ surveyId, className }: SurveyAnalytic
     )
   }
 
+  // If no analytics exist, show generation prompt
+  if (!aiAnalytics?.hasAnalytics) {
+    return (
+      <Card className={className}>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Brain className="h-5 w-5" />
+            AI-Powered Analytics
+          </CardTitle>
+          <CardDescription>
+            Generate intelligent insights and visualizations using AI
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-start gap-3 p-4 rounded-lg border bg-blue-50 dark:bg-blue-950/20">
+            <Info className="h-4 w-4 text-blue-600 mt-0.5" />
+            <p className="text-sm text-blue-800 dark:text-blue-200">
+              {aiAnalytics?.message || 'AI analytics not generated yet. Click below to create comprehensive insights.'}
+            </p>
+          </div>
+          
+          <div className="text-center space-y-4">
+            <div className="space-y-2">
+              <h4 className="font-medium">What you&apos;ll get:</h4>
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4 text-green-600" />
+                  <span>Executive Summary</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4 text-green-600" />
+                  <span>Key Findings</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4 text-green-600" />
+                  <span>Business Recommendations</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4 text-green-600" />
+                  <span>Smart Visualizations</span>
+                </div>
+              </div>
+            </div>
+            
+            <Button 
+              onClick={generateAIAnalytics} 
+              disabled={generating}
+              className="w-full"
+            >
+              {generating ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Generating AI Analytics...
+                </>
+              ) : (
+                <>
+                  <Brain className="h-4 w-4 mr-2" />
+                  Generate AI Analytics
+                </>
+              )}
+            </Button>
+            
+            {generating && (
+              <p className="text-sm text-muted-foreground">
+                This may take 30-60 seconds as AI analyzes your survey data...
+              </p>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
   return (
     <div className={`space-y-8 ${className}`}>
+      {/* AI Analytics Header */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Brain className="h-5 w-5 text-primary" />
+                AI Analytics Dashboard
+              </CardTitle>
+              <CardDescription>
+                {aiAnalytics.dashboard?.description || 'Intelligent insights powered by AI'}
+              </CardDescription>
+            </div>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={generateAIAnalytics}
+              disabled={generating}
+            >
+              {generating ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Zap className="h-4 w-4" />
+              )}
+              Regenerate
+            </Button>
+          </div>
+        </CardHeader>
+      </Card>
+
       {/* Overview Cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Respondents</CardTitle>
+            <CardTitle className="text-sm font-medium">Survey Type</CardTitle>
+            <Activity className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-lg font-bold">{aiAnalytics.analysis?.surveyType || 'Unknown'}</div>
+            <p className="text-xs text-muted-foreground">
+              {aiAnalytics.analysis?.analysisComplexity || 'Unknown'} complexity
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Response Count</CardTitle>
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{schema.survey_meta.total_respondents.toLocaleString()}</div>
+            <div className="text-2xl font-bold">{aiAnalytics.dataQuality?.responseCount?.toLocaleString() || 'N/A'}</div>
             <p className="text-xs text-muted-foreground">
-              {schema.survey_meta.question_count} questions analyzed
+              {aiAnalytics.dataQuality?.completenessScore || 0}% completion rate
             </p>
           </CardContent>
         </Card>
@@ -127,332 +340,221 @@ export function SurveyAnalyticsDashboard({ surveyId, className }: SurveyAnalytic
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Data Quality</CardTitle>
-            <Activity className="h-4 w-4 text-muted-foreground" />
+            <CheckCircle className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {(schema.survey_meta.data_quality_score * 100).toFixed(1)}%
-            </div>
-            <div className="text-xs text-muted-foreground">
-              <Badge variant={schema.survey_meta.data_quality_score >= 0.9 ? "default" : "secondary"} className="text-xs">
-                {schema.survey_meta.data_quality_score >= 0.9 ? "Excellent" : "Good"}
-              </Badge>
-            </div>
+            <div className="text-2xl font-bold">{aiAnalytics.dataQuality?.reliabilityAssessment || 'Unknown'}</div>
+            <Badge variant={
+              aiAnalytics.dataQuality?.reliabilityAssessment === 'High' ? 'default' : 
+              aiAnalytics.dataQuality?.reliabilityAssessment === 'Good' ? 'secondary' : 'outline'
+            } className="text-xs">
+              Reliability
+            </Badge>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Question Types</CardTitle>
-            <BarChart3 className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">AI Models</CardTitle>
+            <Brain className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{schema.questions.length}</div>
+            <div className="text-lg font-bold">{aiAnalytics.dashboard?.charts?.length || 0}</div>
             <p className="text-xs text-muted-foreground">
-              {new Set(schema.questions.map(q => q.detected_type)).size} unique types
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Demographics</CardTitle>
-            <PieChartIcon className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{Object.keys(schema.demographics).length}</div>
-            <p className="text-xs text-muted-foreground">
-              Available for analysis
+              Charts generated
             </p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Platform Adoption Section */}
-      <div className="space-y-4">
-        <div>
-          <h3 className="text-lg font-semibold">Platform Adoption</h3>
-          <p className="text-sm text-muted-foreground">Social media platform usage patterns and adoption rates</p>
-        </div>
-        <PlatformAdoptionCharts factSheet={schema.fact_sheet} />
-      </div>
-
-      {/* Usage Patterns Section */}
-      <div className="space-y-4">
-        <div>
-          <h3 className="text-lg font-semibold">Usage Patterns</h3>
-          <p className="text-sm text-muted-foreground">Daily usage statistics and behavioral patterns</p>
-        </div>
-        <UsagePatternsCharts factSheet={schema.fact_sheet} />
-      </div>
-
-      {/* Demographics Section */}
-      <div className="space-y-4">
-        <div>
-          <h3 className="text-lg font-semibold">Demographics</h3>
-          <p className="text-sm text-muted-foreground">Age, gender, and other demographic breakdowns</p>
-        </div>
-        <DemographicsCharts demographics={schema.demographics} />
-      </div>
-
-      {/* Insights Section */}
-      <div className="space-y-4">
-        <div>
-          <h3 className="text-lg font-semibold">AI Insights & Recommendations</h3>
-          <p className="text-sm text-muted-foreground">Intelligent analysis and suggested questions</p>
-        </div>
-        <InsightsPanel 
-          recommendations={schema.usage_recommendations} 
-          questions={schema.questions}
-          surveyMeta={schema.survey_meta}
-        />
-      </div>
-    </div>
-  )
-}
-
-// Platform Adoption Charts Component
-function PlatformAdoptionCharts({ factSheet }: { factSheet: any }) {
-  // Find platform adoption data
-  const platformData = Object.values(factSheet.question_stats || {}).find((stats: any) => 
-    stats.adoption_rates && Object.keys(stats.adoption_rates).length > 0
-  ) as any
-
-  if (!platformData?.adoption_rates) {
-    return (
-      <Card>
-        <CardContent className="flex items-center justify-center h-64">
-          <p className="text-muted-foreground">No platform adoption data available</p>
-        </CardContent>
-      </Card>
-    )
-  }
-
-  // Prepare data for charts
-  const adoptionData = Object.entries(platformData.adoption_rates)
-    .map(([platform, stats]: [string, any]) => ({
-      platform: platform.length > 12 ? platform.substring(0, 12) + '...' : platform,
-      fullName: platform,
-      percentage: stats.percentage,
-      users: stats.users,
-      rank: stats.rank
-    }))
-    .sort((a, b) => b.percentage - a.percentage)
-    .slice(0, 8) // Top 8 platforms
-
-  return (
-    <div className="grid gap-4 md:grid-cols-2">
-      {/* Bar Chart */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+      {/* Main Content Tabs */}
+      <Tabs defaultValue="insights" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="insights" className="flex items-center gap-2">
+            <Lightbulb className="h-4 w-4" />
+            Insights
+          </TabsTrigger>
+          <TabsTrigger value="visualizations" className="flex items-center gap-2">
             <BarChart3 className="h-4 w-4" />
-            Platform Adoption Rates
-          </CardTitle>
-          <CardDescription>
-            Percentage of respondents using each platform
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <ChartContainer
-            config={{
-              percentage: {
-                label: "Adoption Rate",
-                color: CHART_COLORS.primary,
-              },
-            }}
-            className="h-64"
-          >
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={adoptionData}>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                <XAxis 
-                  dataKey="platform" 
-                  className="text-xs fill-muted-foreground"
-                  angle={-45}
-                  textAnchor="end"
-                  height={60}
-                />
-                <YAxis className="text-xs fill-muted-foreground" />
-                <ChartTooltip content={<ChartTooltipContent />} />
-                <Bar 
-                  dataKey="percentage" 
-                  fill={CHART_COLORS.primary}
-                  radius={[4, 4, 0, 0]}
-                />
-              </BarChart>
-            </ResponsiveContainer>
-          </ChartContainer>
-        </CardContent>
-      </Card>
+            Visualizations
+          </TabsTrigger>
+          <TabsTrigger value="performance" className="flex items-center gap-2">
+            <Clock className="h-4 w-4" />
+            Performance
+          </TabsTrigger>
+        </TabsList>
 
-      {/* Usage Patterns */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Activity className="h-4 w-4" />
-            Usage Patterns
-          </CardTitle>
-          <CardDescription>
-            Multi-platform vs single-platform users
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <span className="text-sm">Average platforms per user</span>
-              <span className="font-semibold">{platformData.usage_patterns?.average_selections_per_user || 'N/A'}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm">Single platform users</span>
-              <span className="font-semibold">{platformData.usage_patterns?.single_selection_users || 'N/A'}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm">Multi-platform users</span>
-              <span className="font-semibold">{platformData.usage_patterns?.multi_selection_users || 'N/A'}</span>
-            </div>
-            
-            {/* Simple usage pattern visualization */}
-            {platformData.usage_patterns && (
-              <div className="mt-4">
-                <div className="flex h-2 rounded-full overflow-hidden bg-muted">
-                  <div 
-                    className="bg-primary" 
-                    style={{ 
-                      width: `${(platformData.usage_patterns.single_selection_users / (platformData.usage_patterns.single_selection_users + platformData.usage_patterns.multi_selection_users)) * 100}%` 
-                    }}
-                  />
-                  <div 
-                    className="bg-secondary" 
-                    style={{ 
-                      width: `${(platformData.usage_patterns.multi_selection_users / (platformData.usage_patterns.single_selection_users + platformData.usage_patterns.multi_selection_users)) * 100}%` 
-                    }}
-                  />
-                </div>
-                <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                  <span>Single</span>
-                  <span>Multi</span>
-                </div>
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+        <TabsContent value="insights" className="space-y-6">
+          <InsightsSection insights={aiAnalytics.insights} analysis={aiAnalytics.analysis} />
+        </TabsContent>
+
+        <TabsContent value="visualizations" className="space-y-6">
+          <VisualizationsSection dashboard={aiAnalytics.dashboard} />
+        </TabsContent>
+
+        <TabsContent value="performance" className="space-y-6">
+          <PerformanceSection 
+            performance={aiAnalytics.performance} 
+            metadata={aiAnalytics.metadata}
+            dataQuality={aiAnalytics.dataQuality}
+        />
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }
 
-// Usage Patterns Charts Component
-function UsagePatternsCharts({ factSheet }: { factSheet: any }) {
-  // Find usage statistics data
-  const usageData = Object.values(factSheet.question_stats || {}).find((stats: any) => 
-    stats.statistics && stats.statistics.mean !== undefined
-  ) as any
-
-  if (!usageData?.statistics) {
+// Insights Section Component
+function InsightsSection({ insights, analysis }: { insights?: any, analysis?: any }) {
+  if (!insights) {
     return (
       <Card>
         <CardContent className="flex items-center justify-center h-64">
-          <p className="text-muted-foreground">No usage statistics available</p>
+          <p className="text-muted-foreground">No insights available</p>
         </CardContent>
       </Card>
     )
   }
 
-  // Prepare distribution data
-  const distributionData = usageData.distribution ? 
-    Object.entries(usageData.distribution).map(([range, stats]: [string, any]) => ({
-      range: range.replace('_hours', 'h'),
-      count: stats.count,
-      percentage: stats.percentage
-    })) : []
-
   return (
-    <div className="grid gap-4 md:grid-cols-2">
-      {/* Statistics Card */}
+    <div className="space-y-6">
+      {/* Executive Summary */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <TrendingUp className="h-4 w-4" />
-            Usage Statistics
+            <Target className="h-5 w-5" />
+            Executive Summary
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-lg leading-relaxed">{insights.executiveSummary}</p>
+          
+          {analysis?.mainThemes && (
+            <div className="mt-4">
+              <h4 className="font-medium mb-2">Key Themes:</h4>
+              <div className="flex flex-wrap gap-2">
+                {analysis.mainThemes.map((theme: string, index: number) => (
+                  <Badge key={index} variant="secondary">{theme}</Badge>
+                ))}
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Key Findings */}
+      {insights.keyFindings && insights.keyFindings.length > 0 && (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+              <Lightbulb className="h-5 w-5" />
+              Key Findings
           </CardTitle>
           <CardDescription>
-            Daily usage patterns and distribution
+              {insights.keyFindings.length} important insights discovered
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-primary">{usageData.statistics.mean}</div>
-                <div className="text-xs text-muted-foreground">Average hours/day</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-secondary">{usageData.statistics.median}</div>
-                <div className="text-xs text-muted-foreground">Median hours/day</div>
-              </div>
+              {insights.keyFindings.map((finding: any, index: number) => (
+                <div key={index} className="border-l-4 border-primary pl-4 space-y-2">
+                  <div className="flex items-start justify-between">
+                    <h4 className="font-medium">{finding.title}</h4>
+                    <div className="flex gap-2">
+                      <Badge variant={finding.priority === 'critical' ? 'destructive' : 'default'}>
+                        {finding.priority}
+                      </Badge>
+                      <Badge variant="outline">
+                        {finding.confidence} confidence
+                      </Badge>
             </div>
-            
-            <div className="grid grid-cols-2 gap-4">
-              <div className="text-center">
-                <div className="text-lg font-semibold">{usageData.statistics.min}</div>
-                <div className="text-xs text-muted-foreground">Minimum</div>
-              </div>
-              <div className="text-center">
-                <div className="text-lg font-semibold">{usageData.statistics.max}</div>
-                <div className="text-xs text-muted-foreground">Maximum</div>
-              </div>
             </div>
-
-            <div className="text-center pt-2 border-t">
-              <div className="text-sm font-medium">Standard Deviation</div>
-              <div className="text-lg">{usageData.statistics.std_dev}</div>
+                  <p className="text-muted-foreground">{finding.description}</p>
+                  <div className="text-sm">
+                    <p><strong>Evidence:</strong> {finding.statisticalEvidence}</p>
+                    <p><strong>Business Impact:</strong> {finding.businessImplication}</p>
             </div>
+                </div>
+              ))}
           </div>
         </CardContent>
       </Card>
+      )}
 
-      {/* Distribution Chart */}
-      {distributionData.length > 0 && (
+      {/* Recommendations */}
+      {insights.recommendations && insights.recommendations.length > 0 && (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+              <Target className="h-5 w-5" />
+              Recommendations
+          </CardTitle>
+          <CardDescription>
+              Actionable next steps based on the analysis
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+              {insights.recommendations.map((rec: any, index: number) => (
+                <div key={index} className="p-4 rounded-lg border bg-muted/50">
+                  <div className="flex items-start justify-between mb-2">
+                    <h4 className="font-medium">{rec.recommendation}</h4>
+                    <div className="flex gap-2">
+                      <Badge variant={rec.priority === 'high' ? 'destructive' : 'secondary'}>
+                        {rec.priority}
+                      </Badge>
+                      <Badge variant="outline">
+                        {rec.timeframe}
+                      </Badge>
+              </div>
+            </div>
+                  <p className="text-sm text-muted-foreground mb-2">
+                    <strong>Category:</strong> {rec.category}
+                  </p>
+                  <p className="text-sm">{rec.rationale}</p>
+              </div>
+              ))}
+          </div>
+        </CardContent>
+      </Card>
+      )}
+
+      {/* Data Quality */}
+      {insights.dataQuality && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <BarChart3 className="h-4 w-4" />
-              Usage Distribution
+              <CheckCircle className="h-5 w-5" />
+              Data Quality Assessment
             </CardTitle>
-            <CardDescription>
-              How users are distributed across usage ranges
-            </CardDescription>
           </CardHeader>
           <CardContent>
-            <ChartContainer
-              config={{
-                percentage: {
-                  label: "Percentage",
-                  color: CHART_COLORS.accent,
-                },
-              }}
-              className="h-64"
-            >
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={distributionData}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                  <XAxis 
-                    dataKey="range" 
-                    className="text-xs fill-muted-foreground"
-                  />
-                  <YAxis className="text-xs fill-muted-foreground" />
-                  <ChartTooltip content={<ChartTooltipContent />} />
-                  <Area 
-                    type="monotone" 
-                    dataKey="percentage" 
-                    stroke={CHART_COLORS.accent}
-                    fill={CHART_COLORS.accent}
-                    fillOpacity={0.6}
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            </ChartContainer>
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              <div className="text-center">
+                <div className="text-2xl font-bold">{insights.dataQuality.responseRate}%</div>
+                <div className="text-sm text-muted-foreground">Response Rate</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold">{insights.dataQuality.completeness}%</div>
+                <div className="text-sm text-muted-foreground">Completeness</div>
+              </div>
+            </div>
+            
+            <div className="space-y-2">
+              <div>
+                <strong>Reliability:</strong> {insights.dataQuality.reliability}
+              </div>
+              {insights.dataQuality.limitations && insights.dataQuality.limitations.length > 0 && (
+                <div>
+                  <strong>Limitations:</strong>
+                  <ul className="list-disc list-inside text-sm text-muted-foreground mt-1">
+                    {insights.dataQuality.limitations.map((limitation: string, index: number) => (
+                      <li key={index}>{limitation}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
           </CardContent>
         </Card>
       )}
@@ -460,207 +562,194 @@ function UsagePatternsCharts({ factSheet }: { factSheet: any }) {
   )
 }
 
-// Demographics Charts Component
-function DemographicsCharts({ demographics }: { demographics: Record<string, any> }) {
-  if (!demographics || Object.keys(demographics).length === 0) {
+// Visualizations Section Component
+function VisualizationsSection({ dashboard }: { dashboard?: any }) {
+  if (!dashboard?.charts || dashboard.charts.length === 0) {
     return (
       <Card>
         <CardContent className="flex items-center justify-center h-64">
-          <p className="text-muted-foreground">No demographic data available</p>
+          <p className="text-muted-foreground">No visualizations available</p>
         </CardContent>
       </Card>
     )
   }
 
-  // Prepare age distribution data
-  const ageData = demographics.age?.distribution ? 
-    Object.entries(demographics.age.distribution).map(([group, stats]: [string, any]) => ({
-      group,
-      count: stats.count,
-      percentage: stats.percentage
-    })) : []
-
-  // Prepare gender distribution data
-  const genderData = demographics.gender?.distribution ? 
-    Object.entries(demographics.gender.distribution).map(([gender, stats]: [string, any], index) => ({
-      gender,
-      count: stats.count,
-      percentage: stats.percentage,
-      fill: CHART_COLORS.zinc[index % CHART_COLORS.zinc.length]
-    })) : []
-
   return (
-    <div className="grid gap-4 md:grid-cols-2">
-      {/* Age Distribution */}
-      {ageData.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <BarChart3 className="h-4 w-4" />
-              Age Distribution
-            </CardTitle>
-            <CardDescription>
-              Respondents by age group
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ChartContainer
-              config={{
-                percentage: {
-                  label: "Percentage",
-                  color: CHART_COLORS.primary,
-                },
-              }}
-              className="h-64"
-            >
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={ageData}>
+    <div className="space-y-6">
+      <div className="grid gap-6 md:grid-cols-2">
+        {dashboard.charts.map((chart: any, index: number) => (
+          <ChartCard key={chart.id || index} chart={chart} />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// Chart Card Component
+function ChartCard({ chart }: { chart: any }) {
+  const renderChart = () => {
+    if (!chart.data || chart.data.length === 0) {
+      return (
+        <div className="h-64 flex items-center justify-center text-muted-foreground">
+          No data available
+        </div>
+      )
+    }
+
+    switch (chart.type) {
+      case 'bar':
+        return (
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart data={chart.data}>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                  <XAxis 
-                    dataKey="group" 
-                    className="text-xs fill-muted-foreground"
-                  />
-                  <YAxis className="text-xs fill-muted-foreground" />
+              <XAxis dataKey={chart.chartConfig?.xAxis?.key || 'category'} className="text-xs" />
+              <YAxis className="text-xs" />
                   <ChartTooltip content={<ChartTooltipContent />} />
                   <Bar 
-                    dataKey="percentage" 
+                dataKey={chart.chartConfig?.yAxis?.key || 'value'} 
                     fill={CHART_COLORS.primary}
                     radius={[4, 4, 0, 0]}
                   />
                 </BarChart>
               </ResponsiveContainer>
-            </ChartContainer>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Gender Distribution */}
-      {genderData.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <PieChartIcon className="h-4 w-4" />
-              Gender Distribution
-            </CardTitle>
-            <CardDescription>
-              Respondents by gender
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ChartContainer
-              config={{
-                percentage: {
-                  label: "Percentage",
-                  color: CHART_COLORS.secondary,
-                },
-              }}
-              className="h-64"
-            >
-              <ResponsiveContainer width="100%" height="100%">
+        )
+      
+      case 'pie':
+        return (
+          <ResponsiveContainer width="100%" height={300}>
                 <PieChart>
                   <Pie
-                    data={genderData}
-                    dataKey="percentage"
-                    nameKey="gender"
+                data={chart.data}
+                dataKey={chart.chartConfig?.yAxis?.key || 'value'}
+                nameKey={chart.chartConfig?.xAxis?.key || 'name'}
                     cx="50%"
                     cy="50%"
                     outerRadius={80}
-                    label={({ gender, percentage }) => `${gender}: ${percentage}%`}
+                label={({ name, value }) => `${name}: ${value}`}
                   >
-                    {genderData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.fill} />
+                {chart.data.map((entry: any, index: number) => (
+                  <Cell key={`cell-${index}`} fill={CHART_COLORS.zinc[index % CHART_COLORS.zinc.length]} />
                     ))}
                   </Pie>
                   <ChartTooltip content={<ChartTooltipContent />} />
                 </PieChart>
               </ResponsiveContainer>
-            </ChartContainer>
+        )
+      
+      default:
+        return (
+          <div className="h-64 flex items-center justify-center text-muted-foreground">
+            Chart type {chart.type} not supported yet
+          </div>
+        )
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">{chart.title}</CardTitle>
+        <CardDescription>{chart.description}</CardDescription>
+      </CardHeader>
+      <CardContent>
+        {renderChart()}
+        
+        {chart.insights && (
+          <div className="mt-4 p-3 rounded-lg bg-muted/50">
+            <h5 className="font-medium mb-2">Key Insight</h5>
+            <p className="text-sm text-muted-foreground mb-2">{chart.insights.keyTakeaway}</p>
+            <p className="text-sm">{chart.insights.actionableInsight}</p>
+            {chart.insights.statisticalSignificance && (
+              <Badge variant="default" className="mt-2">
+                Statistically Significant
+              </Badge>
+            )}
+          </div>
+        )}
           </CardContent>
         </Card>
-      )}
-    </div>
   )
 }
 
-// Insights Panel Component
-function InsightsPanel({ 
-  recommendations, 
-  questions, 
-  surveyMeta 
-}: { 
-  recommendations: any[], 
-  questions: any[], 
-  surveyMeta: any 
+// Performance Section Component
+function PerformanceSection({ performance, metadata, dataQuality }: { 
+  performance?: any, 
+  metadata?: any, 
+  dataQuality?: any 
 }) {
   return (
-    <div className="space-y-4">
-      {/* Recommendations */}
+    <div className="space-y-6">
+      {/* Performance Metrics */}
+      {performance && (
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Info className="h-4 w-4" />
-            Analysis Recommendations
+              <Clock className="h-5 w-5" />
+              Generation Performance
           </CardTitle>
-          <CardDescription>
-            Suggested analyses based on your survey data
-          </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-3">
-            {recommendations.map((rec, index) => (
-              <div key={index} className="flex items-start space-x-3 p-3 rounded-lg bg-muted/50">
-                <Badge variant={rec.type === 'quality_warning' ? 'destructive' : 'default'}>
-                  {rec.confidence || rec.type.split('_')[0]}
-                </Badge>
-                <div className="flex-1">
-                  <div className="font-medium">{rec.title}</div>
-                  <div className="text-sm text-muted-foreground">{rec.description}</div>
-                  {rec.suggested_queries && (
-                    <div className="mt-2">
-                      <div className="text-xs font-medium mb-1">Try asking:</div>
-                      <div className="space-y-1">
-                        {rec.suggested_queries.slice(0, 2).map((query: string, qIndex: number) => (
-                          <div key={qIndex} className="text-xs bg-background px-2 py-1 rounded border">
-                            &ldquo;{query}&rdquo;
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+              <div className="text-center">
+                <div className="text-2xl font-bold">{Math.round(performance.totalTimeMs / 1000)}s</div>
+                <div className="text-xs text-muted-foreground">Total Time</div>
                           </div>
-                        ))}
+              <div className="text-center">
+                <div className="text-lg font-semibold">{Math.round(performance.analysisTimeMs / 1000)}s</div>
+                <div className="text-xs text-muted-foreground">Analysis</div>
                       </div>
+              <div className="text-center">
+                <div className="text-lg font-semibold">{Math.round(performance.queryTimeMs / 1000)}s</div>
+                <div className="text-xs text-muted-foreground">Queries</div>
                     </div>
-                  )}
+              <div className="text-center">
+                <div className="text-lg font-semibold">{Math.round(performance.insightTimeMs / 1000)}s</div>
+                <div className="text-xs text-muted-foreground">Insights</div>
                 </div>
+              <div className="text-center">
+                <div className="text-lg font-semibold">{Math.round(performance.visualizationTimeMs / 1000)}s</div>
+                <div className="text-xs text-muted-foreground">Charts</div>
               </div>
-            ))}
           </div>
         </CardContent>
       </Card>
+      )}
 
-      {/* Question Analysis */}
+      {/* AI Models Used */}
+      {metadata?.modelsUsed && (
       <Card>
         <CardHeader>
-          <CardTitle>Question Analysis</CardTitle>
-          <CardDescription>
-            Detected question types and analysis potential
-          </CardDescription>
+            <CardTitle className="flex items-center gap-2">
+              <Brain className="h-5 w-5" />
+              AI Models Used
+            </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-2">
-            {questions.map((question, index) => (
-              <div key={index} className="flex items-center justify-between p-2 rounded border">
-                <div className="flex-1">
-                  <div className="font-medium text-sm">{question.prompt.substring(0, 60)}...</div>
-                  <div className="text-xs text-muted-foreground">
-                    Type: {question.detected_type.replace('_', ' ')} 
-                    • Confidence: {(question.detection_confidence * 100).toFixed(0)}%
-                  </div>
-                </div>
-                <Badge variant="outline">
-                  {question.detected_type}
-                </Badge>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <div className="font-medium">Analysis</div>
+                <div className="text-sm text-muted-foreground">{metadata.modelsUsed.analysis}</div>
               </div>
-            ))}
+              <div>
+                <div className="font-medium">Queries</div>
+                <div className="text-sm text-muted-foreground">{metadata.modelsUsed.queries}</div>
+                  </div>
+              <div>
+                <div className="font-medium">Insights</div>
+                <div className="text-sm text-muted-foreground">{metadata.modelsUsed.insights}</div>
+                </div>
+              <div>
+                <div className="font-medium">Visualization</div>
+                <div className="text-sm text-muted-foreground">{metadata.modelsUsed.visualization}</div>
+              </div>
+            </div>
+            
+            <div className="mt-4 text-sm text-muted-foreground">
+              Generated at: {new Date(metadata.generatedAt).toLocaleString()}
           </div>
         </CardContent>
       </Card>
+      )}
     </div>
   )
 } 

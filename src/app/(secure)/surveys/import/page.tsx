@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Progress } from "@/components/ui/progress"
 import { 
   Upload, 
   FileText, 
@@ -29,6 +30,7 @@ import {
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import toast from "react-hot-toast"
+import { FileChunker, ChunkedUploadProgress, type FileChunk } from "@/app/utils/file-chunking"
 
 interface ParsedColumn {
   name: string;
@@ -49,6 +51,19 @@ interface ImportPreview {
   detectedDemographics: string[];
   errors: string[];
   warnings: string[];
+  researchDataAnalysis?: {
+    confidence: number;
+    isResearchData: boolean;
+    suggestCodebook: boolean;
+    reasons: string[];
+    recommendations: string[];
+    detectedPatterns: {
+      technicalColumns: string[];
+      numericOnlyColumns: string[];
+      metadataColumns: string[];
+      waveIdentifiers: string[];
+    };
+  };
 }
 
 interface ColumnMapping {
@@ -68,6 +83,13 @@ const SurveyImportPage = () => {
   const [preview, setPreview] = useState<ImportPreview | null>(null)
   const [loading, setLoading] = useState(false)
   
+  // Chunked upload state
+  const [isChunkedUpload, setIsChunkedUpload] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState(0)
+  const [currentChunk, setCurrentChunk] = useState(0)
+  const [totalChunks, setTotalChunks] = useState(0)
+  const [uploadStatus, setUploadStatus] = useState('')
+  
   // Import source state
   const [importSource, setImportSource] = useState<'file' | 'google-sheets' | 'surveymonkey' | 'typeform'>('file')
   const [platformUrl, setPlatformUrl] = useState('')
@@ -79,14 +101,72 @@ const SurveyImportPage = () => {
   const [isPublic, setIsPublic] = useState(true)
   const [createDigitalTwins, setCreateDigitalTwins] = useState(true)
   const [columnMappings, setColumnMappings] = useState<ColumnMapping[]>([])
+  
+  // Codebook state
+  const [codebookFile, setCodebookFile] = useState<File | null>(null)
+  const [showCodebookUpload, setShowCodebookUpload] = useState(false)
+  const [codebookMappings, setCodebookMappings] = useState<any[]>([])
+  const [codebookCoverage, setCodebookCoverage] = useState<any>(null)
+  const [codebookProcessed, setCodebookProcessed] = useState(false)
 
   const handleFileUpload = async (selectedFile: File) => {
     if (!selectedFile) return
 
     setFile(selectedFile)
     setLoading(true)
+    setUploadProgress(0)
+    setCurrentChunk(0)
+    setTotalChunks(0)
+    setUploadStatus('Analyzing file...')
 
     try {
+      // First, analyze if we need chunking
+      const analysis = await FileChunker.analyzeFile(selectedFile)
+      
+      if (analysis.needsChunking) {
+        setIsChunkedUpload(true)
+        setUploadStatus(`Large file detected (${Math.round(selectedFile.size / 1024 / 1024)}MB). Processing in chunks...`)
+        
+        // Chunk the file
+        const chunks = await FileChunker.chunkFile(selectedFile)
+        setTotalChunks(chunks.length)
+        
+        // Upload first chunk to get preview
+        const firstChunk = chunks[0]
+        const preview = await uploadChunk(firstChunk, selectedFile.name, true)
+        
+        if (preview) {
+          setPreview(preview)
+          setSurveyTitle(preview.suggestedTitle)
+          
+          // Check if codebook is suggested
+          if (preview.researchDataAnalysis?.suggestCodebook) {
+            setShowCodebookUpload(true)
+          }
+          
+          // Initialize column mappings
+          const mappings: ColumnMapping[] = preview.columns.map((col: ParsedColumn) => ({
+            originalName: col.name,
+            mappedName: col.name,
+            questionType: col.type,
+            isDemographic: col.isDemographic,
+            demographicField: col.demographicField,
+            isRequired: col.isRequired,
+            includeInSurvey: !col.isDemographic
+          }))
+          setColumnMappings(mappings)
+          
+          // Upload remaining chunks
+          await uploadRemainingChunks(chunks.slice(1), selectedFile.name)
+          
+          setCurrentStep(2)
+          toast.success('Large file uploaded and analyzed successfully!')
+        }
+      } else {
+        // Standard single-file upload
+        setIsChunkedUpload(false)
+        setUploadStatus('Uploading file...')
+        
       const formData = new FormData()
       formData.append('file', selectedFile)
 
@@ -103,6 +183,11 @@ const SurveyImportPage = () => {
       if (data.status && data.preview) {
         setPreview(data.preview)
         setSurveyTitle(data.preview.suggestedTitle)
+          
+          // Check if codebook is suggested
+          if (data.preview.researchDataAnalysis?.suggestCodebook) {
+            setShowCodebookUpload(true)
+          }
         
         // Initialize column mappings
         const mappings: ColumnMapping[] = data.preview.columns.map((col: ParsedColumn) => ({
@@ -112,7 +197,7 @@ const SurveyImportPage = () => {
           isDemographic: col.isDemographic,
           demographicField: col.demographicField,
           isRequired: col.isRequired,
-          includeInSurvey: !col.isDemographic // Include non-demographic columns by default
+            includeInSurvey: !col.isDemographic
         }))
         setColumnMappings(mappings)
         
@@ -120,10 +205,108 @@ const SurveyImportPage = () => {
         toast.success('File uploaded and analyzed successfully!')
       } else {
         toast.error(data.message || 'Failed to process file')
+        }
       }
     } catch (error) {
       console.error('Upload error:', error)
       toast.error('Failed to upload file')
+    } finally {
+      setLoading(false)
+      setUploadStatus('')
+    }
+  }
+
+  const uploadChunk = async (chunk: FileChunk, originalFileName: string, isFirstChunk: boolean = false): Promise<ImportPreview | null> => {
+    const formData = new FormData()
+    formData.append('file', chunk.chunk)
+    formData.append('chunkIndex', chunk.chunkIndex.toString())
+    formData.append('totalChunks', chunk.totalChunks.toString())
+    formData.append('isFirstChunk', chunk.isFirstChunk.toString())
+    formData.append('isLastChunk', chunk.isLastChunk.toString())
+    formData.append('originalFileName', originalFileName)
+
+    const endpoint = isFirstChunk ? '/api/surveys/import' : '/api/surveys/import/chunk'
+    
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      },
+      body: formData
+    })
+
+    const data = await response.json()
+    
+    if (!data.status) {
+      throw new Error(data.message || 'Failed to upload chunk')
+    }
+
+    // Update progress
+    setCurrentChunk(chunk.chunkIndex + 1)
+    setUploadProgress(((chunk.chunkIndex + 1) / chunk.totalChunks) * 100)
+    setUploadStatus(data.message || `Uploaded chunk ${chunk.chunkIndex + 1} of ${chunk.totalChunks}`)
+
+    return isFirstChunk && data.preview ? data.preview : null
+  }
+
+  const uploadRemainingChunks = async (chunks: FileChunk[], originalFileName: string) => {
+    for (const chunk of chunks) {
+      await uploadChunk(chunk, originalFileName, false)
+      
+      // Small delay to prevent overwhelming the server
+      await new Promise(resolve => setTimeout(resolve, 100))
+    }
+  }
+
+  const handleCodebookProcessing = async () => {
+    if (!codebookFile || !preview) return
+
+    setLoading(true)
+    
+    try {
+      const formData = new FormData()
+      formData.append('codebook', codebookFile)
+      formData.append('originalColumns', JSON.stringify(preview.columns.map(c => c.name)))
+
+      const response = await fetch('/api/surveys/import/codebook', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: formData
+      })
+
+      const data = await response.json()
+
+      if (data.status) {
+        setCodebookMappings(data.mappings)
+        setCodebookCoverage(data.coverage)
+        setCodebookProcessed(true)
+        
+        // Update column mappings with codebook data
+        const updatedMappings = columnMappings.map(mapping => {
+          const codebookMapping = data.mappings.find(m => m.originalName === mapping.originalName)
+          if (codebookMapping && codebookMapping.hasMapping) {
+            return {
+              ...mapping,
+              mappedName: codebookMapping.mappedName,
+              // Keep existing question type unless we can infer better from value labels
+              questionType: codebookMapping.valueLabels && Object.keys(codebookMapping.valueLabels).length > 0 
+                ? 'single-choice' 
+                : mapping.questionType
+            }
+          }
+          return mapping
+        })
+        
+        setColumnMappings(updatedMappings)
+        toast.success(`Codebook processed! ${data.coverage.percentage}% of columns mapped.`)
+      } else {
+        toast.error(data.message || 'Failed to process codebook')
+      }
+    } catch (error) {
+      console.error('Codebook processing error:', error)
+      toast.error('Failed to process codebook')
     } finally {
       setLoading(false)
     }
@@ -220,13 +403,27 @@ const SurveyImportPage = () => {
           createDigitalTwins
         }))
 
+        // Create AbortController for timeout handling
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), 300000) // 5 minutes timeout
+
+        try {
         response = await fetch('/api/surveys/import/execute', {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`
           },
-          body: formData
+            body: formData,
+            signal: controller.signal
         })
+          clearTimeout(timeoutId)
+        } catch (fetchError) {
+          clearTimeout(timeoutId)
+          if (fetchError.name === 'AbortError') {
+            throw new Error('Import timed out. Large imports may take several minutes. Please check your surveys list to see if the import completed.')
+          }
+          throw fetchError
+        }
       } else {
         // Platform import
         let endpoint = ''
@@ -254,14 +451,41 @@ const SurveyImportPage = () => {
             break
         }
 
+        const platformController = new AbortController()
+        const platformTimeoutId = setTimeout(() => platformController.abort(), 300000) // 5 minutes timeout
+
+        try {
         response = await fetch(endpoint, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`,
             'Content-Type': 'application/json'
           },
-          body: JSON.stringify(requestBody)
+            body: JSON.stringify(requestBody),
+            signal: platformController.signal
         })
+          clearTimeout(platformTimeoutId)
+        } catch (fetchError) {
+          clearTimeout(platformTimeoutId)
+          if (fetchError.name === 'AbortError') {
+            throw new Error('Import timed out. Large imports may take several minutes. Please check your surveys list to see if the import completed.')
+          }
+          throw fetchError
+        }
+      }
+
+      // Check if response is ok first
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      // Check if response is JSON
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        // If it's HTML, it might be a redirect or error page
+        const text = await response.text();
+        console.error('Non-JSON response received:', text.substring(0, 200));
+        throw new Error('Server returned an unexpected response. Please try again.');
       }
 
       const data = await response.json()
@@ -274,7 +498,11 @@ const SurveyImportPage = () => {
       }
     } catch (error) {
       console.error('Import error:', error)
-      toast.error('Failed to import survey')
+      if (error.message.includes('JSON')) {
+        toast.error('Import may have succeeded but response was corrupted. Please check your surveys list.')
+      } else {
+        toast.error('Failed to import survey: ' + error.message)
+      }
     } finally {
       setLoading(false)
     }
@@ -400,6 +628,8 @@ const SurveyImportPage = () => {
 
             {/* Source-specific input */}
             {importSource === 'file' && (
+              <div className="space-y-4">
+                {!loading ? (
               <div className="border-2 border-dashed border-border rounded-lg p-8 text-center">
                 <input
                   type="file"
@@ -415,9 +645,51 @@ const SurveyImportPage = () => {
                   <div className="space-y-2">
                     <FileText className="h-8 w-8 mx-auto text-muted-foreground" />
                     <p className="text-sm font-medium">Click to upload or drag and drop</p>
-                    <p className="text-xs text-muted-foreground">CSV, Excel files up to 10MB</p>
+                        <p className="text-xs text-muted-foreground">
+                          CSV, Excel files • Large files supported via chunked upload
+                        </p>
                   </div>
                 </label>
+                  </div>
+                ) : (
+                  <Card>
+                    <CardContent className="p-6">
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-center">
+                          <Upload className="h-8 w-8 text-primary animate-pulse" />
+                        </div>
+                        
+                        <div className="text-center">
+                          <h4 className="font-medium mb-2">
+                            {isChunkedUpload ? 'Processing Large File' : 'Uploading File'}
+                          </h4>
+                          <p className="text-sm text-muted-foreground mb-4">
+                            {uploadStatus || 'Please wait while we process your file...'}
+                          </p>
+                        </div>
+
+                        {isChunkedUpload && totalChunks > 0 && (
+                          <div className="space-y-2">
+                            <div className="flex justify-between text-sm">
+                              <span>Progress</span>
+                              <span>{currentChunk} of {totalChunks} chunks</span>
+                            </div>
+                            <Progress value={uploadProgress} className="w-full" />
+                            <div className="text-xs text-center text-muted-foreground">
+                              {Math.round(uploadProgress)}% complete
+                            </div>
+                          </div>
+                        )}
+
+                        {!isChunkedUpload && (
+                          <div className="flex justify-center">
+                            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                          </div>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
               </div>
             )}
 
@@ -541,6 +813,141 @@ const SurveyImportPage = () => {
               </CardContent>
             </Card>
 
+            {/* Research Data Detection Alert */}
+            {preview.researchDataAnalysis && preview.researchDataAnalysis.confidence >= 50 && (
+              <Card className={`border-2 ${preview.researchDataAnalysis.suggestCodebook ? 'border-orange-200 bg-orange-50 dark:bg-orange-950/20' : 'border-blue-200 bg-blue-50 dark:bg-blue-950/20'}`}>
+                <CardHeader>
+                  <CardTitle className={`flex items-center gap-2 ${preview.researchDataAnalysis.suggestCodebook ? 'text-orange-800 dark:text-orange-200' : 'text-blue-800 dark:text-blue-200'}`}>
+                    <AlertCircle className="h-5 w-5" />
+                    Research Data Detected ({preview.researchDataAnalysis.confidence}% confidence)
+                  </CardTitle>
+                  <CardDescription className={preview.researchDataAnalysis.suggestCodebook ? 'text-orange-700 dark:text-orange-300' : 'text-blue-700 dark:text-blue-300'}>
+                    {preview.researchDataAnalysis.confidence >= 90 ? 'Very High' : 
+                     preview.researchDataAnalysis.confidence >= 70 ? 'High' : 
+                     preview.researchDataAnalysis.confidence >= 50 ? 'Medium' : 'Low'} confidence this is research data with technical variable names
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <h4 className="font-medium mb-2">Detected Patterns:</h4>
+                    <ul className={`text-sm space-y-1 ${preview.researchDataAnalysis.suggestCodebook ? 'text-orange-700 dark:text-orange-300' : 'text-blue-700 dark:text-blue-300'}`}>
+                      {preview.researchDataAnalysis.reasons.slice(0, 3).map((reason, i) => (
+                        <li key={i}>• {reason}</li>
+                      ))}
+                      {preview.researchDataAnalysis.reasons.length > 3 && (
+                        <li>• And {preview.researchDataAnalysis.reasons.length - 3} more patterns...</li>
+                      )}
+                    </ul>
+                  </div>
+                  
+                  <div>
+                    <h4 className="font-medium mb-2">Recommendations:</h4>
+                    <ul className={`text-sm space-y-1 ${preview.researchDataAnalysis.suggestCodebook ? 'text-orange-700 dark:text-orange-300' : 'text-blue-700 dark:text-blue-300'}`}>
+                      {preview.researchDataAnalysis.recommendations.map((rec, i) => (
+                        <li key={i}>• {rec}</li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  {preview.researchDataAnalysis.suggestCodebook && (
+                    <div className="pt-2 border-t border-orange-200 dark:border-orange-800">
+                      <div className="flex items-center justify-between mb-3">
+                        <h4 className="font-medium text-orange-800 dark:text-orange-200">
+                          Upload Codebook (Recommended)
+                        </h4>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setShowCodebookUpload(!showCodebookUpload)}
+                          className="text-orange-700 border-orange-300 hover:bg-orange-100 dark:text-orange-300 dark:border-orange-700 dark:hover:bg-orange-900/20"
+                        >
+                          {showCodebookUpload ? 'Hide' : 'Show'} Codebook Upload
+                        </Button>
+                      </div>
+                      
+                      {showCodebookUpload && (
+                        <div className="space-y-3">
+                          <p className="text-sm text-orange-700 dark:text-orange-300">
+                            A codebook will help map technical variable names (like &quot;DEVICE_TYPE_W142&quot;) to readable questions (like &quot;What device did you use?&quot;).
+                          </p>
+                          <div className="flex items-center gap-3">
+                            <Input
+                              type="file"
+                              accept=".csv,.xlsx,.xls"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0]
+                                if (file) {
+                                  setCodebookFile(file)
+                                  toast.success(`Codebook &quot;${file.name}&quot; selected`)
+                                }
+                              }}
+                              className="flex-1"
+                            />
+                            {codebookFile && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  setCodebookFile(null)
+                                  toast.success('Codebook removed')
+                                }}
+                                className="text-orange-700 border-orange-300 hover:bg-orange-100 dark:text-orange-300 dark:border-orange-700 dark:hover:bg-orange-900/20"
+                              >
+                                Remove
+                              </Button>
+                            )}
+                          </div>
+                                                     {codebookFile && (
+                             <div className="space-y-2">
+                               <p className="text-sm text-orange-600 dark:text-orange-400">
+                                 ✓ Codebook ready: {codebookFile.name} ({Math.round(codebookFile.size / 1024)}KB)
+                               </p>
+                               {!codebookProcessed ? (
+                                 <Button
+                                   onClick={handleCodebookProcessing}
+                                   disabled={loading}
+                                   size="sm"
+                                   className="bg-orange-600 hover:bg-orange-700 text-white"
+                                 >
+                                   {loading ? 'Processing...' : 'Process Codebook'}
+                                 </Button>
+                               ) : (
+                                 <div className="text-sm text-green-600 dark:text-green-400">
+                                   ✓ Processed! {codebookCoverage?.percentage}% coverage ({codebookCoverage?.mapped}/{codebookCoverage?.total} columns)
+                                 </div>
+                               )}
+                             </div>
+                           )}
+                          <div className="text-xs text-orange-600 dark:text-orange-400 space-y-1">
+                            <p><strong>Expected format:</strong> CSV or Excel with columns:</p>
+                                                         <p>• Variable Name (e.g., &quot;DEVICE_TYPE_W142&quot;)</p>
+                             <p>• Question Text (e.g., &quot;What device did you use to take this survey?&quot;)</p>
+                             <p>• Value Labels (optional, e.g., &quot;1=Desktop, 2=Mobile, 3=Tablet&quot;)</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {preview.researchDataAnalysis.detectedPatterns && (
+                    <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
+                      <details className="text-xs">
+                        <summary className="cursor-pointer font-medium text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200">
+                          Technical Details
+                        </summary>
+                        <div className="mt-2 space-y-1 text-gray-500 dark:text-gray-400">
+                          <p>Technical columns: {preview.researchDataAnalysis.detectedPatterns.technicalColumns?.length || 0}</p>
+                          <p>Wave identifiers: {preview.researchDataAnalysis.detectedPatterns.waveIdentifiers?.length || 0}</p>
+                          <p>Metadata columns: {preview.researchDataAnalysis.detectedPatterns.metadataColumns?.length || 0}</p>
+                          <p>Numeric-only columns: {preview.researchDataAnalysis.detectedPatterns.numericOnlyColumns?.length || 0}</p>
+                        </div>
+                      </details>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
             {/* Data Preview */}
             <Card>
               <CardHeader>
@@ -653,6 +1060,57 @@ const SurveyImportPage = () => {
               </Card>
             )}
 
+            {/* Codebook Coverage Summary */}
+            {codebookProcessed && codebookCoverage && (
+              <Card className="border-green-200 bg-green-50 dark:bg-green-950/20">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-green-800 dark:text-green-200">
+                    <CheckCircle className="h-5 w-5" />
+                    Codebook Applied
+                  </CardTitle>
+                  <CardDescription className="text-green-700 dark:text-green-300">
+                    {codebookCoverage.percentage}% of columns mapped from codebook ({codebookCoverage.mapped}/{codebookCoverage.total})
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <h4 className="font-medium text-green-800 dark:text-green-200 mb-1">Mapped Columns:</h4>
+                      <div className="space-y-1">
+                        {codebookMappings.filter(m => m.hasMapping).slice(0, 3).map(mapping => (
+                          <div key={mapping.originalName} className="text-green-700 dark:text-green-300">
+                            • {mapping.originalName} → {mapping.mappedName}
+                          </div>
+                        ))}
+                        {codebookMappings.filter(m => m.hasMapping).length > 3 && (
+                          <div className="text-green-600 dark:text-green-400">
+                            ... and {codebookMappings.filter(m => m.hasMapping).length - 3} more
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    {codebookCoverage.unmappedColumns.length > 0 && (
+                      <div>
+                        <h4 className="font-medium text-green-800 dark:text-green-200 mb-1">Unmapped Columns:</h4>
+                        <div className="space-y-1">
+                          {codebookCoverage.unmappedColumns.slice(0, 3).map(col => (
+                            <div key={col} className="text-green-600 dark:text-green-400">
+                              • {col}
+                            </div>
+                          ))}
+                          {codebookCoverage.unmappedColumns.length > 3 && (
+                            <div className="text-green-500 dark:text-green-500">
+                              ... and {codebookCoverage.unmappedColumns.length - 3} more
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             {/* Column Mappings Table */}
             <Card>
               <CardHeader>
@@ -674,6 +1132,11 @@ const SurveyImportPage = () => {
                           {mapping.isDemographic && (
                             <Badge variant="outline" className="text-xs">
                               Demographic
+                            </Badge>
+                          )}
+                          {codebookProcessed && codebookMappings.find(m => m.originalName === mapping.originalName)?.hasMapping && (
+                            <Badge variant="secondary" className="text-xs bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                              Codebook
                             </Badge>
                           )}
                         </div>

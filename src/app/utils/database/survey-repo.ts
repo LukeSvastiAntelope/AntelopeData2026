@@ -732,14 +732,15 @@ export const SurveyRepo = {
                 [surveyId]
             );
             
-            // For each response, get their answers
+            // For each response, get their answers with value label decoding
             const responses = [];
             for (const response of responseRows) {
                 const [answerRows] = await db.execute<RowDataPacket[]>(
                     `SELECT 
                         sa.question_id,
                         sa.answer_value,
-                        sq.prompt as question_text
+                        sq.prompt as question_text,
+                        sq.options
                     FROM survey_answers sa
                     JOIN survey_questions sq ON sa.question_id = sq.id
                     WHERE sa.response_id = ?`,
@@ -751,11 +752,32 @@ export const SurveyRepo = {
                     submitted_at: response.submitted_at,
                     demographics: response.demographics, // Already parsed JSON
                     agentToken: response.agent_token,
-                    answers: answerRows.map((answer: any) => ({
-                        questionId: answer.question_id,
-                        questionText: answer.question_text,
-                        value: answer.answer_value
-                    }))
+                    answers: answerRows.map((answer: any) => {
+                        let decodedValue = answer.answer_value;
+                        
+                        // Decode numeric answers using value labels if available
+                        if (answer.options) {
+                            try {
+                                const options = Array.isArray(answer.options) ? answer.options : JSON.parse(answer.options);
+                                
+                                // Check if the answer is a number that corresponds to an option index
+                                const answerNum = parseInt(answer.answer_value);
+                                if (!isNaN(answerNum) && answerNum >= 1 && answerNum <= options.length) {
+                                    // Convert 1-based index to 0-based and get the label
+                                    decodedValue = options[answerNum - 1];
+                                }
+                            } catch (error) {
+                                // If parsing fails, keep the original value
+                                console.warn(`Failed to parse options for question ${answer.question_id}:`, error);
+                            }
+                        }
+                        
+                        return {
+                            questionId: answer.question_id,
+                            questionText: answer.question_text,
+                            value: decodedValue
+                        };
+                    })
                 });
             }
             
@@ -893,25 +915,57 @@ export const SurveyRepo = {
     // Delete a survey and all related data
     deleteSurvey: async (surveyId: number, createdBy: number) => {
         const db = await getMySQLConnection();
-        const connection = await db.getConnection();
         
         try {
-            await connection.beginTransaction();
-            
             // Verify survey exists and belongs to user
-            const [surveyRows] = await connection.execute<RowDataPacket[]>(
-                "SELECT id FROM surveys WHERE id = ? AND created_by = ?",
+            const [surveyRows] = await db.execute<RowDataPacket[]>(
+                "SELECT id, title FROM surveys WHERE id = ? AND created_by = ?",
                 [surveyId, createdBy]
             );
             
             if (!surveyRows[0]) {
-                await connection.rollback();
-                connection.release();
                 return false;
             }
+
+            console.log(`Starting deletion of survey ${surveyId}: ${surveyRows[0].title}`);
+
+            // Get counts to estimate progress
+            const [responseCounts] = await db.execute<RowDataPacket[]>(
+                'SELECT COUNT(*) as count FROM survey_responses WHERE survey_id = ?',
+                [surveyId]
+            );
+            const responseCount = responseCounts[0].count;
+            console.log(`Survey has ${responseCount} responses to delete`);
+
+            // If it's a large survey (>1000 responses), use batched deletion
+            if (responseCount > 1000) {
+                return await SurveyRepo.deleteLargeSurvey(surveyId, createdBy, responseCount);
+            }
+
+            // For smaller surveys, use the original approach but with better timeout handling
+            const connection = await db.getConnection();
+            
+            try {
+                // Set a longer timeout for this connection
+                await connection.execute('SET SESSION innodb_lock_wait_timeout = 300'); // 5 minutes
+                await connection.beginTransaction();
+                
+                // Get all agent tokens for Pinecone cleanup before deleting responses
+                console.log('Collecting digital twin tokens for Pinecone cleanup...');
+                const [agentTokenRows] = await connection.execute<RowDataPacket[]>(
+                    `SELECT ra.agent_token 
+                     FROM responder_agents ra
+                     INNER JOIN survey_responses sr ON ra.created_from_response_id = sr.id
+                     WHERE sr.survey_id = ?`,
+                    [surveyId]
+                );
+                
+                const agentTokens = agentTokenRows.map((row: any) => row.agent_token).filter(Boolean);
+                console.log(`Found ${agentTokens.length} digital twins to clean up from Pinecone`);
             
             // Delete in order of dependencies:
             // 1. Delete survey answers
+                console.log('Deleting survey answers...');
             await connection.execute(
                 `DELETE sa FROM survey_answers sa 
                  INNER JOIN survey_responses sr ON sa.response_id = sr.id 
@@ -920,30 +974,225 @@ export const SurveyRepo = {
             );
             
             // 2. Delete survey responses
+                console.log('Deleting survey responses...');
             await connection.execute(
                 'DELETE FROM survey_responses WHERE survey_id = ?',
                 [surveyId]
             );
             
-            // 3. Delete survey questions
+                // 3. Clean up digital twins from Pinecone
+                if (agentTokens.length > 0) {
+                    console.log('Cleaning up digital twins from Pinecone...');
+                    try {
+                        await SurveyRepo.cleanupPineconeDigitalTwins(agentTokens);
+                        console.log(`Successfully cleaned up ${agentTokens.length} digital twins from Pinecone`);
+                    } catch (pineconeError) {
+                        console.error('Error cleaning up Pinecone digital twins:', pineconeError);
+                        // Don't fail the entire deletion if Pinecone cleanup fails
+                        console.warn('Continuing with survey deletion despite Pinecone cleanup failure');
+                    }
+                }
+                
+                // 4. Delete survey questions
+                console.log('Deleting survey questions...');
             await connection.execute(
                 'DELETE FROM survey_questions WHERE survey_id = ?',
                 [surveyId]
             );
             
-            // 4. Finally delete the survey itself
+                // 5. Finally delete the survey itself
+                console.log('Deleting survey...');
             await connection.execute(
                 'DELETE FROM surveys WHERE id = ?',
                 [surveyId]
             );
             
             await connection.commit();
-            connection.release();
+                console.log(`Successfully deleted survey ${surveyId}`);
             return true;
             
         } catch (error) {
             await connection.rollback();
+                throw error;
+            } finally {
             connection.release();
+            }
+            
+        } catch (error) {
+            console.error('Error deleting survey:', error);
+            throw error;
+        }
+    },
+
+    // Batched deletion for large surveys
+    deleteLargeSurvey: async (surveyId: number, createdBy: number, responseCount: number) => {
+        const db = await getMySQLConnection();
+        const batchSize = 100; // Process 100 responses at a time
+        
+        try {
+            console.log(`Starting batched deletion for large survey ${surveyId} with ${responseCount} responses`);
+            
+            // Step 0: Get all agent tokens for Pinecone cleanup before deleting responses
+            console.log('Collecting digital twin tokens for Pinecone cleanup...');
+            const [agentTokenRows] = await db.execute<RowDataPacket[]>(
+                `SELECT ra.agent_token 
+                 FROM responder_agents ra
+                 INNER JOIN survey_responses sr ON ra.created_from_response_id = sr.id
+                 WHERE sr.survey_id = ?`,
+                [surveyId]
+            );
+            
+            const agentTokens = agentTokenRows.map((row: any) => row.agent_token).filter(Boolean);
+            console.log(`Found ${agentTokens.length} digital twins to clean up from Pinecone`);
+            
+            // Step 1: Delete survey answers in batches
+            // First, get all response IDs for this survey
+            console.log('Getting response IDs for batched deletion...');
+            const [responseIdRows] = await db.execute<RowDataPacket[]>(
+                'SELECT id FROM survey_responses WHERE survey_id = ? ORDER BY id',
+                [surveyId]
+            );
+            const responseIds = responseIdRows.map((row: any) => row.id);
+            console.log(`Found ${responseIds.length} response IDs to process`);
+            
+            // Delete answers in batches by response ID
+            console.log('Deleting survey answers in batches...');
+            let deletedAnswers = 0;
+            for (let i = 0; i < responseIds.length; i += batchSize) {
+                const batchIds = responseIds.slice(i, i + batchSize);
+                const placeholders = batchIds.map(() => '?').join(',');
+                
+                const connection = await db.getConnection();
+                try {
+                    await connection.execute('SET SESSION innodb_lock_wait_timeout = 120');
+                    
+                    const [result] = await connection.execute<ResultSetHeader>(
+                        `DELETE FROM survey_answers WHERE response_id IN (${placeholders})`,
+                        batchIds
+                    );
+                    
+                    const deletedInBatch = (result as ResultSetHeader).affectedRows;
+                    deletedAnswers += deletedInBatch;
+                    
+                    if (deletedInBatch > 0) {
+                        console.log(`Deleted ${deletedAnswers} survey answers so far... (batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(responseIds.length/batchSize)})`);
+                    }
+                } finally {
+                    connection.release();
+                }
+                
+                // Small delay to prevent overwhelming the database
+                if (i + batchSize < responseIds.length) {
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                }
+            }
+            
+            // Step 2: Delete survey responses in batches
+            console.log('Deleting survey responses in batches...');
+            let deletedResponses = 0;
+            for (let i = 0; i < responseIds.length; i += batchSize) {
+                const batchIds = responseIds.slice(i, i + batchSize);
+                const placeholders = batchIds.map(() => '?').join(',');
+                
+                const connection = await db.getConnection();
+                try {
+                    await connection.execute('SET SESSION innodb_lock_wait_timeout = 120');
+                    
+                    const [result] = await connection.execute<ResultSetHeader>(
+                        `DELETE FROM survey_responses WHERE id IN (${placeholders})`,
+                        batchIds
+                    );
+                    
+                    const deletedInBatch = (result as ResultSetHeader).affectedRows;
+                    deletedResponses += deletedInBatch;
+                    
+                    if (deletedInBatch > 0) {
+                        console.log(`Deleted ${deletedResponses}/${responseCount} survey responses... (batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(responseIds.length/batchSize)})`);
+                    }
+                } finally {
+                    connection.release();
+                }
+                
+                // Small delay to prevent overwhelming the database
+                if (i + batchSize < responseIds.length) {
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                }
+            }
+            
+            // Step 3: Clean up digital twins from Pinecone
+            if (agentTokens.length > 0) {
+                console.log('Cleaning up digital twins from Pinecone...');
+                try {
+                    await SurveyRepo.cleanupPineconeDigitalTwins(agentTokens);
+                    console.log(`Successfully cleaned up ${agentTokens.length} digital twins from Pinecone`);
+                } catch (pineconeError) {
+                    console.error('Error cleaning up Pinecone digital twins:', pineconeError);
+                    // Don't fail the entire deletion if Pinecone cleanup fails
+                    console.warn('Continuing with survey deletion despite Pinecone cleanup failure');
+                }
+            }
+            
+            // Step 4: Delete survey questions (should be small)
+            console.log('Deleting survey questions...');
+            await db.execute(
+                'DELETE FROM survey_questions WHERE survey_id = ?',
+                [surveyId]
+            );
+            
+            // Step 5: Finally delete the survey itself
+            console.log('Deleting survey...');
+            const [result] = await db.execute<ResultSetHeader>(
+                'DELETE FROM surveys WHERE id = ? AND created_by = ?',
+                [surveyId, createdBy]
+            );
+            
+            if ((result as ResultSetHeader).affectedRows === 0) {
+                throw new Error('Survey not found or access denied');
+            }
+            
+            console.log(`Successfully deleted large survey ${surveyId} with ${deletedResponses} responses, ${deletedAnswers} answers, and ${agentTokens.length} digital twins`);
+            return true;
+            
+        } catch (error) {
+            console.error('Error in batched deletion:', error);
+            throw error;
+        }
+    },
+
+    // Clean up digital twins from Pinecone
+    cleanupPineconeDigitalTwins: async (agentTokens: string[]) => {
+        try {
+            // Import Pinecone dynamically to avoid issues if not available
+            const { Pinecone } = await import('@pinecone-database/pinecone');
+            
+            const pinecone = new Pinecone({
+                apiKey: process.env.PINECONE_API_KEY!,
+            });
+            
+            const index = pinecone.index('prediction-results');
+            
+            // Delete in batches to avoid overwhelming Pinecone
+            const batchSize = 50;
+            for (let i = 0; i < agentTokens.length; i += batchSize) {
+                const batch = agentTokens.slice(i, i + batchSize);
+                const idsToDelete = batch.map(token => `digital-twin-${token}`);
+                
+                try {
+                    await index.deleteMany(idsToDelete);
+                    console.log(`Deleted batch of ${idsToDelete.length} digital twins from Pinecone (${i + idsToDelete.length}/${agentTokens.length})`);
+                } catch (batchError) {
+                    console.error(`Error deleting batch ${i}-${i + batch.length}:`, batchError);
+                    // Continue with next batch even if this one fails
+                }
+                
+                // Small delay between batches
+                if (i + batchSize < agentTokens.length) {
+                    await new Promise(resolve => setTimeout(resolve, 200));
+                }
+            }
+            
+        } catch (error) {
+            console.error('Error setting up Pinecone cleanup:', error);
             throw error;
         }
     },
