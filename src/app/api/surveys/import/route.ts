@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
 import Fuse from 'fuse.js';
+import { promises as fs } from 'fs';
+import path from 'path';
+import { tmpdir } from 'os';
+import { ResearchDataDetector } from '@/app/utils/survey/research-data-detector';
+import { CodebookParser } from '@/app/utils/survey/codebook-parser';
 
 // Demographic field patterns for auto-detection
 const DEMOGRAPHIC_PATTERNS = [
@@ -42,6 +47,45 @@ interface ImportPreview {
   detectedDemographics: string[];
   errors: string[];
   warnings: string[];
+  researchDataAnalysis?: {
+    confidence: number;
+    isResearchData: boolean;
+    suggestCodebook: boolean;
+    reasons: string[];
+    recommendations: string[];
+    detectedPatterns: {
+      technicalColumns: string[];
+      numericOnlyColumns: string[];
+      metadataColumns: string[];
+      waveIdentifiers: string[];
+    };
+  };
+}
+
+// Add chunk storage interfaces and functions
+interface ChunkData {
+  chunkIndex: number;
+  totalChunks: number;
+  data: any[];
+  fileName: string;
+  userId: string;
+  timestamp: number;
+}
+
+// Helper function to get temp directory for chunks
+function getTempDir(userId: string, fileName: string): string {
+  return path.join(tmpdir(), 'survey-import-chunks', userId, fileName.replace(/[^a-zA-Z0-9.-]/g, '_'));
+}
+
+// Store chunk data temporarily
+async function storeChunk(chunkData: ChunkData): Promise<void> {
+  const tempDir = getTempDir(chunkData.userId, chunkData.fileName);
+  
+  // Ensure directory exists
+  await fs.mkdir(tempDir, { recursive: true });
+  
+  const chunkFile = path.join(tempDir, `chunk_${chunkData.chunkIndex}.json`);
+  await fs.writeFile(chunkFile, JSON.stringify(chunkData));
 }
 
 // Helper function to detect demographic fields using enhanced fuzzy matching
@@ -166,14 +210,28 @@ function parseCSV(buffer: Buffer): Promise<any[]> {
     Papa.parse(csvString, {
       header: true,
       skipEmptyLines: true,
+      transformHeader: (header: string, index: number) => {
+        // Handle duplicate headers by appending index
+        const cleanHeader = header.trim();
+        return cleanHeader || `Column_${index}`;
+      },
       complete: (results) => {
         if (results.errors.length > 0) {
-          reject(new Error(`CSV parsing errors: ${results.errors.map(e => e.message).join(', ')}`));
+          console.warn('CSV parsing warnings:', results.errors.map(e => e.message));
+          // Only reject on critical errors, not warnings
+          const criticalErrors = results.errors.filter(e => e.type === 'Delimiter' || e.type === 'Quotes');
+          if (criticalErrors.length > 0) {
+            reject(new Error(`CSV parsing errors: ${criticalErrors.map(e => e.message).join(', ')}`));
+          } else {
+            console.log('CSV parsed with warnings, continuing...');
+            resolve(results.data);
+          }
         } else {
           resolve(results.data);
         }
       },
       error: (error) => {
+        console.error('CSV parsing error:', error);
         reject(error);
       }
     });
@@ -200,6 +258,13 @@ export async function POST(req: NextRequest) {
     const formData = await req.formData();
     const file = formData.get('file') as File;
     
+    // Check if this is a chunked upload
+    const chunkIndex = formData.get('chunkIndex');
+    const totalChunks = formData.get('totalChunks');
+    const isFirstChunk = formData.get('isFirstChunk') === 'true';
+    const isLastChunk = formData.get('isLastChunk') === 'true';
+    const originalFileName = formData.get('originalFileName') as string;
+    
     if (!file) {
       return NextResponse.json({ 
         status: false, 
@@ -207,25 +272,31 @@ export async function POST(req: NextRequest) {
       }, { status: 400 });
     }
 
-    // Validate file type
-    const allowedTypes = [
-      'text/csv',
-      'application/vnd.ms-excel',
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-    ];
+    // Enhanced file type validation
+    const fileName = (originalFileName || file.name).toLowerCase();
+    const mimeType = file.type.toLowerCase();
     
-    if (!allowedTypes.includes(file.type)) {
+    // Check by extension first (more reliable for chunked uploads)
+    const isCSV = fileName.endsWith('.csv') || mimeType === 'text/csv' || mimeType === 'application/csv';
+    const isExcel = fileName.endsWith('.xlsx') || fileName.endsWith('.xls') || 
+                   mimeType.includes('excel') || mimeType.includes('spreadsheet');
+    
+    if (!isCSV && !isExcel) {
       return NextResponse.json({ 
         status: false, 
         message: 'Unsupported file type. Please upload CSV or Excel files.' 
       }, { status: 400 });
     }
 
-    // Validate file size (10MB limit)
-    if (file.size > 10 * 1024 * 1024) {
+    // For chunked uploads, we have different size limits per chunk
+    const maxChunkSize = chunkIndex !== null ? 5 * 1024 * 1024 : 10 * 1024 * 1024; // 5MB per chunk, 10MB for single files
+    
+    if (file.size > maxChunkSize) {
       return NextResponse.json({ 
         status: false, 
-        message: 'File too large. Maximum size is 10MB.' 
+        message: chunkIndex !== null 
+          ? 'Chunk too large. Maximum chunk size is 5MB.' 
+          : 'File too large. Maximum size is 10MB.' 
       }, { status: 400 });
     }
 
@@ -234,7 +305,7 @@ export async function POST(req: NextRequest) {
     
     // Parse based on file type
     try {
-      if (file.type === 'text/csv') {
+      if (isCSV) {
         rawData = await parseCSV(buffer);
       } else {
         // Excel file
@@ -257,7 +328,27 @@ export async function POST(req: NextRequest) {
       }, { status: 400 });
     }
 
-    // Analyze columns
+    // 🔍 Research Data Detection (NEW!)
+    const researchDataAnalysis = ResearchDataDetector.analyzeForResearchData(
+      rawData.slice(0, 100), // Analyze first 100 rows for performance
+      originalFileName || file.name
+    );
+
+    // For chunked uploads, handle differently
+    if (chunkIndex !== null) {
+      return handleChunkedUpload({
+        rawData,
+        chunkIndex: parseInt(chunkIndex as string),
+        totalChunks: parseInt(totalChunks as string),
+        isFirstChunk,
+        isLastChunk,
+        originalFileName: originalFileName || file.name,
+        userId: userIdHeader,
+        researchDataAnalysis // Pass analysis to chunked handler
+      });
+    }
+
+    // Standard single-file processing (existing logic)
     const headers = Object.keys(rawData[0]);
     const columns: ParsedColumn[] = [];
     const detectedDemographics: string[] = [];
@@ -315,7 +406,8 @@ export async function POST(req: NextRequest) {
       suggestedTitle,
       detectedDemographics: [...new Set(detectedDemographics)],
       errors,
-      warnings
+      warnings,
+      researchDataAnalysis // Add research data analysis
     };
 
     return NextResponse.json({ 
@@ -330,4 +422,121 @@ export async function POST(req: NextRequest) {
       message: 'Internal server error during file processing' 
     }, { status: 500 });
   }
+}
+
+// Handle chunked upload processing
+async function handleChunkedUpload(params: {
+  rawData: any[];
+  chunkIndex: number;
+  totalChunks: number;
+  isFirstChunk: boolean;
+  isLastChunk: boolean;
+  originalFileName: string;
+  userId: string;
+  researchDataAnalysis?: any;
+}) {
+  const { rawData, chunkIndex, totalChunks, isFirstChunk, isLastChunk, originalFileName, userId, researchDataAnalysis } = params;
+  
+  // For the first chunk, we do full header analysis and create the preview
+  if (isFirstChunk) {
+    const headers = Object.keys(rawData[0]);
+    const columns: ParsedColumn[] = [];
+    const detectedDemographics: string[] = [];
+    const errors: string[] = [];
+    const warnings: string[] = [];
+
+    // Use all existing header analysis logic
+    for (const header of headers) {
+      // Get sample values for this column (use more data since this is the first chunk)
+      const values = rawData.slice(0, Math.min(500, rawData.length)).map(row => String(row[header] || '')).filter(v => v.trim() !== '');
+      const uniqueValues = [...new Set(values)].slice(0, 20);
+      
+      // Detect demographic field
+      const demoMatch = detectDemographicField(header);
+      const isDemographic = demoMatch !== null;
+      
+      if (isDemographic && demoMatch) {
+        detectedDemographics.push(demoMatch.field);
+      }
+      
+      // Detect question type
+      const questionType = detectQuestionType(header, uniqueValues);
+      
+      // Check if column seems required
+      const emptyCount = rawData.filter(row => !row[header] || String(row[header]).trim() === '').length;
+      const isRequired = emptyCount < rawData.length * 0.1;
+      
+      columns.push({
+        name: header,
+        type: questionType as any,
+        isDemographic,
+        demographicField: demoMatch?.field,
+        sampleValues: values.slice(0, 5),
+        uniqueValues,
+        isRequired
+      });
+    }
+
+    // Generate suggested survey title
+    const suggestedTitle = `Imported Survey - ${originalFileName.replace(/\.[^/.]+$/, "")}`;
+    
+    // Add warnings for chunked uploads
+    if (detectedDemographics.length === 0) {
+      warnings.push('No demographic fields detected. Digital twin creation may be limited.');
+    }
+    
+    warnings.push(`Large file detected - processing in ${totalChunks} chunks. This may take a few minutes.`);
+
+    // Store chunk data temporarily (you might want to use Redis or a temp table for this)
+    // For now, we'll return the preview and let the client handle subsequent chunks
+    const chunkData: ChunkData = {
+      chunkIndex,
+      totalChunks,
+      data: rawData,
+      fileName: originalFileName,
+      userId,
+      timestamp: Date.now()
+    };
+
+    await storeChunk(chunkData);
+
+    const preview: ImportPreview = {
+      fileName: originalFileName,
+      totalRows: rawData.length, // This is just the first chunk, actual total will be higher
+      columns,
+      previewData: rawData.slice(0, 5),
+      suggestedTitle,
+      detectedDemographics: [...new Set(detectedDemographics)],
+      errors,
+      warnings,
+      researchDataAnalysis // Add research data analysis for chunked uploads too
+    };
+
+    return NextResponse.json({ 
+      status: true, 
+      preview,
+      isChunked: true,
+      chunkInfo: {
+        chunkIndex,
+        totalChunks,
+        chunkRows: rawData.length,
+        isFirstChunk,
+        isLastChunk
+      }
+    });
+  }
+
+  // For subsequent chunks, just return processing info
+  return NextResponse.json({ 
+    status: true, 
+    isChunked: true,
+    chunkInfo: {
+      chunkIndex,
+      totalChunks,
+      chunkRows: rawData.length,
+      isFirstChunk,
+      isLastChunk
+    },
+    message: `Processed chunk ${chunkIndex + 1} of ${totalChunks} (${rawData.length} rows)`
+  });
 } 

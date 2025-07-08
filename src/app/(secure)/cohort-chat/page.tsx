@@ -315,7 +315,36 @@ export default function CohortChatPage() {
   const [selectedModel, setSelectedModel] = useState('gpt-4o');
   const [temperature, setTemperature] = useState(0.0);
   const [sources, setSources] = useState<{survey: boolean; twins: boolean; web: boolean}>({survey: true, twins: true, web: false});
-  const [systemPrompt, setSystemPrompt] = useState('You are an expert analyst summarising the perspectives of a group of survey respondents.');
+  const [systemPrompt, setSystemPrompt] = useState(`You are an expert survey analyst and data scientist specializing in extracting meaningful insights from survey responses. Your role is to help users understand their survey data through comprehensive analysis and clear communication.
+
+CORE RESPONSIBILITIES:
+• Analyze survey responses to identify patterns, trends, and key insights
+• Provide data-driven answers with specific evidence from the survey data
+• Highlight demographic differences and segment variations when relevant
+• Offer actionable recommendations based on findings
+• Present complex data in accessible, easy-to-understand language
+
+ANALYSIS APPROACH:
+• Always ground your analysis in the actual survey data provided
+• Use statistical measures (percentages, correlations, distributions) when appropriate
+• Identify outliers, unexpected findings, or interesting patterns
+• Compare responses across different demographic groups or cohorts
+• Look for sentiment patterns, satisfaction levels, and behavioral indicators
+
+RESPONSE STYLE:
+• Start with key findings or executive summary for complex queries
+• Use clear headings and bullet points for readability
+• Include specific data points and percentages to support your insights
+• Explain the significance of findings in practical terms
+• Suggest follow-up questions or areas for deeper investigation when relevant
+
+WHEN CITING DATA:
+• Reference specific response patterns with citation numbers
+• Explain methodology when discussing statistical analysis
+• Acknowledge limitations or potential biases in the data
+• Distinguish between correlation and causation in your interpretations
+
+Remember: You are not just summarizing data - you are providing expert interpretation that helps users make informed decisions based on their survey insights.`);
   const [streamingMode, setStreamingMode] = useState<'off' | 'smart' | 'buffered' | 'instant'>('off');
 
   const [showCohortCreator, setShowCohortCreator] = useState(false);
@@ -1599,7 +1628,7 @@ FORMATTING REQUIREMENTS:
           <div className="p-2">
 
           {/* Chat Area - No more tabs, just clean chat */}
-          <div className="flex flex-col h-[calc(100vh-80px)]">
+          <div className="flex flex-col h-full">
             {messages.length===0 ? (
               <div className="flex flex-col items-center justify-center flex-1 gap-6">
                 {/* Introduction */}
@@ -1631,16 +1660,17 @@ FORMATTING REQUIREMENTS:
                 {/* Chat input (sticky at bottom of empty state) */}
                 <div className="relative w-full max-w-xl">
                   <Textarea 
-                    className="flex-1 min-h-[100px] pl-4 pr-4 resize-none text-base" 
+                    className="flex-1 min-h-[100px] pl-20 pr-12 resize-none text-base" 
                     placeholder="Ask the cohort…" 
                     value={input} 
                     onChange={e=>setInput(e.target.value)} 
                     onKeyDown={handleKeyDown}
                     rows={2}
                   />
-                  {/* Plus button for survey selection (empty state) */}
-                  <div className="absolute left-2 bottom-2" data-survey-dropdown>
-                    <div className="relative">
+                  {/* Left side buttons - Plus and Upload - positioned inside textarea */}
+                  <div className="absolute left-2 bottom-2 flex gap-1">
+                    {/* Plus button for survey selection (empty state) */}
+                    <div className="relative" data-survey-dropdown>
                       <Button
                         size="icon"
                         variant="ghost"
@@ -1696,9 +1726,73 @@ FORMATTING REQUIREMENTS:
                         </div>
                       )}
                     </div>
+                    
+                    {/* Upload button */}
+                    <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
+                      <DialogTrigger asChild>
+                        <Button 
+                          size="icon" 
+                          variant="ghost" 
+                          className="h-8 w-8" 
+                          title="Upload survey file"
+                        >
+                          <Upload className="h-4 w-4"/>
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-2xl">
+                        <DialogHeader>
+                          <DialogTitle>Import Survey Data</DialogTitle>
+                        </DialogHeader>
+                        {!uploadPreview ? (
+                          <div className="space-y-4">
+                            <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
+                              <input
+                                type="file"
+                                accept=".csv,.xlsx,.xls"
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) handleFileUpload(file);
+                                }}
+                                className="hidden"
+                                id="file-upload-empty-state"
+                              />
+                              <label htmlFor="file-upload-empty-state" className="cursor-pointer">
+                                <FileText className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+                                <p className="text-lg font-medium mb-2">Drop your survey file here</p>
+                                <p className="text-sm text-gray-500">or click to browse (CSV, Excel)</p>
+                                <p className="text-xs text-gray-400 mt-2">Max file size: 10MB</p>
+                              </label>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="space-y-4">
+                            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                              <h3 className="font-medium text-green-800 mb-2">File Analysis Complete</h3>
+                              <div className="space-y-2 text-sm">
+                                <p><strong>Title:</strong> {uploadPreview.suggestedTitle}</p>
+                                <p><strong>Responses:</strong> {uploadPreview.totalRows || 0}</p>
+                                <p><strong>Questions:</strong> {uploadPreview.columns?.length || 0}</p>
+                                {uploadPreview.detectedDemographics && uploadPreview.detectedDemographics.length > 0 && (
+                                  <p><strong>Demographics:</strong> {uploadPreview.detectedDemographics.join(', ')}</p>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex gap-2 justify-end">
+                              <Button variant="outline" onClick={() => { setShowUploadDialog(false); resetUploadDialog(); }}>
+                                Cancel
+                              </Button>
+                              <Button onClick={handleExecuteImport} disabled={uploadLoading}>
+                                {uploadLoading ? 'Importing...' : 'Import Survey'}
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                      </DialogContent>
+                    </Dialog>
                   </div>
+                  
                   {/* Send button */}
-                  <div className="absolute right-2 bottom-2 flex gap-1">
+                  <div className="absolute right-2 bottom-2">
                     <Button 
                       size="icon" 
                       variant="ghost" 
@@ -1774,152 +1868,156 @@ FORMATTING REQUIREMENTS:
                 </ScrollArea>
                 
                 {/* Chat input at bottom of screen for active conversations */}
-                <div className="sticky bottom-0 p-4 bg-card">
+                <div className="sticky bottom-0 p-4 pt-0 bg-card">
                   <div className="relative">
-                    <div className="flex items-end gap-2">
-                      {/* Plus button for survey selection */}
-                      <div className="relative">
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-8 w-8 flex-shrink-0"
-                          onClick={() => setShowSurveyDropdown(!showSurveyDropdown)}
-                          title="Select survey"
-                        >
-                          <Plus className="h-4 w-4" />
-                        </Button>
-                        
-                        {/* Survey dropdown */}
-                        {showSurveyDropdown && (
-                          <div className="absolute bottom-full left-0 mb-2 w-80 bg-popover border border-border rounded-md shadow-lg z-50">
-                            <div className="p-3">
-                              <div className="flex items-center justify-between mb-3">
-                                <h4 className="font-medium text-sm">Select Survey</h4>
-                                <Button
-                                  size="icon"
-                                  variant="ghost"
-                                  className="h-6 w-6"
-                                  onClick={() => setShowSurveyDropdown(false)}
-                                >
-                                  <X className="h-3 w-3" />
-                                </Button>
-                              </div>
-                              <div className="space-y-1 max-h-60 overflow-y-auto">
-                                {surveys.length === 0 ? (
-                                  <div className="text-center py-4 text-muted-foreground text-sm">
-                                    No surveys available
-                                  </div>
-                                ) : (
-                                  surveys.map((survey) => (
-                                    <div
-                                      key={survey.id}
-                                      className={cn(
-                                        "flex items-center gap-3 p-2 rounded-md cursor-pointer transition-colors hover:bg-muted",
-                                        selectedSurveyId === survey.id && "bg-muted"
-                                      )}
-                                      onClick={() => handleInlineSurveySelect(survey.id)}
-                                    >
-                                      <BarChart3 className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                                      <div className="flex-1 min-w-0">
-                                        <div className="text-sm font-medium truncate">
-                                          {survey.title}
-                                        </div>
-                                      </div>
-                                      {selectedSurveyId === survey.id && (
-                                        <div className="h-2 w-2 bg-primary rounded-full flex-shrink-0" />
-                                      )}
+                    <div className="relative">
+                      <Textarea 
+                        className="min-h-[80px] pl-4 pr-4 resize-none" 
+                        placeholder="Ask the cohort…" 
+                        value={input} 
+                        onChange={e=>setInput(e.target.value)} 
+                        onKeyDown={handleKeyDown}
+                        disabled={isLoading}
+                        rows={2}
+                      />
+                      
+                      {/* Left side buttons - Plus and Upload - positioned inside textarea */}
+                      <div className="absolute left-2 bottom-2 flex gap-1">
+                        {/* Plus button for survey selection */}
+                        <div className="relative">
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-8 w-8 flex-shrink-0"
+                            onClick={() => setShowSurveyDropdown(!showSurveyDropdown)}
+                            title="Select survey"
+                          >
+                            <Plus className="h-4 w-4" />
+                          </Button>
+                          
+                          {/* Survey dropdown */}
+                          {showSurveyDropdown && (
+                            <div className="absolute bottom-full left-0 mb-2 w-80 bg-popover border border-border rounded-md shadow-lg z-50">
+                              <div className="p-3">
+                                <div className="flex items-center justify-between mb-3">
+                                  <h4 className="font-medium text-sm">Select Survey</h4>
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    className="h-6 w-6"
+                                    onClick={() => setShowSurveyDropdown(false)}
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                                <div className="space-y-1 max-h-60 overflow-y-auto">
+                                  {surveys.length === 0 ? (
+                                    <div className="text-center py-4 text-muted-foreground text-sm">
+                                      No surveys available
                                     </div>
-                                  ))
-                                )}
+                                  ) : (
+                                    surveys.map((survey) => (
+                                      <div
+                                        key={survey.id}
+                                        className={cn(
+                                          "flex items-center gap-3 p-2 rounded-md cursor-pointer transition-colors hover:bg-muted",
+                                          selectedSurveyId === survey.id && "bg-muted"
+                                        )}
+                                        onClick={() => handleInlineSurveySelect(survey.id)}
+                                      >
+                                        <BarChart3 className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                                        <div className="flex-1 min-w-0">
+                                          <div className="text-sm font-medium truncate">
+                                            {survey.title}
+                                          </div>
+                                        </div>
+                                        {selectedSurveyId === survey.id && (
+                                          <div className="h-2 w-2 bg-primary rounded-full flex-shrink-0" />
+                                        )}
+                                      </div>
+                                    ))
+                                  )}
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        )}
+                          )}
+                        </div>
+                        
+                        {/* Upload button */}
+                        <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
+                          <DialogTrigger asChild>
+                            <Button 
+                              size="icon" 
+                              variant="ghost" 
+                              className="h-8 w-8" 
+                              title="Upload survey file"
+                            >
+                              <Upload className="h-4 w-4"/>
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent className="max-w-2xl">
+                            <DialogHeader>
+                              <DialogTitle>Import Survey Data</DialogTitle>
+                            </DialogHeader>
+                            {!uploadPreview ? (
+                              <div className="space-y-4">
+                                <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
+                                  <input
+                                    type="file"
+                                    accept=".csv,.xlsx,.xls"
+                                    onChange={(e) => {
+                                      const file = e.target.files?.[0];
+                                      if (file) handleFileUpload(file);
+                                    }}
+                                    className="hidden"
+                                    id="file-upload-left"
+                                  />
+                                  <label htmlFor="file-upload-left" className="cursor-pointer">
+                                    <FileText className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+                                    <p className="text-lg font-medium mb-2">Drop your survey file here</p>
+                                    <p className="text-sm text-gray-500">or click to browse (CSV, Excel)</p>
+                                    <p className="text-xs text-gray-400 mt-2">Max file size: 10MB</p>
+                                  </label>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="space-y-4">
+                                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                                  <h3 className="font-medium text-green-800 mb-2">File Analysis Complete</h3>
+                                  <div className="space-y-2 text-sm">
+                                    <p><strong>Title:</strong> {uploadPreview.suggestedTitle}</p>
+                                    <p><strong>Responses:</strong> {uploadPreview.totalRows || 0}</p>
+                                    <p><strong>Questions:</strong> {uploadPreview.columns?.length || 0}</p>
+                                    {uploadPreview.detectedDemographics && uploadPreview.detectedDemographics.length > 0 && (
+                                      <p><strong>Demographics:</strong> {uploadPreview.detectedDemographics.join(', ')}</p>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="flex gap-2 justify-end">
+                                  <Button variant="outline" onClick={() => { setShowUploadDialog(false); resetUploadDialog(); }}>
+                                    Cancel
+                                  </Button>
+                                  <Button onClick={handleExecuteImport} disabled={uploadLoading}>
+                                    {uploadLoading ? 'Importing...' : 'Import Survey'}
+                                  </Button>
+                                </div>
+                              </div>
+                            )}
+                          </DialogContent>
+                        </Dialog>
                       </div>
                       
-                      {/* Textarea */}
-                      <div className="flex-1 relative">
-                        <Textarea 
-                          className="min-h-[80px] pl-4 pr-4 resize-none" 
-                          placeholder="Ask the cohort…" 
-                          value={input} 
-                          onChange={e=>setInput(e.target.value)} 
-                          onKeyDown={handleKeyDown}
+                      {/* Send button - positioned inside textarea on the right */}
+                      <div className="absolute right-2 bottom-2">
+                        <Button 
+                          size="icon" 
+                          variant="ghost" 
+                          className="h-8 w-8" 
+                          onClick={handleSend} 
                           disabled={isLoading}
-                          rows={2}
-                        />
-                        <div className="absolute right-2 bottom-2 flex gap-1">
-                          <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
-                            <DialogTrigger asChild>
-                              <Button 
-                                size="icon" 
-                                variant="ghost" 
-                                className="h-8 w-8" 
-                                title="Upload survey file"
-                              >
-                                <Upload className="h-4 w-4"/>
-                              </Button>
-                            </DialogTrigger>
-                            <DialogContent className="max-w-2xl">
-                              <DialogHeader>
-                                <DialogTitle>Import Survey Data</DialogTitle>
-                              </DialogHeader>
-                              {!uploadPreview ? (
-                                <div className="space-y-4">
-                                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
-                                    <input
-                                      type="file"
-                                      accept=".csv,.xlsx,.xls"
-                                      onChange={(e) => {
-                                        const file = e.target.files?.[0];
-                                        if (file) handleFileUpload(file);
-                                      }}
-                                      className="hidden"
-                                      id="file-upload-bottom"
-                                    />
-                                    <label htmlFor="file-upload-bottom" className="cursor-pointer">
-                                      <FileText className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-                                      <p className="text-lg font-medium mb-2">Drop your survey file here</p>
-                                      <p className="text-sm text-gray-500">or click to browse (CSV, Excel)</p>
-                                      <p className="text-xs text-gray-400 mt-2">Max file size: 10MB</p>
-                                    </label>
-                                  </div>
-                                </div>
-                              ) : (
-                                <div className="space-y-4">
-                                  <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                                    <h3 className="font-medium text-green-800 mb-2">File Analysis Complete</h3>
-                                    <div className="space-y-2 text-sm">
-                                      <p><strong>Title:</strong> {uploadPreview.suggestedTitle}</p>
-                                      <p><strong>Responses:</strong> {uploadPreview.totalRows || 0}</p>
-                                      <p><strong>Questions:</strong> {uploadPreview.columns?.length || 0}</p>
-                                      {uploadPreview.detectedDemographics && uploadPreview.detectedDemographics.length > 0 && (
-                                        <p><strong>Demographics:</strong> {uploadPreview.detectedDemographics.join(', ')}</p>
-                                      )}
-                                    </div>
-                                  </div>
-                                  <div className="flex gap-2 justify-end">
-                                    <Button variant="outline" onClick={() => { setShowUploadDialog(false); resetUploadDialog(); }}>
-                                      Cancel
-                                    </Button>
-                                    <Button onClick={handleExecuteImport} disabled={uploadLoading}>
-                                      {uploadLoading ? 'Importing...' : 'Import Survey'}
-                                    </Button>
-                                  </div>
-                                </div>
-                              )}
-                            </DialogContent>
-                          </Dialog>
-                          <Button 
-                            size="icon" 
-                            variant="ghost" 
-                            className="h-8 w-8" 
-                            onClick={handleSend} 
-                            disabled={isLoading}
-                          >
-                            <Send className="h-4 w-4"/>
-                          </Button>
-                        </div>
+                        >
+                          <Send className="h-4 w-4"/>
+                        </Button>
                       </div>
                     </div>
                   </div>
@@ -1933,7 +2031,7 @@ FORMATTING REQUIREMENTS:
       
       {/* Right Sidebar */}
       <div className="relative">
-        <div className={cn('h-full bg-background transition-all duration-300 ease-in-out', isCollapsed? 'w-0':'w-[350px] overflow-y-auto px-4 py-2')}>
+        <div className={cn('h-screen bg-background transition-all duration-300 ease-in-out sticky top-0', isCollapsed? 'w-0':'w-[350px] overflow-y-auto px-4 py-2')}>
           {!isCollapsed && (
             <Tabs defaultValue="conversations" className="w-full">
               <TabsList className="grid w-full grid-cols-3">
@@ -2330,8 +2428,57 @@ FORMATTING REQUIREMENTS:
 
                   {/* Prompt Editor */}
                   <div className="space-y-2">
-                    <Label>Agent Instructions</Label>
-                    <Textarea value={systemPrompt} onChange={e=>handleSystemPromptChange(e.target.value)} className="min-h-32"/>
+                    <div className="flex items-center justify-between">
+                      <Label>Agent Instructions</Label>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 text-xs text-muted-foreground hover:text-foreground"
+                        onClick={() => {
+                          setSystemPrompt(`You are an expert survey analyst and data scientist specializing in extracting meaningful insights from survey responses. Your role is to help users understand their survey data through comprehensive analysis and clear communication.
+
+CORE RESPONSIBILITIES:
+• Analyze survey responses to identify patterns, trends, and key insights
+• Provide data-driven answers with specific evidence from the survey data
+• Highlight demographic differences and segment variations when relevant
+• Offer actionable recommendations based on findings
+• Present complex data in accessible, easy-to-understand language
+
+ANALYSIS APPROACH:
+• Always ground your analysis in the actual survey data provided
+• Use statistical measures (percentages, correlations, distributions) when appropriate
+• Identify outliers, unexpected findings, or interesting patterns
+• Compare responses across different demographic groups or cohorts
+• Look for sentiment patterns, satisfaction levels, and behavioral indicators
+
+RESPONSE STYLE:
+• Start with key findings or executive summary for complex queries
+• Use clear headings and bullet points for readability
+• Include specific data points and percentages to support your insights
+• Explain the significance of findings in practical terms
+• Suggest follow-up questions or areas for deeper investigation when relevant
+
+WHEN CITING DATA:
+• Reference specific response patterns with citation numbers
+• Explain methodology when discussing statistical analysis
+• Acknowledge limitations or potential biases in the data
+• Distinguish between correlation and causation in your interpretations
+
+Remember: You are not just summarizing data - you are providing expert interpretation that helps users make informed decisions based on their survey insights.`);
+                        }}
+                      >
+                        Reset to Default
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Customize how the AI agent analyzes and presents survey insights. The default instruction provides comprehensive analytical capabilities.
+                    </p>
+                    <Textarea 
+                      value={systemPrompt} 
+                      onChange={e=>handleSystemPromptChange(e.target.value)} 
+                      className="min-h-32"
+                      placeholder="Enter custom instructions for how the AI should analyze and respond to survey questions..."
+                    />
                   </div>
                 </div>
               </TabsContent>
