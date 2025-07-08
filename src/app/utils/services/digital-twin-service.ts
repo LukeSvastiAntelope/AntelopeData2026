@@ -142,8 +142,12 @@ Guidelines:
       }
 
       const existingMetadata = existingRecord.metadata;
-      const existingAnswers = JSON.parse(existingMetadata?.answers as string || '[]');
-      const existingPrinciples = JSON.parse(existingMetadata?.principles as string);
+      const existingAnswers = typeof existingMetadata?.answers === 'string' 
+        ? JSON.parse(existingMetadata.answers) 
+        : (existingMetadata?.answers || []);
+      const existingPrinciples = typeof existingMetadata?.principles === 'string'
+        ? JSON.parse(existingMetadata.principles)
+        : existingMetadata?.principles;
 
       // Combine existing and new answers
       const allAnswers = [...existingAnswers, ...newAnswers];
@@ -337,8 +341,12 @@ Guidelines:
       }
 
       const metadata = fetchResult.records[`digital-twin-${agentToken}`].metadata;
-      const demographics = JSON.parse(metadata?.demographics as string);
-      const principles = JSON.parse(metadata?.principles as string);
+      const demographics = typeof metadata?.demographics === 'string'
+        ? JSON.parse(metadata.demographics)
+        : metadata?.demographics;
+      const principles = typeof metadata?.principles === 'string'
+        ? JSON.parse(metadata.principles)
+        : metadata?.principles;
 
       // Generate response using the persona
       const prompt = `You are a digital twin representing a real person. Answer the following question as this person would, based on their profile:

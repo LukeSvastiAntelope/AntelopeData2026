@@ -250,4 +250,15 @@
 /* Chat message styles */
 .chat-message {
   /* No hover effects */
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+}
+
+/* Ensure markdown content wraps properly */
+.chat-message p,
+.chat-message div,
+.chat-message span,
+.chat-message li {
+  overflow-wrap: break-word;
+  word-wrap: break-word;
 }

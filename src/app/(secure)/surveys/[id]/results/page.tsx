@@ -38,6 +38,7 @@ import { AreaChart, Area, BarChart, Bar, PieChart as RechartsPieChart, Pie, Cell
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { SurveyAnalyticsDashboard } from '@/components/SurveyAnalyticsDashboard'
+import { SurveyRespondentsTable } from '@/components/survey-respondents-table'
 
 
 
@@ -632,49 +633,16 @@ const SurveyResultsPage = () => {
                     </Card>
                   </div>
 
-                  {/* Recent Responses List */}
+                  {/* Survey Responses Table */}
                   <div className="space-y-4">
                     <div>
-                      <h3 className="text-lg font-semibold">Recent Responses</h3>
-                      <p className="text-sm text-muted-foreground">Latest survey responses ({data.responses.length} total)</p>
+                      <h3 className="text-lg font-semibold">Survey Responses</h3>
+                      <p className="text-sm text-muted-foreground">All survey responses ({data.responses.length} total)</p>
                     </div>
                     {data.responses.length === 0 ? (
                       <p className="text-center text-muted-foreground py-8">No responses yet.</p>
                     ) : (
-                      <div className="rounded-lg border border-border overflow-auto max-h-[400px]">
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>Responder</TableHead>
-                              <TableHead>Age</TableHead>
-                              <TableHead>Location</TableHead>
-                              <TableHead>Occupation</TableHead>
-                              <TableHead>Education</TableHead>
-                              <TableHead>Submitted</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {data.responses.slice(0, 10).map((resp) => (
-                              <TableRow 
-                                key={resp.id}
-                                className="cursor-pointer hover:bg-muted/50"
-                                onClick={() => router.push(`/surveys/${surveyId}/results/${resp.id}`)}
-                              >
-                                <TableCell className="font-medium">
-                                  {resp.demographics?.name || resp.demographics?.email || `Responder #${resp.id}`}
-                                </TableCell>
-                                <TableCell>{resp.demographics?.age || '-'}</TableCell>
-                                <TableCell>{resp.demographics?.location || '-'}</TableCell>
-                                <TableCell>{resp.demographics?.occupation || '-'}</TableCell>
-                                <TableCell>{resp.demographics?.education || '-'}</TableCell>
-                                <TableCell className="text-xs text-muted-foreground">
-                                  {formatDate(resp.submitted_at)}
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      </div>
+                      <SurveyRespondentsTable data={data.responses} surveyId={surveyId} />
                     )}
                   </div>
                 </>
