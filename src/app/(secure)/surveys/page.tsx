@@ -586,13 +586,11 @@ const SurveysPage = () => {
                                     <BarChart3 className="h-4 w-4" />
                                   </Button>
                                 </Link>
-                                {(survey.status === 'active' || survey.status === 'published') && (
-                                  <Link href={`/survey/${survey.slug}`} target="_blank">
-                                    <Button variant="ghost" size="sm">
-                                      <ExternalLink className="h-4 w-4" />
-                                    </Button>
-                                  </Link>
-                                )}
+                                <Link href={`/survey/${survey.slug}`} target="_blank">
+                                  <Button variant="ghost" size="sm" title={survey.status === 'draft' ? 'Preview survey' : 'View survey'}>
+                                    <Eye className="h-4 w-4" />
+                                  </Button>
+                                </Link>
                                 <Button 
                                   variant="ghost" 
                                   size="sm"

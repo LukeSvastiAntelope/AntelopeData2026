@@ -13,6 +13,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
 import { Loader2, CheckCircle, Info } from "lucide-react"
+import { DEMOGRAPHICS_FORM_CONFIGS, shouldCollectField } from "@/app/utils/anonymity-config"
+import { AnonymityLevel } from "@/app/utils/interface"
 
 interface ResponderInfoModalProps {
   open: boolean
@@ -23,6 +25,7 @@ interface ResponderInfoModalProps {
   }
   updateDemographics: (field: string, value: string) => void
   onExistingTwinFound?: (demographics: any) => void
+  anonymityLevel: AnonymityLevel
 }
 
 export const ResponderInfoModal = ({
@@ -31,6 +34,7 @@ export const ResponderInfoModal = ({
   demographics,
   updateDemographics,
   onExistingTwinFound,
+  anonymityLevel,
 }: ResponderInfoModalProps) => {
   const [localName, setLocalName] = useState(demographics.name)
   const [localEmail, setLocalEmail] = useState(demographics.email)
@@ -92,27 +96,35 @@ export const ResponderInfoModal = ({
   }
 
   const handleContinue = () => {
-    // validation
-    if (!localName.trim()) {
+    const formConfig = DEMOGRAPHICS_FORM_CONFIGS[anonymityLevel]
+    
+    // validation based on anonymity level
+    if (formConfig.requiredFields.includes('name') && !localName.trim()) {
       setError("Name is required")
       return
     }
-    if (!localEmail.trim()) {
-      setError("Email is required")
-      return
-    }
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    if (!emailRegex.test(localEmail)) {
-      setError("Please enter a valid email address")
-      return
+    if (formConfig.requiredFields.includes('email')) {
+      if (!localEmail.trim()) {
+        setError("Email is required")
+        return
+      }
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+      if (!emailRegex.test(localEmail)) {
+        setError("Please enter a valid email address")
+        return
+      }
     }
 
     // Clear any errors
     setError(null)
 
-    // propagate to parent
-    updateDemographics("name", localName.trim())
-    updateDemographics("email", localEmail.trim())
+    // propagate to parent only if fields are allowed
+    if (shouldCollectField('name', anonymityLevel)) {
+      updateDemographics("name", localName.trim())
+    }
+    if (shouldCollectField('email', anonymityLevel)) {
+      updateDemographics("email", localEmail.trim())
+    }
 
     // close modal
     onOpenChange(false)
@@ -124,51 +136,75 @@ export const ResponderInfoModal = ({
         <DialogHeader>
           <DialogTitle>Tell us about you</DialogTitle>
           <DialogDescription>
-            Before starting the survey, please provide your name and email so we can follow up with your results.
+            {anonymityLevel === 'anonymous' 
+              ? 'This survey is completely anonymous. Only basic demographic categories may be collected.'
+              : anonymityLevel === 'semi_anonymous'
+              ? 'This survey collects general demographic information without personal identifiers.'
+              : 'Before starting the survey, please provide your name and email so we can follow up with your results.'
+            }
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
-          <div>
-            <Label htmlFor="responder-name">Name *</Label>
-            <Input
-              id="responder-name"
-              placeholder="Your full name"
-              value={localName}
-              onChange={(e) => setLocalName(e.target.value)}
-            />
-          </div>
-          <div>
-            <Label htmlFor="responder-email">Email *</Label>
-            <div className="relative">
+          {shouldCollectField('name', anonymityLevel) && (
+            <div>
+              <Label htmlFor="responder-name">
+                Name {DEMOGRAPHICS_FORM_CONFIGS[anonymityLevel].requiredFields.includes('name') ? '*' : ''}
+              </Label>
               <Input
-                id="responder-email"
-                type="email"
-                placeholder="your.email@example.com"
-                value={localEmail}
-                onChange={(e) => setLocalEmail(e.target.value)}
-                onBlur={handleEmailBlur}
+                id="responder-name"
+                placeholder="Your full name"
+                value={localName}
+                onChange={(e) => setLocalName(e.target.value)}
               />
-              {checkingEmail && (
-                <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+            </div>
+          )}
+          {shouldCollectField('email', anonymityLevel) && (
+            <div>
+              <Label htmlFor="responder-email">
+                Email {DEMOGRAPHICS_FORM_CONFIGS[anonymityLevel].requiredFields.includes('email') ? '*' : ''}
+              </Label>
+              <div className="relative">
+                <Input
+                  id="responder-email"
+                  type="email"
+                  placeholder="your.email@example.com"
+                  value={localEmail}
+                  onChange={(e) => setLocalEmail(e.target.value)}
+                  onBlur={handleEmailBlur}
+                />
+                {checkingEmail && (
+                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                    <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                  </div>
+                )}
+              </div>
+              {foundExisting && (
+                <div className="mt-2 p-3 bg-blue-50 dark:bg-blue-950/20 rounded-md border border-blue-200 dark:border-blue-800">
+                  <div className="flex items-center gap-2 text-blue-800 dark:text-blue-200">
+                    <CheckCircle className="h-4 w-4" />
+                    <span className="text-sm font-medium">Digital Twin Found!</span>
+                  </div>
+                  <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
+                    We found your existing digital twin and pre-filled your information. You can modify it if needed.
+                  </p>
                 </div>
               )}
             </div>
-            {foundExisting && (
-              <div className="mt-2 p-3 bg-blue-50 dark:bg-blue-950/20 rounded-md border border-blue-200 dark:border-blue-800">
-                <div className="flex items-center gap-2 text-blue-800 dark:text-blue-200">
-                  <CheckCircle className="h-4 w-4" />
-                  <span className="text-sm font-medium">Digital Twin Found!</span>
-                </div>
-                <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
-                  We found your existing digital twin and pre-filled your information. You can modify it if needed.
-                </p>
-              </div>
-            )}
-          </div>
+          )}
           {error && (
             <p className="text-sm text-destructive">{error}</p>
+          )}
+          {anonymityLevel === 'anonymous' && !shouldCollectField('name', anonymityLevel) && !shouldCollectField('email', anonymityLevel) && (
+            <div className="p-4 bg-green-50 dark:bg-green-950/20 rounded-md border border-green-200 dark:border-green-800">
+              <div className="flex items-center gap-2 text-green-800 dark:text-green-200">
+                <Info className="h-4 w-4" />
+                <span className="text-sm font-medium">Anonymous Survey</span>
+              </div>
+              <p className="text-xs text-green-700 dark:text-green-300 mt-1">
+                This survey is completely anonymous. No personal information will be collected.
+              </p>
+            </div>
           )}
         </div>
 

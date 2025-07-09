@@ -443,6 +443,8 @@ export interface IAgentContext {
 export type QuestionType = 'text' | 'single-choice' | 'multi-choice' | 'scale' | 'email' | 'number';
 export type SurveyStatus = 'draft' | 'scheduled' | 'active' | 'published' | 'closed' | 'archived';
 export type EnrichmentStatus = 'pending' | 'processing' | 'completed' | 'failed';
+export type AnonymityLevel = 'full' | 'semi_anonymous' | 'anonymous';
+export type DemographicCategory = 'full_profile' | 'partial_profile' | 'minimal_profile' | 'imported_synthetic' | 'anonymous_profile';
 
 export interface SurveyDB {
     id: number;
@@ -451,6 +453,8 @@ export interface SurveyDB {
     slug: string;
     created_by: number;
     is_public: boolean;
+    anonymity_level: AnonymityLevel;
+    demographics_required: boolean;
     created_at: string;
     updated_at: string;
     start_at?: string | null;
@@ -476,6 +480,7 @@ export interface SurveyResponseDB {
     responder_id: number | null;
     submitted_at: string;
     demographics: Record<string, any>; // JSON parsed
+    anonymity_level: AnonymityLevel;
     ip_address: string;
     user_agent: string;
 }
@@ -493,6 +498,8 @@ export interface ResponderAgentDB {
     base_profile: Record<string, any>; // JSON parsed
     enrichment_status: EnrichmentStatus;
     created_from_response_id: number;
+    completion_percentage: number;
+    demographic_category: DemographicCategory;
     agent_token: string;
     created_at: string;
     updated_at: string;
@@ -518,6 +525,8 @@ export interface Survey {
     slug: string;
     createdBy: number;
     isPublic: boolean;
+    anonymityLevel: AnonymityLevel;
+    demographicsRequired: boolean;
     createdAt: string;
     updatedAt: string;
     startAt?: string;
@@ -559,6 +568,8 @@ export interface ResponderAgent {
     baseProfile: Record<string, any>;
     enrichmentStatus: EnrichmentStatus;
     createdFromResponseId: number;
+    completionPercentage: number;
+    demographicCategory: DemographicCategory;
     agentToken: string;
     createdAt: string;
     updatedAt: string;
@@ -705,4 +716,52 @@ export interface SurveyDemographicResponseDB {
     field_value: any; // JSON parsed value
     field_type: 'text' | 'select' | 'multi-select' | 'number' | 'date' | 'boolean' | 'scale';
     created_at: string;
+}
+
+// ===== ANONYMITY SYSTEM INTERFACES =====
+
+export interface SurveyAnonymityAuditDB {
+    id: number;
+    survey_id: number;
+    old_anonymity_level: AnonymityLevel | null;
+    new_anonymity_level: AnonymityLevel;
+    changed_by: number;
+    change_reason?: string;
+    changed_at: string;
+}
+
+export interface AnonymityConfiguration {
+    level: AnonymityLevel;
+    fieldsToCollect: string[];
+    fieldsToExclude: string[];
+    description: string;
+    privacyNote: string;
+}
+
+export interface DigitalTwinAnalytics {
+    demographic_category: DemographicCategory;
+    twin_count: number;
+    avg_completion: number;
+    min_completion: number;
+    max_completion: number;
+    high_quality_count: number;
+    medium_quality_count: number;
+    low_quality_count: number;
+}
+
+export interface CompletionCalculationResult {
+    percentage: number;
+    category: DemographicCategory;
+    missingFields: string[];
+    availableFields: string[];
+}
+
+// Demographics form variants for different anonymity levels
+export interface DemographicsFormConfig {
+    anonymityLevel: AnonymityLevel;
+    requiredFields: string[];
+    optionalFields: string[];
+    excludedFields: string[];
+    privacyNotice: string;
+    consentText?: string;
 }

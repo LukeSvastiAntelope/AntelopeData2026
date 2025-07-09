@@ -12,6 +12,8 @@ import { SidebarTrigger } from "@/components/ui/sidebar"
 import { RadioGroup } from "@/components/ui/radio-group"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Badge } from "@/components/ui/badge"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import { 
   Plus, 
   Trash2, 
@@ -19,8 +21,19 @@ import {
   ArrowLeft,
   Eye,
   Settings,
-  AlertCircle
+  AlertCircle,
+  Shield,
+  Info,
+  Brain
 } from "lucide-react"
+import { AnonymityLevel } from '@/app/utils/interface'
+import { 
+  ANONYMITY_CONFIGURATIONS, 
+  getAnonymityLevelDescription, 
+  getPrivacyNotice,
+  getRecommendedAnonymityLevel,
+  canChangeAnonymityLevel
+} from '@/app/utils/anonymity-config'
 
 interface SurveyQuestion {
   id?: number
@@ -38,6 +51,8 @@ interface Survey {
   slug: string
   status: 'draft' | 'published' | 'closed'
   is_public: boolean
+  anonymity_level: AnonymityLevel
+  demographics_required: boolean
   created_at: string
   start_at?: string
   end_at?: string
@@ -57,6 +72,8 @@ const EditSurveyPage = () => {
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [isPublic, setIsPublic] = useState(true)
+  const [anonymityLevel, setAnonymityLevel] = useState<AnonymityLevel>('full')
+  const [demographicsRequired, setDemographicsRequired] = useState(true)
   const [questions, setQuestions] = useState<SurveyQuestion[]>([])
   const [startAt, setStartAt] = useState('')
   const [endAt, setEndAt] = useState('')
@@ -82,6 +99,8 @@ const EditSurveyPage = () => {
         setTitle(surveyData.title)
         setDescription(surveyData.description || '')
         setIsPublic(surveyData.is_public)
+        setAnonymityLevel(surveyData.anonymity_level || 'full')
+        setDemographicsRequired(surveyData.demographics_required !== false)
         setQuestions(surveyData.questions || [])
         setStartAt(surveyData.start_at ? new Date(surveyData.start_at).toISOString().slice(0, 16) : '')
         setEndAt(surveyData.end_at ? new Date(surveyData.end_at).toISOString().slice(0, 16) : '')
@@ -169,6 +188,8 @@ const EditSurveyPage = () => {
           title,
           description,
           isPublic,
+          anonymityLevel,
+          demographicsRequired,
           startAt: startAt || null,
           endAt: endAt || null,
           questions: questions.map((q, index) => ({
@@ -217,6 +238,8 @@ const EditSurveyPage = () => {
           title,
           description,
           isPublic,
+          anonymityLevel,
+          demographicsRequired,
           startAt: startAt || null,
           endAt: endAt || null,
           questions: questions.map((q, index) => ({
@@ -367,6 +390,114 @@ const EditSurveyPage = () => {
                 />
                 <Label htmlFor="isPublic">Make this survey publicly accessible</Label>
               </div>
+            </CardContent>
+          </Card>
+
+          {/* Privacy & Anonymity */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Shield className="h-5 w-5" />
+                Privacy & Anonymity
+              </CardTitle>
+              <CardDescription>
+                Configure data collection and privacy settings
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label htmlFor="anonymityLevel">Anonymity Level</Label>
+                <Select
+                  value={anonymityLevel}
+                  onValueChange={(value: AnonymityLevel) => {
+                    if (survey && !canChangeAnonymityLevel(survey.anonymity_level, value, survey.status === 'published')) {
+                      setError('Cannot change anonymity level: this would violate existing respondent privacy agreements')
+                      return
+                    }
+                    setAnonymityLevel(value)
+                  }}
+                >
+                  <SelectTrigger className="mt-1">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="full">
+                      <div className="space-y-1">
+                        <div className="font-medium">Full Demographics</div>
+                        <div className="text-xs text-muted-foreground">
+                          Collect name, email, and complete demographic profile
+                        </div>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="semi_anonymous">
+                      <div className="space-y-1">
+                        <div className="font-medium">Semi-Anonymous</div>
+                        <div className="text-xs text-muted-foreground">
+                          Collect demographics without personal identification
+                        </div>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="anonymous">
+                      <div className="space-y-1">
+                        <div className="font-medium">Anonymous</div>
+                        <div className="text-xs text-muted-foreground">
+                          Minimal data collection for complete privacy
+                        </div>
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-sm text-muted-foreground mt-2">
+                  {getAnonymityLevelDescription(anonymityLevel)}
+                </p>
+              </div>
+
+              <Alert>
+                <Info className="h-4 w-4" />
+                <AlertDescription>
+                  {getPrivacyNotice(anonymityLevel)}
+                </AlertDescription>
+              </Alert>
+
+              {title && description && (
+                <div className="bg-blue-50 dark:bg-blue-950/20 p-3 rounded-lg">
+                  <div className="flex items-start gap-2">
+                    <Brain className="h-4 w-4 text-blue-600 mt-0.5" />
+                    <div className="text-xs text-blue-700 dark:text-blue-300">
+                      <p className="font-medium mb-1">AI Recommendation</p>
+                      <p>
+                        Based on your survey content, we recommend: <strong>
+                          {getRecommendedAnonymityLevel(title, description)}
+                        </strong> anonymity level.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label htmlFor="demographicsRequired">Require Demographics</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Force respondents to complete demographics before survey questions
+                  </p>
+                </div>
+                <Checkbox
+                  id="demographicsRequired"
+                  checked={demographicsRequired}
+                  onCheckedChange={(checked) => setDemographicsRequired(checked as boolean)}
+                  disabled={anonymityLevel === 'anonymous'}
+                />
+              </div>
+
+              {survey?.status === 'published' && (
+                <Alert>
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    <strong>Published Survey:</strong> Privacy settings can only be made more restrictive to protect existing respondents.
+                  </AlertDescription>
+                </Alert>
+              )}
             </CardContent>
           </Card>
 

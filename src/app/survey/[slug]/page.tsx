@@ -16,10 +16,13 @@ import {
   CheckCircle,
   AlertCircle,
   Brain,
-  Loader2
+  Loader2,
+  Shield
 } from "lucide-react"
 import { useParams } from 'next/navigation'
 import { ResponderInfoModal } from '@/components/ResponderInfoModal'
+import { DEMOGRAPHICS_FORM_CONFIGS, shouldCollectField } from '@/app/utils/anonymity-config'
+import { AnonymityLevel } from '@/app/utils/interface'
 
 interface SurveyQuestion {
   id: number
@@ -34,6 +37,7 @@ interface Survey {
   id: number
   title: string
   description: string
+  anonymity_level: AnonymityLevel
   questions: SurveyQuestion[]
 }
 
@@ -96,6 +100,9 @@ const SurveyPage = () => {
   const [modalOpen, setModalOpen] = useState<boolean>(true) // Start with modal open
   const [shouldCheckExistingTwin, setShouldCheckExistingTwin] = useState<boolean>(false)
 
+  // Check if we should skip demographics for anonymous surveys
+  const shouldSkipDemographics = survey?.anonymity_level === 'anonymous'
+
   useEffect(() => {
     const fetchSurvey = async () => {
       try {
@@ -116,6 +123,13 @@ const SurveyPage = () => {
               questionId: q.id,
               value: q.type === 'multiple-choice' ? [] : ''
             })))
+          }
+          
+          // For anonymous surveys, skip demographics and go straight to questions
+          if (data.survey?.anonymity_level === 'anonymous') {
+            setCurrentStep('questions')
+            setDemographicsCompleted(true)
+            setModalOpen(false) // Don't show the modal for anonymous surveys
           }
         } else {
           setError('Survey not found')
@@ -233,26 +247,32 @@ const SurveyPage = () => {
   }
 
   const validateDemographics = () => {
-    if (!demographics.name.trim()) {
-      setError('Name is required')
-      return false
-    }
+    if (!survey) return false
     
-    if (!demographics.email.trim()) {
-      setError('Email is required')
-      return false
-    }
+    const formConfig = DEMOGRAPHICS_FORM_CONFIGS[survey.anonymity_level]
     
-    // Basic email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    if (!emailRegex.test(demographics.email)) {
-      setError('Please enter a valid email address')
-      return false
-    }
-    
-    if (!demographics.age.trim()) {
-      setError('Age is required')
-      return false
+    // Check required fields based on anonymity level
+    for (const field of formConfig.requiredFields) {
+      if (field === 'name' && !demographics.name.trim()) {
+        setError('Name is required')
+        return false
+      }
+      if (field === 'email') {
+        if (!demographics.email.trim()) {
+          setError('Email is required')
+          return false
+        }
+        // Basic email validation
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+        if (!emailRegex.test(demographics.email)) {
+          setError('Please enter a valid email address')
+          return false
+        }
+      }
+      if (field === 'age' && !demographics.age.trim()) {
+        setError('Age is required')
+        return false
+      }
     }
 
     return true
@@ -285,6 +305,19 @@ const SurveyPage = () => {
     }
     
     updateAnswer(questionId, newValues)
+  }
+
+  // Helper function to check if a field should be shown based on anonymity level
+  const shouldShowField = (field: string) => {
+    if (!survey) return false
+    return shouldCollectField(field, survey.anonymity_level)
+  }
+
+  // Helper function to check if a field is required based on anonymity level
+  const isFieldRequired = (field: string) => {
+    if (!survey) return false
+    const formConfig = DEMOGRAPHICS_FORM_CONFIGS[survey.anonymity_level]
+    return formConfig.requiredFields.includes(field)
   }
 
   if (loading) {
@@ -385,30 +418,32 @@ const SurveyPage = () => {
             </CardDescription>
             
             {/* Progress Indicator */}
-            <div className="mt-6 flex items-center justify-center gap-4">
-              <div className="flex items-center gap-2">
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-                  currentStep === 'demographics' ? 'bg-primary text-primary-foreground' : 
-                  demographicsCompleted ? 'bg-green-500 text-white' : 'bg-muted text-muted-foreground'
-                }`}>
-                  {demographicsCompleted ? <CheckCircle className="h-4 w-4" /> : '1'}
+            {!shouldSkipDemographics && (
+              <div className="mt-6 flex items-center justify-center gap-4">
+                <div className="flex items-center gap-2">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
+                    currentStep === 'demographics' ? 'bg-primary text-primary-foreground' : 
+                    demographicsCompleted ? 'bg-green-500 text-white' : 'bg-muted text-muted-foreground'
+                  }`}>
+                    {demographicsCompleted ? <CheckCircle className="h-4 w-4" /> : '1'}
+                  </div>
+                  <span className={`text-sm ${currentStep === 'demographics' ? 'font-medium' : 'text-muted-foreground'}`}>
+                    About You
+                  </span>
                 </div>
-                <span className={`text-sm ${currentStep === 'demographics' ? 'font-medium' : 'text-muted-foreground'}`}>
-                  About You
-                </span>
-              </div>
-              <div className={`w-8 h-0.5 ${demographicsCompleted ? 'bg-green-500' : 'bg-muted'}`} />
-              <div className="flex items-center gap-2">
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-                  currentStep === 'questions' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
-                }`}>
-                  2
+                <div className={`w-8 h-0.5 ${demographicsCompleted ? 'bg-green-500' : 'bg-muted'}`} />
+                <div className="flex items-center gap-2">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
+                    currentStep === 'questions' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
+                  }`}>
+                    2
+                  </div>
+                  <span className={`text-sm ${currentStep === 'questions' ? 'font-medium' : 'text-muted-foreground'}`}>
+                    Survey Questions
+                  </span>
                 </div>
-                <span className={`text-sm ${currentStep === 'questions' ? 'font-medium' : 'text-muted-foreground'}`}>
-                  Survey Questions
-                </span>
               </div>
-            </div>
+            )}
           </CardHeader>
         </Card>
 
@@ -425,7 +460,7 @@ const SurveyPage = () => {
         )}
 
         {/* Step 1: Demographics Section */}
-        {currentStep === 'demographics' && (
+        {currentStep === 'demographics' && survey && !shouldSkipDemographics && (
           <Card className="mb-8">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -433,175 +468,204 @@ const SurveyPage = () => {
               About You
             </CardTitle>
             <CardDescription>
-              This information helps create a more accurate digital twin
+              {survey.anonymity_level === 'semi_anonymous'
+                ? 'This survey collects general demographic information without personal identifiers.'
+                : 'This information helps create a more accurate digital twin'
+              }
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             {/* Required Fields */}
-            <div>
-              <h4 className="font-medium mb-3 text-sm text-muted-foreground">Required Information</h4>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <Label htmlFor="name">Name *</Label>
-                  <Input
-                    id="name"
-                    placeholder="Your full name"
-                    value={demographics.name}
-                    onChange={(e) => updateDemographics('name', e.target.value)}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="email">Email *</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="your.email@example.com"
-                    value={demographics.email}
-                    onChange={(e) => updateDemographics('email', e.target.value)}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="age">Age *</Label>
-                  <Input
-                    id="age"
-                    type="number"
-                    placeholder="25"
-                    value={demographics.age}
-                    onChange={(e) => updateDemographics('age', e.target.value)}
-                  />
+            {(shouldShowField('name') || shouldShowField('email') || shouldShowField('age')) && (
+              <div>
+                <h4 className="font-medium mb-3 text-sm text-muted-foreground">Required Information</h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {shouldShowField('name') && (
+                    <div>
+                      <Label htmlFor="name">Name {isFieldRequired('name') ? '*' : ''}</Label>
+                      <Input
+                        id="name"
+                        placeholder="Your full name"
+                        value={demographics.name}
+                        onChange={(e) => updateDemographics('name', e.target.value)}
+                      />
+                    </div>
+                  )}
+                  {shouldShowField('email') && (
+                    <div>
+                      <Label htmlFor="email">Email {isFieldRequired('email') ? '*' : ''}</Label>
+                      <Input
+                        id="email"
+                        type="email"
+                        placeholder="your.email@example.com"
+                        value={demographics.email}
+                        onChange={(e) => updateDemographics('email', e.target.value)}
+                      />
+                    </div>
+                  )}
+                  {shouldShowField('age') && (
+                    <div>
+                      <Label htmlFor="age">Age {isFieldRequired('age') ? '*' : ''}</Label>
+                      <Input
+                        id="age"
+                        type="number"
+                        placeholder="25"
+                        value={demographics.age}
+                        onChange={(e) => updateDemographics('age', e.target.value)}
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
-            </div>
+            )}
 
             {/* Optional Personal Information */}
-            <div>
-              <h4 className="font-medium mb-3 text-sm text-muted-foreground">Personal Information (Optional)</h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="location">Location</Label>
-                  <Input
-                    id="location"
-                    placeholder="City, Country"
-                    value={demographics.location}
-                    onChange={(e) => updateDemographics('location', e.target.value)}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="occupation">Occupation</Label>
-                  <Input
-                    id="occupation"
-                    placeholder="Your job/profession"
-                    value={demographics.occupation}
-                    onChange={(e) => updateDemographics('occupation', e.target.value)}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="education">Education Level</Label>
-                  <select
-                    id="education"
-                    value={demographics.education}
-                    onChange={(e) => updateDemographics('education', e.target.value)}
-                    className="w-full px-3 py-2 border border-input bg-background rounded-md"
-                  >
-                    <option value="">Select education level</option>
-                    <option value="high-school">High School</option>
-                    <option value="some-college">Some College</option>
-                    <option value="bachelors">Bachelor&apos;s Degree</option>
-                    <option value="masters">Master&apos;s Degree</option>
-                    <option value="phd">PhD/Doctorate</option>
-                    <option value="other">Other</option>
-                  </select>
-                </div>
-                <div>
-                  <Label htmlFor="income">Income Range</Label>
-                  <select
-                    id="income"
-                    value={demographics.income}
-                    onChange={(e) => updateDemographics('income', e.target.value)}
-                    className="w-full px-3 py-2 border border-input bg-background rounded-md"
-                  >
-                    <option value="">Select income range</option>
-                    <option value="under-25k">Under $25,000</option>
-                    <option value="25k-50k">$25,000 - $50,000</option>
-                    <option value="50k-75k">$50,000 - $75,000</option>
-                    <option value="75k-100k">$75,000 - $100,000</option>
-                    <option value="100k-150k">$100,000 - $150,000</option>
-                    <option value="over-150k">Over $150,000</option>
-                    <option value="prefer-not-to-say">Prefer not to say</option>
-                  </select>
+            {(shouldShowField('location') || shouldShowField('occupation') || shouldShowField('education') || shouldShowField('income')) && (
+              <div>
+                <h4 className="font-medium mb-3 text-sm text-muted-foreground">Personal Information (Optional)</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {shouldShowField('location') && (
+                    <div>
+                      <Label htmlFor="location">Location</Label>
+                      <Input
+                        id="location"
+                        placeholder="City, Country"
+                        value={demographics.location}
+                        onChange={(e) => updateDemographics('location', e.target.value)}
+                      />
+                    </div>
+                  )}
+                  {shouldShowField('occupation') && (
+                    <div>
+                      <Label htmlFor="occupation">Occupation</Label>
+                      <Input
+                        id="occupation"
+                        placeholder="Your job/profession"
+                        value={demographics.occupation}
+                        onChange={(e) => updateDemographics('occupation', e.target.value)}
+                      />
+                    </div>
+                  )}
+                  {shouldShowField('education') && (
+                    <div>
+                      <Label htmlFor="education">Education Level</Label>
+                      <select
+                        id="education"
+                        value={demographics.education}
+                        onChange={(e) => updateDemographics('education', e.target.value)}
+                        className="w-full px-3 py-2 border border-input bg-background rounded-md"
+                      >
+                        <option value="">Select education level</option>
+                        <option value="high-school">High School</option>
+                        <option value="some-college">Some College</option>
+                        <option value="bachelors">Bachelor&apos;s Degree</option>
+                        <option value="masters">Master&apos;s Degree</option>
+                        <option value="phd">PhD/Doctorate</option>
+                        <option value="other">Other</option>
+                      </select>
+                    </div>
+                  )}
+                  {shouldShowField('income') && (
+                    <div>
+                      <Label htmlFor="income">Income Range</Label>
+                      <select
+                        id="income"
+                        value={demographics.income}
+                        onChange={(e) => updateDemographics('income', e.target.value)}
+                        className="w-full px-3 py-2 border border-input bg-background rounded-md"
+                      >
+                        <option value="">Select income range</option>
+                        <option value="under-25k">Under $25,000</option>
+                        <option value="25k-50k">$25,000 - $50,000</option>
+                        <option value="50k-75k">$50,000 - $75,000</option>
+                        <option value="75k-100k">$75,000 - $100,000</option>
+                        <option value="100k-150k">$100,000 - $150,000</option>
+                        <option value="over-150k">Over $150,000</option>
+                        <option value="prefer-not-to-say">Prefer not to say</option>
+                      </select>
+                    </div>
+                  )}
                 </div>
               </div>
-            </div>
+            )}
 
             {/* Interests and Views */}
-            <div>
-              <h4 className="font-medium mb-3 text-sm text-muted-foreground">Interests & Views (Optional)</h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="interests">Interests & Hobbies</Label>
-                  <Textarea
-                    id="interests"
-                    placeholder="e.g., Technology, Sports, Reading, Travel..."
-                    value={demographics.interests}
-                    onChange={(e) => updateDemographics('interests', e.target.value)}
-                    rows={3}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="politicalViews">Political Views</Label>
-                  <select
-                    id="politicalViews"
-                    value={demographics.politicalViews}
-                    onChange={(e) => updateDemographics('politicalViews', e.target.value)}
-                    className="w-full px-3 py-2 border border-input bg-background rounded-md"
-                  >
-                    <option value="">Select political leaning</option>
-                    <option value="very-liberal">Very Liberal</option>
-                    <option value="liberal">Liberal</option>
-                    <option value="moderate">Moderate</option>
-                    <option value="conservative">Conservative</option>
-                    <option value="very-conservative">Very Conservative</option>
-                    <option value="libertarian">Libertarian</option>
-                    <option value="other">Other</option>
-                    <option value="prefer-not-to-say">Prefer not to say</option>
-                  </select>
+            {(shouldShowField('interests') || shouldShowField('politicalViews')) && (
+              <div>
+                <h4 className="font-medium mb-3 text-sm text-muted-foreground">Interests & Views (Optional)</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {shouldShowField('interests') && (
+                    <div>
+                      <Label htmlFor="interests">Interests & Hobbies</Label>
+                      <Textarea
+                        id="interests"
+                        placeholder="e.g., Technology, Sports, Reading, Travel..."
+                        value={demographics.interests}
+                        onChange={(e) => updateDemographics('interests', e.target.value)}
+                        rows={3}
+                      />
+                    </div>
+                  )}
+                  {shouldShowField('politicalViews') && (
+                    <div>
+                      <Label htmlFor="politicalViews">Political Views</Label>
+                      <select
+                        id="politicalViews"
+                        value={demographics.politicalViews}
+                        onChange={(e) => updateDemographics('politicalViews', e.target.value)}
+                        className="w-full px-3 py-2 border border-input bg-background rounded-md"
+                      >
+                        <option value="">Select political leaning</option>
+                        <option value="very-liberal">Very Liberal</option>
+                        <option value="liberal">Liberal</option>
+                        <option value="moderate">Moderate</option>
+                        <option value="conservative">Conservative</option>
+                        <option value="very-conservative">Very Conservative</option>
+                        <option value="libertarian">Libertarian</option>
+                        <option value="other">Other</option>
+                        <option value="prefer-not-to-say">Prefer not to say</option>
+                      </select>
+                    </div>
+                  )}
                 </div>
               </div>
-            </div>
+            )}
 
             {/* Social Media */}
-            <div>
-              <h4 className="font-medium mb-3 text-sm text-muted-foreground">Social Media (Optional)</h4>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <Label htmlFor="twitter">Twitter/X Handle</Label>
-                  <Input
-                    id="twitter"
-                    placeholder="@username"
-                    value={demographics.socialMedia.twitter}
-                    onChange={(e) => updateDemographics('socialMedia.twitter', e.target.value)}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="linkedin">LinkedIn Profile</Label>
-                  <Input
-                    id="linkedin"
-                    placeholder="linkedin.com/in/username"
-                    value={demographics.socialMedia.linkedin}
-                    onChange={(e) => updateDemographics('socialMedia.linkedin', e.target.value)}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="instagram">Instagram Handle</Label>
-                  <Input
-                    id="instagram"
-                    placeholder="@username"
-                    value={demographics.socialMedia.instagram}
-                    onChange={(e) => updateDemographics('socialMedia.instagram', e.target.value)}
-                  />
+            {shouldShowField('socialMedia') && (
+              <div>
+                <h4 className="font-medium mb-3 text-sm text-muted-foreground">Social Media (Optional)</h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <Label htmlFor="twitter">Twitter/X Handle</Label>
+                    <Input
+                      id="twitter"
+                      placeholder="@username"
+                      value={demographics.socialMedia.twitter}
+                      onChange={(e) => updateDemographics('socialMedia.twitter', e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="linkedin">LinkedIn Profile</Label>
+                    <Input
+                      id="linkedin"
+                      placeholder="linkedin.com/in/username"
+                      value={demographics.socialMedia.linkedin}
+                      onChange={(e) => updateDemographics('socialMedia.linkedin', e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="instagram">Instagram Handle</Label>
+                    <Input
+                      id="instagram"
+                      placeholder="@username"
+                      value={demographics.socialMedia.instagram}
+                      onChange={(e) => updateDemographics('socialMedia.instagram', e.target.value)}
+                    />
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
           </CardContent>
           <CardContent className="pt-0">
             <div className="flex justify-end">
@@ -617,22 +681,39 @@ const SurveyPage = () => {
         {currentStep === 'questions' && (
           <>
             {/* Demographics Summary */}
-            <Card className="mb-6">
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="font-medium text-sm text-muted-foreground mb-1">Your Information</h3>
-                    <p className="text-sm">
-                      {demographics.name} • {demographics.email} • Age {demographics.age}
-                      {demographics.location && ` • ${demographics.location}`}
-                    </p>
+            {!shouldSkipDemographics && (
+              <Card className="mb-6">
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="font-medium text-sm text-muted-foreground mb-1">Your Information</h3>
+                      <p className="text-sm">
+                        {demographics.name} • {demographics.email} • Age {demographics.age}
+                        {demographics.location && ` • ${demographics.location}`}
+                      </p>
+                    </div>
+                    <Button variant="outline" size="sm" onClick={backToDemographics}>
+                      Edit Info
+                    </Button>
                   </div>
-                  <Button variant="outline" size="sm" onClick={backToDemographics}>
-                    Edit Info
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            )}
+            
+            {/* Anonymous Survey Notice */}
+            {shouldSkipDemographics && (
+              <Card className="mb-6">
+                <CardContent className="pt-6">
+                  <div className="flex items-center gap-2 text-green-800 dark:text-green-200">
+                    <Shield className="h-4 w-4" />
+                    <span className="text-sm font-medium">Anonymous Survey</span>
+                  </div>
+                  <p className="text-xs text-green-700 dark:text-green-300 mt-1">
+                    This survey is completely anonymous. No personal or demographic information is being collected.
+                  </p>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Questions */}
         <div className="space-y-6">
@@ -763,13 +844,16 @@ const SurveyPage = () => {
       </div>
 
       {/* Modal should always be available, regardless of current step */}
-      <ResponderInfoModal
-        open={modalOpen}
-        onOpenChange={handleModalOpenChange}
-        demographics={demographics}
-        updateDemographics={updateDemographics}
-        onExistingTwinFound={handleExistingTwinFound}
-      />
+      {survey && (
+        <ResponderInfoModal
+          open={modalOpen}
+          onOpenChange={handleModalOpenChange}
+          demographics={demographics}
+          updateDemographics={updateDemographics}
+          onExistingTwinFound={handleExistingTwinFound}
+          anonymityLevel={survey.anonymity_level}
+        />
+      )}
     </div>
   )
 }
