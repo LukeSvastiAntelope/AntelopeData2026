@@ -581,7 +581,7 @@ const SurveysPage = () => {
                                     <Edit className="h-4 w-4" />
                                   </Button>
                                 </Link>
-                                <Link href={`/surveys/${survey.id}/analytics`}>
+                                <Link href={`/surveys/${survey.id}/results`}>
                                   <Button variant="ghost" size="sm">
                                     <BarChart3 className="h-4 w-4" />
                                   </Button>
