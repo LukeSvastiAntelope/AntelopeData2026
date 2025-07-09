@@ -10,6 +10,7 @@ import { Switch } from "@/components/ui/switch"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import { Badge } from "@/components/ui/badge"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import { 
   Plus, 
   Trash2, 
@@ -22,11 +23,20 @@ import {
   Settings,
   Brain,
   Calendar,
-  Clock
+  Clock,
+  Shield,
+  Info
 } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from 'next/navigation'
 import { toast } from 'react-hot-toast'
+import { AnonymityLevel } from '@/app/utils/interface'
+import { 
+  ANONYMITY_CONFIGURATIONS, 
+  getAnonymityLevelDescription, 
+  getPrivacyNotice,
+  getRecommendedAnonymityLevel 
+} from '@/app/utils/anonymity-config'
 
 interface SurveyQuestion {
   id: string
@@ -41,6 +51,8 @@ interface Survey {
   title: string
   description: string
   isPublic: boolean
+  anonymityLevel: AnonymityLevel
+  demographicsRequired: boolean
   questions: SurveyQuestion[]
   startAt?: string
   endAt?: string
@@ -53,6 +65,8 @@ const CreateSurveyPage = () => {
     title: '',
     description: '',
     isPublic: true,
+    anonymityLevel: 'full',
+    demographicsRequired: true,
     questions: [],
     autoPublish: false
   })
@@ -224,6 +238,94 @@ const CreateSurveyPage = () => {
                       onChange={(e) => setSurvey(prev => ({ ...prev, description: e.target.value }))}
                     />
                   </div>
+
+                  {/* Anonymity Level Section */}
+                  <div className="border-t pt-4 space-y-4">
+                    <div className="flex items-center gap-2">
+                      <Shield className="h-5 w-5 text-primary" />
+                      <h3 className="font-medium">Privacy & Anonymity</h3>
+                    </div>
+                    
+                    <div>
+                      <Label htmlFor="anonymityLevel">Anonymity Level</Label>
+                      <Select
+                        value={survey.anonymityLevel}
+                        onValueChange={(value: AnonymityLevel) => setSurvey(prev => ({ ...prev, anonymityLevel: value }))}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="full">
+                            <div className="space-y-1">
+                              <div className="font-medium">Full Demographics</div>
+                              <div className="text-xs text-muted-foreground">
+                                Collect name, email, and complete demographic profile
+                              </div>
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="semi_anonymous">
+                            <div className="space-y-1">
+                              <div className="font-medium">Semi-Anonymous</div>
+                              <div className="text-xs text-muted-foreground">
+                                Collect demographics without personal identification
+                              </div>
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="anonymous">
+                            <div className="space-y-1">
+                              <div className="font-medium">Anonymous</div>
+                              <div className="text-xs text-muted-foreground">
+                                Minimal data collection for complete privacy
+                              </div>
+                            </div>
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <p className="text-sm text-muted-foreground mt-2">
+                        {getAnonymityLevelDescription(survey.anonymityLevel)}
+                      </p>
+                    </div>
+
+                    <Alert>
+                      <Info className="h-4 w-4" />
+                      <AlertDescription>
+                        {getPrivacyNotice(survey.anonymityLevel)}
+                      </AlertDescription>
+                    </Alert>
+
+                    {survey.title && survey.description && (
+                      <div className="bg-blue-50 dark:bg-blue-950/20 p-3 rounded-lg">
+                        <div className="flex items-start gap-2">
+                          <Brain className="h-4 w-4 text-blue-600 mt-0.5" />
+                          <div className="text-xs text-blue-700 dark:text-blue-300">
+                            <p className="font-medium mb-1">AI Recommendation</p>
+                            <p>
+                              Based on your survey content, we recommend: <strong>
+                                {getRecommendedAnonymityLevel(survey.title, survey.description)}
+                              </strong> anonymity level.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <Label htmlFor="demographicsRequired">Require Demographics</Label>
+                        <p className="text-sm text-muted-foreground">
+                          Force respondents to complete demographics before survey questions
+                        </p>
+                      </div>
+                      <Switch
+                        id="demographicsRequired"
+                        checked={survey.demographicsRequired}
+                        onCheckedChange={(checked) => setSurvey(prev => ({ ...prev, demographicsRequired: checked }))}
+                        disabled={survey.anonymityLevel === 'anonymous'}
+                      />
+                    </div>
+                  </div>
+
                   <div className="flex items-center justify-between">
                     <div>
                       <Label htmlFor="public">Public Survey</Label>

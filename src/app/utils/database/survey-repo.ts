@@ -11,10 +11,18 @@ import {
     Survey,
     SurveyQuestion,
     SurveyResponse,
-    ResponderAgent
+    ResponderAgent,
+    AnonymityLevel,
+    DemographicCategory
 } from "../interface";
 import { generateConfirmationToken } from "../api/token";
 import { randomUUID } from 'crypto';
+import { 
+    calculateCompletionPercentage, 
+    filterDemographicsForAnonymity,
+    canChangeAnonymityLevel,
+    categorizeImportedTwin
+} from "../anonymity-config";
 
 export const SurveyRepo = {
     createSurvey: async (data: any, createdBy: number) => {
@@ -55,23 +63,25 @@ export const SurveyRepo = {
             
             const hasSourceTracking = sourceColumns.length > 0;
             
-            // Insert survey meta with optional source tracking
+            // Insert survey meta with optional source tracking and anonymity level
             let surveyResult: ResultSetHeader;
+            const anonymityLevel = data.anonymityLevel || 'full';
+            const demographicsRequired = data.demographicsRequired !== false; // Default to true
             
             if (hasSourceTracking) {
                 const source = data.source || 'native';
                 const sourceMetadata = data.sourceMetadata ? JSON.stringify(data.sourceMetadata) : null;
                 
                 [surveyResult] = await connection.execute<ResultSetHeader>(
-                    `INSERT INTO surveys (title, description, slug, created_by, is_public, status, start_at, end_at, source, source_metadata) 
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                    [data.title, data.description, slug, createdBy, data.isPublic, status, startAt, endAt, source, sourceMetadata]
+                    `INSERT INTO surveys (title, description, slug, created_by, is_public, anonymity_level, demographics_required, status, start_at, end_at, source, source_metadata) 
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                    [data.title, data.description, slug, createdBy, data.isPublic, anonymityLevel, demographicsRequired, status, startAt, endAt, source, sourceMetadata]
                 );
             } else {
                 [surveyResult] = await connection.execute<ResultSetHeader>(
-                    `INSERT INTO surveys (title, description, slug, created_by, is_public, status, start_at, end_at) 
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-                    [data.title, data.description, slug, createdBy, data.isPublic, status, startAt, endAt]
+                    `INSERT INTO surveys (title, description, slug, created_by, is_public, anonymity_level, demographics_required, status, start_at, end_at) 
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                    [data.title, data.description, slug, createdBy, data.isPublic, anonymityLevel, demographicsRequired, status, startAt, endAt]
                 );
             }
             
@@ -177,21 +187,31 @@ export const SurveyRepo = {
             
             const hasResponseSourceTracking = responseSourceColumns.length > 0;
             
-            // Insert survey response with optional source tracking
+            // Get survey anonymity level
+            const [surveyRows] = await connection.execute<RowDataPacket[]>(
+                'SELECT anonymity_level FROM surveys WHERE id = ?',
+                [data.surveyId]
+            );
+            const anonymityLevel = surveyRows[0]?.anonymity_level || 'full';
+            
+            // Filter demographics based on anonymity level
+            const filteredDemographics = filterDemographicsForAnonymity(data.demographics, anonymityLevel);
+            
+            // Insert survey response with optional source tracking and anonymity level
             let responseResult: ResultSetHeader;
             
             if (hasResponseSourceTracking) {
                 const source = data.source || 'native';
                 [responseResult] = await connection.execute<ResultSetHeader>(
-                    `INSERT INTO survey_responses (survey_id, demographics, ip_address, user_agent, source) 
-                     VALUES (?, ?, ?, ?, ?)`,
-                    [data.surveyId, JSON.stringify(data.demographics), ipAddress, userAgent, source]
+                    `INSERT INTO survey_responses (survey_id, demographics, anonymity_level, ip_address, user_agent, source) 
+                     VALUES (?, ?, ?, ?, ?, ?)`,
+                    [data.surveyId, JSON.stringify(filteredDemographics), anonymityLevel, ipAddress, userAgent, source]
                 );
             } else {
                 [responseResult] = await connection.execute<ResultSetHeader>(
-                    `INSERT INTO survey_responses (survey_id, demographics, ip_address, user_agent) 
-                     VALUES (?, ?, ?, ?)`,
-                    [data.surveyId, JSON.stringify(data.demographics), ipAddress, userAgent]
+                    `INSERT INTO survey_responses (survey_id, demographics, anonymity_level, ip_address, user_agent) 
+                     VALUES (?, ?, ?, ?, ?)`,
+                    [data.surveyId, JSON.stringify(filteredDemographics), anonymityLevel, ipAddress, userAgent]
                 );
             }
             
@@ -206,9 +226,12 @@ export const SurveyRepo = {
             }
             
             // Handle digital twin creation/linking
-            const email = data.demographics?.email;
+            const email = filteredDemographics?.email;
             let agentToken;
             let isExistingTwin = false;
+            
+            // Calculate completion percentage and demographic category
+            const completionResult = calculateCompletionPercentage(filteredDemographics, anonymityLevel);
             
             // Check if agent_token column exists in survey_responses
             const [agentTokenColumns] = await connection.execute<RowDataPacket[]>(
@@ -250,15 +273,15 @@ export const SurveyRepo = {
                     
                     if (hasEmailColumn) {
                         await connection.execute(
-                            `INSERT INTO responder_agents (created_from_response_id, agent_token, email, base_profile) 
-                             VALUES (?, ?, ?, ?)`,
-                            [responseId, agentToken, email, JSON.stringify({ demographics: data.demographics, status: 'initial' })]
+                            `INSERT INTO responder_agents (created_from_response_id, completion_percentage, demographic_category, agent_token, email, base_profile) 
+                             VALUES (?, ?, ?, ?, ?, ?)`,
+                            [responseId, completionResult.percentage, completionResult.category, agentToken, email, JSON.stringify({ demographics: filteredDemographics, status: 'initial', anonymityLevel })]
                         );
                     } else {
                         await connection.execute(
-                            `INSERT INTO responder_agents (created_from_response_id, agent_token, base_profile) 
-                             VALUES (?, ?, ?)`,
-                            [responseId, agentToken, JSON.stringify({ demographics: data.demographics, status: 'initial' })]
+                            `INSERT INTO responder_agents (created_from_response_id, completion_percentage, demographic_category, agent_token, base_profile) 
+                             VALUES (?, ?, ?, ?, ?)`,
+                            [responseId, completionResult.percentage, completionResult.category, agentToken, JSON.stringify({ demographics: filteredDemographics, status: 'initial', anonymityLevel })]
                         );
                     }
                     
@@ -277,9 +300,9 @@ export const SurveyRepo = {
                 agentToken = `agent_${responseId}_${Date.now()}`;
                 
                 await connection.execute(
-                    `INSERT INTO responder_agents (created_from_response_id, agent_token, base_profile) 
-                     VALUES (?, ?, ?)`,
-                    [responseId, agentToken, JSON.stringify({ demographics: data.demographics, status: 'initial' })]
+                    `INSERT INTO responder_agents (created_from_response_id, completion_percentage, demographic_category, agent_token, base_profile) 
+                     VALUES (?, ?, ?, ?, ?)`,
+                    [responseId, completionResult.percentage, completionResult.category, agentToken, JSON.stringify({ demographics: filteredDemographics, status: 'initial', anonymityLevel })]
                 );
                 
                 // Update the survey_response to include the agent_token (if column exists)
@@ -501,6 +524,140 @@ export const SurveyRepo = {
         return true;
     },
 
+    // Update survey anonymity level with audit trail
+    updateSurveyAnonymityLevel: async (surveyId: number, newAnonymityLevel: AnonymityLevel, changedBy: number, reason?: string) => {
+        const db = await getMySQLConnection();
+        const connection = await db.getConnection();
+        
+        try {
+            await connection.beginTransaction();
+            
+            // Get current survey details
+            const [currentRows] = await connection.execute<RowDataPacket[]>(
+                'SELECT anonymity_level, created_by FROM surveys WHERE id = ?',
+                [surveyId]
+            );
+            
+            if (!currentRows[0]) {
+                throw new Error('Survey not found');
+            }
+            
+            const currentLevel = currentRows[0].anonymity_level;
+            const createdBy = currentRows[0].created_by;
+            
+            // Check permissions (only creator or admin can change)
+            if (createdBy !== changedBy) {
+                // TODO: Add admin role check here if needed
+                throw new Error('Permission denied: Only survey creator can change anonymity level');
+            }
+            
+            // Check if survey has responses
+            const [responseCountRows] = await connection.execute<RowDataPacket[]>(
+                'SELECT COUNT(*) as count FROM survey_responses WHERE survey_id = ?',
+                [surveyId]
+            );
+            const hasResponses = responseCountRows[0].count > 0;
+            
+            // Validate the change
+            const changeValidation = canChangeAnonymityLevel(currentLevel, newAnonymityLevel, hasResponses);
+            if (!changeValidation.allowed) {
+                throw new Error(changeValidation.reason);
+            }
+            
+            // Update the survey
+            await connection.execute(
+                'UPDATE surveys SET anonymity_level = ? WHERE id = ?',
+                [newAnonymityLevel, surveyId]
+            );
+            
+            // Create audit record
+            await connection.execute(
+                `INSERT INTO survey_anonymity_audit (survey_id, old_anonymity_level, new_anonymity_level, changed_by, change_reason) 
+                 VALUES (?, ?, ?, ?, ?)`,
+                [surveyId, currentLevel, newAnonymityLevel, changedBy, reason || 'Anonymity level updated']
+            );
+            
+            await connection.commit();
+            connection.release();
+            
+            return true;
+            
+        } catch (error) {
+            await connection.rollback();
+            connection.release();
+            throw error;
+        }
+    },
+
+    // Get digital twin analytics
+    getDigitalTwinAnalytics: async () => {
+        const db = await getMySQLConnection();
+        
+        const [rows] = await db.execute<RowDataPacket[]>(
+            'SELECT * FROM digital_twin_analytics ORDER BY twin_count DESC'
+        );
+        
+        return rows;
+    },
+
+    // Get digital twins with filtering and sorting
+    getDigitalTwinsWithFilters: async (filters: {
+        demographicCategory?: DemographicCategory;
+        minCompletion?: number;
+        maxCompletion?: number;
+        sortBy?: 'completion_percentage' | 'created_at' | 'demographic_category';
+        sortOrder?: 'ASC' | 'DESC';
+        limit?: number;
+        offset?: number;
+    } = {}) => {
+        const db = await getMySQLConnection();
+        
+            const whereConditions: string[] = [];
+    const queryParams: any[] = [];
+        
+        if (filters.demographicCategory) {
+            whereConditions.push('ra.demographic_category = ?');
+            queryParams.push(filters.demographicCategory);
+        }
+        
+        if (filters.minCompletion !== undefined) {
+            whereConditions.push('ra.completion_percentage >= ?');
+            queryParams.push(filters.minCompletion);
+        }
+        
+        if (filters.maxCompletion !== undefined) {
+            whereConditions.push('ra.completion_percentage <= ?');
+            queryParams.push(filters.maxCompletion);
+        }
+        
+        const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
+        const sortBy = filters.sortBy || 'completion_percentage';
+        const sortOrder = filters.sortOrder || 'DESC';
+        const limit = filters.limit || 50;
+        const offset = filters.offset || 0;
+        
+        const [rows] = await db.execute<RowDataPacket[]>(
+            `SELECT 
+                ra.*,
+                sr.demographics,
+                sr.anonymity_level,
+                s.title as survey_title
+             FROM responder_agents ra
+             LEFT JOIN survey_responses sr ON ra.created_from_response_id = sr.id
+             LEFT JOIN surveys s ON sr.survey_id = s.id
+             ${whereClause}
+             ORDER BY ra.${sortBy} ${sortOrder}
+             LIMIT ? OFFSET ?`,
+            [...queryParams, limit, offset]
+        );
+        
+        return rows.map((row: any) => ({
+            ...row,
+            baseProfile: row.base_profile,
+            demographics: row.demographics
+        }));
+    },
+
     getSurveyById: async (surveyId: number, createdBy: number) => {
         const db = await getMySQLConnection();
         
@@ -658,11 +815,37 @@ export const SurveyRepo = {
                 newStatus = 'scheduled';
             }
 
+            // Handle anonymity level updates with validation
+            const anonymityLevel = data.anonymityLevel || 'full';
+            const demographicsRequired = data.demographicsRequired !== false;
+            
+            // Check if we can change anonymity level (if survey has responses)
+            const [responseCountRows] = await connection.execute<RowDataPacket[]>(
+                'SELECT COUNT(*) as count FROM survey_responses WHERE survey_id = ?',
+                [surveyId]
+            );
+            const hasResponses = responseCountRows[0].count > 0;
+            
+            if (hasResponses) {
+                // Get current anonymity level
+                const [currentSurveyRows] = await connection.execute<RowDataPacket[]>(
+                    'SELECT anonymity_level FROM surveys WHERE id = ?',
+                    [surveyId]
+                );
+                const currentLevel = currentSurveyRows[0]?.anonymity_level || 'full';
+                
+                // Validate anonymity level change
+                const changeValidation = canChangeAnonymityLevel(currentLevel, anonymityLevel, hasResponses);
+                if (!changeValidation.allowed) {
+                    throw new Error(changeValidation.reason);
+                }
+            }
+
             await connection.execute(
                 `UPDATE surveys 
-                 SET title = ?, description = ?, slug = ?, is_public = ?, status = ?, start_at = ?, end_at = ? 
+                 SET title = ?, description = ?, slug = ?, is_public = ?, anonymity_level = ?, demographics_required = ?, status = ?, start_at = ?, end_at = ? 
                  WHERE id = ?`,
-                [data.title, data.description, slug, data.isPublic, newStatus, startAt, endAt, surveyId]
+                [data.title, data.description, slug, data.isPublic, anonymityLevel, demographicsRequired, newStatus, startAt, endAt, surveyId]
             );
             
             // Delete existing questions
