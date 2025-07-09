@@ -1,5 +1,15 @@
 import OpenAI from 'openai';
 import { Pinecone } from '@pinecone-database/pinecone';
+import { 
+  AnonymityLevel, 
+  DemographicCategory, 
+  CompletionCalculationResult 
+} from '../interface';
+import { 
+  calculateCompletionPercentage, 
+  filterDemographicsForAnonymity,
+  categorizeImportedTwin 
+} from '../anonymity-config';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -171,30 +181,35 @@ Guidelines:
   }
 
   /**
-   * Store digital twin in Pinecone for future querying
+   * Store digital twin in Pinecone for future querying with completion tracking
    */
   static async storeInPinecone(
     agentToken: string,
     demographics: Demographics,
     principles: PersonaPrinciples,
     answers: SurveyAnswer[],
-    surveyTitle: string
+    surveyTitle: string,
+    anonymityLevel: AnonymityLevel = 'full',
+    completionData?: CompletionCalculationResult
   ): Promise<void> {
     try {
       const index = pinecone.index('prediction-results');
 
+      // Calculate completion data if not provided
+      const completion = completionData || calculateCompletionPercentage(demographics, anonymityLevel);
+      
+      // Filter demographics based on anonymity level
+      const filteredDemographics = filterDemographicsForAnonymity(demographics, anonymityLevel);
+
       // Create a comprehensive text representation for embedding
       const textForEmbedding = `
         Survey: ${surveyTitle}
+        Anonymity Level: ${anonymityLevel}
+        Completion: ${completion.percentage}%
+        Category: ${completion.category}
         
         Demographics:
-        Name: ${demographics.name}
-        Age: ${demographics.age}
-        Location: ${demographics.location}
-        Occupation: ${demographics.occupation}
-        Education: ${demographics.education}
-        Political Views: ${demographics.politicalViews}
-        Interests: ${demographics.interests}
+        ${Object.entries(filteredDemographics).map(([key, value]) => `${key}: ${value}`).join('\n')}
         
         Core Values: ${principles.coreValues.join(', ')}
         Personality: ${principles.personalityTraits.join(', ')}
@@ -237,16 +252,19 @@ Guidelines:
             // Digital twin specific fields
             type: 'digital-twin',
             surveyTitle,
-            demographics: JSON.stringify(demographics),
+            anonymityLevel,
+            completionPercentage: completion.percentage,
+            demographicCategory: completion.category,
+            demographics: JSON.stringify(filteredDemographics),
             principles: JSON.stringify(principles),
             answers: JSON.stringify(answers),
-            email: demographics.email,
-            age: parseInt(demographics.age) || 0,
-            location: demographics.location,
-            occupation: demographics.occupation,
-            politicalViews: demographics.politicalViews,
-            education: demographics.education,
-            income: demographics.income,
+            email: filteredDemographics.email || null,
+            age: parseInt(filteredDemographics.age) || 0,
+            location: filteredDemographics.location || null,
+            occupation: filteredDemographics.occupation || null,
+            politicalViews: filteredDemographics.politicalViews || null,
+            education: filteredDemographics.education || null,
+            income: filteredDemographics.income || null,
           }
         }
       ]);
@@ -390,5 +408,155 @@ Instructions:
       console.error('Error querying digital twin:', error);
       throw new Error('Failed to query digital twin');
     }
+  }
+
+  /**
+   * Get digital twins filtered by completion percentage and demographic category
+   */
+  static async getDigitalTwinsWithFilters(filters: {
+    demographicCategory?: DemographicCategory;
+    minCompletion?: number;
+    maxCompletion?: number;
+    anonymityLevel?: AnonymityLevel;
+    topK?: number;
+  } = {}): Promise<any[]> {
+    try {
+      const index = pinecone.index('prediction-results');
+      const zeroVector = new Array(1536).fill(0);
+
+      // Build filter object
+      const pineconeFilter: any = {
+        type: { $eq: 'digital-twin' }
+      };
+
+      if (filters.demographicCategory) {
+        pineconeFilter.demographicCategory = { $eq: filters.demographicCategory };
+      }
+
+      if (filters.minCompletion !== undefined) {
+        pineconeFilter.completionPercentage = { $gte: filters.minCompletion };
+      }
+
+      if (filters.maxCompletion !== undefined) {
+        if (pineconeFilter.completionPercentage) {
+          pineconeFilter.completionPercentage.$lte = filters.maxCompletion;
+        } else {
+          pineconeFilter.completionPercentage = { $lte: filters.maxCompletion };
+        }
+      }
+
+      if (filters.anonymityLevel) {
+        pineconeFilter.anonymityLevel = { $eq: filters.anonymityLevel };
+      }
+
+      const searchResults = await index.query({
+        vector: zeroVector,
+        topK: filters.topK || 50,
+        includeMetadata: true,
+        filter: pineconeFilter
+      });
+
+      return searchResults.matches || [];
+    } catch (error) {
+      console.error('Error filtering digital twins:', error);
+      throw new Error('Failed to filter digital twins');
+    }
+  }
+
+  /**
+   * Get analytics about digital twin completion and categories
+   */
+  static async getDigitalTwinAnalytics(): Promise<{
+    totalTwins: number;
+    byCategory: Record<DemographicCategory, number>;
+    byAnonymityLevel: Record<AnonymityLevel, number>;
+    averageCompletion: number;
+    completionDistribution: {
+      high: number; // 80%+
+      medium: number; // 40-79%
+      low: number; // <40%
+    };
+  }> {
+    try {
+      const allTwins = await this.getAllDigitalTwins(1000); // Get more for analytics
+      
+      const analytics = {
+        totalTwins: allTwins.length,
+        byCategory: {
+          full_profile: 0,
+          partial_profile: 0,
+          minimal_profile: 0,
+          imported_synthetic: 0
+        } as Record<DemographicCategory, number>,
+        byAnonymityLevel: {
+          full: 0,
+          semi_anonymous: 0,
+          anonymous: 0
+        } as Record<AnonymityLevel, number>,
+        averageCompletion: 0,
+        completionDistribution: {
+          high: 0,
+          medium: 0,
+          low: 0
+        }
+      };
+
+      let totalCompletion = 0;
+
+      for (const twin of allTwins) {
+        const metadata = twin.metadata;
+        
+        // Count by category
+        const category = metadata?.demographicCategory as DemographicCategory;
+        if (category && analytics.byCategory[category] !== undefined) {
+          analytics.byCategory[category]++;
+        }
+
+        // Count by anonymity level
+        const anonymityLevel = metadata?.anonymityLevel as AnonymityLevel;
+        if (anonymityLevel && analytics.byAnonymityLevel[anonymityLevel] !== undefined) {
+          analytics.byAnonymityLevel[anonymityLevel]++;
+        }
+
+        // Calculate completion distribution
+        const completion = metadata?.completionPercentage || 0;
+        totalCompletion += completion;
+        
+        if (completion >= 80) {
+          analytics.completionDistribution.high++;
+        } else if (completion >= 40) {
+          analytics.completionDistribution.medium++;
+        } else {
+          analytics.completionDistribution.low++;
+        }
+      }
+
+      analytics.averageCompletion = allTwins.length > 0 ? totalCompletion / allTwins.length : 0;
+
+      return analytics;
+    } catch (error) {
+      console.error('Error getting digital twin analytics:', error);
+      throw new Error('Failed to get digital twin analytics');
+    }
+  }
+
+  /**
+   * Categorize imported digital twin based on available data
+   */
+  static categorizeImportedDigitalTwin(demographics: Record<string, any>): {
+    category: DemographicCategory;
+    completionPercentage: number;
+  } {
+    const category = categorizeImportedTwin(demographics);
+    
+    // Calculate a basic completion percentage for imported twins
+    const fieldCount = Object.keys(demographics).filter(key => {
+      const value = demographics[key];
+      return value !== null && value !== undefined && value !== '';
+    }).length;
+    
+    const completionPercentage = Math.min(fieldCount * 10, 100); // Rough estimate
+    
+    return { category, completionPercentage };
   }
 } 

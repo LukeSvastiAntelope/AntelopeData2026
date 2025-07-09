@@ -8,6 +8,10 @@ export async function GET(
 ) {
     try {
         const { slug } = await params;
+        
+        // Auto-activate any scheduled surveys that should be active now
+        await SurveyRepo.autoActivateScheduled();
+        
         const survey = await SurveyRepo.getSurveyBySlug(slug);
         
         if (survey) {
@@ -17,8 +21,8 @@ export async function GET(
         // Not active – check if survey exists but is inactive
         const existsAny = await SurveyRepo.getSurveyBySlugAny(slug);
         if (existsAny) {
-            // Allow preview of draft surveys
-            if ((existsAny as any).status === 'draft') {
+            // Allow preview of draft and scheduled surveys
+            if ((existsAny as any).status === 'draft' || (existsAny as any).status === 'scheduled') {
                 return NextResponse.json({ 
                     status: true, 
                     survey: existsAny,
