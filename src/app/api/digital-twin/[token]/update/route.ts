@@ -45,6 +45,13 @@ export async function PATCH(
     // Optionally regenerate principles & Pinecone vector (non-blocking)
     (async () => {
       try {
+        // Get the survey creator's user ID from the database
+        const [surveyCreatorResult] = await db.execute(
+          'SELECT s.created_by FROM survey_responses sr JOIN surveys s ON sr.survey_id = s.id WHERE sr.id = ?',
+          [(existing as any).created_from_response_id]
+        );
+        const surveyCreatorId = (surveyCreatorResult as any[])[0]?.created_by || 'unknown';
+        
         const allAnswers: any[] = []; // Could load existing answers if desired
         const principles = await DigitalTwinService.generatePersonaPrinciples(
           mergedDemographics,
@@ -56,7 +63,8 @@ export async function PATCH(
           mergedDemographics,
           principles,
           allAnswers,
-          'Profile Update'
+          'Profile Update',
+          String(surveyCreatorId)
         );
       } catch (err) {
         console.error('[DigitalTwinUpdate] Failed to regenerate principles:', err);
