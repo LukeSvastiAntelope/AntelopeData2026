@@ -170,8 +170,9 @@ Guidelines:
       );
 
       // Update the digital twin in Pinecone
+      const createdBy = String(existingMetadata?.createdBy || 'unknown');
       await this.storeInPinecone(agentToken, demographics, updatedPrinciples, allAnswers, 
-        `${existingMetadata?.surveyTitle}, ${surveyTitle}`);
+        `${existingMetadata?.surveyTitle}, ${surveyTitle}`, createdBy);
       
       console.log(`🔄 Updated existing digital twin ${agentToken} with new survey data`);
     } catch (error) {
@@ -189,6 +190,7 @@ Guidelines:
     principles: PersonaPrinciples,
     answers: SurveyAnswer[],
     surveyTitle: string,
+    createdBy: string,
     anonymityLevel: AnonymityLevel = 'full',
     completionData?: CompletionCalculationResult
   ): Promise<void> {
@@ -265,6 +267,7 @@ Guidelines:
             politicalViews: filteredDemographics.politicalViews || null,
             education: filteredDemographics.education || null,
             income: filteredDemographics.income || null,
+            createdBy: createdBy, // CRITICAL SECURITY: User ownership tracking
           }
         }
       ]);
@@ -278,8 +281,11 @@ Guidelines:
 
   /**
    * Get all digital twins from Pinecone
+   * @deprecated Use getUserDigitalTwins instead for security
    */
   static async getAllDigitalTwins(topK: number = 50): Promise<any[]> {
+    console.warn('🚨 SECURITY WARNING: getAllDigitalTwins is deprecated. Use getUserDigitalTwins instead to prevent cross-user access.');
+    
     try {
       const index = pinecone.index('prediction-results');
 
@@ -304,13 +310,79 @@ Guidelines:
   }
 
   /**
+   * SECURE: Get digital twins for a specific user only
+   */
+  static async getUserDigitalTwins(userId: string, topK: number = 50): Promise<any[]> {
+    try {
+      const index = pinecone.index('prediction-results');
+
+      // Query with a generic vector to get all digital twins for this user
+      const zeroVector = new Array(1536).fill(0); // text-embedding-3-small dimension
+
+      const searchResults = await index.query({
+        vector: zeroVector,
+        topK,
+        includeMetadata: true,
+        filter: {
+          type: { $eq: 'digital-twin' },
+          createdBy: { $eq: userId }
+        }
+      });
+
+      // eslint-disable-next-line prefer-const
+      let matches = searchResults.matches || [];
+
+      // ---------------------------------------------
+      // 🩹 Fallback: existing twins created before `createdBy` metadata was added
+      // ---------------------------------------------
+      if (matches.length === 0) {
+        console.log(`🔍 No digital twins found via createdBy metadata for user ${userId}. Falling back to DB lookup...`);
+        try {
+          const { openSql } = await import('@/app/utils/database/db');
+          const db = await openSql();
+          const [agentRows] = await db.execute<any[]>(
+            `SELECT ra.agent_token
+             FROM responder_agents ra
+             LEFT JOIN survey_responses sr ON ra.created_from_response_id = sr.id
+             LEFT JOIN surveys s ON sr.survey_id = s.id
+             WHERE s.created_by = ?`,
+            [userId]
+          );
+
+          const agentTokens: string[] = agentRows.map(r => r.agent_token);
+          if (agentTokens.length > 0) {
+            console.log(`🔍 Fallback DB lookup agent tokens count: ${agentTokens.length}`);
+            const CHUNK_SIZE = 100;
+            for (let i = 0; i < agentTokens.length; i += CHUNK_SIZE) {
+              const chunkIds = agentTokens.slice(i, i + CHUNK_SIZE).map(t => `digital-twin-${t}`);
+              const fetched = await index.fetch(chunkIds);
+              matches.push(...Object.values(fetched.records));
+            }
+            console.log(`🔍 Fallback DB lookup fetched ${matches.length} digital twins for user ${userId}`);
+          }
+        } catch (fallbackErr) {
+          console.error('🔍 Fallback DB lookup failed:', fallbackErr);
+        }
+      }
+
+      return matches;
+    } catch (error) {
+      console.error('Error getting user digital twins:', error);
+      throw new Error('Failed to get user digital twins');
+    }
+  }
+
+  /**
    * Query similar digital twins from Pinecone
+   * @deprecated Use findSimilarTwinsForUser instead for security
    */
   static async findSimilarTwins(
     queryText: string,
     topK: number = 5,
     filter?: Record<string, any>
   ): Promise<any[]> {
+    console.warn('🚨 SECURITY WARNING: findSimilarTwins is deprecated. Use findSimilarTwinsForUser instead to prevent cross-user access.');
+    
     try {
       const index = pinecone.index('prediction-results');
 
@@ -343,12 +415,56 @@ Guidelines:
   }
 
   /**
+   * SECURE: Find similar digital twins for a specific user only
+   */
+  static async findSimilarTwinsForUser(
+    queryText: string,
+    userId: string,
+    topK: number = 5,
+    filter?: Record<string, any>
+  ): Promise<any[]> {
+    try {
+      const index = pinecone.index('prediction-results');
+
+      // Generate embedding for query
+      const embeddingResponse = await openai.embeddings.create({
+        model: "text-embedding-3-small",
+        input: queryText,
+      });
+
+      const queryEmbedding = embeddingResponse.data[0].embedding;
+
+      // Search Pinecone (filter for digital twins only AND user ownership)
+      const digitalTwinFilter = {
+        type: { $eq: 'digital-twin' },
+        createdBy: { $eq: userId },
+        ...filter
+      };
+      
+      const searchResults = await index.query({
+        vector: queryEmbedding,
+        topK,
+        includeMetadata: true,
+        filter: digitalTwinFilter
+      });
+
+      return searchResults.matches || [];
+    } catch (error) {
+      console.error('Error querying user digital twins:', error);
+      throw new Error('Failed to query user digital twins');
+    }
+  }
+
+  /**
    * Generate a response as a specific digital twin
+   * @deprecated Use queryDigitalTwinForUser instead for security
    */
   static async queryDigitalTwin(
     agentToken: string,
     question: string
   ): Promise<string> {
+    console.warn('🚨 SECURITY WARNING: queryDigitalTwin is deprecated. Use queryDigitalTwinForUser instead to prevent cross-user access.');
+    
     try {
       // First, get the digital twin data from Pinecone
       const index = pinecone.index('prediction-results');
@@ -411,7 +527,83 @@ Instructions:
   }
 
   /**
+   * SECURE: Generate a response as a specific digital twin with user ownership validation
+   */
+  static async queryDigitalTwinForUser(
+    agentToken: string,
+    question: string,
+    userId: string
+  ): Promise<string> {
+    try {
+      // First, get the digital twin data from Pinecone
+      const index = pinecone.index('prediction-results');
+      const fetchResult = await index.fetch([`digital-twin-${agentToken}`]);
+      
+      if (!fetchResult.records[`digital-twin-${agentToken}`]) {
+        throw new Error('Digital twin not found');
+      }
+
+      const metadata = fetchResult.records[`digital-twin-${agentToken}`].metadata;
+      
+      // CRITICAL SECURITY: Validate user ownership
+      if (metadata?.createdBy !== userId) {
+        throw new Error('Access denied: You can only query your own digital twins');
+      }
+
+      const demographics = typeof metadata?.demographics === 'string'
+        ? JSON.parse(metadata.demographics)
+        : metadata?.demographics;
+      const principles = typeof metadata?.principles === 'string'
+        ? JSON.parse(metadata.principles)
+        : metadata?.principles;
+
+      // Generate response using the persona
+      const prompt = `You are a digital twin representing a real person. Answer the following question as this person would, based on their profile:
+
+Demographics:
+- Age: ${demographics.age}
+- Location: ${demographics.location}
+- Occupation: ${demographics.occupation}
+- Education: ${demographics.education}
+- Political Views: ${demographics.politicalViews}
+
+Persona Profile:
+- Core Values: ${principles.coreValues.join(', ')}
+- Personality Traits: ${principles.personalityTraits.join(', ')}
+- Political Leanings: ${principles.politicalLeanings}
+- Communication Style: ${principles.communicationStyle}
+- Decision Making Style: ${principles.decisionMakingStyle}
+- Worldview: ${principles.worldview}
+
+Question: ${question}
+
+Instructions:
+- Answer as this specific person would, using their communication style
+- Reflect their values, personality, and worldview
+- Be authentic to their demographic and background
+- Keep responses conversational and natural
+- Don't mention that you're a digital twin`;
+
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          { role: "system", content: "You are a digital twin of a real person. Respond authentically as that person would." },
+          { role: "user", content: prompt }
+        ],
+        temperature: 0.7,
+        max_tokens: 500,
+      });
+
+      return completion.choices[0]?.message?.content || "I'm not sure how to respond to that.";
+    } catch (error) {
+      console.error('Error querying user digital twin:', error);
+      throw new Error('Failed to query digital twin');
+    }
+  }
+
+  /**
    * Get digital twins filtered by completion percentage and demographic category
+   * @deprecated Use getDigitalTwinsWithFiltersForUser instead for security
    */
   static async getDigitalTwinsWithFilters(filters: {
     demographicCategory?: DemographicCategory;
@@ -420,6 +612,8 @@ Instructions:
     anonymityLevel?: AnonymityLevel;
     topK?: number;
   } = {}): Promise<any[]> {
+    console.warn('🚨 SECURITY WARNING: getDigitalTwinsWithFilters is deprecated. Use getDigitalTwinsWithFiltersForUser instead to prevent cross-user access.');
+    
     try {
       const index = pinecone.index('prediction-results');
       const zeroVector = new Array(1536).fill(0);
@@ -464,6 +658,60 @@ Instructions:
   }
 
   /**
+   * SECURE: Get digital twins filtered by completion percentage and demographic category for a specific user
+   */
+  static async getDigitalTwinsWithFiltersForUser(userId: string, filters: {
+    demographicCategory?: DemographicCategory;
+    minCompletion?: number;
+    maxCompletion?: number;
+    anonymityLevel?: AnonymityLevel;
+    topK?: number;
+  } = {}): Promise<any[]> {
+    try {
+      const index = pinecone.index('prediction-results');
+      const zeroVector = new Array(1536).fill(0);
+
+      // Build filter object with user ownership
+      const pineconeFilter: any = {
+        type: { $eq: 'digital-twin' },
+        createdBy: { $eq: userId }
+      };
+
+      if (filters.demographicCategory) {
+        pineconeFilter.demographicCategory = { $eq: filters.demographicCategory };
+      }
+
+      if (filters.minCompletion !== undefined) {
+        pineconeFilter.completionPercentage = { $gte: filters.minCompletion };
+      }
+
+      if (filters.maxCompletion !== undefined) {
+        if (pineconeFilter.completionPercentage) {
+          pineconeFilter.completionPercentage.$lte = filters.maxCompletion;
+        } else {
+          pineconeFilter.completionPercentage = { $lte: filters.maxCompletion };
+        }
+      }
+
+      if (filters.anonymityLevel) {
+        pineconeFilter.anonymityLevel = { $eq: filters.anonymityLevel };
+      }
+
+      const searchResults = await index.query({
+        vector: zeroVector,
+        topK: filters.topK || 50,
+        includeMetadata: true,
+        filter: pineconeFilter
+      });
+
+      return searchResults.matches || [];
+    } catch (error) {
+      console.error('Error filtering user digital twins:', error);
+      throw new Error('Failed to filter user digital twins');
+    }
+  }
+
+  /**
    * Get analytics about digital twin completion and categories
    */
   static async getDigitalTwinAnalytics(): Promise<{
@@ -486,7 +734,8 @@ Instructions:
           full_profile: 0,
           partial_profile: 0,
           minimal_profile: 0,
-          imported_synthetic: 0
+          imported_synthetic: 0,
+          anonymous_profile: 0
         } as Record<DemographicCategory, number>,
         byAnonymityLevel: {
           full: 0,

@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
         const [agents] = await db.execute<RowDataPacket[]>(`
             SELECT 
                 ra.id, ra.agent_token, ra.email, ra.created_from_response_id, ra.created_at,
-                sr.survey_id, sr.demographics, s.title as survey_title,
+                sr.survey_id, sr.demographics, s.title as survey_title, s.created_by as survey_creator,
                 GROUP_CONCAT(
                     CONCAT(sq.prompt, '|||', sa.answer_value) 
                     SEPARATOR '###'
@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
             LEFT JOIN surveys s ON sr.survey_id = s.id
             LEFT JOIN survey_answers sa ON sr.id = sa.response_id
             LEFT JOIN survey_questions sq ON sa.question_id = sq.id
-            GROUP BY ra.id, ra.agent_token, ra.email, ra.created_from_response_id, ra.created_at, sr.survey_id, sr.demographics, s.title
+            GROUP BY ra.id, ra.agent_token, ra.email, ra.created_from_response_id, ra.created_at, sr.survey_id, sr.demographics, s.title, s.created_by
             ORDER BY ra.created_at DESC
         `);
 
@@ -94,7 +94,8 @@ export async function POST(req: NextRequest) {
                         demographics,
                         principles,
                         answers,
-                        agent.survey_title || 'Unknown Survey'
+                        agent.survey_title || 'Unknown Survey',
+                        String(agent.survey_creator)
                     );
 
                     console.log(`✅ Successfully synced digital twin: ${agent.agent_token}`);

@@ -47,7 +47,8 @@ async function ensureDigitalTwinInPinecone(agentToken: string, body: any, survey
                         body.demographics,
                         principles,
                         answersWithText,
-                        survey.title
+                        survey.title,
+                        String(survey.created_by)
                     );
                 }
             } else {
@@ -64,7 +65,8 @@ async function ensureDigitalTwinInPinecone(agentToken: string, body: any, survey
                     body.demographics,
                     principles,
                     answersWithText,
-                    survey.title
+                    survey.title,
+                    String(survey.created_by)
                 );
                 console.log(`✅ New digital twin created and stored for ${agentToken}`);
             }
