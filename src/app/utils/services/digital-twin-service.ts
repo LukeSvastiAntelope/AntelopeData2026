@@ -734,7 +734,8 @@ Instructions:
           full_profile: 0,
           partial_profile: 0,
           minimal_profile: 0,
-          imported_synthetic: 0
+          imported_synthetic: 0,
+          anonymous_profile: 0
         } as Record<DemographicCategory, number>,
         byAnonymityLevel: {
           full: 0,
