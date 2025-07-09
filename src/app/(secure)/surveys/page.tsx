@@ -395,7 +395,7 @@ const SurveysPage = () => {
             <div className="flex-col mb-4">  
               <h2 className="text-3xl font-bold">Survey Management</h2>
               <p className="text-muted-foreground text-base max-w-2xl mx-auto mt-2">
-                Create, manage, and analyze your surveys in one place. Build engaging surveys with AI assistance, import from popular platforms, and get real-time insights from your responses.
+                Create, manage, and analyze your surveys in one place. Build engaging surveys with AI assistance, import from popular platforms, and get real-time insights from the responses.
               </p>
             </div>
           </div>
