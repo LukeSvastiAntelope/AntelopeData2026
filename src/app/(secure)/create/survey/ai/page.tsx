@@ -11,6 +11,7 @@ import { SidebarTrigger } from "@/components/ui/sidebar"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import { GPT_MODELS } from '@/app/utils/const'
 import { 
   Sparkles, 
@@ -34,8 +35,17 @@ import {
   Plus,
   Copy,
   Calendar,
-  Clock
+  Clock,
+  Shield,
+  Info
 } from "lucide-react"
+import { AnonymityLevel } from '@/app/utils/interface'
+import { 
+  ANONYMITY_CONFIGURATIONS, 
+  getAnonymityLevelDescription, 
+  getPrivacyNotice,
+  getRecommendedAnonymityLevel 
+} from '@/app/utils/anonymity-config'
 
 interface GeneratedQuestion {
   type: 'text' | 'single-choice' | 'multiple-choice' | 'rating' | 'yes-no'
@@ -67,6 +77,10 @@ const AISurveyBuilderPage = () => {
   const [editableTitle, setEditableTitle] = useState('')
   const [editableDescription, setEditableDescription] = useState('')
   const [editableQuestions, setEditableQuestions] = useState<GeneratedQuestion[]>([])
+
+  // Anonymity state
+  const [anonymityLevel, setAnonymityLevel] = useState<AnonymityLevel>('full')
+  const [demographicsRequired, setDemographicsRequired] = useState(true)
 
   // Scheduling state
   const [startAt, setStartAt] = useState('')
@@ -246,6 +260,8 @@ const AISurveyBuilderPage = () => {
           title: editableTitle,
           description: editableDescription,
           isPublic: true,
+          anonymityLevel,
+          demographicsRequired,
           startAt: startAt || null,
           endAt: endAt || null,
           autoPublish,
@@ -461,6 +477,93 @@ const AISurveyBuilderPage = () => {
                       className="mt-1"
                       rows={3}
                     />
+                  </div>
+
+                  {/* Anonymity Level Section */}
+                  <div className="border-t pt-4 space-y-4">
+                    <div className="flex items-center gap-2">
+                      <Shield className="h-4 w-4 text-primary" />
+                      <Label className="text-sm font-medium">Privacy & Anonymity</Label>
+                    </div>
+                    
+                    <div>
+                      <Label htmlFor="anonymityLevel">Anonymity Level</Label>
+                      <Select
+                        value={anonymityLevel}
+                        onValueChange={(value: AnonymityLevel) => setAnonymityLevel(value)}
+                      >
+                        <SelectTrigger className="mt-1">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="full">
+                            <div className="space-y-1">
+                              <div className="font-medium">Full Demographics</div>
+                              <div className="text-xs text-muted-foreground">
+                                Collect name, email, and complete demographic profile
+                              </div>
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="semi_anonymous">
+                            <div className="space-y-1">
+                              <div className="font-medium">Semi-Anonymous</div>
+                              <div className="text-xs text-muted-foreground">
+                                Collect demographics without personal identification
+                              </div>
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="anonymous">
+                            <div className="space-y-1">
+                              <div className="font-medium">Anonymous</div>
+                              <div className="text-xs text-muted-foreground">
+                                Minimal data collection for complete privacy
+                              </div>
+                            </div>
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <p className="text-sm text-muted-foreground mt-2">
+                        {getAnonymityLevelDescription(anonymityLevel)}
+                      </p>
+                    </div>
+
+                    <Alert>
+                      <Info className="h-4 w-4" />
+                      <AlertDescription>
+                        {getPrivacyNotice(anonymityLevel)}
+                      </AlertDescription>
+                    </Alert>
+
+                    {editableTitle && editableDescription && (
+                      <div className="bg-blue-50 dark:bg-blue-950/20 p-3 rounded-lg">
+                        <div className="flex items-start gap-2">
+                          <Brain className="h-4 w-4 text-blue-600 mt-0.5" />
+                          <div className="text-xs text-blue-700 dark:text-blue-300">
+                            <p className="font-medium mb-1">AI Recommendation</p>
+                            <p>
+                              Based on your survey content, we recommend: <strong>
+                                {getRecommendedAnonymityLevel(editableTitle, editableDescription)}
+                              </strong> anonymity level.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <Label htmlFor="demographicsRequired">Require Demographics</Label>
+                        <p className="text-sm text-muted-foreground">
+                          Force respondents to complete demographics before survey questions
+                        </p>
+                      </div>
+                      <Checkbox
+                        id="demographicsRequired"
+                        checked={demographicsRequired}
+                        onCheckedChange={(checked) => setDemographicsRequired(checked as boolean)}
+                        disabled={anonymityLevel === 'anonymous'}
+                      />
+                    </div>
                   </div>
 
                   {generatedSurvey.purpose && (
