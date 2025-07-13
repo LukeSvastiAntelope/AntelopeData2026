@@ -27,7 +27,7 @@ export function SuccessCelebration({ surveyTitle, onContinue, className }: Succe
             Perfect! 🎉
           </h3>
           <p className="text-lg text-gray-600">
-            You've selected <span className="font-semibold text-gray-900">"{surveyTitle}"</span>
+            You&apos;ve selected <span className="font-semibold text-gray-900">&quot;{surveyTitle}&quot;</span>
           </p>
           <p className="text-gray-500">
             Now you can start asking questions about your survey data!
@@ -38,10 +38,10 @@ export function SuccessCelebration({ surveyTitle, onContinue, className }: Succe
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 max-w-md">
         <h4 className="font-medium text-blue-900 mb-2">Try asking:</h4>
         <ul className="text-sm text-blue-800 space-y-1">
-          <li>• "What are the main trends in responses?"</li>
-          <li>• "How do demographics affect the answers?"</li>
-          <li>• "Show me interesting patterns in the data"</li>
-          <li>• "What insights can you find?"</li>
+          <li>• &quot;What are the main trends in responses?&quot;</li>
+          <li>• &quot;How do demographics affect the answers?&quot;</li>
+          <li>• &quot;Show me interesting patterns in the data&quot;</li>
+          <li>• &quot;What insights can you find?&quot;</li>
         </ul>
       </div>
 
