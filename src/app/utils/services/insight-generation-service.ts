@@ -202,7 +202,16 @@ Generate insights in this exact JSON structure:
 
     let insights: GeneratedInsights;
     try {
-      insights = JSON.parse(response.content);
+      // Clean up the response content to handle markdown code blocks
+      let cleanedContent = response.content;
+      
+      // Remove markdown code blocks if present
+      cleanedContent = cleanedContent.replace(/```json\s*/g, '').replace(/```\s*$/g, '');
+      
+      // Remove any leading/trailing whitespace
+      cleanedContent = cleanedContent.trim();
+      
+      insights = JSON.parse(cleanedContent);
     } catch (error) {
       console.error('Failed to parse AI insights response:', response.content);
       throw new Error('AI returned invalid JSON response for insights');
