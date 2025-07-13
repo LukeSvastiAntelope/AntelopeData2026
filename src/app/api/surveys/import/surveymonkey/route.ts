@@ -36,10 +36,10 @@ const mapSurveyMonkeyQuestionType = (smType: string, subtype?: string): string =
     case 'open_ended':
       return subtype === 'single' ? 'text' : 'text';
     case 'multiple_choice':
-      return subtype === 'single' ? 'single-choice' : 'multi-choice';
+      return subtype === 'single' ? 'single-choice' : 'multiple-choice';
     case 'rating':
     case 'ranking':
-      return 'scale';
+      return 'rating';
     case 'matrix':
       return 'single-choice';
     case 'demographic':
