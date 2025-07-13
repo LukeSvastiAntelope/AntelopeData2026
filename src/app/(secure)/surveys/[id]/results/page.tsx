@@ -38,7 +38,7 @@ import { AreaChart, Area, BarChart, Bar, PieChart as RechartsPieChart, Pie, Cell
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { SurveyAnalyticsDashboard } from '@/components/SurveyAnalyticsDashboard'
-import { SurveyRespondentsTable } from '@/components/survey-respondents-table'
+import { SurveyRespondentsTablePaginated } from '@/components/SurveyRespondentsTablePaginated'
 
 
 
@@ -97,18 +97,18 @@ const SurveyResultsPage = () => {
   const surveyId = params.id as string
   const router = useRouter()
 
-  const [data, setData] = useState<SurveyAnalyticsApiResponse | null>(null)
+  const [summary, setSummary] = useState<any>(null)
   const [loading, setLoading] = useState(true)
 
   // Campaign management functions
   const [campaignLoading, setCampaignLoading] = useState(false)
 
   const handleCampaignAction = async (action: 'start' | 'stop' | 'schedule', actionData?: any) => {
-    if (!data?.survey) return
+    if (!summary?.survey) return
     
     setCampaignLoading(true)
     try {
-      const response = await fetch(`/api/surveys/${data.survey.id}/campaign`, {
+      const response = await fetch(`/api/surveys/${summary.survey.id}/campaign`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -127,10 +127,10 @@ const SurveyResultsPage = () => {
 
       // Update local state
       const newStatus = action === 'start' ? 'active' : action === 'stop' ? 'stopped' : 'scheduled'
-      setData({
-        ...data,
+      setSummary({
+        ...summary,
         survey: {
-          ...data.survey,
+          ...summary.survey,
           status: newStatus
         }
       })
@@ -146,91 +146,37 @@ const SurveyResultsPage = () => {
   useEffect(() => {
     if (!surveyId) return
 
-    const fetchResults = async () => {
+    const fetchSummary = async () => {
       try {
-        const res = await fetch(`/api/surveys/${surveyId}/analytics`, {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem('token')}` || ''
-          }
-        })
+        const res = await fetch(`/api/surveys/${surveyId}/summary`)
         if (res.ok) {
-          const json: SurveyAnalyticsApiResponse = await res.json()
-          setData(json)
+          const json = await res.json()
+          setSummary(json)
         }
       } catch (err) {
-        console.error('Failed to fetch survey results', err)
+        console.error('Failed to fetch survey summary', err)
       } finally {
         setLoading(false)
       }
     }
 
-    fetchResults()
+    fetchSummary()
   }, [surveyId])
 
   // Analytics calculations
   const analytics = useMemo(() => {
-    if (!data?.responses) return null
+    if (!summary) return null
 
-    const responses = data.responses
-
-    // Age distribution
-    const ageGroups = responses.reduce((acc, r) => {
-      const age = parseInt(r.demographics.age)
-      if (age < 25) acc['18-24'] = (acc['18-24'] || 0) + 1
-      else if (age < 35) acc['25-34'] = (acc['25-34'] || 0) + 1
-      else if (age < 45) acc['35-44'] = (acc['35-44'] || 0) + 1
-      else if (age < 55) acc['45-54'] = (acc['45-54'] || 0) + 1
-      else acc['55+'] = (acc['55+'] || 0) + 1
-      return acc
-    }, {} as Record<string, number>)
-
-    const ageData = Object.entries(ageGroups).map(([range, count]) => ({ range, count }))
-
-    // Location distribution (top 5)
-    const locationCounts = responses.reduce((acc, r) => {
-      const location = r.demographics.location || 'Not specified'
-      acc[location] = (acc[location] || 0) + 1
-      return acc
-    }, {} as Record<string, number>)
-
-    const locationData = Object.entries(locationCounts)
-      .sort(([,a], [,b]) => b - a)
-      .slice(0, 5)
-      .map(([location, count]) => ({ location, count }))
-
-    // Education distribution
-    const educationCounts = responses.reduce((acc, r) => {
-      const education = r.demographics.education || 'Not specified'
-      acc[education] = (acc[education] || 0) + 1
-      return acc
-    }, {} as Record<string, number>)
-
-    const educationData = Object.entries(educationCounts).map(([education, count]) => ({ education, count }))
-
-    // Response timeline (by day)
-    const timelineData = responses.reduce((acc, r) => {
-      const date = new Date(r.submitted_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-      acc[date] = (acc[date] || 0) + 1
-      return acc
-    }, {} as Record<string, number>)
-
-    const timeline = Object.entries(timelineData)
-      .sort(([a], [b]) => {
-        // Parse dates for proper sorting
-        const dateA = new Date(a + ', 2024')
-        const dateB = new Date(b + ', 2024')
-        return dateA.getTime() - dateB.getTime()
-      })
-      .map(([date, count]) => ({ date, count }))
+    const { ageData, locationData, educationData, timeline } = summary
 
     return {
-      totalResponses: responses.length,
+      totalResponses: summary.survey.response_count,
       ageData,
       locationData,
       educationData,
       timeline
     }
-  }, [data])
+  }, [summary])
 
 
 
@@ -259,7 +205,7 @@ const SurveyResultsPage = () => {
     )
   }
 
-  if (!data) {
+  if (!summary) {
     return (
       <div className="flex-1 p-2 w-full bg-background">
         <div className="mx-auto rounded-lg bg-card text-card-foreground shadow-lg">
@@ -287,7 +233,7 @@ const SurveyResultsPage = () => {
                   </BreadcrumbItem>
                   <BreadcrumbSeparator />
                   <BreadcrumbItem>
-                    <BreadcrumbPage>{data?.survey?.title || 'Results'}</BreadcrumbPage>
+                    <BreadcrumbPage>{summary?.survey?.title || 'Results'}</BreadcrumbPage>
                   </BreadcrumbItem>
                 </BreadcrumbList>
               </Breadcrumb>
@@ -307,35 +253,35 @@ const SurveyResultsPage = () => {
 
         <div className="p-6 space-y-6">
           {/* Survey Overview */}
-          {data.survey && (
+          {summary.survey && (
             <Card>
               <CardHeader>
                 <div className="flex items-start justify-between">
                   <div className="space-y-2">
                     <CardTitle className="flex items-center gap-2">
                       <BarChart3 className="h-5 w-5" />
-                      {data.survey.title}
+                      {summary.survey.title}
                     </CardTitle>
                     <CardDescription>
-                      {data.survey.description}
+                      {summary.survey.description}
                     </CardDescription>
                     <div className="flex items-center gap-4 text-sm text-muted-foreground">
                       <div className="flex items-center gap-1">
                         <Calendar className="h-4 w-4" />
-                        Created {formatDate(data.survey.created_at)}
+                        Created {formatDate(summary.survey.created_at)}
                       </div>
-                      <Badge variant={data.survey.status === 'active' ? 'default' : 'secondary'}>
-                        {data.survey.status}
+                      <Badge variant={summary.survey.status === 'active' ? 'default' : 'secondary'}>
+                        {summary.survey.status}
                       </Badge>
                       <div className="flex items-center gap-1">
                         <Users className="h-4 w-4" />
-                        {data.responses.length} Responses
+                        {summary.survey.response_count} Responses
                       </div>
                       <div className="flex items-center gap-1">
                         <Brain className="h-4 w-4" />
-                        {data.responses.length} Digital Twins
+                        {summary.survey.response_count} Digital Twins
                       </div>
-                      {data.survey.is_public && (
+                      {summary.survey.is_public && (
                         <div className="flex items-center gap-1 text-green-600">
                           <span className="inline-block h-2 w-2 rounded-full bg-green-600" />
                           Public
@@ -345,9 +291,9 @@ const SurveyResultsPage = () => {
                   </div>
                   
                   {/* Campaign Actions */}
-                  {['draft', 'scheduled', 'active', 'stopped'].includes(data.survey.status) && (
+                  {['draft', 'scheduled', 'active', 'stopped'].includes(summary.survey.status) && (
                     <div className="flex gap-2">
-                      {['draft', 'scheduled', 'stopped'].includes(data.survey.status) && (
+                      {['draft', 'scheduled', 'stopped'].includes(summary.survey.status) && (
                         <Button
                           size="sm"
                           onClick={() => handleCampaignAction('start')}
@@ -358,7 +304,7 @@ const SurveyResultsPage = () => {
                         </Button>
                       )}
                       
-                      {data.survey.status === 'active' && (
+                      {summary.survey.status === 'active' && (
                         <Button
                           size="sm"
                           variant="outline"
@@ -370,7 +316,7 @@ const SurveyResultsPage = () => {
                         </Button>
                       )}
                       
-                      {['draft', 'stopped'].includes(data.survey.status) && (
+                      {['draft', 'stopped'].includes(summary.survey.status) && (
                         <Button
                           size="sm"
                           variant="outline"
@@ -637,12 +583,12 @@ const SurveyResultsPage = () => {
                   <div className="space-y-4">
                     <div>
                       <h3 className="text-lg font-semibold">Survey Responses</h3>
-                      <p className="text-sm text-muted-foreground">All survey responses ({data.responses.length} total)</p>
+                      <p className="text-sm text-muted-foreground">All survey responses ({summary?.survey.response_count || 0} total)</p>
                     </div>
-                    {data.responses.length === 0 ? (
+                    {(summary?.survey.response_count || 0) === 0 ? (
                       <p className="text-center text-muted-foreground py-8">No responses yet.</p>
                     ) : (
-                      <SurveyRespondentsTable data={data.responses} surveyId={surveyId} />
+                      <SurveyRespondentsTablePaginated surveyId={surveyId} />
                     )}
                   </div>
                 </>

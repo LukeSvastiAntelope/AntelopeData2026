@@ -1073,6 +1073,137 @@ export const SurveyRepo = {
         }
     },
 
+    /**
+     * Fetch a paginated list of survey responses with demographics only.
+     * Used for lightweight table views to avoid loading all answers.
+     *
+     * @param surveyId   ID of the survey we want responses for
+     * @param createdBy  User ID – ensures caller owns the survey
+     * @param limit      How many items per page (default 20)
+     * @param offset     Offset calculated as pageIndex * limit (default 0)
+     * @returns          { total: number, responses: Array<ResponseRow> }
+     */
+    getSurveyResponsesPage: async (
+        surveyId: number,
+        createdBy: number,
+        limit: number = 20,
+        offset: number = 0
+    ) => {
+        const db = await getMySQLConnection();
+
+        // Verify ownership first
+        const [surveyRows] = await db.execute<RowDataPacket[]>(
+            'SELECT id FROM surveys WHERE id = ? AND created_by = ?',
+            [surveyId, createdBy]
+        );
+        if (!surveyRows[0]) return null;
+
+        // Get total count for pagination metadata
+        const [[countRow]] = await db.execute<RowDataPacket[]>(
+            'SELECT COUNT(*) as total FROM survey_responses WHERE survey_id = ?',
+            [surveyId]
+        );
+        const total = countRow.total as number;
+
+        // Get paged rows – only demographics & basic meta (no answers)
+        // Note: MySQL prepared statements have issues with LIMIT ? OFFSET ? placeholders in some versions.
+        // We embed the already-validated numeric values directly to avoid the ER_WRONG_ARGUMENTS error.
+        const limitClause = Number.isFinite(limit) ? Math.max(1, limit) : 20;
+        const offsetClause = Number.isFinite(offset) ? Math.max(0, offset) : 0;
+
+        const [responseRows] = await db.execute<RowDataPacket[]>(
+            `SELECT id, demographics, submitted_at, agent_token
+             FROM survey_responses
+             WHERE survey_id = ?
+             ORDER BY submitted_at DESC
+             LIMIT ${limitClause} OFFSET ${offsetClause}`,
+            [surveyId]
+        );
+
+        return {
+            total,
+            responses: responseRows.map((r: any) => ({
+                id: r.id,
+                submitted_at: r.submitted_at,
+                demographics: r.demographics, // JSON parsed by mysql2
+                agentToken: r.agent_token,
+            })),
+        };
+    },
+
+    /**
+     * Compute lightweight aggregated stats for a survey – used for charts on the results overview.
+     */
+    getSurveySummary: async (surveyId: number, createdBy: number) => {
+        const db = await getMySQLConnection();
+
+        // Verify ownership
+        const [surveyRows] = await db.execute<RowDataPacket[]>(
+            'SELECT id, title, description, created_at, status, is_public FROM surveys WHERE id = ? AND created_by = ?',
+            [surveyId, createdBy]
+        );
+        if (!surveyRows[0]) return null;
+        const survey = surveyRows[0];
+
+        // Pull demographics & submitted_at only (much smaller than full answers)
+        const [rows] = await db.execute<RowDataPacket[]>(
+            'SELECT demographics, submitted_at FROM survey_responses WHERE survey_id = ?',
+            [surveyId]
+        );
+
+        // Aggregations
+        const ageBuckets: Record<string, number> = { '18-24':0, '25-34':0, '35-44':0, '45-54':0, '55+':0 };
+        const locationCounts: Record<string, number> = {};
+        const educationCounts: Record<string, number> = {};
+        const timeline: Record<string, number> = {};
+
+        rows.forEach((r:any) => {
+            let demographics:any = {};
+            try { demographics = typeof r.demographics === 'string' ? JSON.parse(r.demographics) : r.demographics; }
+            catch {}
+
+            // Age
+            const age = parseInt(demographics?.age || '0', 10);
+            if (!isNaN(age)) {
+                if (age < 25) ageBuckets['18-24']++; else
+                if (age < 35) ageBuckets['25-34']++; else
+                if (age < 45) ageBuckets['35-44']++; else
+                if (age < 55) ageBuckets['45-54']++; else ageBuckets['55+']++;
+            }
+
+            // Location
+            const loc = demographics?.location || 'Not specified';
+            locationCounts[loc] = (locationCounts[loc]||0)+1;
+
+            // Education
+            const edu = demographics?.education || 'Not specified';
+            educationCounts[edu] = (educationCounts[edu]||0)+1;
+
+            // Timeline by day (MMM dd)
+            const dateKey = new Date(r.submitted_at).toLocaleDateString('en-US',{month:'short',day:'numeric'});
+            timeline[dateKey] = (timeline[dateKey]||0)+1;
+        });
+
+        // Transform to arrays expected by front-end
+        const ageData = Object.entries(ageBuckets).map(([range,count])=>({range,count}));
+        const locationData = Object.entries(locationCounts)
+            .sort(([,a],[,b])=>b-a)
+            .slice(0,5)
+            .map(([location,count])=>({location,count}));
+        const educationData = Object.entries(educationCounts).map(([education,count])=>({education,count}));
+        const timelineData = Object.entries(timeline)
+            .sort((a,b)=> new Date(a[0]+', 2024').getTime() - new Date(b[0]+', 2024').getTime())
+            .map(([date,count])=>({date,count}));
+
+        return {
+            survey:{...survey, response_count: rows.length},
+            ageData,
+            locationData,
+            educationData,
+            timeline: timelineData
+        };
+    },
+
     // Close a survey manually
     closeSurvey: async (surveyId: number, createdBy: number) => {
         const db = await getMySQLConnection();
