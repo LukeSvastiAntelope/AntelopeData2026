@@ -185,11 +185,19 @@ export function SurveyRespondentsTablePaginated({ surveyId }: Props) {
           </Select>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="icon" disabled={pageIndex===0} onClick={() => setPageIndex(0)}><ChevronsLeft /></Button>
-          <Button variant="outline" size="icon" disabled={pageIndex===0} onClick={() => setPageIndex(p => Math.max(p-1,0))}><ChevronLeft/></Button>
-          <span>Page {pageIndex+1} of {data?.totalPages ?? '…'}</span>
-          <Button variant="outline" size="icon" disabled={!data || pageIndex+1>= (data.totalPages || 0)} onClick={() => setPageIndex(p => p+1)}><ChevronRight/></Button>
-          <Button variant="outline" size="icon" disabled={!data || pageIndex+1>= (data.totalPages || 0)} onClick={() => data && setPageIndex(data.totalPages-1)}><ChevronsRight /></Button>
+          <Button variant="outline" size="icon" className="h-6 w-6 p-0" disabled={pageIndex===0} onClick={() => setPageIndex(0)}>
+            <ChevronsLeft className="h-3 w-3" />
+          </Button>
+          <Button variant="outline" size="icon" className="h-6 w-6 p-0" disabled={pageIndex===0} onClick={() => setPageIndex(p => Math.max(p-1,0))}>
+            <ChevronLeft className="h-3 w-3" />
+          </Button>
+          <span className="text-sm">Page {pageIndex+1} of {data?.totalPages ?? '…'}</span>
+          <Button variant="outline" size="icon" className="h-6 w-6 p-0" disabled={!data || pageIndex+1>= (data.totalPages || 0)} onClick={() => setPageIndex(p => p+1)}>
+            <ChevronRight className="h-3 w-3" />
+          </Button>
+          <Button variant="outline" size="icon" className="h-6 w-6 p-0" disabled={!data || pageIndex+1>= (data.totalPages || 0)} onClick={() => data && setPageIndex(data.totalPages-1)}>
+            <ChevronsRight className="h-3 w-3" />
+          </Button>
         </div>
       </div>
     </div>
