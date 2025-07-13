@@ -1,0 +1,470 @@
+// Simple Statistics Generator - Generates basic SQL queries for survey analysis
+import { openSql } from '../database/db';
+import { RowDataPacket } from 'mysql2';
+
+export interface SimpleStatsConfig {
+  maxDistributionQueries?: number;
+  maxCrossTabQueries?: number;
+  includeTextQuestions?: boolean;
+}
+
+export interface QuestionAnalysis {
+  id: number;
+  prompt: string;
+  type: string;
+  options: string[];
+  detectedType: 'yes_no' | 'rating_scale' | 'multiple_choice' | 'text' | 'numeric' | 'skip';
+  priority: number;
+  isInteresting: boolean;
+}
+
+export interface SimpleStatsQuery {
+  id: string;
+  type: 'distribution' | 'cross_tab';
+  title: string;
+  description: string;
+  sql: string;
+  parameters: any[];
+  questionIds: number[];
+  expectedChartType: 'bar' | 'pie' | 'heatmap';
+}
+
+export interface SimpleStatsResult {
+  surveyId: number;
+  questions: QuestionAnalysis[];
+  queries: SimpleStatsQuery[];
+  executedResults: Array<{
+    queryId: string;
+    data: any[];
+    summary: string;
+  }>;
+  metadata: {
+    totalQuestions: number;
+    analyzableQuestions: number;
+    generatedAt: string;
+  };
+}
+
+export class SimpleStatsGenerator {
+  
+  async generateStats(surveyId: number, config: SimpleStatsConfig = {}): Promise<SimpleStatsResult> {
+    const maxDistributions = config.maxDistributionQueries || 8;
+    const maxCrossTabs = config.maxCrossTabQueries || 5;
+    
+    console.log(`Generating simple stats for survey ${surveyId}`);
+    
+    // Get survey questions
+    const questions = await this.getSurveyQuestions(surveyId);
+    
+    // Analyze and categorize questions
+    const analyzedQuestions = this.analyzeQuestions(questions);
+    
+    // Generate distribution queries
+    const distributionQueries = this.generateDistributionQueries(
+      analyzedQuestions.filter(q => q.isInteresting), 
+      maxDistributions
+    );
+    
+    // Generate cross-tabulation queries
+    const crossTabQueries = this.generateCrossTabQueries(
+      analyzedQuestions.filter(q => q.isInteresting),
+      maxCrossTabs
+    );
+    
+    const allQueries = [...distributionQueries, ...crossTabQueries];
+    
+    // Execute all queries
+    const executedResults = await this.executeQueries(surveyId, allQueries);
+    
+    return {
+      surveyId,
+      questions: analyzedQuestions,
+      queries: allQueries,
+      executedResults,
+      metadata: {
+        totalQuestions: questions.length,
+        analyzableQuestions: analyzedQuestions.filter(q => q.isInteresting).length,
+        generatedAt: new Date().toISOString()
+      }
+    };
+  }
+  
+  private async getSurveyQuestions(surveyId: number): Promise<any[]> {
+    const db = await openSql();
+    
+    const [questions] = await db.execute(`
+      SELECT 
+        id,
+        prompt,
+        type,
+        options,
+        question_order,
+        is_required
+      FROM survey_questions 
+      WHERE survey_id = ?
+      ORDER BY question_order ASC
+    `, [surveyId]) as any[];
+    
+    return questions.map(q => ({
+      ...q,
+      options: q.options ? (Array.isArray(q.options) ? q.options : JSON.parse(q.options)) : []
+    }));
+  }
+  
+  private analyzeQuestions(questions: any[]): QuestionAnalysis[] {
+    return questions.map(q => {
+      const analysis: QuestionAnalysis = {
+        id: q.id,
+        prompt: q.prompt,
+        type: q.type,
+        options: q.options || [],
+        detectedType: this.detectQuestionType(q),
+        priority: this.calculatePriority(q),
+        isInteresting: false
+      };
+      
+      analysis.isInteresting = this.isQuestionInteresting(analysis);
+      
+      return analysis;
+    });
+  }
+  
+  private detectQuestionType(question: any): QuestionAnalysis['detectedType'] {
+    const options = question.options || [];
+    const prompt = question.prompt.toLowerCase();
+    
+    // Skip administrative questions
+    if (prompt.includes('respondent id') || 
+        prompt.includes('interview start') || 
+        prompt.includes('interview end') ||
+        options.length === 0) {
+      return 'skip';
+    }
+    
+    // Yes/No questions
+    if (options.length === 2 && 
+        (options.includes('Yes') && options.includes('No'))) {
+      return 'yes_no';
+    }
+    
+    // Yes/No/Not sure questions
+    if (options.length === 3 && 
+        options.includes('Yes') && options.includes('No') && 
+        (options.includes('Not sure') || options.includes('Unsure'))) {
+      return 'yes_no';
+    }
+    
+    // Rating scales (importance, agreement, frequency, etc.)
+    const ratingKeywords = [
+      'very', 'somewhat', 'not very', 'not at all',
+      'extremely', 'moderately', 'slightly',
+      'always', 'often', 'sometimes', 'rarely', 'never',
+      'strongly agree', 'agree', 'disagree', 'strongly disagree',
+      'definitely', 'probably', 'probably not', 'definitely not'
+    ];
+    
+    const hasRatingWords = options.some(opt => 
+      ratingKeywords.some(keyword => opt.toLowerCase().includes(keyword))
+    );
+    
+    if (hasRatingWords || options.length >= 4) {
+      return 'rating_scale';
+    }
+    
+    // Multiple choice (3-6 options, not rating)
+    if (options.length >= 3 && options.length <= 6) {
+      return 'multiple_choice';
+    }
+    
+    // Text questions
+    if (question.type === 'text' || options.length === 0) {
+      return 'text';
+    }
+    
+    return 'multiple_choice'; // Default fallback
+  }
+  
+  private calculatePriority(question: any): number {
+    let priority = 1;
+    const prompt = question.prompt.toLowerCase();
+    
+    // High priority topics
+    const highPriorityTerms = [
+      'trust', 'opinion', 'think', 'believe', 'feel',
+      'important', 'comfortable', 'effective', 'threat',
+      'ai', 'artificial intelligence', 'covid', 'health',
+      'satisfaction', 'experience', 'recommend'
+    ];
+    
+    if (highPriorityTerms.some(term => prompt.includes(term))) {
+      priority += 2;
+    }
+    
+    // Boost for good answer distributions
+    const options = question.options || [];
+    if (options.length >= 3 && options.length <= 6) {
+      priority += 1;
+    }
+    
+    return priority;
+  }
+  
+  private isQuestionInteresting(analysis: QuestionAnalysis): boolean {
+    // Skip administrative questions
+    if (analysis.detectedType === 'skip') return false;
+    
+    // Skip text questions for now (could add sentiment analysis later)
+    if (analysis.detectedType === 'text') return false;
+    
+    // Must have reasonable number of options
+    if (analysis.options.length === 0 || analysis.options.length > 8) return false;
+    
+    // Must be substantive question
+    if (analysis.prompt.length < 10) return false;
+    
+    return true;
+  }
+  
+  private generateDistributionQueries(questions: QuestionAnalysis[], maxQueries: number): SimpleStatsQuery[] {
+    // Sort by priority and take top questions
+    const topQuestions = questions
+      .sort((a, b) => b.priority - a.priority)
+      .slice(0, maxQueries);
+    
+    return topQuestions.map((q, index) => ({
+      id: `dist_${q.id}`,
+      type: 'distribution',
+      title: `Distribution: ${this.truncateText(q.prompt, 60)}`,
+      description: `Response distribution for "${q.prompt}"`,
+      sql: `
+        SELECT 
+          answer_value, 
+          COUNT(*) as count,
+          ROUND(COUNT(*) * 100.0 / (
+            SELECT COUNT(*) 
+            FROM survey_answers 
+            WHERE question_id = ? AND answer_value IS NOT NULL AND answer_value != ''
+          ), 1) as percentage
+        FROM survey_answers sa
+        WHERE sa.question_id = ? 
+          AND sa.answer_value IS NOT NULL 
+          AND sa.answer_value != ''
+        GROUP BY sa.answer_value 
+        ORDER BY count DESC
+      `,
+      parameters: [q.id, q.id],
+      questionIds: [q.id],
+      expectedChartType: q.detectedType === 'yes_no' ? 'pie' : 'bar'
+    }));
+  }
+  
+  private generateCrossTabQueries(questions: QuestionAnalysis[], maxQueries: number): SimpleStatsQuery[] {
+    const crossTabs: SimpleStatsQuery[] = [];
+    
+    // Find demographic-like questions (shorter options, basic categories)
+    const demographicQuestions = questions.filter(q => 
+      q.options.length <= 4 && 
+      (q.detectedType === 'multiple_choice' || q.detectedType === 'yes_no')
+    );
+    
+    // Find opinion questions (rating scales, longer prompts)
+    const opinionQuestions = questions.filter(q => 
+      q.detectedType === 'rating_scale' && 
+      q.priority >= 2
+    );
+    
+    let generated = 0;
+    
+    // Generate cross-tabs between demographics and opinions
+    for (const demo of demographicQuestions.slice(0, 3)) {
+      for (const opinion of opinionQuestions.slice(0, 2)) {
+        if (generated >= maxQueries) break;
+        
+        crossTabs.push({
+          id: `cross_${demo.id}_${opinion.id}`,
+          type: 'cross_tab',
+          title: `${demo.prompt} × ${opinion.prompt}`,
+          description: `Cross-tabulation between "${demo.prompt}" and "${opinion.prompt}"`,
+          sql: `
+            SELECT 
+              a1.answer_value as demo_answer,
+              a2.answer_value as opinion_answer,
+              COUNT(*) as count,
+              ROUND(COUNT(*) * 100.0 / (
+                SELECT COUNT(*) 
+                FROM survey_answers sa1 
+                JOIN survey_answers sa2 ON sa1.response_id = sa2.response_id
+                WHERE sa1.question_id = ? AND sa2.question_id = ?
+                  AND sa1.answer_value IS NOT NULL AND sa1.answer_value != ''
+                  AND sa2.answer_value IS NOT NULL AND sa2.answer_value != ''
+              ), 1) as percentage
+            FROM survey_answers a1
+            JOIN survey_answers a2 ON a1.response_id = a2.response_id
+            WHERE a1.question_id = ? AND a2.question_id = ?
+              AND a1.answer_value IS NOT NULL AND a1.answer_value != ''
+              AND a2.answer_value IS NOT NULL AND a2.answer_value != ''
+            GROUP BY a1.answer_value, a2.answer_value
+            HAVING count >= 5
+            ORDER BY count DESC
+            LIMIT 20
+          `,
+          parameters: [demo.id, opinion.id, demo.id, opinion.id],
+          questionIds: [demo.id, opinion.id],
+          expectedChartType: 'heatmap'
+        });
+        
+        generated++;
+      }
+      if (generated >= maxQueries) break;
+    }
+    
+    return crossTabs;
+  }
+  
+  private async executeQueries(surveyId: number, queries: SimpleStatsQuery[]): Promise<Array<{queryId: string; data: any[]; summary: string}>> {
+    const db = await openSql();
+    const results: Array<{queryId: string; data: any[]; summary: string}> = [];
+    
+    for (const query of queries) {
+      try {
+        console.log(`Executing ${query.type} query: ${query.title}`);
+        
+        const [data] = await db.execute(query.sql, query.parameters) as any[];
+        
+        // Post-process cross-tab data to map numeric values to text labels
+        let processedData = data;
+        if (query.type === 'cross_tab') {
+          processedData = await this.mapCrossTabLabels(db, data, query.questionIds);
+        } else if (query.type === 'distribution') {
+          processedData = await this.mapDistributionLabels(db, data, query.questionIds[0]);
+        }
+        
+        const summary = this.generateQuerySummary(query, processedData);
+        
+        results.push({
+          queryId: query.id,
+          data: processedData,
+          summary: summary
+        });
+        
+        console.log(`Query ${query.id} returned ${data.length} rows`);
+        
+      } catch (error) {
+        console.error(`Error executing query ${query.id}:`, error);
+        results.push({
+          queryId: query.id,
+          data: [],
+          summary: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`
+        });
+      }
+    }
+    
+    // Do not close the shared connection pool here; it is reused elsewhere in the application
+    return results;
+  }
+
+  private parseOptions(optionValue: any): string[] {
+    // Accept a variety of shapes: already-parsed array, JSON string, comma-separated string, null/undefined.
+
+    if (Array.isArray(optionValue)) {
+      return optionValue.map((v) => String(v));
+    }
+
+    if (optionValue === null || optionValue === undefined) return [];
+
+    const optionsString = String(optionValue);
+
+    // Attempt JSON parse first (handles strings that look like '["Yes","No"]')
+    try {
+      const parsed = JSON.parse(optionsString);
+      if (Array.isArray(parsed)) {
+        return parsed;
+      }
+    } catch {
+      // Not JSON – fall through to comma-separated parsing.
+    }
+
+    // Fallback: treat as a comma-separated list (common in legacy surveys)
+    return optionsString
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+  }
+
+  private async mapCrossTabLabels(db: any, data: any[], questionIds: number[]): Promise<any[]> {
+    if (questionIds.length < 2) return data;
+
+    // Get options for both questions
+    const [q1Options] = await db.execute(
+      'SELECT options FROM survey_questions WHERE id = ?',
+      [questionIds[0]]
+    ) as any[];
+
+    const [q2Options] = await db.execute(
+      'SELECT options FROM survey_questions WHERE id = ?',
+      [questionIds[1]]
+    ) as any[];
+
+    const q1OptionsArray = this.parseOptions(q1Options[0]?.options || '');
+    const q2OptionsArray = this.parseOptions(q2Options[0]?.options || '');
+
+    // Map numeric values to text labels (non-numeric values are passed through)
+    const mapped = data.map((row: any) => ({
+      ...row,
+      demo_answer: this.getOptionText(row.demo_answer, q1OptionsArray),
+      opinion_answer: this.getOptionText(row.opinion_answer, q2OptionsArray)
+    }));
+
+    // Remove rows where mapping failed and answers remain raw numeric codes (likely not useful for display)
+    const cleaned = mapped.filter((row: any) => {
+      const isDemoNumeric = /^\d+$/.test(row.demo_answer);
+      const isOpinionNumeric = /^\d+$/.test(row.opinion_answer);
+      return !(isDemoNumeric || isOpinionNumeric);
+    });
+
+    return cleaned;
+  }
+
+  private async mapDistributionLabels(db: any, data: any[], questionId: number): Promise<any[]> {
+    if (!questionId) return data;
+
+    const [optionsRow] = await db.execute('SELECT options FROM survey_questions WHERE id = ?', [questionId]) as any[];
+    const optionsArray = this.parseOptions(optionsRow[0]?.options || '');
+
+    const mapped = data.map((row: any) => ({
+      ...row,
+      answer_value: this.getOptionText(row.answer_value, optionsArray)
+    }));
+
+    return mapped.filter((row: any) => !/^\d+$/.test(row.answer_value));
+  }
+
+  private getOptionText(value: string, options: string[]): string {
+    const numericValue = parseInt(value);
+    if (!isNaN(numericValue) && numericValue >= 1 && numericValue <= options.length) {
+      // Map numeric codes to option text
+      return options[numericValue - 1] || value;
+    }
+    return value; // Return original value if it's already text or mapping failed
+  }
+
+  private generateQuerySummary(query: SimpleStatsQuery, data: any[]): string {
+    if (data.length === 0) {
+      return `No data found for ${query.title}`;
+    }
+    
+    if (query.type === 'distribution') {
+      const total = data.reduce((sum, row) => sum + (row.count || 0), 0);
+      const topAnswer = data[0];
+      return `${total} total responses. Top answer: "${topAnswer.answer_value}" (${topAnswer.percentage}%)`;
+    } else {
+      const total = data.reduce((sum, row) => sum + (row.count || 0), 0);
+      return `${total} total response combinations across ${data.length} unique combinations`;
+    }
+  }
+  
+  private truncateText(text: string, maxLength: number): string {
+    if (text.length <= maxLength) return text;
+    return text.substring(0, maxLength - 3) + '...';
+  }
+} 
