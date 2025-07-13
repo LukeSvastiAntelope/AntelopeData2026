@@ -13,7 +13,7 @@ export const maxDuration = 300; // 5 minutes
 interface ColumnMapping {
   originalName: string;
   mappedName: string;
-  questionType: 'text' | 'single-choice' | 'multiple-choice' | 'multi-choice' | 'rating' | 'email' | 'number';
+  questionType: 'text' | 'single-choice' | 'multiple-choice' | 'rating' | 'email' | 'number';
   isDemographic: boolean;
   demographicField?: string;
   isRequired: boolean;
@@ -195,7 +195,7 @@ function generateSurveyQuestions(mappings: ColumnMapping[]): any[] {
       
       // For single-choice questions, we'll need to determine options from the data
       // This will be handled during response processing
-      if (mapping.questionType === 'single-choice' || mapping.questionType === 'multiple-choice' || mapping.questionType === 'multi-choice') {
+      if (mapping.questionType === 'single-choice' || mapping.questionType === 'multiple-choice') {
         question.options = []; // Will be populated later
       }
       
@@ -211,7 +211,7 @@ function collectChoiceOptions(data: any[], mappings: ColumnMapping[]): Map<strin
   const optionsMap = new Map<string, string[]>();
   
   for (const mapping of mappings) {
-    if ((mapping.questionType === 'single-choice' || mapping.questionType === 'multiple-choice' || mapping.questionType === 'multi-choice') && mapping.includeInSurvey) {
+    if ((mapping.questionType === 'single-choice' || mapping.questionType === 'multiple-choice') && mapping.includeInSurvey) {
       const values = data
         .map(row => String(row[mapping.originalName] || '').trim())
         .filter(v => v !== '')
@@ -359,8 +359,8 @@ export async function POST(req: NextRequest) {
             if (questionId) {
                           let answerValue: string | string[] = String(row[mapping.originalName] || '').trim();
             
-            // For multi-choice questions, handle comma-separated values
-            if ((mapping.questionType === 'multiple-choice' || mapping.questionType === 'multi-choice') && answerValue.includes(',')) {
+            // For multiple-choice questions, handle comma-separated values
+            if (mapping.questionType === 'multiple-choice' && answerValue.includes(',')) {
               answerValue = answerValue.split(',').map(v => v.trim());
             }
               
