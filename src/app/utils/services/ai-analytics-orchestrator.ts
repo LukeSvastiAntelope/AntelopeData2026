@@ -4,6 +4,7 @@ import { SurveyAnalysisEngine, SurveyAnalysisConfig } from './survey-analysis-en
 import { StatisticalQueryGenerator, StatisticalAnalysisConfig } from './statistical-query-generator';
 import { InsightGenerationService, InsightGenerationConfig } from './insight-generation-service';
 import { VisualizationEngine, VisualizationConfig } from './visualization-engine';
+import { SimpleStatsGenerator } from './simple-stats-generator';
 
 export interface AIAnalyticsConfig {
   // Model selection for different stages
@@ -77,20 +78,20 @@ export class AIAnalyticsOrchestrator {
   private visualizationEngine: VisualizationEngine;
 
   constructor(config: Partial<AIAnalyticsConfig> = {}) {
-    // Initialize engines with model preferences
+    // Initialize engines with optimized model assignments
     this.analysisEngine = new SurveyAnalysisEngine(
-      config.analysisModel || 'claude-3-5-sonnet-latest'
+      config.analysisModel || 'gpt-4o-mini' // Simple analysis, don't need complex reasoning
     );
     this.queryGenerator = new StatisticalQueryGenerator(
-      config.queryModel || 'gpt-4o-mini',
+      config.queryModel || 'gpt-4o-mini', // Simple SQL generation
       config.queryCacheHours || 24
     );
     this.insightService = new InsightGenerationService(
-      config.insightModel || 'claude-3-5-sonnet-latest',
+      config.insightModel || 'deepseek-chat', // Best for business insights
       config.insightsCacheHours || 48
     );
     this.visualizationEngine = new VisualizationEngine(
-      config.visualizationModel || 'gpt-4o',
+      config.visualizationModel || 'gpt-4o', // Good for structured visualization
       config.visualizationCacheHours || 24
     );
   }
@@ -162,71 +163,51 @@ export class AIAnalyticsOrchestrator {
     };
 
     try {
-      // Step 1: Survey Analysis & Understanding
+      // Step 1: Skip complex analysis, create simple metadata
       const analysisStart = Date.now();
-      console.log('Step 1: Analyzing survey structure and content...');
+      console.log('Step 1: Creating simple survey metadata...');
       
-      const analysisConfig: SurveyAnalysisConfig = {
-        analysisModel: config.analysisModel,
-        forceRegenerate: config.forceRegenerate || config.forceRegenerateAnalysis
+      // Create minimal analysis metadata for the query generator
+      result.analysis = {
+        surveyId: surveyId,
+        surveyType: 'Survey Analysis',
+        mainThemes: ['Survey Responses'],
+        analysisComplexity: 'simple'
       };
-      
-      result.analysis = await this.analysisEngine.analyzeSurvey(surveyId, analysisConfig);
-      result.metadata.cacheStatus.analysis = analysisConfig.forceRegenerate ? 'generated' : 'cached';
+      result.metadata.cacheStatus.analysis = 'generated';
       result.performance.analysisTimeMs = Date.now() - analysisStart;
       
-      console.log(`Analysis completed in ${result.performance.analysisTimeMs}ms`);
+      console.log(`Simple metadata created in ${result.performance.analysisTimeMs}ms`);
 
-      // Step 2: Generate Statistical Queries
+      // Step 2 & 3: Generate and Execute Statistical Queries (using SimpleStatsGenerator)
       const queryStart = Date.now();
-      console.log('Step 2: Generating statistical analysis queries...');
+      console.log('Step 2 & 3: Generating and executing statistical queries...');
       
-      const queryConfig: StatisticalAnalysisConfig = {
-        analysisModel: config.queryModel,
-        forceRegenerate: config.forceRegenerate || config.forceRegenerateQueries,
-        cacheExpirationHours: config.queryCacheHours
-      };
+      // Use SimpleStatsGenerator directly (it already executes queries)
+      const statsGenerator = new SimpleStatsGenerator();
       
-      result.queries = await this.queryGenerator.generateAnalysisQueries(
-        surveyId, 
-        result.analysis, 
-        queryConfig
-      );
-      result.metadata.cacheStatus.queries = queryConfig.forceRegenerate ? 'generated' : 'cached';
+      const statsResult = await statsGenerator.generateStats(surveyId, {
+        maxDistributionQueries: 10,
+        maxCrossTabQueries: 5
+      });
+      
+      // Use the results directly from SimpleStatsGenerator
+      result.queries = statsResult.queries;
+      result.queryResults = statsResult.executedResults.map((qr: any) => ({
+        id: qr.queryId,
+        data: qr.data,
+        summary: qr.summary,
+        executedAt: new Date().toISOString(),
+        success: qr.data && qr.data.length > 0,
+        analysisType: statsResult.queries.find(q => q.id === qr.queryId)?.type || 'distribution',
+        title: statsResult.queries.find(q => q.id === qr.queryId)?.title || 'Analysis',
+        description: statsResult.queries.find(q => q.id === qr.queryId)?.description || qr.summary
+      }));
+      
+      result.metadata.cacheStatus.queries = 'generated';
       result.performance.queryTimeMs = Date.now() - queryStart;
       
-      console.log(`Generated ${result.queries.length} queries in ${result.performance.queryTimeMs}ms`);
-
-      // Step 3: Execute Statistical Queries
-      console.log('Step 3: Executing statistical queries...');
-      const queryExecutionStart = Date.now();
-      
-      result.queryResults = [];
-      for (const query of result.queries) {
-        try {
-          const queryResult = await this.queryGenerator.executeQuery(query);
-          result.queryResults.push({
-            ...query,
-            data: queryResult,
-            executedAt: new Date().toISOString(),
-            success: true
-          });
-        } catch (error) {
-          console.error(`Failed to execute query ${query.analysisType}:`, error);
-          result.queryResults.push({
-            ...query,
-            data: [],
-            error: error instanceof Error ? error.message : 'Unknown error',
-            executedAt: new Date().toISOString(),
-            success: false
-          });
-        }
-      }
-      
-      const queryExecutionTime = Date.now() - queryExecutionStart;
-      result.performance.queryTimeMs += queryExecutionTime;
-      
-      console.log(`Executed queries in ${queryExecutionTime}ms`);
+      console.log(`Generated and executed ${result.queryResults.length} queries in ${result.performance.queryTimeMs}ms`);
 
       // Step 4: Generate Insights
       const insightStart = Date.now();
@@ -250,25 +231,24 @@ export class AIAnalyticsOrchestrator {
       
       console.log(`Insights generated in ${result.performance.insightTimeMs}ms`);
 
-      // Step 5: Generate Visualizations & Dashboard
+      // Step 5: Generate Visualizations & Dashboard (simplified approach)
       const vizStart = Date.now();
-      console.log('Step 5: Creating dashboard and visualizations...');
+      console.log('Step 5: Creating dashboard directly from statistical data...');
       
-      const vizConfig: VisualizationConfig = {
-        visualizationModel: config.visualizationModel,
-        forceRegenerate: config.forceRegenerate || config.forceRegenerateVisualizations,
-        cacheExpirationHours: config.visualizationCacheHours,
-        maxCharts: config.maxCharts
-      };
+      // Skip AI visualization - create charts directly from statistical results
+      const successfulQueryResults = result.queryResults.filter(r => r.success);
       
-      result.dashboard = await this.visualizationEngine.generateDashboard(
-        surveyId,
-        successfulResults,
-        result.insights,
-        result.analysis,
-        vizConfig
-      );
-      result.metadata.cacheStatus.visualizations = vizConfig.forceRegenerate ? 'generated' : 'cached';
+      if (successfulQueryResults.length > 0) {
+        // Create charts directly from statistical data without AI
+        result.dashboard = this.createDirectDashboard(surveyId, successfulQueryResults);
+        console.log(`Created dashboard with ${result.dashboard.charts.length} charts directly from data`);
+      } else {
+        // Fallback dashboard
+        result.dashboard = this.createFallbackDashboard(surveyId, []);
+        console.log('Created fallback dashboard due to no successful queries');
+      }
+      
+      result.metadata.cacheStatus.visualizations = 'generated';
       result.performance.visualizationTimeMs = Date.now() - vizStart;
       
       console.log(`Dashboard created in ${result.performance.visualizationTimeMs}ms`);
@@ -530,5 +510,158 @@ export class AIAnalyticsOrchestrator {
       console.error('Failed to parse cached analytics data:', error);
       return null;
     }
+    }
+
+  private createDirectDashboard(surveyId: number, queryResults: any[]): any {
+    const charts: any[] = [];
+
+    // Create charts directly from statistical query results
+    for (const queryResult of queryResults) {
+      if (queryResult.data && queryResult.data.length > 0) {
+        const chart = this.createChartFromQueryResult(queryResult);
+        if (chart) {
+          charts.push(chart);
+        }
+      }
+    }
+
+    return {
+      title: `Survey ${surveyId} Statistical Analysis`,
+      description: `Statistical distributions and analysis for survey ${surveyId}`,
+      charts: charts,
+      layout: {
+        sections: [
+          {
+            title: "Statistical Distributions",
+            chartIds: charts.map(c => c.id),
+            priority: 1
+          }
+        ],
+        recommendedOrder: charts.map(c => c.id)
+      },
+      interactivity: {
+        filters: [],
+        drillDowns: []
+      }
+    };
+  }
+
+  private createChartFromQueryResult(queryResult: any): any | null {
+    if (!queryResult.data || queryResult.data.length === 0) {
+      return null;
+    }
+
+    // Use the preserved unique ID from SimpleStatsGenerator
+    const uniqueId = queryResult.id || `${queryResult.analysisType || 'unknown'}_${Math.random().toString(36).substr(2, 9)}`;
+
+    if (queryResult.analysisType === 'cross_tab') {
+      // Convert raw rows to heat-map friendly format (keeping numeric values for now)
+      const heatmapData = queryResult.data.map((row: any) => ({
+        x: row.demo_answer,
+        y: row.opinion_answer,
+        response_count: row.count,
+      }));
+
+      const [xLabelRaw, yLabelRaw] = (queryResult.title || '').split(' × ').map(p => p?.trim());
+      return {
+        id: `chart_${uniqueId}`,
+        type: 'heatmap',
+        title: queryResult.title || 'Cross-tabulation',
+        description: queryResult.description || 'Cross-tabulation between two questions',
+        data: heatmapData,
+        chartConfig: {
+          xAxis: { key: 'x', label: xLabelRaw || 'XAxis', type: 'category' },
+          yAxis: { key: 'y', label: yLabelRaw || 'YAxis', type: 'category' },
+        },
+        insights: this.generateDataInsight(queryResult.data, queryResult.analysisType),
+        priority: 5,
+        category: 'correlation',
+      };
+    }
+
+    // Default to distribution bar chart
+    const chartType = 'bar' as const;
+
+    return {
+      id: `chart_${uniqueId}`,
+      type: chartType,
+      title: queryResult.title || 'Distribution',
+      description: queryResult.description || `Statistical distribution (${queryResult.data.length} categories)`,
+      data: queryResult.data,
+      chartConfig: {
+        xAxis: { key: 'answer_value', label: 'Response', type: 'category' },
+        yAxis: { key: 'count', label: 'Count', type: 'numeric' },
+        series: [{ key: 'count', label: 'Responses', color: '#3f3f46' }],
+        colors: ['#18181b', '#27272a', '#3f3f46', '#52525b'],
+        layout: 'vertical',
+        showLegend: false,
+        showTooltip: true,
+        formatters: { percentage: 'percentage' },
+      },
+      insights: this.generateDataInsight(queryResult.data, queryResult.analysisType),
+      priority: 5,
+      category: 'opinion',
+    };
+  }
+
+  private generateDataInsight(data: any[], analysisType: string): any {
+    if (!data || data.length === 0) {
+      return {
+        keyTakeaway: 'No data available',
+        statisticalSignificance: false,
+        businessRelevance: 'Insufficient data',
+        actionableInsight: 'Collect more responses',
+      };
+    }
+
+    const totalResponses = data.reduce((sum, item) => sum + (item.count || 0), 0);
+
+    if (analysisType === 'distribution') {
+      const sorted = [...data].sort((a, b) => (b.count || 0) - (a.count || 0));
+      const top = sorted[0];
+      const second = sorted[1];
+      const topPct = top.percentage || 0;
+
+      let takeaway = '';
+      if (data.length === 2) {
+        takeaway = `${top.answer_value}: ${topPct}%, ${second.answer_value}: ${second.percentage || 0}%`;
+      } else if (topPct > 40) {
+        takeaway = `Clear majority chose "${top.answer_value}" (${topPct}%)`;
+      } else {
+        takeaway = `"${top.answer_value}" leads with ${topPct}%`;
+      }
+
+      return {
+        keyTakeaway: takeaway,
+        statisticalSignificance: totalResponses >= 30,
+        businessRelevance: `${totalResponses} total responses`,
+        actionableInsight: `${data.length} categories analysed`,
+      };
+    }
+
+    // Cross-tab insight
+    const topCombo = [...data].sort((a, b) => (b.count || 0) - (a.count || 0))[0];
+    return {
+      keyTakeaway: `Most common combination: ${topCombo.demo_answer} × ${topCombo.opinion_answer} (${topCombo.count} responses)`,
+      statisticalSignificance: totalResponses >= 30,
+      businessRelevance: `${data.length} combinations from ${totalResponses} responses`,
+      actionableInsight: 'Use heat-map to spot clusters',
+    };
+  }
+
+  private createFallbackDashboard(surveyId: number, queryResults: any[]): any {
+    return {
+      title: `Survey ${surveyId} Analysis`,
+      description: 'Basic survey analysis dashboard',
+      charts: [],
+      layout: {
+        sections: [],
+        recommendedOrder: []
+      },
+      interactivity: {
+        filters: [],
+        drillDowns: []
+      }
+    };
   }
 } 

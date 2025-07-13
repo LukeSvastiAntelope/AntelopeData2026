@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area, ScatterChart, Scatter } from 'recharts'
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area, ScatterChart, Scatter, LineChart, Line } from 'recharts'
 import { TrendingUp, Users, BarChart3, PieChart as PieChartIcon, Activity, Info, Loader2, Brain, Lightbulb, Target, AlertTriangle, CheckCircle, Clock, Zap } from 'lucide-react'
 
 interface SurveyAnalyticsDashboardProps {
@@ -143,9 +143,9 @@ export function SurveyAnalyticsDashboard({ surveyId, className }: SurveyAnalytic
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          analysisModel: 'claude-3-5-sonnet-latest',
+          analysisModel: 'o3-mini',
           queryModel: 'gpt-4o-mini',
-          insightModel: 'claude-3-5-sonnet-latest',
+          insightModel: 'deepseek-chat',
           visualizationModel: 'gpt-4o',
           maxCharts: 8,
           includeRawData: true,
@@ -393,11 +393,11 @@ export function SurveyAnalyticsDashboard({ surveyId, className }: SurveyAnalytic
         </TabsContent>
 
         <TabsContent value="performance" className="space-y-6">
-          <PerformanceSection 
-            performance={aiAnalytics.performance} 
+          <PerformanceSection
+            performance={aiAnalytics.performance}
             metadata={aiAnalytics.metadata}
             dataQuality={aiAnalytics.dataQuality}
-        />
+          />
         </TabsContent>
       </Tabs>
     </div>
@@ -635,6 +635,164 @@ function ChartCard({ chart }: { chart: any }) {
                 </PieChart>
               </ResponsiveContainer>
         )
+
+      case 'scatter':
+        return (
+          <ResponsiveContainer width="100%" height={300}>
+            <ScatterChart data={chart.data}>
+              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+              <XAxis 
+                dataKey={chart.chartConfig?.xAxis?.key || 'x'} 
+                type="number"
+                className="text-xs"
+                name={chart.chartConfig?.xAxis?.label || 'X Axis'}
+              />
+              <YAxis 
+                dataKey={chart.chartConfig?.yAxis?.key || 'y'} 
+                type="number"
+                className="text-xs"
+                name={chart.chartConfig?.yAxis?.label || 'Y Axis'}
+              />
+              <ChartTooltip content={<ChartTooltipContent />} />
+              <Scatter 
+                dataKey={chart.chartConfig?.yAxis?.key || 'y'} 
+                fill={CHART_COLORS.primary}
+              />
+            </ScatterChart>
+          </ResponsiveContainer>
+        )
+
+      case 'heatmap':
+        // Custom heatmap implementation using CSS Grid
+        const renderHeatmap = () => {
+          if (!chart.data || chart.data.length === 0) {
+            return <p className="text-center text-muted-foreground">No data available for heatmap</p>
+          }
+
+          // Get unique values for x and y axes to create grid
+          const xKey = chart.chartConfig?.xAxis?.key || 'x'
+          const yKey = chart.chartConfig?.yAxis?.key || 'y'
+          const valueKey = 'response_count'
+          
+          const xValues = [...new Set(chart.data.map((item: any) => item[xKey]))].sort()
+          const yValues = [...new Set(chart.data.map((item: any) => item[yKey]))].sort()
+          const allValues = chart.data.map((item: any) => item[valueKey] || 0)
+          const maxValue = Math.max(...allValues)
+          const minValue = Math.min(...allValues)
+          
+          return (
+            <div className="space-y-3">
+               {/* Axis question labels removed (now in header) */}
+              <div 
+                className="grid gap-[2px] mx-auto w-full"
+                style={{ 
+                  gridTemplateColumns: `auto repeat(${xValues.length}, 1fr)`,
+                  width: '100%'
+                }}
+              >
+                {/* Empty corner cell */}
+                <div className="w-12 h-6"></div>
+                
+                                 {/* X-axis labels */}
+                 {xValues.map((xVal, i) => (
+                   <div key={`x-${i}`} className="text-[11px] text-center px-2 py-0.5 font-medium min-w-16">
+                     {String(xVal)}
+                   </div>
+                 ))}
+                
+                {/* Grid cells */}
+                {yValues.map((yVal, yIndex) => (
+                  <React.Fragment key={`row-${yIndex}`}>
+                                         {/* Y-axis label */}
+                     <div className="text-[11px] text-right px-2 py-0.5 font-medium whitespace-nowrap">
+                       {String(yVal)}
+                     </div>
+                    
+                    {/* Data cells */}
+                    {xValues.map((xVal, xIndex) => {
+                      const dataPoint = chart.data.find((item: any) => 
+                        item[xKey] === xVal && item[yKey] === yVal
+                      )
+                      const value = dataPoint?.[valueKey] || 0
+                      const intensity = maxValue > 0 ? (value - minValue) / (maxValue - minValue) : 0
+                      
+                      return (
+                        <div
+                          key={`cell-${xIndex}-${yIndex}`}
+                          className="h-6 min-w-16 border border-border/20 flex items-center justify-center text-[11px] font-medium rounded"
+                          style={{
+                            backgroundColor: `hsl(var(--primary) / ${0.1 + intensity * 0.7})`,
+                            color: intensity > 0.5 ? 'hsl(var(--primary-foreground))' : 'hsl(var(--foreground))'
+                          }}
+                          title={`${xVal} × ${yVal}: ${value}`}
+                        >
+                          {value}
+                        </div>
+                      )
+                    })}
+                  </React.Fragment>
+                ))}
+              </div>
+              {/* Legend */}
+              <div className="flex items-center justify-center gap-2 mt-2">
+                <span className="text-xs text-muted-foreground">Least ({minValue})</span>
+                <div
+                  className="h-2 w-32 rounded bg-gradient-to-r"
+                  style={{
+                    backgroundImage:
+                      'linear-gradient(to right, hsl(var(--primary)/0.1), hsl(var(--primary)/0.8))'
+                  }}
+                />
+                <span className="text-xs text-muted-foreground">Most ({maxValue})</span>
+              </div>
+              {/* Caption removed to reduce redundancy */}
+            </div>
+          )
+        }
+        
+        return (
+          <div className="overflow-auto p-4">
+            {renderHeatmap()}
+          </div>
+        )
+
+      case 'line':
+        return (
+          <ResponsiveContainer width="100%" height={300}>
+            <LineChart data={chart.data}>
+              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+              <XAxis dataKey={chart.chartConfig?.xAxis?.key || 'category'} className="text-xs" />
+              <YAxis className="text-xs" />
+              <ChartTooltip content={<ChartTooltipContent />} />
+              <Line 
+                type="monotone"
+                dataKey={chart.chartConfig?.yAxis?.key || 'value'} 
+                stroke={CHART_COLORS.primary}
+                strokeWidth={2}
+                dot={{ fill: CHART_COLORS.primary, strokeWidth: 2, r: 4 }}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        )
+
+      case 'area':
+        return (
+          <ResponsiveContainer width="100%" height={300}>
+            <AreaChart data={chart.data}>
+              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+              <XAxis dataKey={chart.chartConfig?.xAxis?.key || 'category'} className="text-xs" />
+              <YAxis className="text-xs" />
+              <ChartTooltip content={<ChartTooltipContent />} />
+              <Area 
+                type="monotone"
+                dataKey={chart.chartConfig?.yAxis?.key || 'value'} 
+                stroke={CHART_COLORS.primary}
+                fill={CHART_COLORS.primary}
+                fillOpacity={0.3}
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+        )
       
       default:
         return (
@@ -645,22 +803,34 @@ function ChartCard({ chart }: { chart: any }) {
     }
   }
 
+  // Determine redundancy for non-heatmap charts
+  const rawTitle = chart.title as string;
+
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base">{chart.title}</CardTitle>
-        <CardDescription>{chart.description}</CardDescription>
+        {chart.type === 'heatmap' ? (
+          <CardTitle className="text-base font-semibold whitespace-normal">
+            X: {chart.chartConfig?.xAxis?.label}<br/>
+            Y: {chart.chartConfig?.yAxis?.label}
+          </CardTitle>
+        ) : (
+           <>
+             <CardTitle className="text-lg font-semibold">{rawTitle}</CardTitle>
+           </>
+        )}
       </CardHeader>
       <CardContent>
         {renderChart()}
         
         {chart.insights && (
-          <div className="mt-4 p-3 rounded-lg bg-muted/50">
-            <h5 className="font-medium mb-2">Key Insight</h5>
-            <p className="text-sm text-muted-foreground mb-2">{chart.insights.keyTakeaway}</p>
-            <p className="text-sm">{chart.insights.actionableInsight}</p>
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <Badge variant="secondary" className="flex items-center gap-1 whitespace-normal text-sm font-medium px-3 py-1">
+              <Lightbulb className="h-4 w-4" />
+              {chart.insights.keyTakeaway}
+            </Badge>
             {chart.insights.statisticalSignificance && (
-              <Badge variant="default" className="mt-2">
+              <Badge variant="default" className="text-xs">
                 Statistically Significant
               </Badge>
             )}
