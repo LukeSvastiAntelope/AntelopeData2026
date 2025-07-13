@@ -440,7 +440,7 @@ export interface IAgentContext {
 
 // ===== SURVEY & DIGITAL-TWIN INTERFACES =====
 
-export type QuestionType = 'text' | 'single-choice' | 'multi-choice' | 'scale' | 'email' | 'number';
+export type QuestionType = 'text' | 'single-choice' | 'multiple-choice' | 'rating' | 'yes-no' | 'email' | 'number';
 export type SurveyStatus = 'draft' | 'scheduled' | 'active' | 'published' | 'closed' | 'archived';
 export type EnrichmentStatus = 'pending' | 'processing' | 'completed' | 'failed';
 export type AnonymityLevel = 'full' | 'semi_anonymous' | 'anonymous';
@@ -649,7 +649,7 @@ export interface CohortFilterRule {
 export interface DemographicTemplateDB {
     id: number;
     field_name: string;
-    field_type: 'text' | 'select' | 'multi-select' | 'number' | 'date' | 'boolean' | 'scale';
+    field_type: 'text' | 'select' | 'multi-select' | 'number' | 'date' | 'boolean' | 'rating';
     field_label: string;
     field_options: any | null; // JSON parsed array or null
     validation_rules: any | null; // JSON parsed rules
@@ -664,7 +664,7 @@ export interface DemographicTemplateDB {
 export interface DemographicTemplate {
     id: number;
     fieldName: string;
-    fieldType: 'text' | 'select' | 'multi-select' | 'number' | 'date' | 'boolean' | 'scale';
+    fieldType: 'text' | 'select' | 'multi-select' | 'number' | 'date' | 'boolean' | 'rating';
     fieldLabel: string;
     fieldOptions?: any[];
     validationRules?: Record<string, any>;
@@ -699,7 +699,7 @@ export interface CustomDemographicFieldDB {
     id: number;
     survey_id: number;
     field_name: string;
-    field_type: 'text' | 'select' | 'multi-select' | 'number' | 'date' | 'boolean' | 'scale';
+    field_type: 'text' | 'select' | 'multi-select' | 'number' | 'date' | 'boolean' | 'rating';
     field_label: string;
     field_options: any | null;
     validation_rules: any | null;
@@ -714,7 +714,7 @@ export interface SurveyDemographicResponseDB {
     survey_response_id: number;
     field_name: string;
     field_value: any; // JSON parsed value
-    field_type: 'text' | 'select' | 'multi-select' | 'number' | 'date' | 'boolean' | 'scale';
+    field_type: 'text' | 'select' | 'multi-select' | 'number' | 'date' | 'boolean' | 'rating';
     created_at: string;
 }
 
