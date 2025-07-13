@@ -3,6 +3,11 @@ import { openSql as getMySQLConnection } from "@/app/utils/database/db";
 import { CohortRepo } from "@/app/utils/database/cohort-repo";
 import { CohortFilterRule } from "@/app/utils/interface";
 import { TextEncoder } from "util";
+import { auth } from '@/auth';
+// Simple in-memory cache for survey fact sheets (auto-expires after 15 minutes)
+// NOTE: Suitable for dev/single-node deployments. Replace with Redis in prod.
+const FACT_SHEET_TTL_MS = 15 * 60 * 1000;
+const factSheetCache: Map<number, { ts: number; data: any }> = new Map();
 import { createCompletion, createStreamingCompletion } from "@/app/utils/services/ai-service";
 import { verifyConfirmationToken } from "@/app/utils/api/token";
 import { SmartSurveyQueryBuilder } from "@/app/utils/survey/smart-query-builder";
@@ -177,12 +182,12 @@ export async function POST(req: NextRequest) {
   try {
     console.log('🚀 COHORT QUERY ROUTE STARTED - NEW VERSION WITH FACT SHEET FIRST');
     
-    // Get user ID from NextAuth middleware
-    const userIdHeader = req.headers.get('x-user-id');
-    if (!userIdHeader) {
+    // Authenticate request via NextAuth session (safer than trusting header)
+    const session = await auth();
+    if (!session?.user?.id) {
       return NextResponse.json({ status: false, message: "Unauthorized" }, { status: 401 });
     }
-    const userId = userIdHeader;
+    const userId = session.user.id;
 
     const body = (await req.json()) as CohortQueryPayload;
     const { cohort, question, topK = 1000, surveyId, model = 'gpt-4o', temperature = 0.0, sources, systemPrompt, stream = true } = body;
@@ -283,13 +288,21 @@ export async function POST(req: NextRequest) {
     // 🎯 STEP 3: Load fact sheet as context data (not as replacement)
     let factSheet = null;
     if (surveyId) {
-      try {
-        const { analyzeSurveySchema } = await import('../../../../../scripts/analyze-survey-schema.js');
-        const schema = await analyzeSurveySchema(surveyId, db);
-        factSheet = schema.fact_sheet;
-        console.log(`📊 Loaded fact sheet with ${Object.keys(factSheet.question_stats || {}).length} question stats for context`);
-      } catch (error) {
-        console.warn('Could not load fact sheet:', error.message);
+      // Check cache first
+      const cached = factSheetCache.get(surveyId);
+      if (cached && Date.now() - cached.ts < FACT_SHEET_TTL_MS) {
+        factSheet = cached.data;
+        console.log('📊 Fact sheet served from cache');
+      } else {
+        try {
+          const { analyzeSurveySchema } = await import('../../../../../scripts/analyze-survey-schema.js');
+          const schema = await analyzeSurveySchema(surveyId, db);
+          factSheet = schema.fact_sheet;
+          factSheetCache.set(surveyId, { ts: Date.now(), data: factSheet });
+          console.log(`📊 Loaded fact sheet with ${Object.keys(factSheet.question_stats || {}).length} question stats (cached)`);
+        } catch (error) {
+          console.warn('Could not load fact sheet:', error.message);
+        }
       }
     }
     

@@ -39,7 +39,7 @@ export async function GET(
         tokenUsage: report.token_usage,
         processingTimeMs: report.processing_time_ms,
         summary: report.summary,
-        metadata: report.metadata ? JSON.parse(report.metadata) : {}
+        metadata: report.metadata ?? {}
       },
       sections: sections
     });
