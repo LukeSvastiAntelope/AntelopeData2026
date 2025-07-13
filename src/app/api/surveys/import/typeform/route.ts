@@ -48,7 +48,7 @@ const mapTypeformFieldType = (tfType: string): string => {
     case 'rating':
     case 'opinion_scale':
     case 'number':
-      return 'scale';
+      return 'rating';
     case 'email':
       return 'email';
     case 'phone_number':

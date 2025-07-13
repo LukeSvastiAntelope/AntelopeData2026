@@ -915,7 +915,7 @@ export const SurveyRepo = {
                 [surveyId]
             );
             
-            // For each response, get their answers with value label decoding
+            // For each response, get their answers with improved value label decoding
             const responses = [];
             for (const response of responseRows) {
                 const [answerRows] = await db.execute<RowDataPacket[]>(
@@ -938,20 +938,43 @@ export const SurveyRepo = {
                     answers: answerRows.map((answer: any) => {
                         let decodedValue = answer.answer_value;
                         
+                        // Handle empty or null values
+                        if (!answer.answer_value || answer.answer_value === '') {
+                            decodedValue = '(No answer)';
+                        }
                         // Decode numeric answers using value labels if available
-                        if (answer.options) {
+                        else if (answer.options) {
                             try {
                                 const options = Array.isArray(answer.options) ? answer.options : JSON.parse(answer.options);
+                                const answerValue = String(answer.answer_value).trim();
                                 
-                                // Check if the answer is a number that corresponds to an option index
-                                const answerNum = parseInt(answer.answer_value);
-                                if (!isNaN(answerNum) && answerNum >= 1 && answerNum <= options.length) {
-                                    // Convert 1-based index to 0-based and get the label
-                                    decodedValue = options[answerNum - 1];
+                                // Handle common survey research missing value codes
+                                if (answerValue === '99') {
+                                    decodedValue = "Don't know/Refused";
+                                } else if (answerValue === '98') {
+                                    decodedValue = "Not applicable";
+                                } else if (['7', '8', '9'].includes(answerValue)) {
+                                    decodedValue = "Not applicable";
+                                } else {
+                                    // Try to decode as option index (1-based)
+                                    const answerNum = parseInt(answerValue);
+                                    if (!isNaN(answerNum) && answerNum >= 1 && answerNum <= options.length) {
+                                        // Convert 1-based index to 0-based and get the label
+                                        decodedValue = options[answerNum - 1];
+                                    } else {
+                                        // If it's not a valid index, keep the original value but mark it
+                                        if (!isNaN(answerNum)) {
+                                            decodedValue = `${answerValue} (out of range)`;
+                                        } else {
+                                            // Non-numeric answer, keep as-is
+                                            decodedValue = answerValue;
+                                        }
+                                    }
                                 }
                             } catch (error) {
                                 // If parsing fails, keep the original value
                                 console.warn(`Failed to parse options for question ${answer.question_id}:`, error);
+                                decodedValue = answer.answer_value;
                             }
                         }
                         

@@ -1,6 +1,7 @@
 // Statistical Query Generator - Generates SQL queries for statistical analysis based on survey metadata
 import { openSql } from '../database/db';
 import { createCompletion } from './ai-service';
+import { SimpleStatsGenerator, SimpleStatsResult } from './simple-stats-generator';
 
 export interface StatisticalAnalysisConfig {
   analysisModel?: string;
@@ -9,6 +10,9 @@ export interface StatisticalAnalysisConfig {
 }
 
 export interface StatisticalQueryResult {
+  id?: string; // Unique identifier for the query
+  title?: string; // Human readable title for visualization
+  description?: string; // Detailed description of what the query shows
   analysisType: 'distribution' | 'cross_tabulation' | 'correlation' | 'segmentation';
   query: string;
   parameters: any[];
@@ -43,8 +47,9 @@ export class StatisticalQueryGenerator {
     analysisMetadata: any,
     config: StatisticalAnalysisConfig = {}
   ): Promise<StatisticalQueryResult[]> {
-    const model = config.analysisModel || this.defaultModel;
     const cacheHours = config.cacheExpirationHours || this.defaultCacheHours;
+
+    console.log(`Generating statistical queries for survey ${surveyId} using simplified approach`);
 
     // Check for cached results unless force regenerate
     if (!config.forceRegenerate) {
@@ -55,24 +60,96 @@ export class StatisticalQueryGenerator {
       }
     }
 
-    // Get survey schema and sample data
-    const surveySchema = await this.getSurveySchema(surveyId);
+    try {
+      // Use the new simplified stats generator
+      const statsGenerator = new SimpleStatsGenerator();
+      const statsResult = await statsGenerator.generateStats(surveyId, {
+        maxDistributionQueries: 8,
+        maxCrossTabQueries: 5
+      });
+      
+      // Convert to StatisticalQueryResult format
+      const queries = this.convertSimpleStatsToQueryResults(statsResult);
+      
+      // Cache the results
+      await this.cacheResults(surveyId, queries);
+      
+      console.log(`Generated ${queries.length} queries using simplified approach`);
+      
+      return queries;
+      
+    } catch (error) {
+      console.error(`Error generating queries for survey ${surveyId}:`, error);
+      
+      // Fallback to basic queries
+      const surveySchema = await this.getSurveySchema(surveyId);
+      console.log('Falling back to basic statistical queries');
+             return this.generateFallbackQueries(surveyId, surveySchema);
+    }
+  }
+
+  private convertSimpleStatsToQueryResults(statsResult: SimpleStatsResult): StatisticalQueryResult[] {
+    const results: StatisticalQueryResult[] = [];
     
-    // Generate queries using AI
-    const queries = await this.generateQueriesWithAI(surveyId, analysisMetadata, surveySchema, model);
+    // Convert each executed query to StatisticalQueryResult format
+    for (const executedResult of statsResult.executedResults) {
+      const originalQuery = statsResult.queries.find(q => q.id === executedResult.queryId);
+      if (!originalQuery) continue;
+      
+      const analysisType = originalQuery.type === 'distribution' ? 'distribution' : 'cross_tabulation';
+      
+      results.push({
+        id: originalQuery.id, // Preserve the original unique ID
+        title: originalQuery.title,
+        description: originalQuery.description,
+        analysisType: analysisType as 'distribution' | 'cross_tabulation',
+        query: originalQuery.sql,
+        parameters: originalQuery.parameters,
+        resultStructure: {
+          columns: this.inferColumnsFromData(executedResult.data, originalQuery.type),
+          expectedRowCount: executedResult.data.length,
+          statisticalTests: []
+        },
+        metadata: {
+          questionIds: originalQuery.questionIds.map(id => id.toString()),
+          analysisDescription: originalQuery.description,
+          businessRelevance: `Statistical analysis: ${originalQuery.title}`,
+          statisticalSignificance: executedResult.data.length >= 30,
+          minimumSampleSize: 30
+        }
+      });
+    }
     
-    // Cache the results
-    await this.cacheResults(surveyId, queries);
+    return results;
+  }
+  
+  private inferColumnsFromData(data: any[], queryType: string): Array<{ name: string; type: string; description: string }> {
+    if (data.length === 0) {
+      return [{ name: 'no_data', type: 'VARCHAR', description: 'No data available' }];
+    }
     
-    // After parsing queries from AI
-    // Sanitize correlation queries to avoid ambiguous column and text aggregation issues
-    queries.forEach((q: any) => {
-      if (q.analysisType === 'correlation' && typeof q.query === 'string') {
-        q.query = this.sanitizeCorrelationQuery(q.query);
-      }
-    });
+    const sampleRow = data[0];
+    const columns = [];
     
-    return queries;
+    for (const [key, value] of Object.entries(sampleRow)) {
+      const type = typeof value === 'number' ? 'INT' : 'VARCHAR';
+      const description = this.getColumnDescription(key, queryType);
+      columns.push({ name: key, type, description });
+    }
+    
+    return columns;
+  }
+  
+  private getColumnDescription(columnName: string, queryType: string): string {
+    const descriptions: { [key: string]: string } = {
+      'answer_value': 'Survey response value',
+      'count': 'Number of responses',
+      'percentage': 'Percentage of total responses',
+      'demo_answer': 'Demographic response',
+      'opinion_answer': 'Opinion response'
+    };
+    
+    return descriptions[columnName] || `${queryType} analysis column`;
   }
 
   private async generateQueriesWithAI(
@@ -162,6 +239,12 @@ Return a JSON array of query objects with this exact structure:
     try {
       // Clean up common JSON formatting issues from AI responses
       let cleanedContent = response.content;
+      
+      // Remove markdown code blocks if present
+      cleanedContent = cleanedContent.replace(/```json\s*/g, '').replace(/```\s*$/g, '');
+      
+      // Remove any leading/trailing whitespace
+      cleanedContent = cleanedContent.trim();
       
       // Fix missing quotes around property names and string values
       cleanedContent = cleanedContent.replace(/(\w+):/g, '"$1":'); // Add quotes around property names
