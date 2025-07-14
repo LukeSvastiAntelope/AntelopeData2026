@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
 import { ArrowUpDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react"
+import { useRouter } from "next/navigation"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -43,6 +44,7 @@ interface Props {
 }
 
 export function SurveyRespondentsTablePaginated({ surveyId }: Props) {
+  const router = useRouter()
   const [pageIndex, setPageIndex] = React.useState(0) // zero-based
   const [pageSize, setPageSize] = React.useState(10)
   const [sorting, setSorting] = React.useState<SortingState>([])
@@ -158,7 +160,12 @@ export function SurveyRespondentsTablePaginated({ surveyId }: Props) {
               </TableRow>
             ) : data && data.responses.length ? (
               table.getRowModel().rows.map(row => (
-                <TableRow key={row.id} data-state={row.getIsSelected() && "selected"}>
+                <TableRow
+                  key={row.id}
+                  data-state={row.getIsSelected() && "selected"}
+                  onClick={() => router.push(`/surveys/${surveyId}/results/${row.original.id}`)}
+                  className="cursor-pointer hover:bg-muted/50"
+                >
                   {row.getVisibleCells().map(cell => (
                     <TableCell key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</TableCell>
                   ))}

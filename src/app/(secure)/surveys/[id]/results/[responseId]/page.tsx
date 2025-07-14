@@ -31,30 +31,63 @@ interface SurveyDetailApi {
 const ResponderDetailPage = () => {
   const params = useParams() as { id:string; responseId:string }
   const surveyId = params.id
-  const responseId = parseInt(params.responseId)
+  console.debug('Route params', params)
+  const responseId = parseInt(params.responseId as any)
 
   const [data,setData] = useState<SurveyResponseDetail|null>(null)
   const [surveyTitle,setSurveyTitle]=useState<string>('')
   const [loading,setLoading] = useState(true)
   const [copied,setCopied] = useState(false)
 
-  useEffect(()=>{
+  useEffect(() => {
     const fetchData = async () => {
-      try{
-        const res = await fetch(`/api/surveys/${surveyId}/analytics`,{
-          headers:{ 'Authorization':`Bearer ${localStorage.getItem('token')}` }
-        })
-        if(res.ok){
-          const json:SurveyDetailApi = await res.json()
-          setSurveyTitle(json.survey.title)
-          const found = json.responses.find(r=>r.id===responseId)
-          if(found) setData(found)
+      try {
+        const res = await fetch(`/api/surveys/${surveyId}/responses/${responseId}`)
+        if (res.ok) {
+          const json = await res.json()
+          console.debug('Response detail payload', json)
+          if (json.status && json.response) {
+            const resp = json.response
+            console.debug('Parsed resp.answers', resp.answers)
+            setSurveyTitle(resp?.survey_title || '')
+
+            // Safe-parse demographics which may come as JSON string
+            let parsedDemographics: Record<string, any> = {};
+            try {
+              parsedDemographics = typeof resp.demographics === 'string' ? JSON.parse(resp.demographics) : resp.demographics || {};
+            } catch {
+              parsedDemographics = {};
+            }
+
+            const answers = Array.isArray(resp.answers)
+              ? resp.answers.map((a: any) => ({
+                  questionId: a.question_id ?? a.questionId ?? a.id,
+                  questionText:
+                    (a.question && (a.question.prompt ?? a.question.text)) ||
+                    a.prompt ||
+                    a.questionText ||
+                    'Question',
+                  value: a.answer_value ?? a.answerValue ?? a.value ?? ''
+                }))
+              : [];
+
+            setData({
+              id: resp.id,
+              submitted_at: resp.submitted_at,
+              demographics: parsedDemographics,
+              agentToken: resp.agent_token,
+              answers
+            })
+          }
         }
-      }catch(e){console.error(e)}
-      finally{setLoading(false)}
+      } catch (e) {
+        console.error(e)
+      } finally {
+        setLoading(false)
+      }
     }
-    if(!isNaN(responseId)) fetchData()
-  },[surveyId,responseId])
+    if (!isNaN(responseId)) fetchData()
+  }, [surveyId, responseId])
 
   const copyToken = () => {
     if(!data) return
