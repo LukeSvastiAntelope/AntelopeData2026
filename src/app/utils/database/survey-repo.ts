@@ -1028,9 +1028,9 @@ export const SurveyRepo = {
                     sq.type,
                     sq.options
                 FROM survey_answers sa
-                JOIN survey_questions sq ON sa.question_id = sq.id
+                LEFT JOIN survey_questions sq ON sa.question_id = sq.id
                 WHERE sa.response_id = ?
-                ORDER BY sq.question_order ASC`,
+                ORDER BY IFNULL(sq.question_order, sa.question_id) ASC`,
                 [responseId]
             );
             
