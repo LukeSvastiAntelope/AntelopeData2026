@@ -406,7 +406,7 @@ const SurveyResultsPage = () => {
                   </div>
 
                   {/* Compact Charts Grid */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                     {/* Age Distribution */}
                     <Card>
                       <CardHeader className="pb-2">
@@ -417,7 +417,7 @@ const SurveyResultsPage = () => {
                           config={{ count: { label: "Responses", color: "hsl(var(--zinc-600))" } }} 
                           className="aspect-auto h-[160px] w-full"
                         >
-                          <BarChart data={analytics.ageData}>
+                          <BarChart data={analytics.ageData} margin={{ left: -20, right: 20, top: 12, bottom: 12 }}>
                             <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted))" />
                             <XAxis dataKey="range" tickLine={false} axisLine={false} stroke="hsl(var(--muted-foreground))" fontSize={10} />
                             <YAxis tickLine={false} axisLine={false} stroke="hsl(var(--muted-foreground))" fontSize={10} />
@@ -433,24 +433,24 @@ const SurveyResultsPage = () => {
                       <CardHeader className="pb-2">
                         <CardTitle className="text-sm">Top Locations</CardTitle>
                       </CardHeader>
-                      <CardContent className="pb-4 flex flex-col items-center justify-center">
-                        <div className="w-full flex justify-center">
+                      <CardContent className="pb-4 flex items-center gap-4">
+                        <div className="flex-shrink-0">
                           <ChartContainer 
                             config={{ count: { label: "Responses", color: "hsl(var(--zinc-600))" } }} 
-                            className="aspect-square h-[120px] w-[120px]"
+                            className="aspect-square h-[140px] w-[140px]"
                           >
                             <RechartsPieChart>
                               <Pie
-                                data={analytics.locationData.map((d, i) => ({ ...d, fill: COLORS[i % COLORS.length] }))}
+                                data={analytics.locationData.filter(d => d.location !== 'Not specified').map((d, i) => ({ ...d, fill: COLORS[i % COLORS.length] }))}
                                 cx="50%"
                                 cy="50%"
                                 labelLine={false}
-                                outerRadius={50}
+                                outerRadius={60}
                                 innerRadius={20}
                                 paddingAngle={2}
                                 dataKey="count"
                               >
-                                {analytics.locationData.map((_, index) => (
+                                {analytics.locationData.filter(d => d.location !== 'Not specified').map((_, index) => (
                                   <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                                 ))}
                               </Pie>
@@ -459,8 +459,8 @@ const SurveyResultsPage = () => {
                           </ChartContainer>
                         </div>
                         {/* Legend */}
-                        <div className="w-full flex flex-col gap-1 text-xs mt-2">
-                          {analytics.locationData.slice(0, 3).map((d, i) => (
+                        <div className="flex-1 flex flex-col gap-2 text-xs">
+                          {analytics.locationData.filter(d => d.location !== 'Not specified').map((d, i) => (
                             <div key={d.location} className="flex items-center gap-1">
                               <span
                                 className="inline-block h-2 w-2 rounded-sm"
@@ -480,100 +480,55 @@ const SurveyResultsPage = () => {
                       </CardHeader>
                       <CardContent className="pb-4">
                         <ChartContainer 
-                          config={{ count: { label: "Responses", color: "hsl(var(--zinc-600))" } }} 
+                          config={{ 
+                            count: { label: "Responses", color: "hsl(var(--zinc-600))" },
+                            label: { color: "hsl(var(--background))" }
+                          }} 
                           className="aspect-auto h-[160px] w-full"
                         >
                           <BarChart 
                             data={analytics.educationData} 
-                            layout="horizontal"
-                            margin={{ left: 0, right: 16, top: 12, bottom: 12 }}
+                            accessibilityLayer
+                            layout="vertical"
+                            margin={{ right: 16 }}
                           >
-                            <CartesianGrid horizontal={false} stroke="hsl(var(--muted))" />
-                            <XAxis 
-                              type="number" 
-                              tickLine={false} 
-                              axisLine={false} 
-                              stroke="hsl(var(--muted-foreground))" 
-                              fontSize={10}
-                              hide
-                            />
+                            <CartesianGrid horizontal={false} />
                             <YAxis 
-                              dataKey="education" 
-                              type="category" 
-                              width={80} 
+                              dataKey="education"
+                              type="category"
                               tickLine={false} 
+                              tickMargin={10}
                               axisLine={false} 
-                              stroke="hsl(var(--muted-foreground))" 
-                              fontSize={9}
+                              tickFormatter={(value) => value.length > 20 ? value.slice(0, 20) + "..." : value}
                               hide
                             />
-                            <ChartTooltip content={<ChartTooltipContent />} />
-                            <Bar dataKey="count" fill="hsl(var(--zinc-600))" radius={2}>
+                            <XAxis dataKey="count" type="number" hide />
+                            <ChartTooltip
+                              cursor={false}
+                              content={<ChartTooltipContent indicator="line" />}
+                            />
+                            <Bar
+                              dataKey="count"
+                              layout="vertical"
+                              fill="hsl(var(--zinc-600))"
+                              radius={4}
+                            >
                               <LabelList
                                 dataKey="education"
                                 position="insideLeft"
                                 offset={8}
-                                fill="white"
+                                className="fill-white"
                                 fontSize={10}
                               />
                               <LabelList
                                 dataKey="count"
                                 position="right"
                                 offset={8}
-                                fill="hsl(var(--foreground))"
+                                className="fill-foreground"
                                 fontSize={10}
                               />
                             </Bar>
                           </BarChart>
-                        </ChartContainer>
-                      </CardContent>
-                    </Card>
-
-                    {/* Response Timeline */}
-                    <Card>
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-sm">Response Timeline</CardTitle>
-                      </CardHeader>
-                      <CardContent className="pb-4">
-                        <ChartContainer 
-                          config={{ count: { label: "Responses", color: "hsl(var(--zinc-600))" } }} 
-                          className="aspect-auto h-[160px] w-full"
-                        >
-                          <AreaChart 
-                            data={analytics.timeline}
-                            margin={{ left: 0, right: 0, top: 12, bottom: 12 }}
-                          >
-                            <defs>
-                              <linearGradient id="fillTimelineCompact" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="5%" stopColor="hsl(var(--zinc-600))" stopOpacity={0.8} />
-                                <stop offset="95%" stopColor="hsl(var(--zinc-600))" stopOpacity={0.1} />
-                              </linearGradient>
-                            </defs>
-                            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted))" />
-                            <XAxis 
-                              dataKey="date" 
-                              tickLine={false} 
-                              axisLine={false} 
-                              stroke="hsl(var(--muted-foreground))" 
-                              fontSize={8}
-                              interval="preserveStartEnd"
-                            />
-                            <YAxis 
-                              tickLine={false} 
-                              axisLine={false} 
-                              stroke="hsl(var(--muted-foreground))" 
-                              fontSize={9}
-                              allowDecimals={false}
-                            />
-                            <ChartTooltip content={<ChartTooltipContent />} />
-                            <Area 
-                              type="monotone" 
-                              dataKey="count" 
-                              stroke="hsl(var(--zinc-600))" 
-                              strokeWidth={2} 
-                              fill="url(#fillTimelineCompact)" 
-                            />
-                          </AreaChart>
                         </ChartContainer>
                       </CardContent>
                     </Card>
