@@ -234,11 +234,11 @@ export class SimpleStatsGenerator {
     return topQuestions.map((q, index) => ({
       id: `dist_${q.id}`,
       type: 'distribution',
-      title: `Distribution: ${this.truncateText(q.prompt, 60)}`,
+      title: `Distribution: ${this.truncateText(q.prompt, 150)}`,
       description: `Response distribution for "${q.prompt}"`,
       sql: `
         SELECT 
-          answer_value, 
+          COALESCE(CAST(answer_code AS CHAR), answer_value) AS answer_value, 
           COUNT(*) as count,
           ROUND(COUNT(*) * 100.0 / (
             SELECT COUNT(*) 
@@ -249,7 +249,7 @@ export class SimpleStatsGenerator {
         WHERE sa.question_id = ? 
           AND sa.answer_value IS NOT NULL 
           AND sa.answer_value != ''
-        GROUP BY sa.answer_value 
+        GROUP BY COALESCE(CAST(sa.answer_code AS CHAR), sa.answer_value) 
         ORDER BY count DESC
       `,
       parameters: [q.id, q.id],
@@ -283,12 +283,12 @@ export class SimpleStatsGenerator {
         crossTabs.push({
           id: `cross_${demo.id}_${opinion.id}`,
           type: 'cross_tab',
-          title: `${demo.prompt} × ${opinion.prompt}`,
+          title: `${this.truncateText(demo.prompt, 75)} × ${this.truncateText(opinion.prompt, 75)}`,
           description: `Cross-tabulation between "${demo.prompt}" and "${opinion.prompt}"`,
           sql: `
             SELECT 
-              a1.answer_value as demo_answer,
-              a2.answer_value as opinion_answer,
+              COALESCE(CAST(a1.answer_code AS CHAR), a1.answer_value) as demo_answer,
+              COALESCE(CAST(a2.answer_code AS CHAR), a2.answer_value) as opinion_answer,
               COUNT(*) as count,
               ROUND(COUNT(*) * 100.0 / (
                 SELECT COUNT(*) 
@@ -303,7 +303,9 @@ export class SimpleStatsGenerator {
             WHERE a1.question_id = ? AND a2.question_id = ?
               AND a1.answer_value IS NOT NULL AND a1.answer_value != ''
               AND a2.answer_value IS NOT NULL AND a2.answer_value != ''
-            GROUP BY a1.answer_value, a2.answer_value
+            GROUP BY 
+              COALESCE(CAST(a1.answer_code AS CHAR), a1.answer_value),
+              COALESCE(CAST(a2.answer_code AS CHAR), a2.answer_value)
             HAVING count >= 5
             ORDER BY count DESC
             LIMIT 20

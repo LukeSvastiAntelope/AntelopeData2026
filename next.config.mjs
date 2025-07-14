@@ -1,4 +1,5 @@
 /** @type {import('next').NextConfig} */
+import path from 'path';
 const nextConfig = {
     env: {
         PINATA_JWT: process.env.PINATA_JWT,
@@ -44,11 +45,20 @@ const nextConfig = {
         contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
     },
     webpack: (config) => {
+        // Existing rule for Wallet Adapter CSS
         config.module.rules.push({
             test: /node_modules\/@solana\/wallet-adapter-react-ui\/styles\.css$/,
             type: 'asset/source',
         });
-        
+
+        // Provide default export shim for csv-parse to satisfy @irys/sdk
+        config.resolve = config.resolve || {};
+        config.resolve.alias = {
+            ...(config.resolve.alias || {}),
+            // Using process.cwd() because __dirname is not available in ESM config
+            'csv-parse': path.resolve(process.cwd(), 'src/patches/csv-parse-default.js'),
+        };
+
         return config;
     },
 };
