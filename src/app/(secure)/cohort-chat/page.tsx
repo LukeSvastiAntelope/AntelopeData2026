@@ -11,7 +11,7 @@ import { Separator } from '@/components/ui/separator';
 import { Select, SelectTrigger, SelectItem, SelectContent, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
-import { ChevronLeft, ChevronRight, Send, PanelLeft, PanelRight, Upload, FileText, X, Plus, MessageCircle, Trash2, ChevronDown, ChevronRight as ChevronRightIcon, FolderOpen, Folder, ChevronUp, BarChart3 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Send, PanelLeft, PanelRight, Upload, FileText, X, Plus, MessageCircle, Trash2, ChevronDown, ChevronRight as ChevronRightIcon, FolderOpen, Folder, ChevronUp, BarChart3, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from '@/components/ui/sonner';
@@ -1054,18 +1054,49 @@ FORMATTING REQUIREMENTS:
   };
 
   // Generate dynamic prompts based on survey data and advanced analytics
-  const generateDynamicPrompts = (surveyData: any) => {
+  const generateDynamicPrompts = (surveyData: any, forceRefresh = false) => {
     if (!surveyData || !surveyData.questions) return [];
     
     const prompts: string[] = [];
     
+    // Check if we already have cached prompts for this survey
+    const cacheKey = `survey-prompts-${surveyData.id}`;
+    const cachedPrompts = localStorage.getItem(cacheKey);
+    const cacheTimestamp = localStorage.getItem(`${cacheKey}-timestamp`);
+    
+    // Use cached prompts if they exist and are less than 1 hour old (unless force refresh)
+    if (!forceRefresh && cachedPrompts && cacheTimestamp) {
+      const cacheAge = Date.now() - parseInt(cacheTimestamp);
+      if (cacheAge < 60 * 60 * 1000) { // 1 hour cache
+        try {
+          const parsedPrompts = JSON.parse(cachedPrompts);
+          if (parsedPrompts.length > 0) {
+            setDynamicPrompts(parsedPrompts);
+            console.log('📊 Using cached dynamic prompts for survey', surveyData.id);
+            return;
+          }
+        } catch (error) {
+          console.log('Error parsing cached prompts:', error);
+        }
+      }
+    }
+    
     // Fetch survey-specific insights from advanced analytics
     const fetchAnalyticsPrompts = async () => {
       try {
-        const response = await fetch(`/api/surveys/${surveyData.id}/schema`);
+        console.log('📊 Fetching analytics prompts for survey', surveyData.id, forceRefresh ? '(force refresh)' : '');
+        const schemaUrl = `/api/surveys/${surveyData.id}/schema${forceRefresh ? '?refresh=true' : ''}`;
+        const response = await fetch(schemaUrl);
         if (response.ok) {
           const schemaData = await response.json();
           const analyticsPrompts: string[] = [];
+          
+          // Log cache status
+          if (schemaData.access_info?.from_cache) {
+            console.log('📊 Schema data served from cache');
+          } else {
+            console.log('📊 Schema data generated fresh');
+          }
           
           // Extract suggested queries from usage recommendations
           if (schemaData.usage_recommendations) {
@@ -1079,7 +1110,13 @@ FORMATTING REQUIREMENTS:
           
           // If we have analytics-based prompts, use those first
           if (analyticsPrompts.length > 0) {
-            setDynamicPrompts(analyticsPrompts.slice(0, 3));
+            const finalPrompts = analyticsPrompts.slice(0, 3);
+            setDynamicPrompts(finalPrompts);
+            
+            // Cache the prompts
+            localStorage.setItem(cacheKey, JSON.stringify(finalPrompts));
+            localStorage.setItem(`${cacheKey}-timestamp`, Date.now().toString());
+            
             return;
           }
         }
@@ -1773,14 +1810,35 @@ FORMATTING REQUIREMENTS:
                               <div className="p-3">
                                 <div className="flex items-center justify-between mb-3">
                                   <h4 className="font-medium text-sm">Select Survey</h4>
-                                  <Button
-                                    size="icon"
-                                    variant="ghost"
-                                    className="h-6 w-6"
-                                    onClick={() => setShowSurveyDropdown(false)}
-                                  >
-                                    <X className="h-3 w-3" />
-                                  </Button>
+                                  <div className="flex items-center gap-1">
+                                    <Button
+                                      size="icon"
+                                      variant="ghost"
+                                      className="h-6 w-6"
+                                      onClick={() => {
+                                        if (selectedSurveyId) {
+                                          // Clear cached prompts and force refresh
+                                          localStorage.removeItem(`survey-prompts-${selectedSurveyId}`);
+                                          localStorage.removeItem(`survey-prompts-${selectedSurveyId}-timestamp`);
+                                          // Force refresh the schema
+                                          if (selectedSurveyData) {
+                                            generateDynamicPrompts(selectedSurveyData, true);
+                                          }
+                                        }
+                                      }}
+                                      title="Refresh analytics"
+                                    >
+                                      <RefreshCw className="h-3 w-3" />
+                                    </Button>
+                                    <Button
+                                      size="icon"
+                                      variant="ghost"
+                                      className="h-6 w-6"
+                                      onClick={() => setShowSurveyDropdown(false)}
+                                    >
+                                      <X className="h-3 w-3" />
+                                    </Button>
+                                  </div>
                                 </div>
                                 <div className="space-y-1 max-h-60 overflow-y-auto">
                                   {surveys.length === 0 ? (

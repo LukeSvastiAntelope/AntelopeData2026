@@ -2,11 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { openSql } from '@/app/utils/database/db';
 
 // Import the schema analysis functions
-// Import the schema analysis functions
 async function importAnalyzeSurveySchema() {
   const schemaModule = await import('../../../../../../scripts/analyze-survey-schema.js');
   return schemaModule.analyzeSurveySchema;
 }
+
+// Cache TTL - 24 hours
+const SCHEMA_CACHE_TTL_HOURS = 24;
 
 interface SurveySchemaResponse {
   survey_meta: {
@@ -46,6 +48,73 @@ interface SurveySchemaResponse {
   };
 }
 
+// Check for cached schema analysis
+async function getCachedSchema(db: any, surveyId: number): Promise<SurveySchemaResponse | null> {
+  try {
+    console.log(`🔍 Checking cache for survey ${surveyId} (TTL: ${SCHEMA_CACHE_TTL_HOURS} hours)`);
+    
+    const [cached] = await db.execute(`
+      SELECT analytics_data, created_at
+      FROM survey_analytics_cache 
+      WHERE survey_id = ? 
+        AND status = 'completed'
+        AND JSON_EXTRACT(analytics_data, '$.survey_meta') IS NOT NULL
+        AND created_at > DATE_SUB(NOW(), INTERVAL ? HOUR)
+      ORDER BY created_at DESC
+      LIMIT 1
+    `, [surveyId, SCHEMA_CACHE_TTL_HOURS]) as any[];
+
+    console.log(`📊 Cache query returned ${cached?.length || 0} results`);
+
+    if (!cached || cached.length === 0) {
+      console.log(`❌ No valid cache found for survey ${surveyId}`);
+      return null;
+    }
+
+    const analyticsData = cached[0].analytics_data;
+    const schemaData = typeof analyticsData === 'string' ? JSON.parse(analyticsData) : analyticsData;
+    
+    console.log(`✅ Found cached schema analysis from ${cached[0].created_at}`);
+    console.log(`📊 Cache contains ${schemaData.questions?.length || 0} questions`);
+    
+    return schemaData;
+  } catch (error) {
+    console.error('❌ Error retrieving cached schema:', error);
+    return null;
+  }
+}
+
+// Store schema analysis in cache
+async function cacheSchemaAnalysis(db: any, surveyId: number, schema: SurveySchemaResponse): Promise<void> {
+  try {
+    // Remove any existing cache entries for this survey
+    await db.execute(`
+      DELETE FROM survey_analytics_cache 
+      WHERE survey_id = ?
+    `, [surveyId]);
+
+    // Insert new cache entry
+    await db.execute(`
+      INSERT INTO survey_analytics_cache (
+        survey_id, 
+        status, 
+        response_count, 
+        analytics_data,
+        created_at
+      ) VALUES (?, 'completed', ?, ?, NOW())
+    `, [
+      surveyId,
+      schema.survey_meta.total_respondents,
+      JSON.stringify(schema)
+    ]);
+
+    console.log(`💾 Cached schema analysis for survey ${surveyId}`);
+  } catch (error) {
+    console.error('Error caching schema analysis:', error);
+    // Don't throw - caching failure shouldn't break the response
+  }
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -63,6 +132,10 @@ export async function GET(
     if (isNaN(surveyId)) {
       return NextResponse.json({ error: 'Invalid survey ID' }, { status: 400 });
     }
+
+    // Check for force refresh parameter
+    const url = new URL(request.url);
+    const forceRefresh = url.searchParams.get('refresh') === 'true';
 
     // Check if user has access to this survey
     const db = await openSql();
@@ -85,11 +158,31 @@ export async function GET(
       return NextResponse.json({ error: 'Access denied' }, { status: 403 });
     }
 
-    console.log(`🔍 Analyzing schema for survey ${surveyId}: "${survey.title}"`);
+    console.log(`🔍 Schema request for survey ${surveyId}: "${survey.title}" (force refresh: ${forceRefresh})`);
 
-    // Perform schema analysis using existing database connection
-    const analyzeSurveySchema = await importAnalyzeSurveySchema();
-    const schema: SurveySchemaResponse = await analyzeSurveySchema(surveyId, db);
+    let schema: SurveySchemaResponse | undefined;
+    let fromCache = false;
+
+    // Try to get from cache first (unless force refresh)
+    if (!forceRefresh) {
+      const cachedSchema = await getCachedSchema(db, surveyId);
+      if (cachedSchema) {
+        schema = cachedSchema;
+        fromCache = true;
+        console.log(`📊 Using cached schema analysis for survey ${surveyId}`);
+      }
+    }
+
+    // If no cache hit or force refresh, perform fresh analysis
+    if (!schema) {
+      console.log(`🔄 Performing fresh schema analysis for survey ${surveyId}...`);
+      const analyzeSurveySchema = await importAnalyzeSurveySchema();
+      schema = await analyzeSurveySchema(surveyId, db);
+      
+      // Cache the results for future use
+      await cacheSchemaAnalysis(db, surveyId, schema);
+      fromCache = false;
+    }
 
     // Add some additional metadata and chart-ready data
     const enrichedSchema = {
@@ -98,13 +191,16 @@ export async function GET(
         user_has_access: true,
         survey_owner: survey.created_by === userId,
         survey_status: survey.status,
-        analysis_timestamp: new Date().toISOString()
+        analysis_timestamp: new Date().toISOString(),
+        from_cache: fromCache,
+        cache_ttl_hours: SCHEMA_CACHE_TTL_HOURS
       },
       usage_recommendations: generateUsageRecommendations(schema),
       chart_data: generateChartData(schema)
     };
 
-    console.log(`✅ Schema analysis completed for survey ${surveyId}`);
+    const cacheStatus = fromCache ? 'from cache' : 'fresh analysis';
+    console.log(`✅ Schema analysis completed for survey ${surveyId} (${cacheStatus})`);
     console.log(`📊 Found ${schema.questions.length} questions, ${Object.keys(schema.demographics).length} demographics`);
 
     return NextResponse.json(enrichedSchema);
