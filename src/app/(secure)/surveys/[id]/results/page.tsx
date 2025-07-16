@@ -148,7 +148,15 @@ const SurveyResultsPage = () => {
 
     const fetchSummary = async () => {
       try {
-        const res = await fetch(`/api/surveys/${surveyId}/summary`)
+        // Try the new stats endpoint first (for surveys with pre-computed stats)
+        let res = await fetch(`/api/surveys/${surveyId}/stats`)
+        
+        if (res.status === 202 || !res.ok) {
+          // Fall back to legacy summary if stats not ready or failed
+          console.log('Pre-computed stats not available, falling back to legacy summary')
+          res = await fetch(`/api/surveys/${surveyId}/summary`)
+        }
+        
         if (res.ok) {
           const json = await res.json()
           setSummary(json)
