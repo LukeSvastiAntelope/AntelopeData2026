@@ -7,8 +7,8 @@ async function importAnalyzeSurveySchema() {
   return schemaModule.analyzeSurveySchema;
 }
 
-// Cache TTL - 24 hours
-const SCHEMA_CACHE_TTL_HOURS = 24;
+// Cache TTL - 30 days (720 hours) - Analytics should persist unless survey data changes
+const SCHEMA_CACHE_TTL_HOURS = 720;
 
 interface SurveySchemaResponse {
   survey_meta: {
@@ -53,8 +53,9 @@ async function getCachedSchema(db: any, surveyId: number): Promise<SurveySchemaR
   try {
     console.log(`🔍 Checking cache for survey ${surveyId} (TTL: ${SCHEMA_CACHE_TTL_HOURS} hours)`);
     
-    const [cached] = await db.execute(`
-      SELECT analytics_data, created_at
+    // First, get the ID of the most recent valid cached schema (without the large data column)
+    const [latestRecord] = await db.execute(`
+      SELECT id, created_at
       FROM survey_analytics_cache 
       WHERE survey_id = ? 
         AND status = 'completed'
@@ -64,17 +65,29 @@ async function getCachedSchema(db: any, surveyId: number): Promise<SurveySchemaR
       LIMIT 1
     `, [surveyId, SCHEMA_CACHE_TTL_HOURS]) as any[];
 
-    console.log(`📊 Cache query returned ${cached?.length || 0} results`);
+    console.log(`📊 Cache query returned ${latestRecord?.length || 0} results`);
+
+    if (!latestRecord || latestRecord.length === 0) {
+      console.log(`❌ No valid cache found for survey ${surveyId}`);
+      return null;
+    }
+
+    // Second, fetch the analytics data for that specific record
+    const [cached] = await db.execute(`
+      SELECT analytics_data
+      FROM survey_analytics_cache 
+      WHERE id = ?
+    `, [latestRecord[0].id]) as any[];
 
     if (!cached || cached.length === 0) {
-      console.log(`❌ No valid cache found for survey ${surveyId}`);
+      console.log(`❌ Failed to fetch cached data for survey ${surveyId}`);
       return null;
     }
 
     const analyticsData = cached[0].analytics_data;
     const schemaData = typeof analyticsData === 'string' ? JSON.parse(analyticsData) : analyticsData;
     
-    console.log(`✅ Found cached schema analysis from ${cached[0].created_at}`);
+    console.log(`✅ Found cached schema analysis from ${latestRecord[0].created_at}`);
     console.log(`📊 Cache contains ${schemaData.questions?.length || 0} questions`);
     
     return schemaData;
