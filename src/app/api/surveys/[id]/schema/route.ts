@@ -202,6 +202,24 @@ export async function GET(
     const cacheStatus = fromCache ? 'from cache' : 'fresh analysis';
     console.log(`✅ Schema analysis completed for survey ${surveyId} (${cacheStatus})`);
     console.log(`📊 Found ${schema.questions.length} questions, ${Object.keys(schema.demographics).length} demographics`);
+    
+    // Debug: Log question structures to understand data format
+    if (schema.questions.length > 0) {
+      // Log first few questions to see different types
+      for (let i = 0; i < Math.min(3, schema.questions.length); i++) {
+        const question = schema.questions[i];
+        console.log(`🔍 Question ${i + 1} structure:`, {
+          id: question.id,
+          prompt: question.prompt.substring(0, 50) + '...',
+          type: question.type,
+          detected_type: question.detected_type,
+          has_statistical_summary: !!question.statistical_summary,
+          statistical_summary_keys: question.statistical_summary ? Object.keys(question.statistical_summary) : null,
+          distribution_keys: question.statistical_summary?.distribution ? Object.keys(question.statistical_summary.distribution) : null,
+          sample_distribution_entry: question.statistical_summary?.distribution ? Object.entries(question.statistical_summary.distribution)[0] : null
+        });
+      }
+    }
 
     return NextResponse.json(enrichedSchema);
 
