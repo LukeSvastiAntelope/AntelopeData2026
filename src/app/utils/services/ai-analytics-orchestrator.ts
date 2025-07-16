@@ -417,9 +417,10 @@ export class AIAnalyticsOrchestrator {
   private async storeAnalyticsResult(surveyId: number, result: AIAnalyticsResult): Promise<void> {
     const db = await openSql();
     
-    // Calculate expiration (24 hours from now)
+    // Calculate expiration (30 days from now instead of 24 hours)
+    // This makes analytics much more persistent and reduces regeneration frequency
     const expiresAt = new Date();
-    expiresAt.setHours(expiresAt.getHours() + 24);
+    expiresAt.setDate(expiresAt.getDate() + 30); // 30 days instead of 24 hours
     
     // Store complete result as JSON
     await db.execute(`

@@ -56,21 +56,33 @@ export async function GET(
       });
     }
 
-    // Fetch full cached analytics data
+    // Fetch full cached analytics data - Use two-step approach to avoid sort buffer issues
     const db = await openSql();
-    const [cachedRow] = await db.execute(
-      `SELECT analytics_data FROM survey_analytics_cache WHERE survey_id = ? AND status = 'completed' ORDER BY created_at DESC LIMIT 1`,
+    
+    // First, get the ID of the most recent completed analytics (without the large data column)
+    const [latestRecord] = await db.execute(
+      `SELECT id FROM survey_analytics_cache 
+       WHERE survey_id = ? AND status = 'completed' 
+       ORDER BY created_at DESC LIMIT 1`,
       [surveyId]
     ) as any[];
 
     let analyticsData: any = null;
-    if (cachedRow && cachedRow.length > 0) {
-      try {
-        analyticsData = typeof cachedRow[0].analytics_data === 'string'
-          ? JSON.parse(cachedRow[0].analytics_data)
-          : cachedRow[0].analytics_data;
-      } catch(e) {
-        console.error('Failed to parse cached analytics JSON', e);
+    if (latestRecord && latestRecord.length > 0) {
+      // Second, fetch the analytics data for that specific record
+      const [cachedRow] = await db.execute(
+        `SELECT analytics_data FROM survey_analytics_cache WHERE id = ?`,
+        [latestRecord[0].id]
+      ) as any[];
+      
+      if (cachedRow && cachedRow.length > 0) {
+        try {
+          analyticsData = typeof cachedRow[0].analytics_data === 'string'
+            ? JSON.parse(cachedRow[0].analytics_data)
+            : cachedRow[0].analytics_data;
+        } catch(e) {
+          console.error('Failed to parse cached analytics JSON', e);
+        }
       }
     }
 
@@ -128,12 +140,12 @@ export async function POST(
       forceRegenerateInsights: body.forceRegenerateInsights || false,
       forceRegenerateVisualizations: body.forceRegenerateVisualizations || false,
       
-      // Cache settings
-      cacheExpirationHours: body.cacheExpirationHours || 24,
-      analysisCacheHours: body.analysisCacheHours || 48,
-      queryCacheHours: body.queryCacheHours || 24,
-      insightsCacheHours: body.insightsCacheHours || 48,
-      visualizationCacheHours: body.visualizationCacheHours || 24,
+      // Cache settings - Updated defaults for longer persistence
+      cacheExpirationHours: body.cacheExpirationHours || 720, // 30 days instead of 24 hours
+      analysisCacheHours: body.analysisCacheHours || 720, // 30 days instead of 48 hours
+      queryCacheHours: body.queryCacheHours || 720, // 30 days instead of 24 hours
+      insightsCacheHours: body.insightsCacheHours || 720, // 30 days instead of 48 hours
+      visualizationCacheHours: body.visualizationCacheHours || 720, // 30 days instead of 24 hours
       
       // Quality settings
       minimumResponses: body.minimumResponses || 10,

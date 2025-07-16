@@ -59,11 +59,11 @@ export interface DashboardLayout {
 
 export class VisualizationEngine {
   private defaultModel: string;
-  private defaultCacheHours: number;
+  private defaultCacheHours: number = 720; // 30 days instead of 24 hours
 
   constructor(
     defaultModel: string = 'gpt-4o', // Good balance for visualization logic
-    defaultCacheHours: number = 24
+    defaultCacheHours: number = 720
   ) {
     this.defaultModel = defaultModel;
     this.defaultCacheHours = defaultCacheHours;
