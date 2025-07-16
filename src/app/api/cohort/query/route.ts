@@ -11,6 +11,7 @@ const factSheetCache: Map<number, { ts: number; data: any }> = new Map();
 import { createCompletion, createStreamingCompletion } from "@/app/utils/services/ai-service";
 import { verifyConfirmationToken } from "@/app/utils/api/token";
 import { SmartSurveyQueryBuilder } from "@/app/utils/survey/smart-query-builder";
+import { EnhancedSurveyQueryBuilder } from "@/app/utils/survey/enhanced-query-builder";
 import { QueryIntentClassifier } from "@/app/utils/survey/query-intent-classifier";
 import type { FactSheetQueryResult } from "../../../utils/survey/fact-sheet-query-resolver";
 
@@ -384,12 +385,12 @@ export async function POST(req: NextRequest) {
     console.log(`🤖 Proceeding to LLM analysis with fact sheet context`);
     console.log(`🎯 Analysis Type: ${reportAnalysis.reportType} (${Math.round(reportAnalysis.estimatedComplexity * 100)}% complexity)`);
     
-    const smartQueryBuilder = new SmartSurveyQueryBuilder();
+    const enhancedQueryBuilder = new EnhancedSurveyQueryBuilder();
     const intentClassifier = new QueryIntentClassifier();
     
-    // Classify the query intent and build optimized query
+    // Classify the query intent and build optimized query with enhanced demographic handling
     const queryIntent = intentClassifier.classifyQuery(question);
-    const queryResult = await smartQueryBuilder.buildSmartQuery(
+    const queryResult = await enhancedQueryBuilder.buildEnhancedQuery(
       question, 
       filterRules, 
       userId, 

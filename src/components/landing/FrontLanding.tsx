@@ -3,9 +3,9 @@
 import { Button } from "@/components/ui/button"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import { Card, CardContent } from "@/components/ui/card"
-import { Textarea } from "@/components/ui/textarea"
+
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Lightbulb as LightbulbIcon, MessageCircle as MessageCircleIcon, Rocket, Brain as BrainIcon, Send, Upload, FileText } from "lucide-react"
+import { Lightbulb as LightbulbIcon, MessageCircle as MessageCircleIcon, Rocket, Brain as BrainIcon, Upload, FileText } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
 import Link from "next/link"
@@ -15,22 +15,12 @@ import toast from "react-hot-toast"
 
 export default function FrontLanding() {
   const router = useRouter()
-  const [input, setInput] = useState('')
   const [showUploadDialog, setShowUploadDialog] = useState(false)
   const [uploadFile, setUploadFile] = useState<File | null>(null)
   const [uploadLoading, setUploadLoading] = useState(false)
   const [uploadPreview, setUploadPreview] = useState<any>(null)
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
-      // For now, just redirect to register - later we can add demo functionality
-      router.push("/register")
-    }
-  }
-
-  const handleSend = () => {
-    // For now, just redirect to register - later we can add demo functionality
+  const handleSignUp = () => {
     router.push("/register")
   }
 
@@ -128,29 +118,18 @@ export default function FrontLanding() {
               Chat with your surveys and get insights in real-time.
               </p>
               
-              {/* Chat Input Field */}
-              <div className="relative w-full max-w-2xl">
-                <Textarea 
-                  className="flex-1 min-h-[100px] pr-24 resize-none" 
-                  style={{ backgroundColor: '#f9f9f9' }}
-                  placeholder="Upload your survey to get started" 
-                  value={input} 
-                  onChange={e => setInput(e.target.value)} 
-                  onKeyDown={handleKeyDown}
-                  rows={2}
-                />
-                <div className="absolute right-2 bottom-2 flex gap-1">
-                  <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
-                    <DialogTrigger asChild>
-                      <Button 
-                        size="icon" 
-                        variant="ghost" 
-                        className="h-8 w-8" 
-                        title="Upload survey file to see the magic"
-                      >
-                        <Upload className="h-4 w-4"/>
-                      </Button>
-                    </DialogTrigger>
+              {/* Action Buttons */}
+              <div className="flex items-center gap-4">
+                <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
+                  <DialogTrigger asChild>
+                    <Button 
+                      size="lg" 
+                      variant="outline" 
+                      className="px-8 py-3 text-lg font-medium"
+                    >
+                      Import Survey
+                    </Button>
+                  </DialogTrigger>
                     <DialogContent className="max-w-2xl">
                       <DialogHeader>
                         <DialogTitle>Try Antelope with Your Survey Data</DialogTitle>
@@ -218,39 +197,21 @@ export default function FrontLanding() {
                       )}
                     </DialogContent>
                   </Dialog>
+                  <span className="text-muted-foreground">or</span>
                   <Button 
-                    size="icon" 
-                    variant="ghost" 
-                    className="h-8 w-8" 
-                    onClick={handleSend}
+                    size="lg" 
+                    className="px-8 py-3 text-lg font-medium"
+                    onClick={handleSignUp}
                   >
-                    <Send className="h-4 w-4"/>
+                    Sign Up
                   </Button>
                 </div>
-              </div>
 
               <p className="text-xs text-muted-foreground text-center mt-2">
                 This is still in beta so expect hiccups.
               </p>
               
-              {/* <div className="text-xs text-center max-w-xl space-y-2">
-                <p className="font-medium text-muted-foreground">Try asking:</p>
-                <div className="flex flex-wrap gap-2 justify-center">
-                  {[
-                    "What are the key trends in responses?",
-                    "How do demographics affect answers?", 
-                    "Show response patterns"
-                  ].map((prompt, index) => (
-                    <div 
-                      key={index}
-                      className="px-3 py-1.5 border border-border rounded-md bg-background/50 text-muted-foreground hover:bg-background/80 transition-colors cursor-pointer"
-                      onClick={() => setInput(prompt)}
-                    >
-                      &quot;{prompt}&quot;
-                    </div>
-                  ))}
-                </div>
-              </div> */}
+
             </div>
           </section>
 
