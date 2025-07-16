@@ -22,6 +22,36 @@ const getConnection = async () => {
     return pool;
 };
 
+// === NEW UTILS FOR ROBUST ANALYSIS (short-term hardening) ===
+// Helper to decide bucket count for numeric distributions using Sturges rule
+function getOptimalBucketCount(n) {
+  if (!n || n < 1) return 4;
+  const k = Math.ceil(Math.log2(n) + 1); // Sturges
+  return Math.min(Math.max(k, 4), 10); // keep between 4-10 buckets
+}
+
+// Helper to normalise single response value – handles multi-select delimiters
+function normaliseValue(val) {
+  if (val === null || val === undefined) return [];
+  // Already array (JSON parsed earlier)
+  if (Array.isArray(val)) return val;
+
+  if (typeof val === 'string') {
+    // Try JSON array in string
+    try {
+      const parsed = JSON.parse(val);
+      if (Array.isArray(parsed)) return parsed;
+    } catch (_) {
+      /* ignore */ }
+
+    // Fallback: split by common delimiters
+    return val.split(/[;,/|]/).map(s => s.trim()).filter(s => s.length);
+  }
+  // Primitive value (number, boolean etc.)
+  return [val];
+}
+// === END UTILS ===
+
 // Main schema analysis function - can accept existing db connection
 const analyzeSurveySchema = async (surveyId, existingDb = null) => {
     let pool = null;
@@ -169,6 +199,14 @@ const analyzeQuestions = async (db, surveyId) => {
         // Analyze response patterns
         const responseAnalysis = analyzeResponsePatterns(responses.map(r => r.answer_value));
         
+        // Also generate detailed response statistics including distributions
+        const detailedStats = await analyzeQuestionResponses({
+            id: question.id,
+            prompt: question.prompt,
+            type: question.type,
+            detected_type: responseAnalysis.detected_type
+        }, responses);
+        
         let parsedOptions = null;
         if (question.options) {
             try {
@@ -178,6 +216,12 @@ const analyzeQuestions = async (db, surveyId) => {
                 parsedOptions = question.options; // Keep as string if parsing fails
             }
         }
+
+        // Merge basic statistics with detailed distribution analysis
+        const combinedStats = {
+            ...responseAnalysis.statistics,
+            ...(detailedStats || {})
+        };
 
         const questionAnalysis = {
             id: question.id,
@@ -190,7 +234,7 @@ const analyzeQuestions = async (db, surveyId) => {
             value_count: responseAnalysis.unique_values.length,
             response_patterns: responseAnalysis.patterns,
             analysis_potential: determineAnalysisPotential(responseAnalysis),
-            statistical_summary: responseAnalysis.statistics
+            statistical_summary: combinedStats
         };
         
         questionsAnalysis.push(questionAnalysis);
@@ -255,8 +299,19 @@ const analyzeResponsePatterns = (responses) => {
             confidence = 0.95;
         }
     } else if (uniqueValues.length === 2) {
-        detectedType = 'binary';
-        confidence = 0.9;
+        // Check for yes/no pattern specifically
+        const lowerValues = uniqueValues.map(v => String(v).toLowerCase());
+        const hasYes = lowerValues.some(v => v === 'yes' || v === 'y');
+        const hasNo = lowerValues.some(v => v === 'no' || v === 'n');
+        
+        if (hasYes && hasNo) {
+            detectedType = 'yes_no';
+            confidence = 0.95;
+            console.log(`🔍 DETECTED YES-NO: Values:`, uniqueValues);
+        } else {
+            detectedType = 'binary';
+            confidence = 0.9;
+        }
     } else if (uniqueValues.length <= 10 && stringResponses > responses.length * 0.8) {
         detectedType = 'categorical';
         confidence = 0.8;
@@ -277,16 +332,29 @@ const analyzeResponsePatterns = (responses) => {
             };
         }
     }
-    
+
+    // === NEW: Handle degenerate yes/no where only one unique value ===
+    const ynCanonical = ['yes','no','y','n','true','false','1','0'];
+    const lowerUniqRaw = uniqueValues.map(v => String(v).toLowerCase());
+    const lowerUniq = lowerUniqRaw.filter(v => v !== ''); // ignore missing/blank answers
+
+    // Consider it a yes/no question if all observed values fall within the yes/no canonical set and there are <= 2 unique non-blank values
+    const allYesNo = lowerUniq.length > 0 && lowerUniq.every(v => ynCanonical.includes(v));
+    if (allYesNo && lowerUniq.length <= 2) {
+        detectedType = 'yes_no';
+        // lower confidence if we only observed a subset (e.g., only "yes")
+        confidence = lowerUniq.length === 2 ? 0.9 : 0.6;
+    }
+    // === END NEW ===
+
     return {
         detected_type: detectedType,
         confidence: confidence,
-        unique_values: uniqueValues.slice(0, 20), // Limit to first 20 for display
+        unique_values: uniqueValues,
         patterns: {
             array_responses: arrayResponses,
             numeric_responses: numericResponses,
-            string_responses: stringResponses,
-            null_responses: responses.length - parsedResponses.filter(r => r !== null && r !== undefined).length
+            string_responses: stringResponses
         },
         statistics: statistics
     };
@@ -486,19 +554,19 @@ const analyzeQuestionResponses = async (question, responses) => {
         try {
             return typeof r.answer_value === 'string' ? JSON.parse(r.answer_value) : r.answer_value;
         } catch {
-            // If JSON parsing fails, check if it's a comma-separated string
-            if (typeof r.answer_value === 'string' && r.answer_value.includes(',')) {
-                return r.answer_value.split(',').map(item => item.trim());
-            }
+            // If JSON parsing fails, attempt multi-select splitting via normaliseValue
             return r.answer_value;
         }
     });
-    
+
+    // Apply normalisation for multi-select & primitive values
+    const normalised = parsedResponses.flatMap(v => normaliseValue(v));
+
     let stats = {};
     
     if (question.detected_type === 'multi_select') {
         // Platform/option adoption analysis
-        const allOptions = parsedResponses.flatMap(r => Array.isArray(r) ? r : [r]);
+        const allOptions = normalised;
         const optionCounts = {};
         
         allOptions.forEach(option => {
@@ -530,7 +598,7 @@ const analyzeQuestionResponses = async (question, responses) => {
         
     } else if (question.detected_type === 'numeric' || question.detected_type === 'likert_scale') {
         // Numeric analysis
-        const numbers = parsedResponses.map(r => Number(r)).filter(n => !isNaN(n));
+        const numbers = normalised.map(n => Number(n)).filter(n => !isNaN(n));
         
         if (numbers.length > 0) {
             const sorted = numbers.sort((a, b) => a - b);
@@ -544,18 +612,19 @@ const analyzeQuestionResponses = async (question, responses) => {
                 std_dev: parseFloat(Math.sqrt(numbers.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / numbers.length).toFixed(2))
             };
             
-            // Create distribution buckets
+            // Dynamic bucket count via Sturges rule
             const min = Math.min(...numbers);
             const max = Math.max(...numbers);
-            const bucketSize = Math.max(1, Math.floor((max - min) / 4));
-            
+            const bucketCount = getOptimalBucketCount(numbers.length);
+            const bucketSize = Math.max(1, Math.ceil((max - min + 1) / bucketCount));
+
             const distribution = {};
-            for (let i = 0; i < 4; i++) {
+            for (let i = 0; i < bucketCount; i++) {
                 const bucketMin = min + (i * bucketSize);
-                const bucketMax = i === 3 ? max : min + ((i + 1) * bucketSize) - 1;
-                const bucketKey = `${bucketMin}-${bucketMax}_hours`;
+                const bucketMax = i === bucketCount - 1 ? max : bucketMin + bucketSize - 1;
+                const bucketKey = `${bucketMin}-${bucketMax}`;
                 const count = numbers.filter(n => n >= bucketMin && n <= bucketMax).length;
-                
+
                 distribution[bucketKey] = {
                     count,
                     percentage: parseFloat((count / numbers.length * 100).toFixed(1))
@@ -565,24 +634,60 @@ const analyzeQuestionResponses = async (question, responses) => {
             stats.distribution = distribution;
         }
         
-    } else if (question.detected_type === 'binary' || question.detected_type === 'categorical') {
-        // Categorical analysis
+    } else if (question.detected_type === 'binary' || question.detected_type === 'yes_no' || question.detected_type === 'categorical') {
+        // Categorical analysis (including yes/no and binary)
         const valueCounts = {};
-        parsedResponses.forEach(response => {
+        normalised.forEach(response => {
             if (response && response !== null) {
                 valueCounts[response] = (valueCounts[response] || 0) + 1;
             }
         });
         
-        stats.distribution = Object.fromEntries(
-            Object.entries(valueCounts).map(([value, count]) => [
-                value,
-                {
-                    count,
-                    percentage: parseFloat((count / responses.length * 100).toFixed(1))
-                }
-            ])
-        );
+        // Debug logging for question 5 (ID 65 - yes/no question)
+        if (question.id === 65) {
+            console.log(`🔍 DEBUG Q5 (${question.id}): Raw responses:`, responses.map(r => r.answer_value));
+            console.log(`🔍 DEBUG Q5 (${question.id}): Normalised:`, normalised);
+            console.log(`🔍 DEBUG Q5 (${question.id}): Value counts:`, valueCounts);
+            console.log(`🔍 DEBUG Q5 (${question.id}): Detected type: ${question.detected_type}`);
+        }
+        
+        // Only create distribution if we have actual response data
+        if (Object.keys(valueCounts).length > 0) {
+            stats.distribution = Object.fromEntries(
+                Object.entries(valueCounts).map(([value, count]) => [
+                    value,
+                    {
+                        count,
+                        percentage: parseFloat((count / responses.length * 100).toFixed(1))
+                    }
+                ])
+            );
+        }
+        
+        console.log(`   📊 Created distribution for "${question.prompt.substring(0, 40)}..." (${question.detected_type}): ${Object.keys(valueCounts).length} unique values`);
+    } else {
+        // Default categorical analysis for any other types
+        const valueCounts = {};
+        normalised.forEach(response => {
+            if (response && response !== null) {
+                valueCounts[response] = (valueCounts[response] || 0) + 1;
+            }
+        });
+        
+        // Only create distribution if we have actual response data
+        if (Object.keys(valueCounts).length > 0) {
+            stats.distribution = Object.fromEntries(
+                Object.entries(valueCounts).map(([value, count]) => [
+                    value,
+                    {
+                        count,
+                        percentage: parseFloat((count / responses.length * 100).toFixed(1))
+                    }
+                ])
+            );
+        }
+        
+        console.log(`   📊 Created distribution for "${question.prompt.substring(0, 40)}..." (${question.detected_type}): ${Object.keys(valueCounts).length} unique values`);
     }
     
     return stats;
