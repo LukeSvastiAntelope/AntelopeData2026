@@ -25,6 +25,7 @@ import ChartRenderer from '@/components/ChartRenderer'
 import { getAllModels } from '@/app/utils/models'
 import remarkSmart from 'remark-smartypants'
 import OnboardingEmptyState from '@/components/OnboardingEmptyState'
+import SurveyStatsView from '@/components/SurveyStatsView'
 
 // Optional markdown plugins – if not installed, fall back gracefully
 let smart: any = null;
@@ -316,6 +317,7 @@ export default function CohortChatPage() {
   const [selectedModel, setSelectedModel] = useState('gpt-4o');
   const [temperature, setTemperature] = useState(0.0);
   const [sources, setSources] = useState<{survey: boolean; twins: boolean; web: boolean}>({survey: true, twins: true, web: false});
+  const [activeTab, setActiveTab] = useState<'chat' | 'stats'>('chat');
   const [systemPrompt, setSystemPrompt] = useState(`You are an expert survey analyst and data scientist specializing in extracting meaningful insights from survey responses. Your role is to help users understand their survey data through comprehensive analysis and clear communication.
 
 CORE RESPONSIBILITIES:
@@ -1199,6 +1201,17 @@ FORMATTING REQUIREMENTS:
           const mostRecent = data.conversations[0];
           setCurrentConversationId(mostRecent.id);
           setMessages(mostRecent.messages || []);
+          
+          // Set survey context from the loaded conversation if not already set
+          if (!selectedSurveyId && mostRecent.surveyId) {
+            setSelectedSurveyId(mostRecent.surveyId);
+            localStorage.setItem('cohort-chat-selected-survey', String(mostRecent.surveyId));
+          }
+          
+          // Set cohort context from the loaded conversation if not already set
+          if (!selectedCohortId && mostRecent.cohortId) {
+            setSelectedCohortId(mostRecent.cohortId);
+          }
         }
       }
     } catch (error) {
@@ -1277,8 +1290,17 @@ FORMATTING REQUIREMENTS:
     if (conversation) {
       setCurrentConversationId(conversationId);
       setMessages(conversation.messages || []);
-      setSelectedSurveyId(conversation.surveyId || null);
-      setSelectedCohortId(conversation.cohortId || null);
+      
+      // Only update survey/cohort if they're actually different to prevent unnecessary effects
+      if (conversation.surveyId !== selectedSurveyId) {
+        setSelectedSurveyId(conversation.surveyId || null);
+        // Update localStorage when survey actually changes
+        localStorage.setItem('cohort-chat-selected-survey', conversation.surveyId ? String(conversation.surveyId) : 'null');
+      }
+      
+      if (conversation.cohortId !== selectedCohortId) {
+        setSelectedCohortId(conversation.cohortId || null);
+      }
     }
   };
 
@@ -1326,9 +1348,9 @@ FORMATTING REQUIREMENTS:
       groups[key].push(conversation);
     });
     
-    // Sort conversations within each group by updatedAt (newest first)
+    // Sort conversations within each group by createdAt (newest first) to maintain stable order
     Object.keys(groups).forEach(key => {
-      groups[key].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+      groups[key].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     });
     
     return groups;
@@ -1807,169 +1829,192 @@ FORMATTING REQUIREMENTS:
                 onUploadClick={handleUploadClick}
               />
             ) : (
-              <div className="flex flex-col flex-1">
-                <ScrollArea className="flex-1 min-h-0">
-                  <div className="p-4 space-y-6">
-                    {messages.map((m,idx)=>(
-                      <div 
-                        key={idx} 
-                        className="flex gap-4 text-sm justify-start animate-in fade-in duration-500"
-                        style={{ 
-                          animationDelay: `${Math.min(idx * 50, 500)}ms`,
-                          animationFillMode: 'both'
-                        }}
-                      >
-                        {m.role==='agent' && <Avatar className="h-8 w-8 flex-shrink-0"><AvatarImage src="/assets/images/logo-simple.svg"/><AvatarFallback>C</AvatarFallback></Avatar>}
-                        {m.role==='user' && <Avatar className="h-8 w-8 flex-shrink-0"><AvatarFallback>U</AvatarFallback></Avatar>}
-                        <div className={cn(
-                          'rounded-lg px-4 py-3 max-w-[85%] chat-message',
-                          m.role==='user'? 'bg-primary text-white':'text-foreground'
-                        )}>
-                          {m.role==='agent' ? (
-                            <TooltipProvider delayDuration={150}>
-                              <div className="space-y-1">
-                                {m.dataCards && renderDataCards(m.dataCards)}
+              <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'chat' | 'stats')} className="flex flex-col flex-1">
+                <div className="px-4 pt-4">
+                  <TabsList className="grid w-full grid-cols-2">
+                    <TabsTrigger value="chat" className="gap-2">
+                      <MessageCircle className="h-4 w-4" />
+                      Chat
+                    </TabsTrigger>
+                    <TabsTrigger value="stats" className="gap-2">
+                      <BarChart3 className="h-4 w-4" />
+                      Stats
+                    </TabsTrigger>
+                  </TabsList>
+                </div>
+                
+                <TabsContent value="chat" className="flex flex-col flex-1 mt-0">
+                  <div className="flex flex-col flex-1">
+                    <ScrollArea className="flex-1 min-h-0">
+                      <div className="p-4 space-y-6">
+                        {messages.map((m,idx)=>(
+                          <div 
+                            key={idx} 
+                            className="flex gap-4 text-sm justify-start animate-in fade-in duration-500"
+                            style={{ 
+                              animationDelay: `${Math.min(idx * 50, 500)}ms`,
+                              animationFillMode: 'both'
+                            }}
+                          >
+                            {m.role==='agent' && <Avatar className="h-8 w-8 flex-shrink-0"><AvatarImage src="/assets/images/logo-simple.svg"/><AvatarFallback>C</AvatarFallback></Avatar>}
+                            {m.role==='user' && <Avatar className="h-8 w-8 flex-shrink-0"><AvatarFallback>U</AvatarFallback></Avatar>}
+                            <div className={cn(
+                              'rounded-lg px-4 py-3 max-w-[85%] chat-message',
+                              m.role==='user'? 'bg-primary text-white':'text-foreground'
+                            )}>
+                              {m.role==='agent' ? (
+                                <TooltipProvider delayDuration={150}>
+                                  <div className="space-y-1">
+                                    {m.dataCards && renderDataCards(m.dataCards)}
 
-                                {renderWithCitations(m.content, m.citations, m.isUpload)}
+                                    {renderWithCitations(m.content, m.citations, m.isUpload)}
+                                  </div>
+                                </TooltipProvider>
+                              ): (
+                                <div className="font-medium text-white">
+                                  {m.content}
+                                </div>
+                              )}
+                              {m.role==='agent' && m.chartSpec && (
+                                <div className="mt-4 animate-in fade-in duration-700 delay-300">
+                                  <ChartRenderer spec={m.chartSpec}/>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                        {isLoading && (
+                          <div className="flex gap-4 text-sm justify-start animate-in fade-in duration-300">
+                            <Avatar className="h-8 w-8 flex-shrink-0"><AvatarFallback>C</AvatarFallback></Avatar>
+                            <div className="rounded-lg px-4 py-3 text-foreground chat-message">
+                              <div className="flex items-center gap-3">
+                                <div className="flex gap-1">
+                                  <div className="w-2 h-2 bg-current rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                                  <div className="w-2 h-2 bg-current rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                                  <div className="w-2 h-2 bg-current rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                                </div>
+                                <span className="text-sm opacity-70 font-medium">Analyzing cohort responses...</span>
                               </div>
-                            </TooltipProvider>
-                          ): (
-                            <div className="font-medium text-white">
-                              {m.content}
                             </div>
-                          )}
-                          {m.role==='agent' && m.chartSpec && (
-                            <div className="mt-4 animate-in fade-in duration-700 delay-300">
-                              <ChartRenderer spec={m.chartSpec}/>
-                            </div>
-                          )}
-                        </div>
+                          </div>
+                        )}
+                        {/* Auto-scroll target */}
+                        <div ref={messagesEndRef} />
                       </div>
-                    ))}
-                    {isLoading && (
-                      <div className="flex gap-4 text-sm justify-start animate-in fade-in duration-300">
-                        <Avatar className="h-8 w-8 flex-shrink-0"><AvatarFallback>C</AvatarFallback></Avatar>
-                        <div className="rounded-lg px-4 py-3 text-foreground chat-message">
-                          <div className="flex items-center gap-3">
-                            <div className="flex gap-1">
-                              <div className="w-2 h-2 bg-current rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                              <div className="w-2 h-2 bg-current rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                              <div className="w-2 h-2 bg-current rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                    </ScrollArea>
+                    
+                    {/* Chat input at bottom of screen for active conversations */}
+                    <div className="sticky bottom-0 p-4 pt-0 bg-card">
+                      <div className="relative">
+                        <div className="relative">
+                          <Textarea 
+                            className="min-h-[80px] pl-4 pr-4 resize-none" 
+                            placeholder="Ask the cohort…" 
+                            value={input} 
+                            onChange={e=>setInput(e.target.value)} 
+                            onKeyDown={handleKeyDown}
+                            disabled={isLoading}
+                            rows={2}
+                          />
+                          
+                          {/* Left side buttons - Plus and Upload - positioned inside textarea */}
+                          <div className="absolute left-2 bottom-2 flex gap-1">
+                            {/* Plus button for survey selection */}
+                            <div className="relative">
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-8 w-8 flex-shrink-0"
+                                onClick={() => setShowSurveyDropdown(!showSurveyDropdown)}
+                                title="Select survey"
+                              >
+                                <Plus className="h-4 w-4" />
+                              </Button>
+                              
+                              {/* Survey dropdown */}
+                              {showSurveyDropdown && (
+                                <div className="absolute bottom-full left-0 mb-2 w-80 bg-popover border border-border rounded-md shadow-lg z-50" data-survey-dropdown>
+                                  <div className="p-3">
+                                    <div className="flex items-center justify-between mb-3">
+                                      <h4 className="font-medium text-sm">Select Survey</h4>
+                                      <Button
+                                        size="icon"
+                                        variant="ghost"
+                                        className="h-6 w-6"
+                                        onClick={() => setShowSurveyDropdown(false)}
+                                      >
+                                        <X className="h-3 w-3" />
+                                      </Button>
+                                    </div>
+                                    <div className="space-y-1 max-h-60 overflow-y-auto">
+                                      {surveys.length === 0 ? (
+                                        <div className="text-center py-4 text-muted-foreground text-sm">
+                                          No surveys available
+                                        </div>
+                                      ) : (
+                                        surveys.map((survey) => (
+                                          <div
+                                            key={survey.id}
+                                            className={cn(
+                                              "flex items-center gap-3 p-2 rounded-md cursor-pointer transition-colors hover:bg-muted",
+                                              selectedSurveyId === survey.id && "bg-muted"
+                                            )}
+                                            onClick={() => handleInlineSurveySelect(survey.id)}
+                                          >
+                                            <BarChart3 className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                                            <div className="flex-1 min-w-0">
+                                              <div className="text-sm font-medium truncate">
+                                                {survey.title}
+                                              </div>
+                                            </div>
+                                            {selectedSurveyId === survey.id && (
+                                              <div className="h-2 w-2 bg-primary rounded-full flex-shrink-0" />
+                                            )}
+                                          </div>
+                                        ))
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
                             </div>
-                            <span className="text-sm opacity-70 font-medium">Analyzing cohort responses...</span>
+                            
+                            {/* Upload button */}
+                            <Button 
+                              size="icon" 
+                              variant="ghost" 
+                              className="h-8 w-8" 
+                              onClick={handleUploadClick}
+                              title="Upload survey file"
+                            >
+                              <Upload className="h-4 w-4"/>
+                            </Button>
+                          </div>
+                          
+                          {/* Send button - positioned inside textarea on the right */}
+                          <div className="absolute right-2 bottom-2">
+                            <Button 
+                              size="icon" 
+                              variant="ghost" 
+                              className="h-8 w-8" 
+                              onClick={handleSend} 
+                              disabled={isLoading}
+                            >
+                              <Send className="h-4 w-4"/>
+                            </Button>
                           </div>
                         </div>
                       </div>
-                    )}
-                    {/* Auto-scroll target */}
-                    <div ref={messagesEndRef} />
-                  </div>
-                </ScrollArea>
-                
-                {/* Chat input at bottom of screen for active conversations */}
-                <div className="sticky bottom-0 p-4 pt-0 bg-card">
-                  <div className="relative">
-                    <div className="relative">
-                      <Textarea 
-                        className="min-h-[80px] pl-4 pr-4 resize-none" 
-                        placeholder="Ask the cohort…" 
-                        value={input} 
-                        onChange={e=>setInput(e.target.value)} 
-                        onKeyDown={handleKeyDown}
-                        disabled={isLoading}
-                        rows={2}
-                      />
-                      
-                      {/* Left side buttons - Plus and Upload - positioned inside textarea */}
-                      <div className="absolute left-2 bottom-2 flex gap-1">
-                        {/* Plus button for survey selection */}
-                        <div className="relative">
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="h-8 w-8 flex-shrink-0"
-                            onClick={() => setShowSurveyDropdown(!showSurveyDropdown)}
-                            title="Select survey"
-                          >
-                            <Plus className="h-4 w-4" />
-                          </Button>
-                          
-                          {/* Survey dropdown */}
-                          {showSurveyDropdown && (
-                            <div className="absolute bottom-full left-0 mb-2 w-80 bg-popover border border-border rounded-md shadow-lg z-50" data-survey-dropdown>
-                              <div className="p-3">
-                                <div className="flex items-center justify-between mb-3">
-                                  <h4 className="font-medium text-sm">Select Survey</h4>
-                                  <Button
-                                    size="icon"
-                                    variant="ghost"
-                                    className="h-6 w-6"
-                                    onClick={() => setShowSurveyDropdown(false)}
-                                  >
-                                    <X className="h-3 w-3" />
-                                  </Button>
-                                </div>
-                                <div className="space-y-1 max-h-60 overflow-y-auto">
-                                  {surveys.length === 0 ? (
-                                    <div className="text-center py-4 text-muted-foreground text-sm">
-                                      No surveys available
-                                    </div>
-                                  ) : (
-                                    surveys.map((survey) => (
-                                      <div
-                                        key={survey.id}
-                                        className={cn(
-                                          "flex items-center gap-3 p-2 rounded-md cursor-pointer transition-colors hover:bg-muted",
-                                          selectedSurveyId === survey.id && "bg-muted"
-                                        )}
-                                        onClick={() => handleInlineSurveySelect(survey.id)}
-                                      >
-                                        <BarChart3 className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                                        <div className="flex-1 min-w-0">
-                                          <div className="text-sm font-medium truncate">
-                                            {survey.title}
-                                          </div>
-                                        </div>
-                                        {selectedSurveyId === survey.id && (
-                                          <div className="h-2 w-2 bg-primary rounded-full flex-shrink-0" />
-                                        )}
-                                      </div>
-                                    ))
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                        
-                        {/* Upload button */}
-                        <Button 
-                          size="icon" 
-                          variant="ghost" 
-                          className="h-8 w-8" 
-                          onClick={handleUploadClick}
-                          title="Upload survey file"
-                        >
-                          <Upload className="h-4 w-4"/>
-                        </Button>
-                      </div>
-                      
-                      {/* Send button - positioned inside textarea on the right */}
-                      <div className="absolute right-2 bottom-2">
-                        <Button 
-                          size="icon" 
-                          variant="ghost" 
-                          className="h-8 w-8" 
-                          onClick={handleSend} 
-                          disabled={isLoading}
-                        >
-                          <Send className="h-4 w-4"/>
-                        </Button>
-                      </div>
                     </div>
                   </div>
-                </div>
-              </div>
+                </TabsContent>
+                
+                <TabsContent value="stats" className="flex-1 mt-0">
+                  {selectedSurveyId && (
+                    <SurveyStatsView surveyId={selectedSurveyId} />
+                  )}
+                </TabsContent>
+              </Tabs>
             )}
           </div>
           </div>
@@ -2019,7 +2064,7 @@ FORMATTING REQUIREMENTS:
                                 <div key={groupKey} className="space-y-1">
                                   {/* Survey Header */}
                                   <div
-                                    className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-muted/50 cursor-pointer group"
+                                    className="flex items-center gap-2 px-2 py-0.5 rounded-md hover:bg-muted/50 cursor-pointer group"
                                     onClick={() => toggleSurveyExpansion(surveyId)}
                                   >
                                     <div className="flex items-center gap-1.5 flex-1 min-w-0">
@@ -2049,10 +2094,10 @@ FORMATTING REQUIREMENTS:
                                         <div
                                           key={conversation.id}
                                           className={cn(
-                                            "flex items-center gap-2 px-2 py-1 cursor-pointer transition-colors group",
+                                            "flex items-center gap-2 px-2 py-0 cursor-pointer transition-colors group rounded-md",
                                             currentConversationId === conversation.id
-                                              ? "text-primary"
-                                              : "text-foreground hover:text-primary"
+                                              ? "text-primary font-semibold"
+                                              : "text-foreground hover:text-primary hover:bg-muted/50"
                                           )}
                                           onClick={() => switchConversation(conversation.id)}
                                         >
@@ -2082,7 +2127,7 @@ FORMATTING REQUIREMENTS:
                             {/* Conversations without a survey */}
                             {noSurveyConversations.length > 0 && (
                               <div className="space-y-1">
-                                <div className="flex items-center gap-2 px-2 py-1.5">
+                                <div className="flex items-center gap-2 px-2 py-0.5">
                                   <Folder className="h-3 w-3 text-muted-foreground" />
                                   <span className="text-xs font-medium text-muted-foreground">
                                     General Conversations
@@ -2096,10 +2141,10 @@ FORMATTING REQUIREMENTS:
                                     <div
                                       key={conversation.id}
                                       className={cn(
-                                        "flex items-center gap-2 px-2 py-1 cursor-pointer transition-colors group",
+                                        "flex items-center gap-2 px-2 py-0 cursor-pointer transition-colors group rounded-md",
                                         currentConversationId === conversation.id
-                                          ? "text-primary"
-                                          : "text-foreground hover:text-primary"
+                                          ? "text-primary font-semibold"
+                                          : "text-foreground hover:text-primary hover:bg-muted/50"
                                       )}
                                       onClick={() => switchConversation(conversation.id)}
                                     >
