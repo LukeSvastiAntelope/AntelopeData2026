@@ -662,7 +662,12 @@ export const SurveyRepo = {
         const db = await getMySQLConnection();
         
         const [rows] = await db.execute<RowDataPacket[]>(
-            "SELECT * FROM surveys WHERE id = ? AND created_by = ?",
+            `SELECT * FROM surveys 
+             WHERE id = ? 
+             AND (
+               created_by = ? 
+               OR (is_public = 1 AND status = 'published')
+             )`,
             [surveyId, createdBy]
         );
         
@@ -1093,7 +1098,12 @@ export const SurveyRepo = {
 
         // Verify ownership first
         const [surveyRows] = await db.execute<RowDataPacket[]>(
-            'SELECT id FROM surveys WHERE id = ? AND created_by = ?',
+            `SELECT id FROM surveys 
+             WHERE id = ? 
+               AND (
+                 created_by = ? 
+                 OR (is_public = 1 AND status = 'published')
+               )`,
             [surveyId, createdBy]
         );
         if (!surveyRows[0]) return null;
@@ -1139,7 +1149,13 @@ export const SurveyRepo = {
 
         // Verify ownership
         const [surveyRows] = await db.execute<RowDataPacket[]>(
-            'SELECT id, title, description, created_at, status, is_public FROM surveys WHERE id = ? AND created_by = ?',
+            `SELECT id, title, description, created_at, status, is_public 
+             FROM surveys 
+             WHERE id = ? 
+               AND (
+                 created_by = ? 
+                 OR (is_public = 1 AND status = 'published')
+               )`,
             [surveyId, createdBy]
         );
         if (!surveyRows[0]) return null;
@@ -1287,8 +1303,7 @@ export const SurveyRepo = {
                 await connection.execute('SET SESSION innodb_lock_wait_timeout = 300'); // 5 minutes
                 await connection.beginTransaction();
                 
-                // Get all agent tokens for Pinecone cleanup before deleting responses
-                console.log('Collecting digital twin tokens for Pinecone cleanup...');
+                // Collect digital twin tokens before deleting responses
                 const [agentTokenRows] = await connection.execute<RowDataPacket[]>(
                     `SELECT ra.agent_token 
                      FROM responder_agents ra
@@ -1296,12 +1311,22 @@ export const SurveyRepo = {
                      WHERE sr.survey_id = ?`,
                     [surveyId]
                 );
-                
                 const agentTokens = agentTokenRows.map((row: any) => row.agent_token).filter(Boolean);
                 console.log(`Found ${agentTokens.length} digital twins to clean up from Pinecone`);
-            
-            // Delete in order of dependencies:
-            // 1. Delete survey answers
+
+                // First remove derived statistical tables that reference survey and questions
+                await connection.execute(
+                    'DELETE FROM survey_question_stats WHERE survey_id = ?',
+                    [surveyId]
+                );
+
+                await connection.execute(
+                    'DELETE FROM survey_analytics_cache WHERE survey_id = ?',
+                    [surveyId]
+                );
+
+                // Delete in order of dependencies:
+                // 1. Delete survey answers
                 console.log('Deleting survey answers...');
             await connection.execute(
                 `DELETE sa FROM survey_answers sa 
@@ -1368,6 +1393,10 @@ export const SurveyRepo = {
         
         try {
             console.log(`Starting batched deletion for large survey ${surveyId} with ${responseCount} responses`);
+
+            // Remove derived stats and analytics cache first to avoid FK constraints
+            await db.execute('DELETE FROM survey_question_stats WHERE survey_id = ?', [surveyId]);
+            await db.execute('DELETE FROM survey_analytics_cache WHERE survey_id = ?', [surveyId]);
             
             // Step 0: Get all agent tokens for Pinecone cleanup before deleting responses
             console.log('Collecting digital twin tokens for Pinecone cleanup...');
@@ -1580,8 +1609,9 @@ export const SurveyRepo = {
                 [clonedSurveyResult] = await connection.execute<ResultSetHeader>(
                     `INSERT INTO surveys (
                         title, description, slug, created_by, is_public, status, 
+                        response_count, 
                         start_at, end_at, source, source_metadata, parent_survey_id, cloned_at
-                    ) VALUES (?, ?, ?, ?, ?, 'draft', ?, ?, 'clone', ?, ?, NOW())`,
+                    ) VALUES (?, ?, ?, ?, ?, 'draft', 0, ?, ?, 'clone', ?, ?, NOW())`,
                     [
                         newTitle,
                         originalSurvey.description,
@@ -1604,16 +1634,17 @@ export const SurveyRepo = {
                 [clonedSurveyResult] = await connection.execute<ResultSetHeader>(
                     `INSERT INTO surveys (
                         title, description, slug, created_by, is_public, status, 
+                        response_count,
                         start_at, end_at, source, source_metadata
-                    ) VALUES (?, ?, ?, ?, ?, 'draft', ?, ?, 'clone', ?)`,
+                    ) VALUES (?, ?, ?, ?, ?, 'draft', 0, ?, ?, 'clone', ?)`,
                     [
                         newTitle,
                         originalSurvey.description,
                         newSlug,
                         createdBy,
                         originalSurvey.is_public,
-                        null, // start_at - reset to null so user can set new schedule
-                        null, // end_at - reset to null so user can set new schedule
+                        null, // start_at
+                        null, // end_at
                         JSON.stringify({
                             originalSurveyId: surveyId,
                             originalTitle: originalSurvey.title,

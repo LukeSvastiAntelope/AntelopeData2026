@@ -73,9 +73,9 @@ export class SmartSurveyQueryBuilder {
     
     // User's surveys only
     if (whereClause === "1") {
-      whereClause = 's.created_by = ?';
+      whereClause = '(s.created_by = ? OR (s.is_public = 1 AND s.status = \'published\'))';
     } else {
-      whereClause += ' AND s.created_by = ?';
+      whereClause += ' AND (s.created_by = ? OR (s.is_public = 1 AND s.status = \'published\'))';
     }
     params.push(userId);
     
@@ -142,9 +142,9 @@ export class SmartSurveyQueryBuilder {
     let whereClause = this.buildCohortWhereClause(cohortFilters, params);
     
     if (whereClause === "1") {
-      whereClause = 's.created_by = ?';
+      whereClause = '(s.created_by = ? OR (s.is_public = 1 AND s.status = \'published\'))';
     } else {
-      whereClause += ' AND s.created_by = ?';
+      whereClause += ' AND (s.created_by = ? OR (s.is_public = 1 AND s.status = \'published\'))';
     }
     params.push(userId);
     
@@ -202,9 +202,9 @@ export class SmartSurveyQueryBuilder {
     let whereClause = this.buildCohortWhereClause(cohortFilters, params);
     
     if (whereClause === "1") {
-      whereClause = 's.created_by = ?';
+      whereClause = '(s.created_by = ? OR (s.is_public = 1 AND s.status = \'published\'))';
     } else {
-      whereClause += ' AND s.created_by = ?';
+      whereClause += ' AND (s.created_by = ? OR (s.is_public = 1 AND s.status = \'published\'))';
     }
     params.push(userId);
     
@@ -263,9 +263,9 @@ export class SmartSurveyQueryBuilder {
     let whereClause = this.buildCohortWhereClause(cohortFilters, params);
     
     if (whereClause === "1") {
-      whereClause = 's.created_by = ?';
+      whereClause = '(s.created_by = ? OR (s.is_public = 1 AND s.status = \'published\'))';
     } else {
-      whereClause += ' AND s.created_by = ?';
+      whereClause += ' AND (s.created_by = ? OR (s.is_public = 1 AND s.status = \'published\'))';
     }
     params.push(userId);
     
@@ -339,9 +339,9 @@ export class SmartSurveyQueryBuilder {
     let whereClause = this.buildCohortWhereClause(cohortFilters, params);
     
     if (whereClause === "1") {
-      whereClause = 's.created_by = ?';
+      whereClause = '(s.created_by = ? OR (s.is_public = 1 AND s.status = \'published\'))';
     } else {
-      whereClause += ' AND s.created_by = ?';
+      whereClause += ' AND (s.created_by = ? OR (s.is_public = 1 AND s.status = \'published\'))';
     }
     params.push(userId);
     
