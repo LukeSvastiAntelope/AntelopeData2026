@@ -385,25 +385,52 @@ export async function POST(req: NextRequest) {
     console.log(`🤖 Proceeding to LLM analysis with fact sheet context`);
     console.log(`🎯 Analysis Type: ${reportAnalysis.reportType} (${Math.round(reportAnalysis.estimatedComplexity * 100)}% complexity)`);
     
-    const enhancedQueryBuilder = new EnhancedSurveyQueryBuilder();
     const intentClassifier = new QueryIntentClassifier();
-    
-    // Classify the query intent and build optimized query with enhanced demographic handling
     const queryIntent = intentClassifier.classifyQuery(question);
-    const queryResult = await enhancedQueryBuilder.buildEnhancedQuery(
-      question, 
-      filterRules, 
-      userId, 
-      surveyId, 
-      topK
-    );
-
-    console.log(`🎯 Query Intent: ${queryIntent.intent} (${Math.round(queryIntent.confidence * 100)}%)`);
-    console.log(`📊 Query Strategy: ${queryResult.explanation}`);
-    console.log(`🔍 Expected Result Type: ${queryResult.expectedResultType}`);
-
-    // Execute the smart query
-    const [rows] = await db.execute<any[]>(queryResult.sql, queryResult.params);
+    
+    let queryResult;
+    let rows;
+    
+    // Try enhanced query builder first, fall back to original if it fails
+    try {
+      console.log('🚀 Attempting enhanced query with normalized demographics...');
+      const enhancedQueryBuilder = new EnhancedSurveyQueryBuilder();
+      queryResult = await enhancedQueryBuilder.buildEnhancedQuery(
+        question, 
+        filterRules, 
+        userId, 
+        surveyId, 
+        topK
+      );
+      
+      console.log(`🎯 Query Intent: ${queryIntent.intent} (${Math.round(queryIntent.confidence * 100)}%)`);
+      console.log(`📊 Enhanced Query Strategy: ${queryResult.explanation}`);
+      console.log(`🔍 Expected Result Type: ${queryResult.expectedResultType}`);
+      
+      // Execute the enhanced query
+      [rows] = await db.execute<any[]>(queryResult.sql, queryResult.params);
+      console.log('✅ Enhanced query executed successfully');
+      
+    } catch (enhancedError) {
+      console.warn('⚠️ Enhanced query failed, falling back to original query builder:', enhancedError.message);
+      
+      // Fall back to original SmartSurveyQueryBuilder
+      const smartQueryBuilder = new SmartSurveyQueryBuilder();
+      queryResult = await smartQueryBuilder.buildSmartQuery(
+        question, 
+        filterRules, 
+        userId, 
+        surveyId, 
+        topK
+      );
+      
+      console.log(`📊 Fallback Query Strategy: ${queryResult.explanation}`);
+      console.log(`🔍 Expected Result Type: ${queryResult.expectedResultType}`);
+      
+      // Execute the fallback query
+      [rows] = await db.execute<any[]>(queryResult.sql, queryResult.params);
+      console.log('✅ Fallback query executed successfully');
+    }
 
     if (!rows.length) {
       return NextResponse.json({ status: true, answer: "No survey data available for this cohort." });
