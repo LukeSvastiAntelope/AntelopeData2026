@@ -24,11 +24,18 @@ export const SPORTS_CATEGORIES = [
 ]
 
 export const GPT_MODELS = [
+    // OpenAI Models
     {
         key: "o3-mini",
         label: "o3-mini",
         type: "openai",
         model: "o3-mini"
+    },
+    {
+        key: "o3",
+        label: "o3",
+        type: "openai",
+        model: "o3"
     },
     {
         key: 'o1',
@@ -37,39 +44,95 @@ export const GPT_MODELS = [
         model: 'o1'
     },
     {
+        key: 'o1-mini',
+        label: 'o1-mini',
+        type: "openai",
+        model: 'o1-mini'
+    },
+    {
         key: 'gpt-4o',
-        label: 'gpt-4o',
+        label: 'GPT-4o',
         type: "openai",
         model: 'gpt-4o'
     },
     {
-        key: "gemini-2",
-        label: "Gemini 2",
+        key: 'gpt-4o-mini',
+        label: 'GPT-4o Mini',
+        type: "openai",
+        model: 'gpt-4o-mini'
+    },
+    {
+        key: 'gpt-4-turbo',
+        label: 'GPT-4 Turbo',
+        type: "openai",
+        model: 'gpt-4-turbo'
+    },
+    {
+        key: 'gpt-4',
+        label: 'GPT-4',
+        type: "openai",
+        model: 'gpt-4'
+    },
+    {
+        key: 'gpt-3.5-turbo',
+        label: 'GPT-3.5 Turbo',
+        type: "openai",
+        model: 'gpt-3.5-turbo'
+    },
+    
+    // DeepSeek Models
+    {
+        key: "deepseek-chat",
+        label: "DeepSeek Chat",
+        type: "deepseek",
+        model: "deepseek-chat"
+    },
+    {
+        key: "deepseek-coder",
+        label: "DeepSeek Coder",
+        type: "deepseek",
+        model: "deepseek-coder"
+    },
+    
+    // Google Gemini Models
+    {
+        key: "gemini-2.0-flash",
+        label: "Gemini 2.0 Flash",
         type: "gemini",
         model: "gemini-2.0-flash"
     },
     {
-        key: "claude-3-5-sonnet",
+        key: "gemini-1.5-pro",
+        label: "Gemini 1.5 Pro",
+        type: "gemini",
+        model: "gemini-1.5-pro"
+    },
+    {
+        key: "gemini-1.5-flash",
+        label: "Gemini 1.5 Flash",
+        type: "gemini",
+        model: "gemini-1.5-flash"
+    },
+    
+    // Anthropic Claude Models
+    {
+        key: "claude-3-5-sonnet-latest",
         label: "Claude 3.5 Sonnet",
         type: "anthropic",
         model: "claude-3-5-sonnet-latest"
     },
     {
-        key: "claude-3-5-haiku",
+        key: "claude-3-5-haiku-latest",
         label: "Claude 3.5 Haiku",
         type: "anthropic",
         model: "claude-3-5-haiku-latest"
     },
     {
-        key: "claude-3-opus",
+        key: "claude-3-opus-latest",
         label: "Claude 3 Opus",
         type: "anthropic",
         model: "claude-3-opus-latest"
     },
-    // {
-    //     key: "deepseek",
-    //     label: "deepseek",
-    // },
 ];
 
 export const PLUGINS = [
