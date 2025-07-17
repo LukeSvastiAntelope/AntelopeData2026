@@ -399,8 +399,7 @@ export const SurveyRepo = {
                    AND s.is_public = 1
                    AND (s.title LIKE '%Pew Research%' 
                         OR s.title LIKE '%Example%' 
-                        OR s.source = 'pew_research'
-                        OR s.id = 49)
+                        OR s.source = 'pew_research')
                  GROUP BY s.id 
                  ORDER BY s.created_at DESC
                  LIMIT 3`,
@@ -428,8 +427,7 @@ export const SurveyRepo = {
                    AND s.status = 'published' 
                    AND s.is_public = 1
                    AND (s.title LIKE '%Pew Research%' 
-                        OR s.title LIKE '%Example%'
-                        OR s.id = 49)
+                        OR s.title LIKE '%Example%')
                  GROUP BY s.id 
                  ORDER BY s.created_at DESC
                  LIMIT 3`,
