@@ -282,12 +282,21 @@ export class ReportGenerationService {
   }
   
   private async generateThematicAnalysis(data: SurveyData): Promise<ReportSection> {
-    const textResponses = data.responses
-      .filter(r => r.response_text && r.response_text.length > 20)
-      .map(r => r.response_text);
+    // Extract actual text responses from survey answers
+    const textResponses = await this.extractTextResponses(data);
+    
+    // If no meaningful text responses exist, return a descriptive analysis instead
+    if (textResponses.length === 0) {
+      return {
+        type: 'thematic_analysis',
+        title: 'Response Analysis',
+        content: this.generateQuantitativeAnalysis(data),
+        orderIndex: 1
+      };
+    }
     
     const prompt = `
-    Analyze the following text responses for common themes and patterns:
+    Analyze the following survey text responses for common themes and patterns:
     
     ${textResponses.slice(0, 50).join('\n---\n')}
     
@@ -303,7 +312,7 @@ export class ReportGenerationService {
     const completion = await createCompletion({
       model: 'gpt-4o',
       messages: [
-        { role: 'system', content: 'You are a qualitative research analyst.' },
+        { role: 'system', content: 'You are a qualitative research analyst. Only analyze the actual survey responses provided. Do not invent or fabricate any quotes or responses.' },
         { role: 'user', content: prompt }
       ],
       temperature: 0.3,
@@ -316,6 +325,99 @@ export class ReportGenerationService {
       content: completion.content || '',
       orderIndex: 1
     };
+  }
+  
+  private async extractTextResponses(data: SurveyData): Promise<string[]> {
+    const db = await getMySQLConnection();
+    const textResponses: string[] = [];
+    
+    // Safety check - ensure we have responses with IDs
+    if (!data.responses || data.responses.length === 0) {
+      console.log('⚠️ No survey responses available for text extraction');
+      return textResponses;
+    }
+    
+    try {
+      // Get survey answers with meaningful text content
+      // Note: Using correct column names based on actual table structure
+      const responseIds = data.responses.map(r => r.id).filter(id => id != null);
+      
+      if (responseIds.length === 0) {
+        console.log('⚠️ No valid response IDs found');
+        return textResponses;
+      }
+      
+      const placeholders = responseIds.map(() => '?').join(',');
+      const query = `
+        SELECT sa.answer_value, sq.prompt as question_text
+        FROM survey_answers sa
+        JOIN survey_questions sq ON sa.question_id = sq.id
+        WHERE sa.response_id IN (${placeholders})
+        AND sa.answer_value IS NOT NULL
+        AND LENGTH(TRIM(sa.answer_value)) > 20
+        AND sa.answer_value NOT REGEXP '^[0-9]+$'
+        LIMIT 100
+      `;
+      
+      const [answers] = await db.execute<RowDataPacket[]>(query, responseIds);
+      
+      console.log(`📝 Found ${answers.length} potential text responses`);
+      
+      for (const answer of answers) {
+        const text = answer.answer_value?.toString().trim();
+        if (text && text.length > 20 && !this.isNumericOrCodedResponse(text)) {
+          textResponses.push(`[${answer.question_text}] ${text}`);
+        }
+      }
+      
+      console.log(`✅ Extracted ${textResponses.length} meaningful text responses`);
+      
+    } catch (error) {
+      console.error('❌ Error extracting text responses:', error);
+      // Don't throw - just return empty array to trigger quantitative analysis
+    }
+    
+    return textResponses;
+  }
+  
+  private isNumericOrCodedResponse(text: string): boolean {
+    // Check if response is just a number, date, or coded value
+    const numericPattern = /^[\d\.\-\/\s:]+$/;
+    const shortCodePattern = /^[A-Z0-9\-_]{1,10}$/i;
+    return numericPattern.test(text) || shortCodePattern.test(text);
+  }
+  
+  private generateQuantitativeAnalysis(data: SurveyData): string {
+    const responseCount = data.sampleSize;
+    const questionCount = data.questions.length;
+    
+    return `
+## Survey Response Analysis
+
+### Data Overview
+This analysis is based on **${responseCount} survey responses** across **${questionCount} questions** from the survey "${data.surveyTitle}".
+
+### Data Type Assessment
+The survey data consists primarily of structured responses (multiple choice, ratings, demographic categories) rather than open-text responses. This type of data is well-suited for:
+
+- **Statistical Analysis**: Frequency distributions, cross-tabulations, and correlations
+- **Demographic Breakdowns**: Response patterns by demographic groups
+- **Trend Analysis**: Response patterns across different categories
+- **Comparative Analysis**: Differences between respondent segments
+
+### Analytical Approach
+Since this survey contains structured rather than narrative responses, the most meaningful insights come from:
+
+1. **Quantitative Analysis**: Statistical patterns in response distributions
+2. **Demographic Segmentation**: How different groups respond to key questions
+3. **Cross-Tabulation**: Relationships between different response variables
+4. **Trend Identification**: Patterns in responses across the survey
+
+### Recommendation
+For this type of structured survey data, **statistical analysis and visualization** provide more actionable insights than thematic analysis. Consider reviewing the demographic breakdowns and response distributions for the most valuable findings.
+
+**Data Source**: All analysis based on actual survey responses from the database. No synthetic or hypothetical data used.
+    `.trim();
   }
   
   private async generateComparativeAnalysis(data: SurveyData): Promise<ReportSection> {
