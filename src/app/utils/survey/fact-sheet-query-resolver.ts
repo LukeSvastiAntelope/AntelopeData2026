@@ -38,6 +38,11 @@ export class FactSheetQueryResolver {
       return this.generateAnswerFromStats(questionLower, relevantStats, factSheet);
     }
     
+    // Try visualization/chart requests first (high priority)
+    if (this.isVisualizationRequest(questionLower)) {
+      return this.resolveVisualizationRequest(questionLower, factSheet);
+    }
+    
     // Try demographics questions
     if (factSheet.core_stats?.demographic_distribution && this.isDemographicQuestion(questionLower)) {
       return this.resolveDemographicQuestion(questionLower, factSheet.core_stats.demographic_distribution, factSheet);
@@ -358,6 +363,133 @@ export class FactSheetQueryResolver {
       'survey', 'respondents', 'participants', 'general', 'overall'
     ];
     return overviewKeywords.some(keyword => question.includes(keyword));
+  }
+
+  private isVisualizationRequest(question: string): boolean {
+    const vizKeywords = [
+      'graph', 'chart', 'visual', 'plot', 'diagram', 'visualization', 
+      'visualize', 'show', 'display', 'create', 'generate', 'make'
+    ];
+    return vizKeywords.some(keyword => question.includes(keyword));
+  }
+
+  /**
+   * Generate comprehensive visualization response from fact sheet
+   */
+  private resolveVisualizationRequest(question: string, factSheet: any): FactSheetQueryResult {
+    const questionStats = factSheet.fact_sheet?.question_stats || factSheet.question_stats || {};
+    const demographics = factSheet.demographics || {};
+    const surveyMeta = factSheet.survey_meta || factSheet.survey_metadata || {};
+    
+    if (Object.keys(questionStats).length === 0 && Object.keys(demographics).length === 0) {
+      return {
+        canAnswer: false,
+        confidence: 0,
+        reasoning: "No statistical data available for visualization",
+        fallbackNeeded: {
+          reason: "Need statistical data to create visualizations",
+          suggestedQuery: "raw_data_needed"
+        }
+      };
+    }
+
+    let answer = `# Survey Visualization Analysis\n\n`;
+    answer += `Based on **${(surveyMeta.total_respondents || 0).toLocaleString()} survey responses**, here are comprehensive visualizations:\n\n`;
+    
+    const dataCards: any[] = [];
+    const confidence = 0.95;
+
+    // Add key insights from question stats
+    if (Object.keys(questionStats).length > 0) {
+      answer += `## 📊 Key Survey Insights\n\n`;
+      
+      let insightCount = 0;
+      Object.entries(questionStats).forEach(([questionKey, stats]: [string, any]) => {
+        if (insightCount >= 5) return;
+        
+        if (stats.adoption_rates) {
+          const topOption = Object.entries(stats.adoption_rates)
+            .sort(([,a]: any, [,b]: any) => (b as any).percentage - (a as any).percentage)[0];
+          if (topOption) {
+            const [option, data] = topOption;
+            const dataTyped = data as any;
+            answer += `• **${questionKey}**: ${option} leads with ${dataTyped.percentage}% adoption (${dataTyped.users.toLocaleString()} users)\n`;
+            
+            // Create chart for this insight
+            dataCards.push({
+              type: 'adoption_rates',
+              title: questionKey,
+              data: Object.entries(stats.adoption_rates).slice(0, 10).map(([opt, info]: [string, any]) => ({
+                label: opt,
+                value: info.percentage,
+                count: info.users
+              })),
+              chart_type: 'bar'
+            });
+            
+            insightCount++;
+          }
+        } else if (stats.statistics) {
+          answer += `• **${questionKey}**: Average score ${stats.statistics.mean} (range: ${stats.statistics.min}-${stats.statistics.max})\n`;
+          
+          // Create metric card
+          dataCards.push({
+            type: 'numeric_stats',
+            title: questionKey,
+            data: {
+              mean: stats.statistics.mean,
+              median: stats.statistics.median,
+              min: stats.statistics.min,
+              max: stats.statistics.max
+            },
+            chart_type: 'metric_card'
+          });
+          
+          insightCount++;
+        }
+      });
+      answer += '\n';
+    }
+
+    // Add demographics visualizations
+    if (Object.keys(demographics).length > 0) {
+      answer += `## 👥 Demographics Overview\n\n`;
+      
+      Object.entries(demographics).forEach(([key, data]: [string, any]) => {
+        if (data && typeof data === 'object' && data.distribution) {
+          const topSegments = Object.entries(data.distribution)
+            .sort(([,a]: any, [,b]: any) => (b as any).count - (a as any).count)
+            .slice(0, 3);
+          answer += `**${key.charAt(0).toUpperCase() + key.slice(1)}**: `;
+          answer += topSegments.map(([segment, info]: [string, any]) => 
+            `${segment} (${info.count} responses, ${info.percentage}%)`).join(', ') + '\n\n';
+          
+          // Create demographic chart
+          dataCards.push({
+            type: 'demographic_distribution',
+            title: `${key.charAt(0).toUpperCase() + key.slice(1)} Distribution`,
+            data: Object.entries(data.distribution).map(([segment, info]: [string, any]) => ({
+              label: segment,
+              value: info.percentage,
+              count: info.count
+            })),
+            chart_type: 'pie'
+          });
+        }
+      });
+    }
+
+    answer += `## 📈 Chart Specifications\n\n`;
+    answer += `Generated ${dataCards.length} interactive visualizations from pre-computed statistical data.\n\n`;
+    answer += `*Analysis based on pre-computed statistics from ${(surveyMeta.total_respondents || 0).toLocaleString()} respondents*`;
+
+    return {
+      canAnswer: true,
+      answer,
+      dataCards,
+      confidence,
+      reasoning: `Generated comprehensive visualizations from fact sheet data with ${Math.round(confidence * 100)}% confidence`
+    };
   }
   
   private resolveDemographicQuestion(question: string, demographics: any, factSheet: any): FactSheetQueryResult {

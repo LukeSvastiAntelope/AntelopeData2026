@@ -4,16 +4,16 @@ import { CohortRepo } from "@/app/utils/database/cohort-repo";
 import { CohortFilterRule } from "@/app/utils/interface";
 import { TextEncoder } from "util";
 import { auth } from '@/auth';
-// Simple in-memory cache for survey fact sheets (auto-expires after 15 minutes)
-// NOTE: Suitable for dev/single-node deployments. Replace with Redis in prod.
-const FACT_SHEET_TTL_MS = 15 * 60 * 1000;
-const factSheetCache: Map<number, { ts: number; data: any }> = new Map();
+
 import { createCompletion, createStreamingCompletion } from "@/app/utils/services/ai-service";
 import { verifyConfirmationToken } from "@/app/utils/api/token";
 import { SmartSurveyQueryBuilder } from "@/app/utils/survey/smart-query-builder";
 import { EnhancedSurveyQueryBuilder } from "@/app/utils/survey/enhanced-query-builder";
 import { QueryIntentClassifier } from "@/app/utils/survey/query-intent-classifier";
 import type { FactSheetQueryResult } from "../../../utils/survey/fact-sheet-query-resolver";
+// Note: QuestionIntelligence is dynamically imported in the route handler
+
+
 
 interface CohortQueryPayload {
   cohort?: { id?: number; filter?: CohortFilterRule[] };
@@ -179,6 +179,89 @@ function generateDataCards(factSheet: any, question: string): any[] {
   return cards;
 }
 
+/**
+ * Generate AI analysis of statistical results to provide intelligent insights
+ */
+async function generateAIAnalysis(analysisResults: any, userQuestion: string, surveyMeta: any): Promise<string> {
+  try {
+    // Prepare data for AI analysis
+    const dataContext = analysisResults.results.map((result: any) => {
+      const topResults = result.data?.slice(0, 6).map((row: any) => 
+        `${row.answer_value}: ${row.percentage}% (${row.count} responses)`
+      ).join('\n') || 'No data available';
+      
+      return {
+        question: result.title,
+        totalResponses: result.totalResponses || 0,
+        topResults: topResults,
+        analysisType: result.analysisType
+      };
+    }).slice(0, 3); // Limit to top 3 questions for analysis
+
+    const prompt = `You are an expert data analyst providing insights based on survey results. Your task is to analyze the statistical data and provide intelligent interpretation that goes beyond just stating the numbers.
+
+USER QUESTION: "${userQuestion}"
+
+SURVEY CONTEXT: ${surveyMeta.title} (${analysisResults.analysis_count} questions analyzed)
+
+STATISTICAL DATA:
+${dataContext.map((data, i) => `
+Question ${i + 1}: ${data.question}
+Total Responses: ${data.totalResponses}
+Results:
+${data.topResults}
+`).join('\n')}
+
+Your analysis should:
+1. SYNTHESIZE PATTERNS: What do the numbers actually mean? What patterns emerge?
+2. PROVIDE CONTEXT: Why might these results be significant? What do they suggest?
+3. IDENTIFY KEY INSIGHTS: What are the most important takeaways?
+4. CONSIDER IMPLICATIONS: What might these results indicate about the broader topic?
+5. NOTE NUANCES: Are there interesting distinctions in the data worth highlighting?
+
+FORMATTING REQUIREMENTS:
+- Use proper markdown formatting with headers, bullets, and emphasis
+- Structure your response with clear sections using ### headers
+- Use **bold** for key findings and *italics* for emphasis
+- Use bullet points (-) to break down complex insights
+- Include line breaks between paragraphs for readability
+
+Format your response like this:
+
+### 📊 Key Findings
+
+- **Primary insight**: Brief description
+- **Secondary insight**: Brief description
+
+### 🔍 Analysis & Patterns
+
+[2-3 well-structured paragraphs with proper markdown formatting]
+
+### 💡 Implications
+
+[1-2 paragraphs about broader significance]
+
+Be analytical and insightful, not just descriptive. Transform raw statistics into understanding using clear, well-formatted markdown.
+
+Do not repeat the exact percentages already shown above - instead interpret what they reveal.`;
+
+    const completion = await createCompletion({
+      model: 'gpt-4o', // Use stronger model for analysis
+      messages: [
+        { role: 'user', content: prompt }
+      ],
+      temperature: 0.3, // Balanced temperature for insightful but consistent analysis
+      maxTokens: 800
+    });
+
+    return completion.content || 'Analysis could not be generated at this time.';
+
+  } catch (error) {
+    console.warn('⚠️ AI analysis generation failed:', error.message);
+    return 'Statistical data analysis is temporarily unavailable. The numerical results above provide the key findings from your query.';
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     console.log('🚀 COHORT QUERY ROUTE STARTED - NEW VERSION WITH FACT SHEET FIRST');
@@ -192,6 +275,10 @@ export async function POST(req: NextRequest) {
 
     const body = (await req.json()) as CohortQueryPayload;
     const { cohort, question, topK = 1000, surveyId, model = 'gpt-4o', temperature = 0.0, sources, systemPrompt, stream = true } = body;
+    
+    console.log('🔍 DEBUGGING: Request body stream value:', body.stream);
+    console.log('🔍 DEBUGGING: Resolved stream value:', stream);
+    console.log('🔍 DEBUGGING: Model being used:', model);
     
     console.log(`📝 Question: "${question}"`);
     console.log(`📊 Survey ID: ${surveyId}`);
@@ -240,94 +327,216 @@ export async function POST(req: NextRequest) {
     
     // 🎯 NEW: Check if report generation is warranted
     if (reportAnalysis.isReportWorthy && surveyId) {
-      console.log('📊 Complex query detected - initiating background report generation...');
+      console.log('📊 Complex query detected - will offer report generation...');
       
-      try {
-        const { ReportGenerationService } = await import('../../../utils/services/report-generation-service');
-        const reportService = new ReportGenerationService();
-        
-        const reportId = await reportService.initiateReport({
-          userId,
-          surveyId,
-          cohortId: cohort?.id,
-          query: question,
-          reportType: reportAnalysis.reportType,
-          tokenBudget: reportAnalysis.tokenBudget || 6000,
-          complexity: reportAnalysis.estimatedComplexity
-        });
-        
-        console.log(`📋 Report ${reportId} initiated for background processing`);
-        
-        // Return immediate acknowledgment if not streaming
-        if (!stream) {
-          return NextResponse.json({
-            status: true,
-            content: `🔄 **Generating Comprehensive ${reportAnalysis.reportType.charAt(0).toUpperCase() + reportAnalysis.reportType.slice(1)} Report**\n\n` +
-                     `I'm creating a detailed analysis for your query. This will take 3-5 minutes to complete.\n\n` +
-                     `**What I'm analyzing:**\n` +
-                     `• ${reportAnalysis.reportType === 'demographic' ? 'Breaking down responses by demographic segments' : ''}` +
-                     `• ${reportAnalysis.reportType === 'thematic' ? 'Identifying key themes and patterns' : ''}` +
-                     `• ${reportAnalysis.reportType === 'comparative' ? 'Comparing different groups and segments' : ''}` +
-                     `• ${reportAnalysis.reportType === 'longitudinal' ? 'Analyzing changes over time' : ''}` +
-                     `• ${reportAnalysis.reportType === 'comprehensive' ? 'Conducting full multi-dimensional analysis' : ''}\n\n` +
-                     `I'll notify you when the report is ready. The generation includes delays to respect API rate limits.\n\n` +
-                     `You can check the status anytime by visiting the [Reports](/reports) page.`,
-            reportId: reportId,
-            reportStatus: 'initiated',
-            estimatedCompletion: new Date(Date.now() + 300000).toISOString() // 5 minutes
-          });
-        }
-        
-        // For streaming mode, we'll continue with regular analysis but add report notification
-        // The report will be generated in the background
-      } catch (error) {
-        console.error('Failed to initiate report generation:', error);
-        // Continue with regular analysis if report generation fails
-      }
+      // Instead of auto-generating, we'll include report generation suggestion in the response
+      // The frontend can then decide whether to trigger report preview generation
     }
     
-    // 🎯 STEP 3: Load fact sheet as context data (not as replacement)
-    let factSheet = null;
+    // 🎯 STEP 3: Simple approach - Find relevant questions and query them directly
+    let factSheet = null; // Keep for compatibility
+    let analysisResults = null;
     if (surveyId) {
-      // Check cache first
-      const cached = factSheetCache.get(surveyId);
-      if (cached && Date.now() - cached.ts < FACT_SHEET_TTL_MS) {
-        factSheet = cached.data;
-        console.log('📊 Fact sheet served from cache');
-      } else {
-        try {
-          const { analyzeSurveySchema } = await import('../../../../../scripts/analyze-survey-schema.js');
-          const schema = await analyzeSurveySchema(surveyId, db);
-          factSheet = schema.fact_sheet;
-          factSheetCache.set(surveyId, { ts: Date.now(), data: factSheet });
-          console.log(`📊 Loaded fact sheet with ${Object.keys(factSheet.question_stats || {}).length} question stats (cached)`);
-        } catch (error) {
-          console.warn('Could not load fact sheet:', error.message);
+      try {
+        console.log(`🎯 LIGHTWEIGHT APPROACH: Finding relevant questions for "${question}" in survey ${surveyId}`);
+        
+        // Check if survey exists
+        const [surveyCheck] = await db.execute(
+          `SELECT id, title FROM surveys WHERE id = ?`,
+          [surveyId]
+        ) as any[];
+
+        if (surveyCheck && surveyCheck.length > 0) {
+          // Use the new lightweight matcher
+          const { LightweightQuestionMatcher } = await import('../../../utils/survey/lightweight-question-matcher');
+          const matcher = new LightweightQuestionMatcher();
+          
+          // Find relevant questions (no pre-analysis needed)
+          const matchResult = await matcher.findRelevantQuestions(
+            surveyId, 
+            question, 
+            db, 
+            3 // Max 3 most relevant questions
+          );
+          
+          console.log(`✅ ${matchResult.reasoning}`);
+          
+          // Generate targeted queries only for matched questions
+          const executedResults = [];
+          for (const match of matchResult.matches) {
+            console.log(`📊 Querying: ${match.question.prompt} (score: ${match.relevanceScore})`);
+            
+            const data = await matcher.generateTargetedQuery(match.question.id, surveyId, db);
+            
+            if (data && data.length > 0) {
+              executedResults.push({
+                title: match.question.prompt,
+                description: `Response distribution for survey question`,
+                analysisType: 'distribution',
+                data: data.map((row: any) => ({
+                  answer_value: row.answer_value,
+                  count: row.count,
+                  percentage: row.percentage
+                })),
+                visualizationType: 'horizontal_bar',
+                category: 'Survey Data',
+                totalResponses: data.reduce((sum: number, row: any) => sum + row.count, 0),
+                questionId: match.question.id,
+                relevanceScore: match.relevanceScore
+              });
+            }
+          }
+
+          analysisResults = {
+            survey_id: surveyId,
+            survey_title: surveyCheck[0].title,
+            user_question: question,
+            analysis_count: executedResults.length,
+            results: executedResults,
+            matched_questions: matchResult.matches.length,
+            methodology: 'lightweight_targeted_queries'
+          };
+
+           // Create a compatible fact sheet structure for existing code
+           factSheet = {
+             survey_meta: {
+               id: surveyId,
+               title: surveyCheck[0].title,
+               total_respondents: executedResults.reduce((sum, r) => sum + r.totalResponses, 0),
+               description: `Targeted analysis of ${executedResults.length} relevant questions`
+             },
+             question_stats: {},
+             analysis_results: analysisResults,
+             data_source: 'lightweight_targeted_queries'
+           };
+
+           console.log(`✅ LIGHTWEIGHT SUCCESS: ${executedResults.length} targeted queries executed`);
+        } else {
+          console.warn(`❌ Survey ${surveyId} not found`);
         }
+      } catch (error) {
+        console.warn('Could not generate lightweight analysis:', error.message);
       }
     }
     
-    // 🎯 STEP 4: For SIMPLE queries only, try fact sheet with HIGH confidence threshold
+    // 🎯 STEP 4: INTELLIGENT ROUTING - Use smart intent analysis instead of keywords
     let factSheetResult: FactSheetQueryResult = { canAnswer: false, confidence: 0, reasoning: "" };
+    let routingDecision: any = null;
     
-    if (!reportAnalysis.isReportWorthy && factSheet) {
-      console.log('🔍 Query is simple - checking if fact sheet can provide direct answer...');
+    if (factSheet) {
       try {
-        const { FactSheetQueryResolver } = await import('../../../utils/survey/fact-sheet-query-resolver');
-        const factSheetResolver = new FactSheetQueryResolver();
-        factSheetResult = factSheetResolver.resolveFromFactSheet(question, factSheet);
-        console.log(`📊 Fact Sheet Analysis: ${factSheetResult.canAnswer ? 'CAN_ANSWER' : 'NEEDS_LLM'}`);
-        console.log(`📊 Confidence: ${Math.round(factSheetResult.confidence * 100)}%`);
-        console.log(`📊 Reasoning: ${factSheetResult.reasoning}`);
+        console.log('🧠 Analyzing query intent and routing intelligently...');
+        
+        // Import and use intelligent router
+        const { IntelligentRouter } = await import('../../../utils/survey/intelligent-router');
+        const router = new IntelligentRouter();
+        
+        // Analyze what the user actually wants
+        const intent = router.analyzeIntent(question);
+        console.log(`🎯 Intent Analysis: ${intent.primaryAction} → ${intent.outputType} (${intent.complexity.toLowerCase()}) [${Math.round(intent.confidence * 100)}% confidence]`);
+        
+        // Check if we can fulfill with available data
+        const capability = router.assessCapability(intent, factSheet);
+        console.log(`⚙️ Capability: ${capability.canFulfill ? 'CAN_FULFILL' : 'CANNOT_FULFILL'} (${Math.round(capability.confidence * 100)}% confidence)`);
+        console.log(`📝 Reason: ${capability.reason}`);
+        
+        // Make routing decision
+        routingDecision = router.makeRoutingDecision(intent, capability);
+        console.log(`🚏 Route Decision: ${routingDecision.route} - ${routingDecision.reason}`);
+        console.log(`⏱️ Estimated Time: ${routingDecision.estimatedTime}`);
+        
+        // If we have analysis results from LightweightQuestionMatcher, use them directly
+        if (factSheet.analysis_results && factSheet.analysis_results.results && factSheet.analysis_results.results.length > 0) {
+          console.log(`📊 Using direct analysis results with ${factSheet.analysis_results.analysis_count} executed queries`);
+          
+          // Add AI analysis layer first - transform raw data into insights
+          const aiAnalysis = await generateAIAnalysis(factSheet.analysis_results, question, factSheet.survey_meta);
+          
+          // Generate response content with AI analysis first
+          let responseContent = `# Survey Analysis: ${factSheet.survey_meta.title}\n\n`;
+          responseContent += `## 🧠 Analysis & Insights\n\n`;
+          responseContent += aiAnalysis;
+          responseContent += `\n\n---\n\n`;
+          
+          // Add note about charts being displayed below
+          responseContent += `📊 **Interactive charts are displayed below**, followed by detailed statistical breakdowns.\n\n`;
+          
+          // Add detailed statistical results section
+          responseContent += `## 📈 Detailed Statistical Results\n\n`;
+          responseContent += `Based on **fresh analysis** of ${factSheet.analysis_results.analysis_count} relevant questions:\n\n`;
+          
+          // Process each analysis result with full details
+          factSheet.analysis_results.results.forEach((result, index) => {
+            responseContent += `### ${index + 1}. ${result.title}\n\n`;
+            responseContent += `**Total Responses:** ${result.totalResponses.toLocaleString()}\n\n`;
+            
+            if (result.data && result.data.length > 0) {
+              if (result.analysisType === 'distribution') {
+                responseContent += `**Complete Distribution:**\n`;
+                result.data.forEach(row => {
+                  responseContent += `- **${row.answer_value}**: ${row.percentage}% (${row.count.toLocaleString()} responses)\n`;
+                });
+              } else {
+                responseContent += `**Results:** ${result.data.length} data points analyzed\n`;
+              }
+            }
+            
+            responseContent += `\n`;
+          });
+          
+          responseContent += `\n---\n*Analysis generated from live database queries on ${new Date().toLocaleDateString()}*`;
+          
+          // Generate data cards for visualizations (compatible with frontend format)
+          const dataCards = factSheet.analysis_results.results.map((result, index) => {
+            if (result.analysisType === 'distribution' && result.data && result.data.length > 0) {
+                          return {
+              id: `chart_${index}`,
+              title: result.title,
+              description: result.description,
+                chart_type: 'horizontal_bar', // Frontend expects this format
+                data: result.data.map(row => ({
+                  label: row.answer_value,
+                  value: parseFloat(row.percentage),
+                  count: row.count
+                })),
+                metadata: {
+                  total_responses: result.data.reduce((sum, row) => sum + row.count, 0),
+                  analysis_type: 'distribution'
+                }
+              };
+            }
+            return null;
+          }).filter(card => card !== null);
+          
+          factSheetResult = { 
+            canAnswer: true, 
+            confidence: 0.9, 
+            reasoning: `Generated ${factSheet.analysis_results.analysis_count} statistical analyses with real data`,
+            answer: responseContent,
+            dataCards: dataCards
+          };
+          console.log(`📊 Analysis Direct: SUCCESS with ${responseContent.length} characters and ${dataCards.length} charts`);
+          console.log(`📊 Confidence: 90%`);
+        } else {
+          // No analysis results available, mark as cannot answer
+          factSheetResult = { 
+            canAnswer: false, 
+            confidence: 0, 
+            reasoning: 'No analysis results available from lightweight matcher'
+          };
+        }
+        
       } catch (error) {
-        console.error('❌ Error loading FactSheetQueryResolver:', error);
+        console.error('❌ Error in intelligent routing:', error);
+        console.log('🔄 Falling back to original routing logic...');
       }
     } else {
-      console.log('🎯 Query is complex - skipping fact sheet shortcut, proceeding to LLM analysis');
+      console.log('❌ No fact sheet available - will use full LLM analysis');
     }
     
-    // 🎯 STEP 5: Use fact sheet ONLY for simple queries with VERY high confidence (95%+)
-    if (factSheetResult.canAnswer && factSheetResult.confidence >= 0.95) {
+    // 🎯 STEP 5: Use fact sheet based on intelligent routing decision OR high confidence fallback
+    // Force the dynamic SQL path when analysis_results exist
+    if (factSheet && factSheet.analysis_results) {
       console.log(`✅ Simple query answered directly from fact sheet (${Math.round(factSheetResult.confidence * 100)}% confidence)`);
       console.log('🔍 DEBUG: factSheetResult contents:', {
         canAnswer: factSheetResult.canAnswer,
@@ -374,9 +583,12 @@ export async function POST(req: NextRequest) {
           "Content-Type": "text/event-stream",
           "Cache-Control": "no-cache",
           "Connection": "keep-alive",
-          "X-Sample-Size": String(factSheet?.survey_metadata?.total_responses || 0),
-          "X-Source": "fact-sheet",
+            "X-Sample-Size": String(factSheet?.survey_meta?.total_respondents || factSheet?.survey_metadata?.total_responses || 0),
+            "X-Source": "fact-sheet-direct",
           "X-Confidence": String(Math.round(factSheetResult.confidence * 100)),
+            "X-Route": routingDecision?.route || "fact-sheet",
+            "X-Intent": routingDecision ? `${routingDecision.intent?.primaryAction}-${routingDecision.intent?.outputType}` : "unknown",
+            "X-Estimated-Time": routingDecision?.estimatedTime || "< 3 seconds",
         },
       });
     }
@@ -385,31 +597,40 @@ export async function POST(req: NextRequest) {
     console.log(`🤖 Proceeding to LLM analysis with fact sheet context`);
     console.log(`🎯 Analysis Type: ${reportAnalysis.reportType} (${Math.round(reportAnalysis.estimatedComplexity * 100)}% complexity)`);
     
+    console.log('🔍 DEBUGGING: About to create QueryIntentClassifier');
     const intentClassifier = new QueryIntentClassifier();
+    console.log('🔍 DEBUGGING: QueryIntentClassifier created, about to classify query');
     const queryIntent = intentClassifier.classifyQuery(question);
+    console.log('🔍 DEBUGGING: Query classified successfully');
     
     let queryResult;
     let rows;
     
+    console.log('🔍 DEBUGGING: About to try enhanced query builder');
+    
     // Try enhanced query builder first, fall back to original if it fails
     try {
       console.log('🚀 Attempting enhanced query with normalized demographics...');
+      console.log('🔍 DEBUGGING: Creating EnhancedSurveyQueryBuilder');
       const enhancedQueryBuilder = new EnhancedSurveyQueryBuilder();
+      console.log('🔍 DEBUGGING: EnhancedSurveyQueryBuilder created');
       queryResult = await enhancedQueryBuilder.buildEnhancedQuery(
-        question, 
-        filterRules, 
-        userId, 
-        surveyId, 
-        topK
-      );
-      
-      console.log(`🎯 Query Intent: ${queryIntent.intent} (${Math.round(queryIntent.confidence * 100)}%)`);
+      question, 
+      filterRules, 
+      userId, 
+      surveyId, 
+      topK
+    );
+
+    console.log(`🎯 Query Intent: ${queryIntent.intent} (${Math.round(queryIntent.confidence * 100)}%)`);
       console.log(`📊 Enhanced Query Strategy: ${queryResult.explanation}`);
-      console.log(`🔍 Expected Result Type: ${queryResult.expectedResultType}`);
-      
+    console.log(`🔍 Expected Result Type: ${queryResult.expectedResultType}`);
+
       // Execute the enhanced query
+      console.log('🔍 DEBUGGING: About to execute enhanced query');
       [rows] = await db.execute<any[]>(queryResult.sql, queryResult.params);
       console.log('✅ Enhanced query executed successfully');
+      console.log('🔍 DEBUGGING: Enhanced query result rows:', rows.length);
       
     } catch (enhancedError) {
       console.warn('⚠️ Enhanced query failed, falling back to original query builder:', enhancedError.message);
@@ -428,12 +649,100 @@ export async function POST(req: NextRequest) {
       console.log(`🔍 Expected Result Type: ${queryResult.expectedResultType}`);
       
       // Execute the fallback query
+      console.log('🔍 DEBUGGING: About to execute fallback query');
       [rows] = await db.execute<any[]>(queryResult.sql, queryResult.params);
       console.log('✅ Fallback query executed successfully');
+      console.log('🔍 DEBUGGING: Fallback query result rows:', rows.length);
     }
 
     if (!rows.length) {
-      return NextResponse.json({ status: true, answer: "No survey data available for this cohort." });
+      console.log('🔍 DEBUGGING: No rows found from query, checking for fact sheet');
+      
+      // If no text responses but we have fact sheet, use statistical analysis instead
+      if (factSheet && surveyId) {
+        console.log('✅ No text responses found, but fact sheet available - switching to statistical analysis');
+        
+        // Generate response using fact sheet data instead of text responses
+        const factSheetResponseCount = factSheet.survey_meta?.total_respondents || 
+                                      factSheet.survey_metadata?.total_responses || 
+                                      factSheet.core_stats?.response_overview?.total_respondents ||
+                                      0;
+        
+        console.log('📊 Using fact sheet with', factSheetResponseCount, 'responses for statistical analysis');
+        
+        // Create a comprehensive statistical response using fact sheet
+        let statisticalResponse = `# Survey Analysis: ${question}\n\n`;
+        statisticalResponse += `Based on **${factSheetResponseCount.toLocaleString()} survey responses**, here's a comprehensive analysis:\n\n`;
+        
+        // Add key insights from the fact sheet statistics  
+        const questionStats = factSheet.fact_sheet?.question_stats || factSheet.question_stats;
+        if (questionStats && Object.keys(questionStats).length > 0) {
+          statisticalResponse += `## 📊 Key Survey Insights\n\n`;
+          
+          // Show top adoption rates and statistics from fact sheet
+          let insightCount = 0;
+          Object.entries(questionStats).forEach(([questionKey, stats]: [string, any]) => {
+            if (insightCount >= 5) return; // Limit to top 5 insights
+            
+            if (stats.adoption_rates) {
+              const topOption = Object.entries(stats.adoption_rates)
+                .sort(([,a]: any, [,b]: any) => (b as any).percentage - (a as any).percentage)[0];
+              if (topOption) {
+                const [option, data] = topOption;
+                const dataTyped = data as any;
+                statisticalResponse += `• **${questionKey}**: ${option} leads with ${dataTyped.percentage}% adoption (${dataTyped.users.toLocaleString()} users)\n`;
+                insightCount++;
+              }
+            } else if (stats.statistics) {
+              statisticalResponse += `• **${questionKey}**: Average score ${stats.statistics.mean} (range: ${stats.statistics.min}-${stats.statistics.max})\n`;
+              insightCount++;
+            }
+          });
+          statisticalResponse += '\n';
+        }
+        
+        // Add demographic insights if available
+        const demographics = factSheet.demographics;
+        if (demographics) {
+          statisticalResponse += `## 👥 Demographics Overview\n\n`;
+          Object.entries(demographics).forEach(([key, data]: [string, any]) => {
+            if (data && typeof data === 'object' && data.distribution) {
+              const topSegments = Object.entries(data.distribution)
+                .sort(([,a]: any, [,b]: any) => (b as any).count - (a as any).count)
+                .slice(0, 3);
+              statisticalResponse += `**${key.charAt(0).toUpperCase() + key.slice(1)}**: `;
+              statisticalResponse += topSegments.map(([segment, info]: [string, any]) => 
+                `${segment} (${info.count} responses, ${info.percentage}%)`).join(', ') + '\n\n';
+            }
+          });
+        }
+        
+        // Add note about data type
+        statisticalResponse += `## 📋 Data Analysis Method\n\n`;
+        statisticalResponse += `This is a **structured survey** (like Pew Research) with primarily multiple-choice and rating questions. The analysis uses **pre-computed statistical data** from the fact sheet rather than regenerating statistics.\n\n`;
+        
+        // Add charts suggestion if user asked for graphs
+        if (question.toLowerCase().includes('graph') || question.toLowerCase().includes('chart') || question.toLowerCase().includes('visual')) {
+          statisticalResponse += `## 📈 Visualization Available\n\n`;
+          statisticalResponse += `Charts and graphs can be generated from this rich statistical dataset. The survey contains ${Object.keys(questionStats || {}).length} questions with detailed response distributions and ${Object.keys(demographics || {}).length} demographic categories.\n\n`;
+          
+          // Generate data cards for visualization
+          const dataCards = generateDataCards(factSheet, question);
+          if (dataCards.length > 0) {
+            statisticalResponse += '```data-cards\n' + JSON.stringify(dataCards, null, 2) + '\n```\n\n';
+          }
+        }
+        
+        statisticalResponse += `*Analysis based on pre-computed statistics from ${factSheetResponseCount.toLocaleString()} respondents*`;
+        
+        return NextResponse.json({ 
+          status: true, 
+          content: statisticalResponse 
+        });
+      }
+      
+      // Fallback if no fact sheet available
+      return NextResponse.json({ status: true, content: "No survey data available for this cohort." });
     }
 
     // Check if we have sufficient meaningful data - be more lenient and contextual
@@ -815,10 +1124,17 @@ Your goal is to provide exactly the level of analysis the user is seeking while 
     const maxTokens = isO3Model ? Math.min(baseTokens * 1.5, 8000) : baseTokens;
     
     console.log(`🚀 Starting ${reportAnalysis.isReportWorthy ? 'comprehensive' : 'focused'} LLM analysis (${maxTokens} tokens)`);
+    console.log('🔍 DEBUGGING: Stream parameter value:', stream);
+    console.log('🔍 DEBUGGING: About to check streaming mode...');
     
     // Handle non-streaming mode when stream is false
     if (!stream) {
+      console.log('🔍 DEBUGGING: Taking NON-STREAMING path');
       console.log('📄 Non-streaming mode requested');
+      console.log('🔍 DEBUGGING: System message length:', systemMessage.length);
+      console.log('🔍 DEBUGGING: User prompt length:', (demographicSentence + "\n\n" + prompt).length);
+      console.log('🔍 DEBUGGING: Model:', model, 'Max tokens:', maxTokens);
+      
       const completion = await createCompletion({
         model: model,
         messages: [
@@ -830,6 +1146,13 @@ Your goal is to provide exactly the level of analysis the user is seeking while 
         presencePenalty: 0.0,
         maxTokens: maxTokens,
       });
+      
+      console.log('🔍 DEBUGGING: Completion object keys:', Object.keys(completion));
+      console.log('🔍 DEBUGGING: Completion content exists:', !!completion.content);
+      if (completion.content) {
+        console.log('🔍 DEBUGGING: Content length:', completion.content.length);
+        console.log('🔍 DEBUGGING: Content preview:', completion.content.substring(0, 200));
+      }
 
       // Generate data cards from fact sheet
       const dataCards = factSheet ? generateDataCards(factSheet, question) : [];
@@ -865,6 +1188,19 @@ Your goal is to provide exactly the level of analysis the user is seeking while 
         completeResponse += '\n```chart\n' + JSON.stringify(chartSpec) + '\n```\n';
       }
       
+      // Add report generation suggestion if warranted
+      if (reportAnalysis.isReportWorthy && surveyId) {
+        const reportSuggestion = {
+          suggestReport: true,
+          reportType: reportAnalysis.reportType,
+          complexity: reportAnalysis.estimatedComplexity,
+          surveyId: surveyId,
+          cohortId: cohort?.id,
+          query: question
+        };
+        completeResponse += '\n```report-suggestion\n' + JSON.stringify(reportSuggestion, null, 2) + '\n```\n';
+      }
+      
       // Return as JSON response
       return NextResponse.json({ 
         status: true, 
@@ -873,6 +1209,12 @@ Your goal is to provide exactly the level of analysis the user is seeking while 
     }
     
     try {
+      console.log('🔍 DEBUGGING: Taking STREAMING path');
+      console.log('🚀 DEBUGGING: Starting streaming completion');
+      console.log('🔍 DEBUGGING: System message length:', systemMessage.length);
+      console.log('🔍 DEBUGGING: User prompt length:', (demographicSentence + "\n\n" + prompt).length);
+      console.log('🔍 DEBUGGING: Model:', model, 'Max tokens:', maxTokens);
+      
       const streamingCompletion = await createStreamingCompletion({
         model: model,
         messages: [
@@ -884,6 +1226,8 @@ Your goal is to provide exactly the level of analysis the user is seeking while 
         presencePenalty: 0.0,
         maxTokens: maxTokens,
       });
+      
+      console.log('🔍 DEBUGGING: Streaming completion created successfully');
 
       console.log(`🚀 Streaming ${reportAnalysis.isReportWorthy ? 'comprehensive' : 'focused'} analysis to user`);
       console.log(`📊 Query executed for user ${userId}, found ${rows.length} responses from user's surveys`);
@@ -926,6 +1270,19 @@ Your goal is to provide exactly the level of analysis the user is seeking while 
                 // Add chart if requested or relevant
                 if (question.toLowerCase().match(/chart|graph|distribution|histogram/) || reportAnalysis.isReportWorthy) {
                   controller.enqueue(encoder.encode('\n```chart\n' + JSON.stringify(chartSpec) + '\n```\n'));
+                }
+                
+                // Add report generation suggestion if warranted
+                if (reportAnalysis.isReportWorthy && surveyId) {
+                  const reportSuggestion = {
+                    suggestReport: true,
+                    reportType: reportAnalysis.reportType,
+                    complexity: reportAnalysis.estimatedComplexity,
+                    surveyId: surveyId,
+                    cohortId: cohort?.id,
+                    query: question
+                  };
+                  controller.enqueue(encoder.encode('\n```report-suggestion\n' + JSON.stringify(reportSuggestion, null, 2) + '\n```\n'));
                 }
                 
                 controller.close();
@@ -1018,6 +1375,19 @@ Your goal is to provide exactly the level of analysis the user is seeking while 
             // Add chart if requested or relevant
             if (question.toLowerCase().match(/chart|graph|distribution|histogram/) || reportAnalysis.isReportWorthy) {
               controller.enqueue(encoder.encode('\n```chart\n' + JSON.stringify(chartSpec) + '\n```\n'));
+            }
+            
+            // Add report generation suggestion if warranted
+            if (reportAnalysis.isReportWorthy && surveyId) {
+              const reportSuggestion = {
+                suggestReport: true,
+                reportType: reportAnalysis.reportType,
+                complexity: reportAnalysis.estimatedComplexity,
+                surveyId: surveyId,
+                cohortId: cohort?.id,
+                query: question
+              };
+              controller.enqueue(encoder.encode('\n```report-suggestion\n' + JSON.stringify(reportSuggestion, null, 2) + '\n```\n'));
             }
             
             controller.close();
