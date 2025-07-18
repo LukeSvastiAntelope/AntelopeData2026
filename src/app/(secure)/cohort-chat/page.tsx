@@ -332,6 +332,28 @@ Remember: You are not just summarizing data - you are providing expert interpret
     setShowCohortCreator(false);
     setFilterRules([]);
     setNewCohortName('');
+    
+    // Switch to the appropriate conversation for this survey
+    if (surveyId) {
+      // Find conversations for this survey
+      const surveyConversations = conversations.filter(c => c.surveyId === surveyId);
+      
+      if (surveyConversations.length > 0) {
+        // Switch to the most recent conversation for this survey
+        const mostRecentConversation = surveyConversations[0]; // conversations are sorted by date
+        switchConversation(mostRecentConversation.id);
+      } else {
+        // No conversations for this survey, create a new one
+        createNewConversation();
+      }
+    } else {
+      // No survey selected, switch to most recent conversation overall or create new
+      if (conversations.length > 0) {
+        switchConversation(conversations[0].id);
+      } else {
+        createNewConversation();
+      }
+    }
   };
 
   const handleSend = async () => {
@@ -1361,15 +1383,18 @@ FORMATTING REQUIREMENTS:
     handleSurveyChange(surveyId);
     setShowSurveyDropdown(false);
     
-    // Add a survey selection message to the chat
+    // Add a survey selection message to the chat after a brief delay
+    // to ensure it's added to the correct conversation after the switch
     const selectedSurvey = surveys.find(s => s.id === surveyId);
     if (selectedSurvey) {
-      const surveyMessage: ChatMessage = {
-        role: 'user',
-        content: `📊 **Survey Selected:** ${selectedSurvey.title}`,
-        isUpload: false
-      };
-      setMessages(prev => [...prev, surveyMessage]);
+      setTimeout(() => {
+        const surveyMessage: ChatMessage = {
+          role: 'user',
+          content: `📊 **Survey Selected:** ${selectedSurvey.title}`,
+          isUpload: false
+        };
+        setMessages(prev => [...prev, surveyMessage]);
+      }, 100); // Small delay to ensure conversation switch completes
     }
   };
 
