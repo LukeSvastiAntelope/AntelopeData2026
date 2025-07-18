@@ -2,7 +2,18 @@
 
 import React, { useEffect, useState, useRef } from 'react';
 import { SidebarTrigger } from '@/components/ui/sidebar';
-import { Cohort, CohortFilterRule } from '@/app/utils/interface';
+import { 
+  Cohort, 
+  CohortFilterRule, 
+  ChatMessage, 
+  Conversation, 
+  StreamingMode, 
+  ModelConfig, 
+  DataSources, 
+  Survey, 
+  SurveyField, 
+  SurveyData 
+} from './types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -18,285 +29,32 @@ import { toast } from '@/components/ui/sonner';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
 import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import ChartRenderer from '@/components/ChartRenderer'
 import { getAllModels } from '@/app/utils/models'
-import remarkSmart from 'remark-smartypants'
 import OnboardingEmptyState from '@/components/OnboardingEmptyState'
 import SurveyStatsView from '@/components/SurveyStatsView'
+import { 
+  optionalRemark, 
+  optionalRehype, 
+  normaliseText, 
+  normalizeMarkdown,
+  isCompleteUnit, 
+  processPartialResponse, 
+  processCompleteResponse 
+} from './utils';
+import { MessageList, ChatInput } from './components';
 
-// Optional markdown plugins – if not installed, fall back gracefully
-let smart: any = null;
-try { smart = remarkSmart; } catch {}
 
-const toPlugin=(mod:any)=>{
-  if(!mod) return null;
-  if(typeof mod==='function') return mod;
-  if(typeof mod.default==='function') return mod.default;
-  return null;
-};
 
-const optionalRemark = [remarkGfm, toPlugin(smart)].filter(Boolean);
-const optionalRehype: any[] = [];
 
-// helper to normalise whitespace and remove duplicates like 'ageThe'
-const normaliseText=(txt:string)=>{
-  return txt
-    // collapse newlines before and after citation markers so they stay inline
-    .replace(/\n+\s*\[(\d+)\]/g, ' [$1]')    // newline(s) before marker
-    .replace(/\[(\d+)\]\s*\n+/g, '[$1] ')    // newline(s) after marker
-    .replace(/\s+\n/g,'\n')           // trim spaces before newline
-    .replace(/\n{3,}/g,'\n\n')        // collapse >2 blank lines
-    .replace(/([a-z])([A-Z])/g,'$1 $2')  // add space if missing
-    .replace(/\b(\w+)\s+\1\b/gi,'$1'); // remove duplicated words
-};
-
-// Smart buffering - determine when content is ready for rendering
-const isCompleteUnit = (content: string): boolean => {
-  // Always update if content is short (first few words)
-  if (content.length < 50) return true;
-  
-  // Update on complete sentences
-  if (content.match(/[.!?]\s*$/)) return true;
-  
-  // Update on complete markdown blocks
-  if (content.match(/\n\n$/)) return true;
-  
-  // Update on complete list items
-  if (content.match(/\n\s*[-*+]\s+.+$/)) return true;
-  
-  // Update on complete headings
-  if (content.match(/\n#+\s+.+\n/)) return true;
-  
-  // Update every 100 characters as fallback
-  if (content.length % 100 === 0) return true;
-  
-  return false;
-};
-
-// Process partial response during streaming - extract citations as they come in
-const processPartialResponse = (content: string, existingMessage: any) => {
-  // Look for partial citation blocks even if incomplete
-  const parts = content.split('\n---\n');
-  
-  let cleanContent = content;
-  let citations: Record<string, string> = existingMessage?.citations || {};
-  
-  if (parts.length > 1) {
-    const answerTxt = parts[0];
-    const stats = parts.slice(1).join('\n---\n');
-    
-    console.log('Found parts in partial response:', { answerLength: answerTxt.length, statsLength: stats.length });
-    
-    // Only try to extract citations if we have a complete citations section
-    // Look for citations: followed by at least one [number] pattern
-    if (stats.includes('citations:') && stats.match(/\[\d+\]/)) {
-      // Extract citations mapping - be more permissive for partial content
-      const citationMatch = stats.match(/citations:\s*([\s\S]*?)(?=\n---|\n🎯|$)/);
-      const citationsBlock = citationMatch ? citationMatch[1].trim() : '';
-      
-      console.log('Citations block found:', citationsBlock);
-      console.log('Citations block length:', citationsBlock.length);
-      console.log('Citations block lines:', citationsBlock.split('\n'));
-      
-      if (citationsBlock && citationsBlock.length > 10) { // Only process if we have meaningful content
-        const newCitations: Record<string, string> = {};
-        
-        // Process each line that looks like a citation
-        citationsBlock.split('\n').forEach(line => {
-          const trimmed = line.trim();
-          if (!trimmed) return;
-          console.log('Processing citation line:', trimmed);
-          // Handle format: [1] Q: "question" | A: "answer"
-          const m = trimmed.match(/^\[(\d+)\]\s+(.+)/);
-          if (m) {
-            const citationText = m[2];
-            console.log('Citation text:', citationText);
-            // Extract the question and answer parts for better display
-            const qaParts = citationText.match(/Q:\s*"([^"]+)"\s*\|\s*A:\s*"([^"]+)"/);
-            if (qaParts) {
-              // Format as "Question: answer" for cleaner tooltip display
-              newCitations[m[1]] = `${qaParts[1]}: \"${qaParts[2]}\"`;
-              console.log('Formatted citation:', newCitations[m[1]]);
-            } else {
-              // Fallback to the full text if format doesn't match
-              newCitations[m[1]] = citationText;
-              console.log('Using fallback citation:', newCitations[m[1]]);
-            }
-          }
-        });
-        
-        // Only update if we found new citations
-        if (Object.keys(newCitations).length > 0) {
-          citations = { ...citations, ...newCitations };
-          console.log('Updated citations during streaming:', citations);
-        }
-      }
-    } else {
-      console.log('Citations section not complete yet, keeping existing citations');
-    }
-    
-    cleanContent = answerTxt;
-  } else {
-    console.log('No parts found in partial response, using full content');
-  }
-  
-  return {
-    content: normalizeMarkdown(cleanContent),
-    citations
-  };
-};
-
-// Process complete response for citations, charts, and data cards
-const processCompleteResponse = (content: string, existingMessage: any) => {
-  const chartMatchFull = content.match(/```chart[\s\S]*?```/);
-  const dataCardsMatchFull = content.match(/```data-cards[\s\S]*?```/);
-  const parts = content.split('\n---\n');
-  
-  let cleanContent = content;
-  let citations: Record<string, string> = existingMessage?.citations || {};
-  let chartSpec = existingMessage?.chartSpec;
-  let dataCards = existingMessage?.dataCards;
-  
-  if (parts.length > 1) {
-    const answerTxt = parts[0];
-    const stats = parts.slice(1).join('\n---\n');
-    
-    // Extract citations mapping
-    const match = stats.match(/citations:\s*([\s\S]*?)(?=---|\n🎯|$)/);
-    const citationsBlock = match ? match[1].trim() : '';
-    
-    if (citationsBlock) {
-      console.log('Citations block found:', citationsBlock);
-      console.log('Citations block length:', citationsBlock.length);
-      console.log('Citations block lines:', citationsBlock.split('\n'));
-      const newCitations: Record<string, string> = {};
-      
-      citationsBlock.split('\n').forEach(line => {
-        const trimmed = line.trim();
-        if (!trimmed) return;
-        console.log('Processing citation line:', trimmed);
-        // Handle format: [1] Q: "question" | A: "answer"
-        const m = trimmed.match(/^\[(\d+)\]\s+(.+)/);
-        if (m) {
-          const citationText = m[2];
-          console.log('Citation text:', citationText);
-          // Extract the question and answer parts for better display
-          const qaParts = citationText.match(/Q:\s*"([^"]+)"\s*\|\s*A:\s*"([^"]+)"/);
-          if (qaParts) {
-            // Format as "Question: answer" for cleaner tooltip display
-            newCitations[m[1]] = `${qaParts[1]}: \"${qaParts[2]}\"`;
-            console.log('Formatted citation:', newCitations[m[1]]);
-          } else {
-            // Fallback to the full text if format doesn't match
-            newCitations[m[1]] = citationText;
-            console.log('Using fallback citation:', newCitations[m[1]]);
-          }
-        }
-      });
-      
-      // Only update citations if we found new ones, otherwise preserve existing
-      if (Object.keys(newCitations).length > 0) {
-        citations = newCitations;
-        console.log('Updated citations object:', citations);
-      } else {
-        console.log('No new citations found, preserving existing:', citations);
-      }
-    } else {
-      console.log('No citations block found, preserving existing citations:', citations);
-    }
-    
-    cleanContent = answerTxt;
-  } else {
-    console.log('No stats section found, preserving existing citations:', citations);
-  }
-  
-  // Extract chart spec fenced block
-  if (chartMatchFull) {
-    try {
-      const jsonPart = chartMatchFull[0].replace(/```chart|```/g, '').trim();
-      chartSpec = JSON.parse(jsonPart);
-      cleanContent = cleanContent.replace(chartMatchFull[0], '').trim();
-    } catch (error) {
-      console.warn('Failed to parse chart spec:', error);
-    }
-  }
-  
-  // Extract data-cards fenced block
-  if (dataCardsMatchFull) {
-    try {
-      const jsonPart = dataCardsMatchFull[0].replace(/```data-cards|```/g, '').trim();
-      dataCards = JSON.parse(jsonPart);
-      cleanContent = cleanContent.replace(dataCardsMatchFull[0], '').trim();
-      console.log('Extracted data cards:', dataCards);
-    } catch (error) {
-      console.warn('Failed to parse data cards:', error);
-    }
-  }
-  
-  return {
-    content: normalizeMarkdown(cleanContent),
-    citations,
-    chartSpec,
-    dataCards
-  };
-};
-
-// Normalize markdown structure for consistent rendering across AI models
-const normalizeMarkdown = (text: string): string => {
-  let normalized = text;
-  
-  // Ensure proper spacing around headings
-  normalized = normalized.replace(/\n(#{1,6}\s[^\n]+)\n/g, '\n\n$1\n\n');
-  normalized = normalized.replace(/^(#{1,6}\s[^\n]+)\n/g, '$1\n\n');
-  
-  // Ensure proper spacing around lists
-  normalized = normalized.replace(/\n(\s*[-*+]\s[^\n]+)/g, '\n\n$1');
-  normalized = normalized.replace(/(\s*[-*+]\s[^\n]+)\n([^\s-*+\n])/g, '$1\n\n$2');
-  
-  // Ensure proper spacing around numbered lists
-  normalized = normalized.replace(/\n(\s*\d+\.\s[^\n]+)/g, '\n\n$1');
-  normalized = normalized.replace(/(\s*\d+\.\s[^\n]+)\n([^\s\d\n])/g, '$1\n\n$2');
-  
-  // Clean up excessive whitespace but preserve intentional spacing
-  normalized = normalized.replace(/\n{3,}/g, '\n\n');
-  
-  // Move citations to more natural positions (after punctuation)
-  normalized = normalized.replace(/(\[\d+\])([.,:;!?])/g, '$2$1');
-  normalized = normalized.replace(/([.,:;!?])(\s*)(\[\d+\])/g, '$1$3$2');
-  
-  // Ensure citations don't break paragraph flow
-  normalized = normalized.replace(/(\[\d+\])\s*\n\s*([A-Z])/g, '$1 $2');
-  
-  return normalized.trim();
-};
 
 export default function CohortChatPage() {
   const [cohorts, setCohorts] = useState<Cohort[]>([]);
   const [selectedCohortId, setSelectedCohortId] = useState<number | null>(null);
   const [input, setInput] = useState('');
-  type ChatMessage = { 
-    role:'user'|'agent'; 
-    content:string; 
-    citations?: Record<string,string>; 
-    chartSpec?: any; 
-    dataCards?: any[]; 
-    isUpload?: boolean;
-    reportId?: string;
-    reportStatus?: 'initiated' | 'processing' | 'completed' | 'failed';
-  };
 
-  interface Conversation {
-    id: string;
-    title: string;
-    messages: ChatMessage[];
-    createdAt: string;
-    updatedAt: string;
-    surveyId?: number | null;
-    cohortId?: number | null;
-  }
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   
@@ -1081,51 +839,20 @@ FORMATTING REQUIREMENTS:
       }
     }
     
-    // Fetch survey-specific insights from advanced analytics
-    const fetchAnalyticsPrompts = async () => {
-      try {
-        console.log('📊 Fetching analytics prompts for survey', surveyData.id, forceRefresh ? '(force refresh)' : '');
-        const schemaUrl = `/api/surveys/${surveyData.id}/schema${forceRefresh ? '?refresh=true' : ''}`;
-        const response = await fetch(schemaUrl);
-        if (response.ok) {
-          const schemaData = await response.json();
-          const analyticsPrompts: string[] = [];
-          
-          // Log cache status
-          if (schemaData.access_info?.from_cache) {
-            console.log('📊 Schema data served from cache');
-          } else {
-            console.log('📊 Schema data generated fresh');
-          }
-          
-          // Extract suggested queries from usage recommendations
-          if (schemaData.usage_recommendations) {
-            schemaData.usage_recommendations.forEach((rec: any) => {
-              if (rec.suggested_queries && rec.suggested_queries.length > 0) {
-                // Add the first 2 suggested queries from each recommendation
-                analyticsPrompts.push(...rec.suggested_queries.slice(0, 2));
-              }
-            });
-          }
-          
-          // If we have analytics-based prompts, use those first
-          if (analyticsPrompts.length > 0) {
-            const finalPrompts = analyticsPrompts.slice(0, 3);
-            setDynamicPrompts(finalPrompts);
-            
-            // Cache the prompts
-            localStorage.setItem(cacheKey, JSON.stringify(finalPrompts));
-            localStorage.setItem(`${cacheKey}-timestamp`, Date.now().toString());
-            
-            return;
-          }
-        }
-      } catch (error) {
-        console.log('Could not fetch analytics prompts, using fallback:', error);
-      }
+    // Generate simple, effective prompts without heavy schema analysis
+    const generateSimplePrompts = () => {
+      const simplePrompts = [
+        "What are the most interesting insights from this survey?",
+        "Show me some key statistics and trends",
+        "What do the demographics tell us?"
+      ];
       
-      // Fallback to basic prompts if analytics fetch fails
-      generateBasicPrompts();
+      console.log('📊 Using simple prompts for survey', surveyData.id);
+      setDynamicPrompts(simplePrompts);
+      
+      // Cache the prompts
+      localStorage.setItem(cacheKey, JSON.stringify(simplePrompts));
+      localStorage.setItem(`${cacheKey}-timestamp`, Date.now().toString());
     };
     
     const generateBasicPrompts = () => {
@@ -1174,7 +901,7 @@ FORMATTING REQUIREMENTS:
     generateBasicPrompts();
     
     // Asynchronously try to get better prompts from analytics
-    fetchAnalyticsPrompts();
+    generateSimplePrompts();
     
     return prompts.slice(0, 3); // Return initial basic prompts
   };
@@ -1373,26 +1100,28 @@ FORMATTING REQUIREMENTS:
     if (!dataCards || dataCards.length === 0) return null;
     
     return (
-      <div className="grid gap-4 mt-4 mb-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 mt-4 mb-4">
         {dataCards.map((card, index) => (
           <div key={index} className="bg-muted/30 rounded-lg p-4 border">
             <h4 className="font-medium text-sm text-foreground mb-3">{card.title}</h4>
             
             {card.chart_type === 'horizontal_bar' && (
-              <div className="space-y-2">
+              <div className="space-y-3">
                 {card.data.map((item: any, i: number) => (
-                  <div key={i} className="flex items-center gap-3">
-                    <div className="w-20 text-xs text-muted-foreground truncate">
-                      {item.label}
+                  <div key={i} className="space-y-1">
+                    <div className="flex justify-between items-center">
+                      <div className="text-xs text-muted-foreground leading-tight">
+                        {item.label}
+                      </div>
+                      <div className="text-xs font-medium">
+                        {item.value}%
+                      </div>
                     </div>
-                    <div className="flex-1 bg-muted rounded-full h-2 relative">
+                    <div className="w-full bg-muted rounded-full h-2 relative">
                       <div 
                         className="bg-primary h-2 rounded-full" 
                         style={{ width: `${Math.min(item.value, 100)}%` }}
                       />
-                    </div>
-                    <div className="text-xs font-medium w-12 text-right">
-                      {item.value}%
                     </div>
                   </div>
                 ))}
@@ -1844,160 +1573,28 @@ FORMATTING REQUIREMENTS:
                   
                   <TabsContent value="chat" className="flex flex-col flex-1 mt-0">
                     <div className="flex flex-col flex-1">
-                      <ScrollArea className="flex-1 min-h-0" style={{ minHeight: 'calc(100vh - 200px)' }}>
-                        <div className="p-4 space-y-6">
-                          {messages.map((m,idx)=>(
-                            <div 
-                              key={idx} 
-                              className="text-sm animate-in fade-in duration-500"
-                              style={{ 
-                                animationDelay: `${Math.min(idx * 50, 500)}ms`,
-                                animationFillMode: 'both'
-                              }}
-                            >
-                              <div className={cn(
-                                'rounded-lg px-4 py-3 max-w-[85%] chat-message',
-                                m.role==='user' ? 'bg-primary text-white' : 'text-foreground'
-                              )}>
-                                {m.role==='agent' ? (
-                                  <TooltipProvider delayDuration={150}>
-                                    <div className="space-y-1">
-                                      {m.dataCards && renderDataCards(m.dataCards)}
-
-                                      {renderWithCitations(m.content, m.citations, m.isUpload)}
-                                    </div>
-                                  </TooltipProvider>
-                                ): (
-                                  <div className="font-medium text-white">
-                                    {m.content}
-                                  </div>
-                                )}
-                                {m.role==='agent' && m.chartSpec && (
-                                  <div className="mt-3 p-3 bg-muted/30 rounded-lg">
-                                    <ChartRenderer spec={m.chartSpec} />
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          ))}
-                          {isLoading && (
-                            <div className="text-sm animate-in fade-in duration-500">
-                              <div className="rounded-lg px-4 py-3 max-w-[85%] chat-message text-foreground">
-                                <div className="flex items-center gap-2">
-                                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
-                                  <span className="text-sm text-muted-foreground">Thinking...</span>
-                                </div>
-                              </div>
-                            </div>
-                          )}
-                          {/* Auto-scroll target */}
-                          <div ref={messagesEndRef} />
-                        </div>
-                      </ScrollArea>
+                      <MessageList
+                        messages={messages}
+                        isLoading={isLoading}
+                        messagesEndRef={messagesEndRef}
+                        renderWithCitations={renderWithCitations}
+                        renderDataCards={renderDataCards}
+                      />
                       
                       {/* Chat input at bottom of screen for active conversations */}
-                      <div className="sticky bottom-0 p-4 pt-0 bg-card">
-                        <div className="relative">
-                          <div className="relative">
-                            <Textarea 
-                              className="min-h-[80px] pl-4 pr-4 resize-none" 
-                              placeholder="Ask the cohort…" 
-                              value={input} 
-                              onChange={e=>setInput(e.target.value)} 
-                              onKeyDown={handleKeyDown}
-                              disabled={isLoading}
-                              rows={2}
-                            />
-                            
-                            {/* Left side buttons - Plus and Upload - positioned inside textarea */}
-                            <div className="absolute left-2 bottom-2 flex gap-1">
-                              {/* Plus button for survey selection */}
-                              <div className="relative">
-                                <Button
-                                  size="icon"
-                                  variant="ghost"
-                                  className="h-8 w-8 flex-shrink-0"
-                                  onClick={() => setShowSurveyDropdown(!showSurveyDropdown)}
-                                  title="Select survey"
-                                >
-                                  <Plus className="h-4 w-4" />
-                                </Button>
-                                
-                                {/* Survey dropdown */}
-                                {showSurveyDropdown && (
-                                  <div className="absolute bottom-full left-0 mb-2 w-80 bg-popover border border-border rounded-md shadow-lg z-50" data-survey-dropdown>
-                                    <div className="p-3">
-                                      <div className="flex items-center justify-between mb-3">
-                                        <h4 className="font-medium text-sm">Select Survey</h4>
-                                        <Button
-                                          size="icon"
-                                          variant="ghost"
-                                          className="h-6 w-6"
-                                          onClick={() => setShowSurveyDropdown(false)}
-                                        >
-                                          <X className="h-3 w-3" />
-                                        </Button>
-                                      </div>
-                                      <div className="space-y-1 max-h-60 overflow-y-auto">
-                                        {surveys.length === 0 ? (
-                                          <div className="text-center py-4 text-muted-foreground text-sm">
-                                            No surveys available
-                                          </div>
-                                        ) : (
-                                          surveys.map((survey) => (
-                                            <div
-                                              key={survey.id}
-                                              className={cn(
-                                                "flex items-center gap-3 p-2 rounded-md cursor-pointer transition-colors hover:bg-muted",
-                                                selectedSurveyId === survey.id && "bg-muted"
-                                              )}
-                                              onClick={() => handleInlineSurveySelect(survey.id)}
-                                            >
-                                              <BarChart3 className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                                              <div className="flex-1 min-w-0">
-                                                <div className="text-sm font-medium truncate">
-                                                  {survey.title}
-                                                </div>
-                                              </div>
-                                              {selectedSurveyId === survey.id && (
-                                                <div className="h-2 w-2 bg-primary rounded-full flex-shrink-0" />
-                                              )}
-                                            </div>
-                                          ))
-                                        )}
-                                      </div>
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-                              
-                              {/* Upload button */}
-                              <Button 
-                                size="icon" 
-                                variant="ghost" 
-                                className="h-8 w-8" 
-                                onClick={handleUploadClick}
-                                title="Upload survey file"
-                              >
-                                <Upload className="h-4 w-4"/>
-                              </Button>
-                            </div>
-                            
-                            {/* Send button - positioned inside textarea on the right */}
-                            <div className="absolute right-2 bottom-2">
-                              <Button 
-                                size="icon" 
-                                variant="ghost" 
-                                className="h-8 w-8" 
-                                onClick={handleSend} 
-                                disabled={isLoading}
-                              >
-                                <Send className="h-4 w-4"/>
-                              </Button>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
+                      <ChatInput
+                        input={input}
+                        setInput={setInput}
+                        onSend={handleSend}
+                        onKeyDown={handleKeyDown}
+                        isLoading={isLoading}
+                        showSurveyDropdown={showSurveyDropdown}
+                        setShowSurveyDropdown={setShowSurveyDropdown}
+                        surveys={surveys}
+                        selectedSurveyId={selectedSurveyId}
+                        onInlineSurveySelect={handleInlineSurveySelect}
+                        onUploadClick={handleUploadClick}
+                      />
                     </div>
                   </TabsContent>
                   
