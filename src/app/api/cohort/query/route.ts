@@ -274,7 +274,8 @@ export async function POST(req: NextRequest) {
     const userId = session.user.id;
 
     const body = (await req.json()) as CohortQueryPayload;
-    const { cohort, question, topK = 1000, surveyId, model = 'gpt-4o', temperature = 0.0, sources, systemPrompt, stream = true } = body;
+    const { cohort, question, topK = 1000, surveyId: initialSurveyId, model = 'gpt-4o', temperature = 0.0, sources, systemPrompt, stream = true } = body;
+    let surveyId = initialSurveyId; // Allow reassignment for auto-selection
     
     console.log('🔍 DEBUGGING: Request body stream value:', body.stream);
     console.log('🔍 DEBUGGING: Resolved stream value:', stream);
@@ -336,6 +337,93 @@ export async function POST(req: NextRequest) {
     // 🎯 STEP 3: Simple approach - Find relevant questions and query them directly
     let factSheet = null; // Keep for compatibility
     let analysisResults = null;
+    let autoSelectedSurvey = null;
+    
+    // 🎯 NEW: Intelligent Survey Auto-Selection
+    if (!surveyId) {
+      console.log(`🎯 No survey selected - attempting intelligent auto-selection for: "${question}"`);
+      
+      try {
+        // Get user's available surveys
+        const [userSurveys] = await db.execute(`
+          SELECT id, title, description
+          FROM surveys 
+          WHERE (created_by = ? OR (is_public = 1 AND status = 'published'))
+          AND status IN ('published', 'closed')
+          ORDER BY created_at DESC
+        `, [userId]) as any[];
+
+        if (userSurveys.length > 0) {
+          console.log(`🔍 Found ${userSurveys.length} available surveys for auto-selection`);
+          
+          // Use LLM to find the most relevant survey based on question content
+          const surveysText = userSurveys.map((survey: any, index: number) => 
+            `${index + 1}. [ID: ${survey.id}] "${survey.title}"${survey.description ? ` - ${survey.description}` : ''}`
+          ).join('\n');
+
+          const autoSelectionPrompt = `You are an expert at matching user questions to relevant surveys.
+
+USER QUESTION: "${question}"
+
+AVAILABLE SURVEYS:
+${surveysText}
+
+Your task: Determine if the user's question clearly relates to a specific survey. Consider:
+1. Does the question reference specific topics, characters, or scenarios mentioned in survey titles?
+2. Would this question be meaningless without a specific survey context?
+3. Is there a clear semantic match between the question and a survey title?
+
+Examples:
+- "Do most people spare or kill" + "Sparing or Killing Gilbert Alexander in Bioshock 2" = CLEAR MATCH
+- "What are some interesting statistics" + multiple surveys = NO CLEAR MATCH (too generic)
+- "How do people feel about healthcare" + "Healthcare Survey" = CLEAR MATCH
+
+Return ONLY a JSON object with this format:
+{
+  "shouldAutoSelect": true/false,
+  "surveyId": 123 or null,
+  "confidence": 0.0-1.0,
+  "reasoning": "Brief explanation of why this survey was selected or why no selection was made"
+}
+
+Only suggest auto-selection if there's a clear, unambiguous match with high confidence (>0.8).`;
+
+          const autoSelectionResult = await createCompletion({
+            model: 'gpt-4o-mini',
+            messages: [{ role: 'user', content: autoSelectionPrompt }],
+            temperature: 0.2,
+            maxTokens: 200
+          });
+
+          try {
+            const autoSelection = JSON.parse(autoSelectionResult.content);
+            
+            if (autoSelection.shouldAutoSelect && autoSelection.surveyId && autoSelection.confidence > 0.8) {
+              const selectedSurvey = userSurveys.find((s: any) => s.id === autoSelection.surveyId);
+              if (selectedSurvey) {
+                surveyId = autoSelection.surveyId; // Override the surveyId for the rest of the function
+                autoSelectedSurvey = {
+                  id: selectedSurvey.id,
+                  title: selectedSurvey.title,
+                  confidence: autoSelection.confidence,
+                  reasoning: autoSelection.reasoning
+                };
+                console.log(`✅ Auto-selected survey: "${selectedSurvey.title}" (confidence: ${Math.round(autoSelection.confidence * 100)}%)`);
+                console.log(`🧠 Reasoning: ${autoSelection.reasoning}`);
+              }
+            } else {
+              console.log(`❌ No clear survey match found (confidence: ${Math.round((autoSelection.confidence || 0) * 100)}%)`);
+              console.log(`🧠 Reasoning: ${autoSelection.reasoning}`);
+            }
+          } catch (parseError) {
+            console.warn('Could not parse auto-selection result:', parseError.message);
+          }
+        }
+      } catch (error) {
+        console.warn('Survey auto-selection failed:', error.message);
+      }
+    }
+    
     if (surveyId) {
       try {
         console.log(`🎯 LIGHTWEIGHT APPROACH: Finding relevant questions for "${question}" in survey ${surveyId}`);
@@ -363,10 +451,18 @@ export async function POST(req: NextRequest) {
           
           // Generate targeted queries only for matched questions
           const executedResults = [];
+          const noDataQuestions = [];
+          
           for (const match of matchResult.matches) {
             console.log(`📊 Querying: ${match.question.prompt} (score: ${match.relevanceScore})`);
             
-            const data = await matcher.generateTargetedQuery(match.question.id, surveyId, db);
+            // Use demographic filtering if available
+            const data = await matcher.generateTargetedQueryWithFilter(
+              match.question.id, 
+              surveyId, 
+              db, 
+              matchResult.demographicFilter
+            );
             
             if (data && data.length > 0) {
               executedResults.push({
@@ -384,26 +480,71 @@ export async function POST(req: NextRequest) {
                 questionId: match.question.id,
                 relevanceScore: match.relevanceScore
               });
+            } else {
+              noDataQuestions.push({
+                question: match.question.prompt,
+                questionId: match.question.id
+              });
             }
           }
+          
+          // Log issues for debugging
+          if (noDataQuestions.length > 0) {
+            console.log(`⚠️ Found ${noDataQuestions.length} questions with no valid response data:`);
+            noDataQuestions.forEach(q => {
+              console.log(`  - Question ${q.questionId}: ${q.question.substring(0, 80)}...`);
+            });
+          }
 
-          analysisResults = {
-            survey_id: surveyId,
-            survey_title: surveyCheck[0].title,
-            user_question: question,
-            analysis_count: executedResults.length,
-            results: executedResults,
-            matched_questions: matchResult.matches.length,
-            methodology: 'lightweight_targeted_queries'
-          };
+          // If no results but we found relevant questions, provide helpful feedback
+          if (executedResults.length === 0 && matchResult.matches.length > 0) {
+            analysisResults = {
+              survey_id: surveyId,
+              survey_title: surveyCheck[0].title,
+              user_question: question,
+              analysis_count: 0,
+              results: [],
+              matched_questions: matchResult.matches.length,
+              methodology: 'lightweight_targeted_queries',
+              message: `Found ${matchResult.matches.length} relevant questions in "${surveyCheck[0].title}", but no response data is available. This survey may not have any completed responses yet, or the responses may not contain the expected answer data.`,
+              suggestions: [
+                "Check if the survey has any completed responses",
+                "Verify that respondents are actually filling out the questions",
+                "Try asking about other aspects of the survey data"
+              ]
+            };
+          } else {
+            analysisResults = {
+              survey_id: surveyId,
+              survey_title: surveyCheck[0].title,
+              user_question: question,
+              analysis_count: executedResults.length,
+              results: executedResults,
+              matched_questions: matchResult.matches.length,
+              methodology: 'lightweight_targeted_queries'
+            };
+          }
 
            // Create a compatible fact sheet structure for existing code
+           // FIX: Use actual survey response count, not sum of question responses
+           const actualResponseCount = await db.execute(`
+             SELECT COUNT(DISTINCT id) as response_count 
+             FROM survey_responses 
+             WHERE survey_id = ?
+           `, [surveyId]);
+           
+           // Add demographic context to the title if filtering is applied
+           const demographicContext = matchResult.demographicFilter 
+             ? ` (filtered by ${matchResult.demographicFilter.field}: ${matchResult.demographicFilter.value})`
+             : '';
+           
            factSheet = {
              survey_meta: {
                id: surveyId,
-               title: surveyCheck[0].title,
-               total_respondents: executedResults.reduce((sum, r) => sum + r.totalResponses, 0),
-               description: `Targeted analysis of ${executedResults.length} relevant questions`
+               title: surveyCheck[0].title + demographicContext,
+               total_respondents: actualResponseCount[0][0].response_count,
+               description: `Targeted analysis of ${executedResults.length} relevant questions` + 
+                 (matchResult.demographicFilter ? ` with demographic filtering` : '')
              },
              question_stats: {},
              analysis_results: analysisResults,
@@ -420,6 +561,8 @@ export async function POST(req: NextRequest) {
     }
     
     // 🎯 STEP 4: INTELLIGENT ROUTING - Use smart intent analysis instead of keywords
+    // COMMENTED OUT: Fact sheet routing logic causing cross-survey contamination
+    /*
     let factSheetResult: FactSheetQueryResult = { canAnswer: false, confidence: 0, reasoning: "" };
     let routingDecision: any = null;
     
@@ -533,9 +676,12 @@ export async function POST(req: NextRequest) {
     } else {
       console.log('❌ No fact sheet available - will use full LLM analysis');
     }
+    */
     
     // 🎯 STEP 5: Use fact sheet based on intelligent routing decision OR high confidence fallback
     // Force the dynamic SQL path when analysis_results exist
+    // COMMENTED OUT: Fact sheet logic causing cross-survey contamination
+    /*
     if (factSheet && factSheet.analysis_results) {
       console.log(`✅ Simple query answered directly from fact sheet (${Math.round(factSheetResult.confidence * 100)}% confidence)`);
       console.log('🔍 DEBUG: factSheetResult contents:', {
@@ -592,6 +738,7 @@ export async function POST(req: NextRequest) {
         },
       });
     }
+    */
     
     // 🎯 STEP 6: Proceed to LLM analysis with fact sheet context
     console.log(`🤖 Proceeding to LLM analysis with fact sheet context`);
@@ -656,93 +803,88 @@ export async function POST(req: NextRequest) {
     }
 
     if (!rows.length) {
-      console.log('🔍 DEBUGGING: No rows found from query, checking for fact sheet');
+      console.log('🔍 DEBUGGING: No rows found from query, fact sheet disabled for clean data');
+      console.log('✅ No text responses found - but we have structured data from LightweightQuestionMatcher - proceeding to analysis');
       
-      // If no text responses but we have fact sheet, use statistical analysis instead
-      if (factSheet && surveyId) {
-        console.log('✅ No text responses found, but fact sheet available - switching to statistical analysis');
+      // We still have structured data from LightweightQuestionMatcher that needs analysis!
+      // Check if we have fact sheet with analysis results
+      if (factSheet && factSheet.analysis_results && factSheet.analysis_results.results && factSheet.analysis_results.results.length > 0) {
+        console.log(`📊 PROCEEDING WITH ANALYSIS: Using ${factSheet.analysis_results.analysis_count} structured questions for LLM analysis`);
         
-        // Generate response using fact sheet data instead of text responses
-        const factSheetResponseCount = factSheet.survey_meta?.total_respondents || 
-                                      factSheet.survey_metadata?.total_responses || 
-                                      factSheet.core_stats?.response_overview?.total_respondents ||
-                                      0;
+        // Generate AI analysis from the structured data
+        const aiAnalysis = await generateAIAnalysis(factSheet.analysis_results, question, factSheet.survey_meta);
         
-        console.log('📊 Using fact sheet with', factSheetResponseCount, 'responses for statistical analysis');
+        // Create data cards for visualization  
+        const dataCards = factSheet.analysis_results.results.map((result, index) => ({
+          title: result.title,
+          chart_type: 'horizontal_bar', // Set the chart type the frontend expects
+          data: (result.data || []).map((item: any) => ({
+            label: item.answer_value, // Transform answer_value to label
+            value: parseFloat(item.percentage) // Transform percentage to value as number
+          })),
+          totalResponses: result.totalResponses,
+          questionId: result.questionId,
+          index: index
+        }));
         
-        // Create a comprehensive statistical response using fact sheet
-        let statisticalResponse = `# Survey Analysis: ${question}\n\n`;
-        statisticalResponse += `Based on **${factSheetResponseCount.toLocaleString()} survey responses**, here's a comprehensive analysis:\n\n`;
+        console.log(`📊 [DEBUG] Created ${dataCards.length} data cards for visualization`);
+        console.log(`📊 [DEBUG] Data cards structure:`, JSON.stringify(dataCards, null, 2));
         
-        // Add key insights from the fact sheet statistics  
-        const questionStats = factSheet.fact_sheet?.question_stats || factSheet.question_stats;
-        if (questionStats && Object.keys(questionStats).length > 0) {
-          statisticalResponse += `## 📊 Key Survey Insights\n\n`;
-          
-          // Show top adoption rates and statistics from fact sheet
-          let insightCount = 0;
-          Object.entries(questionStats).forEach(([questionKey, stats]: [string, any]) => {
-            if (insightCount >= 5) return; // Limit to top 5 insights
-            
-            if (stats.adoption_rates) {
-              const topOption = Object.entries(stats.adoption_rates)
-                .sort(([,a]: any, [,b]: any) => (b as any).percentage - (a as any).percentage)[0];
-              if (topOption) {
-                const [option, data] = topOption;
-                const dataTyped = data as any;
-                statisticalResponse += `• **${questionKey}**: ${option} leads with ${dataTyped.percentage}% adoption (${dataTyped.users.toLocaleString()} users)\n`;
-                insightCount++;
+        // Generate structured response
+        let responseContent = `# Survey Analysis: ${factSheet.survey_meta.title}\n\n`;
+        responseContent += `## 🧠 Analysis & Insights\n\n`;
+        responseContent += aiAnalysis;
+        responseContent += `\n\n---\n\n`;
+        responseContent += `📊 **Analysis based on ${factSheet.analysis_results.analysis_count} relevant questions from ${factSheet.survey_meta.total_respondents} survey respondents.**\n\n`;
+        
+        // Create SSE stream response with analysis
+        const encoder = new TextEncoder();
+        const stream = new ReadableStream({
+          start(controller) {
+            try {
+              // Send content as SSE format
+              const contentChunk = JSON.stringify({ content: responseContent });
+              controller.enqueue(encoder.encode(`data: ${contentChunk}\n\n`));
+              
+              // Add data cards for visualization if available
+              if (dataCards.length > 0) {
+                console.log(`📊 [DEBUG] Sending ${dataCards.length} data cards to frontend`);
+                const dataCardsContent = '\n```data-cards\n' + JSON.stringify(dataCards, null, 2) + '\n```\n';
+                const dataCardsChunk = JSON.stringify({ content: dataCardsContent });
+                console.log(`📊 [DEBUG] Data cards content length: ${dataCardsContent.length}`);
+                controller.enqueue(encoder.encode(`data: ${dataCardsChunk}\n\n`));
+              } else {
+                console.log(`📊 [DEBUG] No data cards to send (length: ${dataCards.length})`);
               }
-            } else if (stats.statistics) {
-              statisticalResponse += `• **${questionKey}**: Average score ${stats.statistics.mean} (range: ${stats.statistics.min}-${stats.statistics.max})\n`;
-              insightCount++;
+              
+              // Send completion signal
+              controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+              controller.close();
+            } catch (error) {
+              console.error('Response streaming error:', error);
+              const errorChunk = JSON.stringify({ content: '\n\n❌ Error occurred during response formatting. Please try again.' });
+              controller.enqueue(encoder.encode(`data: ${errorChunk}\n\n`));
+              controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+              controller.close();
             }
-          });
-          statisticalResponse += '\n';
-        }
-        
-        // Add demographic insights if available
-        const demographics = factSheet.demographics;
-        if (demographics) {
-          statisticalResponse += `## 👥 Demographics Overview\n\n`;
-          Object.entries(demographics).forEach(([key, data]: [string, any]) => {
-            if (data && typeof data === 'object' && data.distribution) {
-              const topSegments = Object.entries(data.distribution)
-                .sort(([,a]: any, [,b]: any) => (b as any).count - (a as any).count)
-                .slice(0, 3);
-              statisticalResponse += `**${key.charAt(0).toUpperCase() + key.slice(1)}**: `;
-              statisticalResponse += topSegments.map(([segment, info]: [string, any]) => 
-                `${segment} (${info.count} responses, ${info.percentage}%)`).join(', ') + '\n\n';
-            }
-          });
-        }
-        
-        // Add note about data type
-        statisticalResponse += `## 📋 Data Analysis Method\n\n`;
-        statisticalResponse += `This is a **structured survey** (like Pew Research) with primarily multiple-choice and rating questions. The analysis uses **pre-computed statistical data** from the fact sheet rather than regenerating statistics.\n\n`;
-        
-        // Add charts suggestion if user asked for graphs
-        if (question.toLowerCase().includes('graph') || question.toLowerCase().includes('chart') || question.toLowerCase().includes('visual')) {
-          statisticalResponse += `## 📈 Visualization Available\n\n`;
-          statisticalResponse += `Charts and graphs can be generated from this rich statistical dataset. The survey contains ${Object.keys(questionStats || {}).length} questions with detailed response distributions and ${Object.keys(demographics || {}).length} demographic categories.\n\n`;
-          
-          // Generate data cards for visualization
-          const dataCards = generateDataCards(factSheet, question);
-          if (dataCards.length > 0) {
-            statisticalResponse += '```data-cards\n' + JSON.stringify(dataCards, null, 2) + '\n```\n\n';
           }
-        }
-        
-        statisticalResponse += `*Analysis based on pre-computed statistics from ${factSheetResponseCount.toLocaleString()} respondents*`;
-        
-        return NextResponse.json({ 
-          status: true, 
-          content: statisticalResponse 
         });
+        
+        return new NextResponse(stream, {
+          headers: {
+            "Content-Type": "text/event-stream",
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Sample-Size": String(factSheet.survey_meta.total_respondents),
+            "X-Source": "structured-data-analysis",
+            "X-Analysis-Type": "structured",
+            "X-Has-Fact-Sheet": "true"
+          }
+        });
+      } else {
+        console.log('❌ No structured data available for analysis');
+        return NextResponse.json({ status: true, content: "No data available for analysis. Please try a different question." });
       }
-      
-      // Fallback if no fact sheet available
-      return NextResponse.json({ status: true, content: "No survey data available for this cohort." });
     }
 
     // Check if we have sufficient meaningful data - be more lenient and contextual
@@ -782,6 +924,7 @@ export async function POST(req: NextRequest) {
 
     // Demographic distribution summaries
     const ageCounts: Record<string, number> = {};
+    const genderCounts: Record<string, number> = {};
     const locationCounts: Record<string, number> = {};
     const occupationCounts: Record<string, number> = {};
     const educationCounts: Record<string, number> = {};
@@ -796,6 +939,10 @@ export async function POST(req: NextRequest) {
       // Age
       const age = r.age_val as string | null;
       if(age){ ageCounts[age] = (ageCounts[age]||0)+1; }
+      
+      // Gender
+      const gender = r.gender_val as string | null;
+      if(gender){ genderCounts[gender] = (genderCounts[gender]||0)+1; }
       
       // Location
       const location = r.location_val as string | null;
@@ -890,6 +1037,7 @@ export async function POST(req: NextRequest) {
     };
 
     // Create summaries for all demographics
+    const genderSummary = Object.keys(genderCounts).length > 0 ? createDemographicSummary(genderCounts) : '';
     const locationSummary = Object.keys(locationCounts).length > 0 ? createDemographicSummary(locationCounts) : '';
     const occupationSummary = Object.keys(occupationCounts).length > 0 ? createDemographicSummary(occupationCounts) : '';
     const educationSummary = Object.keys(educationCounts).length > 0 ? createDemographicSummary(educationCounts) : '';
@@ -899,6 +1047,7 @@ export async function POST(req: NextRequest) {
     // Build comprehensive demographic summary
     const demographicParts = [];
     if (ageSummary) demographicParts.push(`Age: ${ageSummary}`);
+    if (genderSummary) demographicParts.push(`Gender: ${genderSummary}`);
     if (locationSummary) demographicParts.push(`Location: ${locationSummary}`);
     if (occupationSummary) demographicParts.push(`Occupation: ${occupationSummary}`);
     if (educationSummary) demographicParts.push(`Education: ${educationSummary}`);
@@ -947,7 +1096,8 @@ export async function POST(req: NextRequest) {
         occupation: occupationCounts,
         education: educationCounts,
         income: incomeCounts,
-        political: politicalCounts
+        political: politicalCounts,
+        gender: genderCounts
       }
     };
 
