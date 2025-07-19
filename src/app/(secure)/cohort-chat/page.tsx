@@ -35,6 +35,7 @@ import ChartRenderer from '@/components/ChartRenderer'
 import { getAllModels } from '@/app/utils/models'
 import OnboardingEmptyState from '@/components/OnboardingEmptyState'
 import SurveyStatsView from '@/components/SurveyStatsView'
+import { DynamicCohortBuilder } from '@/components/DynamicCohortBuilder'
 import { 
   optionalRemark, 
   optionalRehype, 
@@ -377,15 +378,40 @@ FORMATTING REQUIREMENTS:
 - Ensure proper spacing around lists and paragraphs
 - Structure your response with clear sections and subsections`;
 
+    // 🚨 DEBUG: Track surveyId being sent
+    console.log('🚨 FRONTEND DEBUG: selectedSurveyId value:', selectedSurveyId);
+    console.log('🚨 FRONTEND DEBUG: Will send surveyId:', selectedSurveyId || 'NOT_SENT');
+
     const payload: any = {
       cohort: selectedCohortId ? { id: selectedCohortId } : undefined,
       question,
-      surveyId: selectedSurveyId || undefined,
       model: selectedModel,
       temperature,
       sources,
       systemPrompt: enhancedSystemPrompt,
     };
+
+    // Only include surveyId if it has a valid value
+    if (selectedSurveyId) {
+      payload.surveyId = selectedSurveyId;
+      console.log('✅ FRONTEND DEBUG: Including surveyId in payload:', selectedSurveyId);
+    } else {
+      console.log('❌ FRONTEND DEBUG: No surveyId selected - will use old code path');
+      
+      // 🚨 SMART FIX: Show user-friendly message if no survey selected
+      const noSurveyMessage = `Please select a survey from the dropdown above to analyze your question. Without a survey selection, I can only provide general demographic information.`;
+      
+      setMessages(prev => [...prev, {
+        id: Date.now().toString(),
+        content: noSurveyMessage,
+        role: 'agent',
+        timestamp: new Date(),
+        isFromDataAnalysis: false
+      }]);
+      
+      setIsLoading(false);
+      return; // Exit early
+    }
 
     if (streamingMode === 'off') {
       payload.stream = false;
@@ -421,7 +447,13 @@ FORMATTING REQUIREMENTS:
       // Regular response
       const finalContent = json.content || json.result || json.text || '';
       const processed = processCompleteResponse(String(finalContent), {});
-      setMessages(prev=>[...prev,{role:'agent',content:processed.content,citations:processed.citations,chartSpec:processed.chartSpec,dataCards:processed.dataCards}]);
+      setMessages(prev=>[...prev,{
+        role:'agent',
+        content:processed.content,
+        citations:processed.citations,
+        chartSpec:processed.chartSpec,
+        dataCards: json.dataCards || processed.dataCards  // Use dataCards from API response
+      }]);
       setIsLoading(false);
       return;
     }
@@ -1011,6 +1043,11 @@ FORMATTING REQUIREMENTS:
   };
 
   const createNewConversation = () => {
+    console.log('🆕 CREATE NEW CONVERSATION DEBUG:');
+    console.log('   - selectedSurveyId:', selectedSurveyId);
+    console.log('   - selectedCohortId:', selectedCohortId);
+    console.log('   - Will create conversation with surveyId:', selectedSurveyId || 'NULL');
+    
     const newId = `conv_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     setCurrentConversationId(newId);
     setMessages([]);
@@ -1026,11 +1063,20 @@ FORMATTING REQUIREMENTS:
       cohortId: selectedCohortId
     };
     
+    console.log('✅ New conversation created:', {
+      id: newId,
+      surveyId: newConversation.surveyId,
+      cohortId: newConversation.cohortId
+    });
+    
     setConversations(prev => [newConversation, ...prev]);
     
     // Auto-expand the survey if one is selected
     if (selectedSurveyId) {
       setExpandedSurveys(prev => new Set([...prev, selectedSurveyId]));
+      console.log('📂 Auto-expanded survey:', selectedSurveyId);
+    } else {
+      console.log('⚠️ WARNING: No selectedSurveyId - conversation will not have survey context!');
     }
   };
 
@@ -1040,12 +1086,14 @@ FORMATTING REQUIREMENTS:
       setCurrentConversationId(conversationId);
       setMessages(conversation.messages || []);
       
-      // Only update survey/cohort if they're actually different to prevent unnecessary effects
-      if (conversation.surveyId !== selectedSurveyId) {
-        setSelectedSurveyId(conversation.surveyId || null);
-        // Update localStorage when survey actually changes
-        localStorage.setItem('cohort-chat-selected-survey', conversation.surveyId ? String(conversation.surveyId) : 'null');
+      // 🚨 FIX: Only update survey if conversation has a VALID surveyId AND it's different
+      // NEVER reset selectedSurveyId to null when switching conversations
+      if (conversation.surveyId && conversation.surveyId !== selectedSurveyId) {
+        console.log('🔄 Survey context change:', selectedSurveyId, '→', conversation.surveyId);
+        setSelectedSurveyId(conversation.surveyId);
+        localStorage.setItem('cohort-chat-selected-survey', String(conversation.surveyId));
       }
+      // If conversation has no surveyId, preserve current selection
       
       if (conversation.cohortId !== selectedCohortId) {
         setSelectedCohortId(conversation.cohortId || null);
@@ -1513,7 +1561,9 @@ FORMATTING REQUIREMENTS:
                   variant="ghost"
                   size="icon"
                   className="h-5 w-5 text-muted-foreground hover:text-foreground"
-                  onClick={createNewConversation}
+                  onClick={() => {
+                    createNewConversation();
+                  }}
                   title="New Conversation"
                 >
                   <Plus className="h-4 w-4" />
@@ -1559,29 +1609,8 @@ FORMATTING REQUIREMENTS:
                   onSurveySelect={handleOnboardingSurveySelect}
                   onUploadClick={handleUploadClick}
                 />
-              ) : messages.length === 0 ? (
-                <OnboardingEmptyState
-                  onTryDemo={handleTryDemo}
-                  onCreateSurvey={handleCreateSurvey}
-                  onImportData={handleImportData}
-                  onPromptClick={handlePromptClick}
-                  dynamicPrompts={dynamicPrompts}
-                  selectedSurveyData={selectedSurveyData}
-                  hasFeaturedSurvey={surveys.some(s => 
-                    s.title.toLowerCase().includes('pew research') || 
-                    s.title.toLowerCase().includes('trend wave')
-                  )}
-                  input={input}
-                  setInput={setInput}
-                  onSend={handleSend}
-                  onKeyDown={handleKeyDown}
-                  isLoading={isLoading}
-                  surveys={surveys}
-                  selectedSurveyId={selectedSurveyId}
-                  onSurveySelect={handleOnboardingSurveySelect}
-                  onUploadClick={handleUploadClick}
-                />
               ) : (
+                // 🚨 FIX: Always show active chat when survey is selected, regardless of message count
                 <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'chat' | 'stats')} className="flex flex-col flex-1">
                   <div className="px-4 pt-4">
                     <TabsList className="inline-flex w-fit items-center gap-2">
@@ -1837,117 +1866,92 @@ FORMATTING REQUIREMENTS:
                       </SelectContent>
                     </Select>
                   </div>
-                  {/* Cohort Creator */}
-                  {showCohortCreator && (
-                    <div className="space-y-4 mt-4">
+                  {/* Dynamic Cohort Creator */}
+                  {showCohortCreator && selectedSurveyId && (
+                    <div className="mt-4">
+                      <DynamicCohortBuilder
+                        surveyId={selectedSurveyId}
+                        onSave={async (name, filters) => {
+                          // Convert dynamic filters to the format expected by the API
+                          const cohortFilterRules: CohortFilterRule[] = filters.map(filter => ({
+                            field: filter.field,
+                            op: filter.op,
+                            value: filter.value
+                          }));
+                          
+                          setSaving(true);
+                          try {
+                            const res = await fetch('/api/cohorts', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ 
+                                name, 
+                                filter: cohortFilterRules, 
+                                visibility: 'private',
+                                surveyId: selectedSurveyId 
+                              }),
+                            });
+                            
+                            const data = await res.json();
+                            if (data.status) {
+                              const newCohort = { 
+                                id: data.id, 
+                                name, 
+                                filter: cohortFilterRules, 
+                                visibility: 'private', 
+                                description: '', 
+                                createdBy: 1, 
+                                createdAt: '', 
+                                updatedAt: '' 
+                              } as any;
+                              
+                              setCohorts([...cohorts, newCohort]);
+                              setSelectedCohortId(data.id);
+                              setShowCohortCreator(false);
+                              setNewCohortName('');
+                              setFilterRules([]);
+                              toast.success(`Cohort "${name}" created successfully!`);
+                            } else {
+                              throw new Error(data.message || 'Failed to create cohort');
+                            }
+                          } catch (error) {
+                            console.error('Error creating cohort:', error);
+                            toast.error('Failed to create cohort');
+                          } finally {
+                            setSaving(false);
+                          }
+                        }}
+                        onCancel={() => {
+                          setShowCohortCreator(false);
+                          setFilterRules([]);
+                          setNewCohortName('');
+                        }}
+                        isLoading={saving}
+                      />
+                    </div>
+                  )}
+                  
+                  {/* Fallback message when no survey selected */}
+                  {showCohortCreator && !selectedSurveyId && (
+                    <div className="space-y-4 mt-4 p-4 border rounded-lg bg-muted/50">
                       <div className="flex items-center justify-between">
                         <div className="space-y-1">
                           <h3 className="text-sm font-medium">Create New Cohort</h3>
                           <p className="text-xs text-muted-foreground">
-                            {selectedSurveyId 
-                              ? "Select fields from your survey to create filter rules"
-                              : "Select a survey above to create cohorts for that specific survey"
-                            }
+                            Please select a survey above to create cohorts for that specific survey
                           </p>
                         </div>
                         <Button 
                           size="sm" 
                           variant="ghost" 
-                          onClick={() => {
-                            setShowCohortCreator(false);
-                            setFilterRules([]);
-                            setNewCohortName('');
-                          }}
+                          onClick={() => setShowCohortCreator(false)}
                           className="h-8 w-8 p-0"
                         >
                           ×
                         </Button>
                       </div>
-                      
-                      {filterRules.map((rule, idx) => (
-                        <div key={idx} className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <Select value={rule.field} onValueChange={val=>updateRule(idx,'field',val)}>
-                              <SelectTrigger className="w-full text-left">
-                                <SelectValue placeholder="Select field" className="text-left"/>
-                              </SelectTrigger>
-                              <SelectContent className="z-50">
-                                {!selectedSurveyId && (
-                                  <SelectItem value="" disabled>
-                                    Select a survey first
-                                  </SelectItem>
-                                )}
-                                {availableFields.map(field => (
-                                  <SelectItem key={field.name} value={field.name}>
-                                    <div className="flex flex-col">
-                                      <span className="font-medium">{field.label}</span>
-                                      <span className="text-xs text-muted-foreground">
-                                        {field.type === 'demographic' ? 'Demographics' : 'Survey Question'}
-                                      </span>
-                                    </div>
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            {filterRules.length > 1 && (
-                              <Button 
-                                size="sm" 
-                                variant="ghost" 
-                                onClick={() => setFilterRules(filterRules.filter((_, i) => i !== idx))}
-                                className="h-8 w-8 p-0 ml-2 flex-shrink-0"
-                              >
-                                ×
-                              </Button>
-                            )}
-                          </div>
-                          <div className="flex gap-2">
-                            <select value={rule.op} onChange={e=>updateRule(idx,'op',e.target.value as any)} className="h-8 rounded-md border border-input bg-background px-2 text-xs w-24">
-                              <option value="=">=</option>
-                              <option value="IN">IN</option>
-                              <option value="CONTAINS">CONTAINS</option>
-                            </select>
-                            <Input placeholder="value" value={Array.isArray(rule.value)? rule.value.join(','): rule.value as string} onChange={e=>updateRule(idx,'value',e.target.value)} className="flex-1 text-left" />
-                          </div>
-                        </div>
-                      ))}
-                      
-                      <Button 
-                        size="sm" 
-                        variant="secondary" 
-                        onClick={() => setFilterRules([...filterRules,{ field:'', op:'=', value:''}])}
-                        disabled={!selectedSurveyId}
-                        className="w-full"
-                      >
-                        + Add Filter Rule
-                      </Button>
-                      
-                      <div className="space-y-2">
-                        <Input placeholder="Enter cohort name (e.g., 'Young Males')" value={newCohortName} onChange={e=>setNewCohortName(e.target.value)} />
-                        <div className="flex gap-2">
-                          <Button 
-                            size="sm" 
-                            variant="outline" 
-                            onClick={() => {
-                              setShowCohortCreator(false);
-                              setFilterRules([]);
-                              setNewCohortName('');
-                            }}
-                            className="flex-1"
-                          >
-                            Cancel
-                          </Button>
-                          <Button 
-                            size="sm" 
-                            onClick={handleSaveCohort} 
-                            disabled={saving || !newCohortName.trim() || filterRules.length===0 || !selectedSurveyId} 
-                            className="flex-1"
-                          >
-                            {saving ? 'Saving...' : 'Save Cohort'}
-                          </Button>
-                        </div>
-                      </div>
-                      </div>
-                    )}
+                    </div>
+                  )}
                   {messages.length>0 && selectedCohortId && (<Button variant="destructive" onClick={handleDeleteCohort}>Delete</Button>)}
                 </div>
               </TabsContent>

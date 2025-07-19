@@ -14,7 +14,7 @@ export interface CreateReportParams {
 
 export interface ReportSection {
   type: 'executive_summary' | 'demographic_analysis' | 'thematic_analysis' | 
-        'statistical_analysis' | 'insights' | 'methodology' | 'appendix';
+        'statistical_analysis' | 'insights' | 'methodology' | 'appendix' | 'visualization';
   title: string;
   content: string;
   chartSpecs?: any;

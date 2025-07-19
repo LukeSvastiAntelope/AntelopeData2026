@@ -27,7 +27,9 @@ const SURVEY_INTENTS: Record<string, SurveyIntentConfig> = {
     keywords: [
       'themes', 'open-ended', 'text responses', 'qualitative', 'narrative', 
       'common themes', 'patterns in responses', 'what people said', 'written responses',
-      'free text', 'comments', 'feedback', 'opinions expressed', 'stories', 'experiences'
+      'free text', 'comments', 'feedback', 'opinions expressed', 'stories', 'experiences',
+      'opinions', 'thoughts', 'views', 'perspectives', 'feelings', 'what do people think',
+      'respondents think', 'responders opinions', 'user opinions', 'what they said'
     ],
     questionTypes: ['text'],
     analysisType: 'thematic',

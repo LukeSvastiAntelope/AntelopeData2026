@@ -29,7 +29,7 @@ export async function authenticate(
     
     // NextAuth signIn with redirect: false returns undefined on success
     // If no error was thrown, it means authentication was successful
-    return { success: true };
+      return { success: true };
   } catch (error: any) {
     console.error('Server action error:', error);
     if (error instanceof AuthError) {
