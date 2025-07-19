@@ -120,16 +120,16 @@ export default function FrontLanding() {
               
               {/* Action Buttons */}
               <div className="flex items-center gap-4">
-                <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
-                  <DialogTrigger asChild>
-                    <Button 
+                  <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
+                    <DialogTrigger asChild>
+                      <Button 
                       size="lg" 
                       variant="outline" 
                       className="px-8 py-3 text-lg font-medium"
-                    >
+                      >
                       Import Survey
-                    </Button>
-                  </DialogTrigger>
+                      </Button>
+                    </DialogTrigger>
                     <DialogContent className="max-w-2xl">
                       <DialogHeader>
                         <DialogTitle>Try Antelope with Your Survey Data</DialogTitle>
@@ -205,7 +205,7 @@ export default function FrontLanding() {
                   >
                     Sign Up
                   </Button>
-                </div>
+              </div>
 
               <p className="text-xs text-muted-foreground text-center mt-2">
                 This is still in beta so expect hiccups.

@@ -28,9 +28,10 @@ export const CohortRepo = {
     // Map database columns to interface
     return rows.map(row => ({
       ...row,
-      survey_id: row.survey_id,
+      survey_id: row.survey_id,  // Keep original database field
+      surveyId: row.survey_id,   // Add camelCase field for frontend compatibility
       filter_json: typeof row.filter_json === 'string' ? JSON.parse(row.filter_json) : row.filter_json
-    })) as CohortDB[];
+    })) as any[];
   },
 
   /**
