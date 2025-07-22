@@ -1,4 +1,5 @@
 import { createCompletion } from "../services/ai-service";
+import { CohortFilterRule } from "../interface";
 
 interface SimpleQuestion {
   id: number;
@@ -20,17 +21,279 @@ interface MatchResult {
   reasoning: string;
   isCorrelationQuery?: boolean; // New: flag for correlation queries
   topicsFound?: string[]; // New: track which topics were found
+  queryStrategy?: 'single_topic' | 'correlation' | 'comparison' | 'demographic_analysis'; // New: strategy type
+  intentAdapted?: boolean; // New: flag indicating if the intent was adapted due to question type mismatch
   demographicFilter?: {
     field: string;
     value: string;
     questionId: number | null;
   } | null;
+  // Multi-cohort support
+  multiCohortResults?: MatchResult[]; // For comparative analysis
+  cohortInfo?: {
+    index: number;
+    name: string;
+    filter: any;
+    field: string;
+    value: any;
+  };
 }
 
 export class LightweightQuestionMatcher {
   
   /**
-   * Enhanced approach: Detect correlation queries and ensure multi-topic coverage
+   * Multi-cohort comparative analysis approach
+   * Each filter rule creates a separate cohort for side-by-side comparison
+   */
+  async findRelevantQuestionsWithCohort(
+    surveyId: number, 
+    userQuery: string, 
+    db: any,
+    cohortFilters: CohortFilterRule[],
+    maxQuestions: number = 3,
+    queryIntent?: any
+  ): Promise<MatchResult> {
+    console.log(`🎯 [MULTI-COHORT] Processing query with ${cohortFilters.length} cohort filter(s)`);
+    console.log(`🎯 [MULTI-COHORT] Filters:`, JSON.stringify(cohortFilters, null, 2));
+    
+    // 🧠 Intent-aware processing
+    if (queryIntent) {
+      console.log(`🧠 [INTENT-AWARE] Using intent guidance: ${queryIntent.intent}`);
+      console.log(`🧠 [INTENT-AWARE] Question types filter: ${queryIntent.questionTypes?.join(', ') || 'none'}`);
+    }
+    
+    // Handle no cohorts case - use regular analysis
+    if (!cohortFilters || cohortFilters.length === 0) {
+      console.log(`🎯 [MULTI-COHORT] No cohort filters - using regular analysis`);
+      return this.findRelevantQuestionsInternal(surveyId, userQuery, db, maxQuestions, null, [], queryIntent);
+    }
+    
+    // Handle single cohort case - maintain backward compatibility
+    if (cohortFilters.length === 1) {
+      console.log(`🎯 [MULTI-COHORT] Single cohort - using existing logic`);
+      return this.processSingleCohort(surveyId, userQuery, db, cohortFilters[0], cohortFilters, maxQuestions, queryIntent);
+    }
+    
+    // 🚀 NEW: Multi-cohort comparative analysis
+    console.log(`🎯 [MULTI-COHORT] Starting comparative analysis for ${cohortFilters.length} cohorts`);
+    
+    const cohortResults: any[] = [];
+    const allExcludeQuestionIds: number[] = [];
+    
+    // Step 1: Build unified blacklist from all cohort filters
+    for (const filter of cohortFilters) {
+      if (['education', 'age', 'gender', 'income', 'political', 'religion', 'location'].includes(filter.field)) {
+        const questionId = await this.findDemographicQuestion(filter.field, surveyId, db);
+        if (questionId && !allExcludeQuestionIds.includes(questionId)) {
+          allExcludeQuestionIds.push(questionId);
+        }
+      } else if (filter.field.startsWith('question_')) {
+        const questionId = parseInt(filter.field.replace('question_', ''));
+        if (!isNaN(questionId) && !allExcludeQuestionIds.includes(questionId)) {
+          allExcludeQuestionIds.push(questionId);
+        }
+      }
+    }
+    
+    console.log(`🚫 [MULTI-COHORT] Unified blacklist: ${allExcludeQuestionIds.length} questions - [${allExcludeQuestionIds.join(', ')}]`);
+    
+    // Step 2: Process each cohort separately
+    for (let i = 0; i < cohortFilters.length; i++) {
+      const filter = cohortFilters[i];
+      console.log(`\n🔍 [COHORT ${i + 1}/${cohortFilters.length}] Processing filter: ${filter.field} = ${JSON.stringify(filter.value)}`);
+      
+      try {
+        // Convert filter to demographic format
+        const cohortDemographicFilter = await this.convertFilterToDemographic(filter, surveyId, db);
+        
+        if (cohortDemographicFilter.found) {
+                     // Run analysis for this specific cohort
+           const cohortResult = await this.findRelevantQuestionsInternal(
+             surveyId,
+             userQuery,
+             db,
+             maxQuestions,
+             cohortDemographicFilter,
+             cohortFilters, // Pass original cohort filters for blacklist building
+             queryIntent // Pass intent context
+           );
+          
+          // Add cohort metadata
+          cohortResult.cohortInfo = {
+            index: i,
+            name: this.generateCohortName(filter),
+            filter: filter,
+            field: filter.field,
+            value: filter.value
+          };
+          
+          cohortResults.push(cohortResult);
+          console.log(`✅ [COHORT ${i + 1}] Analysis completed - ${cohortResult.matches.length} questions found`);
+        } else {
+          console.log(`❌ [COHORT ${i + 1}] No demographic question found for field: ${filter.field}`);
+        }
+      } catch (error) {
+        console.error(`❌ [COHORT ${i + 1}] Analysis failed:`, error);
+      }
+    }
+    
+    // Step 3: Combine results for comparative analysis
+    return this.combineMultiCohortResults(cohortResults, userQuery, surveyId);
+  }
+  
+  /**
+   * Process single cohort (backward compatibility)
+   */
+  private async processSingleCohort(
+    surveyId: number,
+    userQuery: string,
+    db: any,
+    filter: CohortFilterRule,
+    allFilters: CohortFilterRule[],
+    maxQuestions: number,
+    queryIntent?: any
+  ): Promise<MatchResult> {
+    const cohortDemographicFilter = await this.convertFilterToDemographic(filter, surveyId, db);
+    
+    return this.findRelevantQuestionsInternal(
+      surveyId,
+      userQuery,
+      db,
+      maxQuestions,
+      cohortDemographicFilter,
+      allFilters,
+      queryIntent
+    );
+  }
+
+  /**
+   * Convert a cohort filter rule to demographic filter format
+   */
+  private async convertFilterToDemographic(
+    filter: CohortFilterRule,
+    surveyId: number,
+    db: any
+  ): Promise<{ field: string; value: string; questionId: number | null; found: boolean }> {
+    // Handle different value types (string vs array)
+    let filterValue = filter.value;
+    if (Array.isArray(filterValue)) {
+      filterValue = filterValue[0]; // Use first value for now
+      console.log(`🎯 [CONVERT] Using first array value: "${filterValue}"`);
+    }
+    
+    // 🔧 NEW: Handle question-based filters (e.g., question_2139)
+    if (filter.field.startsWith('question_')) {
+      const questionId = parseInt(filter.field.replace('question_', ''));
+      console.log(`🎯 [CONVERT] Question-based filter: ${filter.field} -> questionId: ${questionId}`);
+      
+      if (!isNaN(questionId)) {
+        // Map filter value to actual survey values using the question ID
+        const originalFilterValue = filterValue as string;
+        const mappedFilterValue = this.mapFilterValue('education', originalFilterValue); // Assume education for value mapping
+        if (mappedFilterValue !== originalFilterValue) {
+          console.log(`🎯 [CONVERT] Applied value mapping: "${originalFilterValue}" -> "${mappedFilterValue}"`);
+          filterValue = mappedFilterValue;
+        }
+        
+        return {
+          field: filter.field,
+          value: filterValue as string,
+          questionId: questionId,
+          found: true
+        };
+      }
+    }
+    
+    // Handle standard demographic fields (education, age, gender, etc.)
+    const originalFilterValue = filterValue as string;
+    const mappedFilterValue = this.mapFilterValue(filter.field, originalFilterValue);
+    if (mappedFilterValue !== originalFilterValue) {
+      console.log(`🎯 [CONVERT] Applied value mapping: "${originalFilterValue}" -> "${mappedFilterValue}"`);
+      filterValue = mappedFilterValue;
+    }
+    
+    // Find the question ID for this demographic field
+    const questionId = await this.findDemographicQuestion(filter.field, surveyId, db);
+    
+    return {
+      field: filter.field,
+      value: filterValue as string,
+      questionId: questionId,
+      found: questionId !== null
+    };
+  }
+
+  /**
+   * Generate a human-readable name for a cohort based on its filter
+   */
+  private generateCohortName(filter: CohortFilterRule): string {
+    const fieldNames: { [key: string]: string } = {
+      'education': 'Education',
+      'age': 'Age',
+      'gender': 'Gender',
+      'income': 'Income',
+      'political': 'Political Views',
+      'religion': 'Religion',
+      'location': 'Location'
+    };
+    
+    const fieldName = fieldNames[filter.field] || filter.field;
+    
+    if (Array.isArray(filter.value)) {
+      if (filter.value.length === 1) {
+        return `${fieldName}: ${filter.value[0]}`;
+      } else {
+        return `${fieldName}: ${filter.value.slice(0, 2).join(', ')}${filter.value.length > 2 ? '...' : ''}`;
+      }
+    } else {
+      return `${fieldName}: ${filter.value}`;
+    }
+  }
+
+  /**
+   * Combine multiple cohort results into a comparative analysis format
+   */
+  private combineMultiCohortResults(
+    cohortResults: any[],
+    userQuery: string,
+    surveyId: number
+  ): MatchResult {
+    if (cohortResults.length === 0) {
+      // Return empty result if no cohorts processed successfully
+      return {
+        matches: [],
+        totalQuestions: 0,
+        reasoning: 'No cohorts could be processed successfully',
+        isCorrelationQuery: false,
+        queryStrategy: 'single_topic',
+        topicsFound: [],
+        demographicFilter: null,
+        multiCohortResults: []
+      };
+    }
+    
+    // Use the first cohort's question selection as the base
+    const baseResult = cohortResults[0];
+    
+    // Create comparative result structure
+    const comparativeResult: MatchResult = {
+      matches: baseResult.matches,
+      totalQuestions: baseResult.totalQuestions,
+      reasoning: `Multi-cohort comparative analysis across ${cohortResults.length} cohorts`,
+      isCorrelationQuery: baseResult.isCorrelationQuery,
+      queryStrategy: baseResult.queryStrategy,
+      topicsFound: baseResult.topicsFound,
+      demographicFilter: null, // Not applicable for multi-cohort
+      multiCohortResults: cohortResults
+    };
+    
+    console.log(`🎯 [MULTI-COHORT] Combined results: ${cohortResults.length} cohorts, ${baseResult.matches.length} questions`);
+    
+    return comparativeResult;
+  }
+  
+  /**
+   * Original method - now calls internal with dynamic detection
    */
   async findRelevantQuestions(
     surveyId: number, 
@@ -38,12 +301,28 @@ export class LightweightQuestionMatcher {
     db: any,
     maxQuestions: number = 3
   ): Promise<MatchResult> {
+    return this.findRelevantQuestionsInternal(surveyId, userQuery, db, maxQuestions, null, [], undefined);
+  }
+  
+  /**
+   * Internal method that handles both cohort filters and dynamic detection
+   */
+  private async findRelevantQuestionsInternal(
+    surveyId: number, 
+    userQuery: string, 
+    db: any,
+    maxQuestions: number = 3,
+    overrideDemographicFilter: { field: string; value: string; questionId: number | null; found: boolean } | null = null,
+    cohortFilterRules: any[] = [],
+    queryIntent?: any
+  ): Promise<MatchResult> {
     
-    console.log(`🎯 Enhanced approach: Finding questions for "${userQuery}" in survey ${surveyId}`);
+    console.log(`🎯 [NEW CODE] Analyzing user intent for: "${userQuery}" in survey ${surveyId}`);
+    console.log(`🚀 [NEW CODE] Enhanced strategy system is running!`);
     
-    // Step 1: Detect demographic filter requirements
-    const demographicFilter = this.detectDemographicFilter(userQuery);
-    console.log(`🎯 [DEBUG] Demographic filter:`, demographicFilter);
+    // Step 1: Use override filter if provided, otherwise detect from query
+    const demographicFilter = overrideDemographicFilter || this.detectDemographicFilter(userQuery);
+    console.log(`🎯 [DEBUG] Using demographic filter (${overrideDemographicFilter ? 'from cohort' : 'auto-detected'}):`, demographicFilter);
     
     // Step 2: Find demographic question if filter is needed
     let demographicQuestionId: number | null = null;
@@ -56,10 +335,43 @@ export class LightweightQuestionMatcher {
       }
     }
     
-    // Step 3: Detect if this is a correlation query
-    const isCorrelationQuery = this.detectCorrelationQuery(userQuery);
+    // Step 2.5: 🚫 BUILD BLACKLIST - Exclude cohort filter questions from analysis
+    const excludeQuestionIds: number[] = [];
+    if (cohortFilterRules && cohortFilterRules.length > 0) {
+      console.log(`🚫 [BLACKLIST] Building exclusion list from ${cohortFilterRules.length} cohort filter(s)`);
+      
+      for (const filter of cohortFilterRules) {
+        // Map field names to question IDs for demographic filters
+        if (['education', 'age', 'gender', 'income', 'political', 'religion', 'location'].includes(filter.field)) {
+          const questionId = await this.findDemographicQuestion(filter.field, surveyId, db);
+          if (questionId) {
+            excludeQuestionIds.push(questionId);
+            console.log(`🚫 [BLACKLIST] Excluding question ${questionId} (${filter.field}) from analysis`);
+          }
+        }
+        // Also handle direct question ID references if the filter uses question_XXX format
+        else if (filter.field.startsWith('question_')) {
+          const questionId = parseInt(filter.field.replace('question_', ''));
+          if (!isNaN(questionId)) {
+            excludeQuestionIds.push(questionId);
+            console.log(`🚫 [BLACKLIST] Excluding question ${questionId} (direct reference) from analysis`);
+          }
+        }
+      }
+      
+      if (excludeQuestionIds.length > 0) {
+        console.log(`🚫 [BLACKLIST] Total questions excluded: ${excludeQuestionIds.length} - [${excludeQuestionIds.join(', ')}]`);
+      } else {
+        console.log(`🚫 [BLACKLIST] No questions to exclude from cohort filters`);
+      }
+    }
     
-    // Step 4: Get simple list of questions (no analysis, just basic info)
+    // Step 3: Analyze user intent to determine query strategy
+    const queryStrategy = this.determineQueryStrategy(userQuery);
+    console.log(`🧠 [NEW CODE] Query strategy determined: ${queryStrategy}`);
+    console.log(`🔍 [NEW CODE] Strategy detection working correctly!`);
+    
+    // Step 4: Get survey questions
     const [allQuestions] = await db.execute(`
       SELECT 
         id,
@@ -72,56 +384,121 @@ export class LightweightQuestionMatcher {
     `, [surveyId]);
 
     console.log(`📋 Found ${allQuestions.length} questions in survey`);
-    console.log(`🔗 Correlation query detected: ${isCorrelationQuery}`);
     
-    // Step 5: Filter out obvious non-matches first (metadata and text questions)
+    // Step 5: Filter questions based on blacklist only (NOT intent yet)
     const candidateQuestions = allQuestions.filter((q: any) => 
-      !this.isMetadataQuestion(q.prompt) && !this.isOpenEndedText(q.type)
+      !this.isMetadataQuestion(q.prompt) && 
+      !excludeQuestionIds.includes(q.id) // 🚫 Apply blacklist exclusion
     );
     
-    // Step 6: Use enhanced LLM scoring that handles correlation queries
-    const scoredQuestions = await this.scoreQuestionsWithEnhancedLLM(
-      candidateQuestions, 
-      userQuery, 
-      isCorrelationQuery
-    );
+    console.log(`📋 Pre-scoring candidates: ${candidateQuestions.length} questions (will apply intent filter AFTER scoring)`);
     
-    // Step 7: Smart selection based on query type
+    // 🧠 INTENT FILTERING MOVED: Will be applied AFTER relevance scoring to preserve question discovery
+    
+    console.log(`🔍 After filtering: ${candidateQuestions.length} candidate questions (excluded ${allQuestions.length - candidateQuestions.length} questions)`);
+    if (excludeQuestionIds.length > 0) {
+      console.log(`🚫 Blacklist effect: ${excludeQuestionIds.length} questions excluded from cohort filters`);
+    }
+    
+    console.log(`📋 [NEW CODE] After filtering: ${candidateQuestions.length} candidate questions for analysis`);
+    console.log(`✅ [NEW CODE] Question filtering working - should have ~98 questions for Survey 81`);
+    
+    // Step 6: Use strategy-specific question selection
     let topMatches: QuestionMatch[];
     let topicsFound: string[] = [];
     
-    if (isCorrelationQuery) {
-      // For correlation queries, increase question limit to ensure multi-topic coverage
-      const correlationMaxQuestions = Math.max(maxQuestions, 6); // Minimum 6 for correlation
-      console.log(`🔗 Correlation mode: Expanding question limit from ${maxQuestions} to ${correlationMaxQuestions} for multi-topic coverage`);
-      
-      const result = this.selectCorrelationQuestions(scoredQuestions, correlationMaxQuestions);
-      topMatches = result.matches;
-      topicsFound = result.topicsFound;
-      
-      console.log(`🔗 Correlation analysis: Found questions from topics: ${topicsFound.join(', ')}`);
-    } else {
-      // Standard single-topic selection
-      topMatches = scoredQuestions
-        .filter(match => match.relevanceScore >= 60)
-        .sort((a, b) => b.relevanceScore - a.relevanceScore)
-        .slice(0, maxQuestions);
+    switch (queryStrategy) {
+             case 'correlation':
+         console.log(`🔗 [NEW CODE] CORRELATION STRATEGY: Looking for questions about multiple topics to analyze relationships`);
+         console.log(`🎯 [NEW CODE] This should find education AND US opinion questions!`);
+         const correlationResult = await this.handleCorrelationStrategy(candidateQuestions, userQuery, maxQuestions);
+        topMatches = correlationResult.matches;
+        topicsFound = correlationResult.topicsFound;
+        break;
+        
+      case 'comparison':
+        console.log(`⚖️ COMPARISON STRATEGY: Finding questions that allow comparing different aspects`);
+        const comparisonResult = await this.handleComparisonStrategy(candidateQuestions, userQuery, maxQuestions);
+        topMatches = comparisonResult.matches;
+        topicsFound = comparisonResult.topicsFound;
+        break;
+        
+      case 'demographic_analysis':
+        console.log(`👥 DEMOGRAPHIC STRATEGY: Analyzing how different groups respond to survey questions`);
+        const demographicResult = await this.handleDemographicStrategy(candidateQuestions, userQuery, maxQuestions);
+        topMatches = demographicResult.matches;
+        topicsFound = demographicResult.topicsFound;
+        break;
+        
+      default: // single_topic
+        console.log(`🎯 SINGLE TOPIC STRATEGY: Finding questions directly related to user's topic`);
+        const singleResult = await this.handleSingleTopicStrategy(candidateQuestions, userQuery, maxQuestions);
+        topMatches = singleResult.matches;
+        topicsFound = singleResult.topicsFound;
+        break;
     }
     
-    console.log(`🎯 Top ${topMatches.length} relevant questions found:`);
+    console.log(`🎯 Selected ${topMatches.length} questions using ${queryStrategy} strategy:`);
     topMatches.forEach(match => {
       const topicLabel = match.topicCategory ? ` [${match.topicCategory}]` : '';
       console.log(`  📊 Score ${match.relevanceScore}${topicLabel}: ${match.question.prompt.substring(0, 100)}...`);
     });
     
+    // 🧠 APPLY INTENT FILTERING AFTER SCORING: Now filter the top-scoring questions by intent
+    const originalTopMatches = [...topMatches]; // Save original for fallback
+    
+    if (queryIntent && queryIntent.questionTypes && queryIntent.questionTypes.length > 0) {
+      console.log(`🧠 [POST-SCORING-FILTER] Applying intent filter to ${topMatches.length} top-scoring questions`);
+      console.log(`🧠 [POST-SCORING-FILTER] Intent types: ${queryIntent.questionTypes.join(', ')}`);
+      const beforeFilterCount = topMatches.length;
+      topMatches = topMatches.filter(match => 
+        queryIntent.questionTypes.includes(match.question.type)
+      );
+      console.log(`🧠 [POST-SCORING-FILTER] Filtered from ${beforeFilterCount} to ${topMatches.length} questions matching intent`);
+      
+      // 🎯 FALLBACK: If intent filtering removed ALL questions, adapt the intent
+      if (topMatches.length === 0 && originalTopMatches.length > 0) {
+        console.log(`🎯 [ADAPTIVE-INTENT] No questions match intent, adapting analysis to available question types`);
+        topMatches = originalTopMatches;
+        
+        // Determine the best analysis type based on available questions
+        const availableTypes = [...new Set(originalTopMatches.map(m => m.question.type))];
+        console.log(`🎯 [ADAPTIVE-INTENT] Available question types: ${availableTypes.join(', ')}`);
+        
+        // Adapt the intent based on what's available
+        if (availableTypes.includes('text')) {
+          console.log(`🎯 [ADAPTIVE-INTENT] Adapting to thematic analysis for text questions`);
+          // Keep text questions only
+          topMatches = originalTopMatches.filter(match => match.question.type === 'text');
+        } else if (availableTypes.some(t => ['rating', 'single-choice', 'multiple-choice'].includes(t))) {
+          console.log(`🎯 [ADAPTIVE-INTENT] Adapting to statistical analysis for rating/choice questions`);
+          // Keep statistical questions only
+          topMatches = originalTopMatches.filter(match => 
+            ['rating', 'single-choice', 'multiple-choice'].includes(match.question.type)
+          );
+        } else {
+          console.log(`🎯 [ADAPTIVE-INTENT] Using all available questions regardless of type`);
+          topMatches = originalTopMatches;
+        }
+        
+        console.log(`🎯 [ADAPTIVE-INTENT] Final adapted selection: ${topMatches.length} questions`);
+      }
+    } else {
+      // Default behavior: exclude open-ended text questions (backward compatibility)
+      console.log(`🧠 [POST-SCORING-FILTER] No specific intent - using default (exclude text questions)`);
+      const beforeFilterCount = topMatches.length;
+      topMatches = topMatches.filter(match => !this.isOpenEndedText(match.question.type));
+      console.log(`🧠 [POST-SCORING-FILTER] Filtered from ${beforeFilterCount} to ${topMatches.length} questions (excluded text)`);
+    }
+    
     return {
       matches: topMatches,
       totalQuestions: allQuestions.length,
-      reasoning: isCorrelationQuery 
-        ? `Correlation query: Found ${topMatches.length} questions across ${topicsFound.length} topics: ${topicsFound.join(', ')}`
-        : `Found ${topMatches.length} relevant questions out of ${allQuestions.length} total.`,
-      isCorrelationQuery,
+      reasoning: this.generateStrategyReasoning(queryStrategy, topMatches.length, topicsFound),
+      isCorrelationQuery: queryStrategy === 'correlation',
+      queryStrategy,
       topicsFound,
+      intentAdapted: topMatches.length > 0 && originalTopMatches.length > 0 && topMatches !== originalTopMatches,
       demographicFilter: demographicFilter.found ? {
         field: demographicFilter.field,
         value: demographicFilter.value,
@@ -131,24 +508,173 @@ export class LightweightQuestionMatcher {
   }
   
   /**
-   * Detect if the user query is asking for correlations/relationships between topics
+   * Determine the best analytical strategy based on user query
    */
-  private detectCorrelationQuery(userQuery: string): boolean {
+  private determineQueryStrategy(userQuery: string): 'single_topic' | 'correlation' | 'comparison' | 'demographic_analysis' {
+    const lowerQuery = userQuery.toLowerCase();
+    
+    // Check for correlation keywords
     const correlationKeywords = [
-      'correlation', 'correlate', 'relationship', 'between', 'and',
-      'compare', 'versus', 'vs', 'relate', 'connection', 'link',
+      'correlation', 'correlate', 'relationship', 'between', 'relate', 'connection', 'link',
       'association', 'cross-analyze', 'cross-reference'
     ];
     
-    const lowerQuery = userQuery.toLowerCase();
-    const hasCorrelationKeywords = correlationKeywords.some(keyword => 
-      lowerQuery.includes(keyword)
-    );
+    // Check for comparison keywords  
+    const comparisonKeywords = [
+      'compare', 'versus', 'vs', 'difference', 'differ', 'contrast', 'against'
+    ];
     
-    // Also check for pattern "X and Y" which often indicates correlation intent
+    // Check for demographic analysis keywords
+    const demographicKeywords = [
+      'men think', 'women think', 'young people', 'older people', 'age group',
+      'gender difference', 'by age', 'by gender', 'by education', 'demographic'
+    ];
+    
+    // Check for "X and Y" pattern which often indicates correlation
     const hasAndPattern = lowerQuery.includes(' and ') && lowerQuery.split(' and ').length >= 2;
     
-    return hasCorrelationKeywords || hasAndPattern;
+    // Priority order: demographic -> correlation -> comparison -> single topic
+    if (demographicKeywords.some(keyword => lowerQuery.includes(keyword))) {
+      return 'demographic_analysis';
+    }
+    
+    if (correlationKeywords.some(keyword => lowerQuery.includes(keyword)) || hasAndPattern) {
+      return 'correlation';
+    }
+    
+    if (comparisonKeywords.some(keyword => lowerQuery.includes(keyword))) {
+      return 'comparison';
+    }
+    
+    return 'single_topic';
+  }
+  
+  /**
+   * Handle correlation analysis strategy
+   */
+  private async handleCorrelationStrategy(
+    questions: any[], 
+    userQuery: string, 
+    maxQuestions: number
+  ): Promise<{ matches: QuestionMatch[], topicsFound: string[] }> {
+    
+    // Use enhanced LLM scoring for correlation
+    const scoredQuestions = await this.scoreQuestionsWithEnhancedLLM(
+      questions, 
+      userQuery, 
+      true // isCorrelationQuery = true
+    );
+    
+    // Increase question limit for correlation to ensure multi-topic coverage
+    const correlationMaxQuestions = Math.max(maxQuestions, 6);
+    
+    return this.selectCorrelationQuestions(scoredQuestions, correlationMaxQuestions);
+  }
+  
+  /**
+   * Handle comparison analysis strategy
+   */
+  private async handleComparisonStrategy(
+    questions: any[], 
+    userQuery: string, 
+    maxQuestions: number
+  ): Promise<{ matches: QuestionMatch[], topicsFound: string[] }> {
+    
+    // For comparisons, we need questions that allow comparing different options/aspects
+    const scoredQuestions = await this.scoreQuestionsWithEnhancedLLM(
+      questions, 
+      userQuery, 
+      false // Not a correlation query, but comparison
+    );
+    
+    const relevantQuestions = scoredQuestions
+      .filter(match => match.relevanceScore >= 50)
+      .sort((a, b) => b.relevanceScore - a.relevanceScore)
+      .slice(0, maxQuestions);
+    
+    const topicsFound = [...new Set(relevantQuestions.map(q => q.topicCategory).filter(Boolean))];
+    
+    return {
+      matches: relevantQuestions,
+      topicsFound
+    };
+  }
+  
+  /**
+   * Handle demographic analysis strategy
+   */
+  private async handleDemographicStrategy(
+    questions: any[], 
+    userQuery: string, 
+    maxQuestions: number
+  ): Promise<{ matches: QuestionMatch[], topicsFound: string[] }> {
+    
+    // For demographic analysis, focus on questions that would show interesting differences between groups
+    const scoredQuestions = await this.scoreQuestionsWithEnhancedLLM(
+      questions, 
+      userQuery, 
+      false
+    );
+    
+    const relevantQuestions = scoredQuestions
+      .filter(match => match.relevanceScore >= 45) // Slightly lower threshold
+      .sort((a, b) => b.relevanceScore - a.relevanceScore)
+      .slice(0, maxQuestions);
+    
+    const topicsFound = [...new Set(relevantQuestions.map(q => q.topicCategory).filter(Boolean))];
+    
+    return {
+      matches: relevantQuestions,
+      topicsFound
+    };
+  }
+  
+  /**
+   * Handle single topic analysis strategy
+   */
+  private async handleSingleTopicStrategy(
+    questions: any[], 
+    userQuery: string, 
+    maxQuestions: number
+  ): Promise<{ matches: QuestionMatch[], topicsFound: string[] }> {
+    
+    const scoredQuestions = await this.scoreQuestionsWithEnhancedLLM(
+      questions, 
+      userQuery, 
+      false
+    );
+    
+    const relevantQuestions = scoredQuestions
+      .filter(match => match.relevanceScore >= 60)
+      .sort((a, b) => b.relevanceScore - a.relevanceScore)
+      .slice(0, maxQuestions);
+    
+    const topicsFound = [...new Set(relevantQuestions.map(q => q.topicCategory).filter(Boolean))];
+    
+    return {
+      matches: relevantQuestions,
+      topicsFound
+    };
+  }
+  
+  /**
+   * Generate reasoning based on strategy used
+   */
+  private generateStrategyReasoning(
+    strategy: string, 
+    questionsFound: number, 
+    topicsFound: string[]
+  ): string {
+    switch (strategy) {
+      case 'correlation':
+        return `Correlation analysis: Found ${questionsFound} questions across ${topicsFound.length} topics (${topicsFound.join(', ')}) to analyze relationships between different aspects of the survey.`;
+      case 'comparison':
+        return `Comparison analysis: Found ${questionsFound} questions to help compare different options or viewpoints within the survey data.`;
+      case 'demographic_analysis':
+        return `Demographic analysis: Found ${questionsFound} questions to analyze how different demographic groups respond to key survey topics.`;
+      default:
+        return `Topic analysis: Found ${questionsFound} relevant questions about the requested topic.`;
+    }
   }
   
   /**
@@ -173,14 +699,26 @@ ${questionsText}`;
     const correlationPrompt = isCorrelationQuery ? `
 
 🔗 CORRELATION ANALYSIS MODE:
-This query asks for relationships between MULTIPLE topics. Your task:
+The user wants to find RELATIONSHIPS between different topics in this survey. Your job:
 
-1. IDENTIFY ALL TOPICS mentioned in the user query (e.g., "healthcare", "media", "military", etc.)
-2. For each question, determine which topic(s) it relates to
-3. Score questions highly if they relate to ANY of the topics mentioned
-4. Assign a "topicCategory" to help group questions by theme
+1. EXTRACT the main topics from the user query (e.g., "healthcare and military" = topics: "healthcare", "military")
+2. Find questions about EACH topic SEPARATELY - we need questions covering ALL mentioned topics
+3. Score questions 70-90 if they relate to ANY mentioned topic
+4. Use "topicCategory" to label which topic each question addresses
 
-For correlation analysis, we need questions from ALL relevant topics, not just the most prominent one.` : '';
+EXAMPLES OF WHAT TO FIND:
+- Query: "correlation between healthcare and military"
+  → Find: Questions about U.S. healthcare system + Questions about military/defense spending
+- Query: "education and media relationship" 
+  → Find: Questions about universities/schools + Questions about news/media
+
+SCORING STRATEGY:
+- Healthcare question about U.S. healthcare system → Score: 85, topicCategory: "healthcare"
+- Military question about defense spending → Score: 80, topicCategory: "military"  
+- Question about both topics together → Score: 90, topicCategory: "healthcare,military"
+
+DO NOT require questions to mention multiple topics - find separate questions for each topic.
+The analysis will compare how the same respondents answered different topic areas.` : '';
 
     const prompt = basePrompt + correlationPrompt + `
 
@@ -191,10 +729,12 @@ Your task: Score each question (1-100) based on how well it would help answer th
 3. DATA UTILITY: Would this question's answers help address the user's query?
 ${isCorrelationQuery ? '4. MULTI-TOPIC COVERAGE: For correlation queries, include questions from ALL mentioned topics' : ''}
 
-Examples:
-- "healthcare and media correlation" should score BOTH healthcare questions AND media questions highly
-- "military vs entertainment" should include both military AND entertainment questions
-- "social media influence" should score social media questions highly
+Examples for correlation queries:
+- "correlation between healthcare and military" → Find questions about healthcare systems AND questions about military/defense
+- "relationship between education and media" → Find questions about universities/schools AND questions about media/news
+- "healthcare vs military spending" → Find questions about healthcare AND questions about military budget/defense
+
+For each topic mentioned, find the relevant questions even if they don't contain the exact keywords.
 
 Return ONLY a JSON array with this exact format:
 [
@@ -223,6 +763,17 @@ Score generously for semantic relevance to ANY topic mentioned in the query.`;
       }
 
       const llmScores = JSON.parse(jsonMatch[0]);
+      
+      if (isCorrelationQuery) {
+        console.log(`🔗 [CORRELATION DEBUG] LLM returned ${llmScores.length} scored questions`);
+        const topScores = llmScores
+          .sort((a: any, b: any) => b.score - a.score)
+          .slice(0, 10);
+        console.log(`🔗 [CORRELATION DEBUG] Top 10 LLM scores:`);
+        topScores.forEach((score: any, i: number) => {
+          console.log(`  ${i+1}. Score ${score.score} [${score.topicCategory || 'no-category'}]: ${score.reasoning}`);
+        });
+      }
       
       // Map LLM scores back to our question format
       const scoredQuestions: QuestionMatch[] = questions.map(q => {
@@ -257,8 +808,11 @@ Score generously for semantic relevance to ANY topic mentioned in the query.`;
     maxQuestions: number
   ): { matches: QuestionMatch[], topicsFound: string[] } {
     
-    // Filter questions with decent scores
-    const relevantQuestions = scoredQuestions.filter(match => match.relevanceScore >= 50);
+    // Filter questions with decent scores - lower threshold for correlation queries
+    const scoreThreshold = 40; // Lower threshold to ensure we find questions
+    const relevantQuestions = scoredQuestions.filter(match => match.relevanceScore >= scoreThreshold);
+    
+    console.log(`🔗 [CORRELATION DEBUG] Found ${relevantQuestions.length} questions above threshold ${scoreThreshold}`);
     
     // Group by topic category
     const topicGroups: { [topic: string]: QuestionMatch[] } = {};
@@ -372,11 +926,14 @@ Score generously for semantic relevance to ANY topic mentioned in the query.`;
       }
     }
     
-    // Military/defense scoring
-    if (lowerQuery.includes('military') || lowerQuery.includes('defense')) {
-      if (lowerQuestion.includes('military') || lowerQuestion.includes('defense')) {
+    // Military/defense scoring - expanded keywords
+    if (lowerQuery.includes('military') || lowerQuery.includes('defense') || lowerQuery.includes('army') || 
+        lowerQuery.includes('navy') || lowerQuery.includes('security') || lowerQuery.includes('armed forces')) {
+      if (lowerQuestion.includes('military') || lowerQuestion.includes('defense') || lowerQuestion.includes('armed forces') ||
+          lowerQuestion.includes('security') || lowerQuestion.includes('army') || lowerQuestion.includes('navy') ||
+          lowerQuestion.includes('forces') || lowerQuestion.includes('troops')) {
         score += 70;
-        reasons.push('military keyword match');
+        reasons.push('military/defense keyword match');
       }
     }
     
@@ -421,37 +978,79 @@ Score generously for semantic relevance to ANY topic mentioned in the query.`;
   }
 
   /**
+   * Map common filter values to actual survey values
+   */
+  private mapFilterValue(field: string, value: string): string {
+    const educationMapping: { [key: string]: string } = {
+      'High School Graduate': 'H.S. graduate or less',
+      'High School': 'H.S. graduate or less',
+      'HS Graduate': 'H.S. graduate or less',
+      'College Graduate': 'College graduate+',
+      'College Grad': 'College graduate+',
+      'Bachelor': 'College graduate+',
+      'Some College': 'Some College', // Already correct
+      'Associates': 'Some College'
+    };
+    
+    if (field === 'education' && educationMapping[value]) {
+      console.log(`🎯 [DEBUG] Mapping education value "${value}" -> "${educationMapping[value]}"`);
+      return educationMapping[value];
+    }
+    
+    return value; // Return original if no mapping needed
+  }
+
+  /**
    * Find the demographic question in the survey that matches the filter field
    */
   private async findDemographicQuestion(field: string, surveyId: number, db: any): Promise<number | null> {
     try {
-      // Map demographic fields to question patterns
-      const questionPatterns = {
-        'gender': ['gender', 'sex', 'male', 'female'],
-        'age': ['age', 'birth', 'old', 'young'],
-        'education': ['education', 'school', 'degree', 'college']
-      };
-      
-      const patterns = questionPatterns[field as keyof typeof questionPatterns];
-      if (!patterns) return null;
+      console.log(`🎯 [DEBUG] Looking for demographic question for field: ${field} in survey ${surveyId}`);
       
       // Get all questions for this survey
       const [questions] = await db.execute(
-        `SELECT id, prompt FROM survey_questions WHERE survey_id = ?`,
+        `SELECT id, prompt FROM survey_questions WHERE survey_id = ? ORDER BY question_order`,
         [surveyId]
       ) as any[];
       
-      // Find question that matches demographic field
-      for (const question of questions) {
-        const lowerPrompt = question.prompt.toLowerCase();
-        
-        for (const pattern of patterns) {
-          if (lowerPrompt.includes(pattern)) {
-            console.log(`🎯 [DEBUG] Found demographic question for ${field}: ID ${question.id} - "${question.prompt}"`);
-            return question.id;
-          }
-        }
-      }
+      console.log(`🎯 [DEBUG] Found ${questions.length} questions to search through`);
+      
+             // Generic approach - find questions by field type
+       const questionPatterns = {
+         'gender': ['gender', 'sex', 'male', 'female'],
+         'age': ['age', 'birth', 'old', 'young'],
+         'education': ['education level', 'education category', 'highest level', 'degree completed']
+       };
+       
+       const patterns = questionPatterns[field as keyof typeof questionPatterns];
+       if (patterns) {
+         // First try exact demographic patterns
+         for (const question of questions) {
+           const lowerPrompt = question.prompt.toLowerCase();
+           
+           for (const pattern of patterns) {
+             if (lowerPrompt.includes(pattern)) {
+               console.log(`🎯 [DEBUG] Found demographic question for ${field}: ID ${question.id} - "${question.prompt}"`);
+               return question.id;
+             }
+           }
+         }
+         
+         // Fallback for education: any education question that's not a subject question
+         if (field === 'education') {
+           for (const question of questions) {
+             const lowerPrompt = question.prompt.toLowerCase();
+             
+             if (lowerPrompt.includes('education') && 
+                 !lowerPrompt.includes('k to 12') && 
+                 !lowerPrompt.includes('grades') &&
+                 !lowerPrompt.includes('stem')) {
+               console.log(`🎯 [DEBUG] Found fallback education question: ID ${question.id} - "${question.prompt}"`);
+               return question.id;
+             }
+           }
+         }
+              }
       
       console.log(`🎯 [DEBUG] No demographic question found for field: ${field}`);
       return null;
@@ -733,6 +1332,14 @@ Score generously for semantic relevance to ANY topic mentioned in the query.`;
       return this.generateTargetedQuery(questionId, surveyId, db);
     }
     
+    // 🎯 MAP FILTER VALUE TO ACTUAL SURVEY VALUES
+    const originalValue = demographicFilter.value;
+    const mappedValue = this.mapFilterValue(demographicFilter.field, originalValue);
+    if (mappedValue !== originalValue) {
+      console.log(`🎯 [DEBUG] Applied value mapping for ${demographicFilter.field}: "${originalValue}" -> "${mappedValue}"`);
+      demographicFilter = { ...demographicFilter, value: mappedValue };
+    }
+    
     // First get the question type to determine how to handle the data
     const [questionInfo] = await db.execute(`
       SELECT type FROM survey_questions WHERE id = ?
@@ -753,24 +1360,24 @@ Score generously for semantic relevance to ANY topic mentioned in the query.`;
     if (questionType === 'yes-no') {
       // UNION approach with demographic filtering
       sql = `
-        SELECT 
+      SELECT 
           answer_value,
-          COUNT(*) as count,
-          ROUND((COUNT(*) * 100.0 / (
-            SELECT COUNT(*) 
-            FROM survey_answers sa2 
-            JOIN survey_responses sr2 ON sa2.response_id = sr2.id 
+        COUNT(*) as count,
+        ROUND((COUNT(*) * 100.0 / (
+          SELECT COUNT(*) 
+          FROM survey_answers sa2 
+          JOIN survey_responses sr2 ON sa2.response_id = sr2.id 
             JOIN survey_answers sa_demo2 ON sr2.id = sa_demo2.response_id
-            WHERE sa2.question_id = ? AND sr2.survey_id = ?
+          WHERE sa2.question_id = ? AND sr2.survey_id = ?
             AND sa_demo2.question_id = ? AND sa_demo2.answer_value = ?
-          )), 1) as percentage
+        )), 1) as percentage
         FROM (
           SELECT sa.answer_value as answer_value
-          FROM survey_answers sa
-          JOIN survey_responses sr ON sa.response_id = sr.id
+      FROM survey_answers sa
+      JOIN survey_responses sr ON sa.response_id = sr.id
           JOIN survey_answers sa_demo ON sr.id = sa_demo.response_id
-          WHERE sa.question_id = ? 
-          AND sr.survey_id = ?
+      WHERE sa.question_id = ? 
+      AND sr.survey_id = ?
           AND sa_demo.question_id = ? AND sa_demo.answer_value = ?
           AND sa.answer_value IS NOT NULL AND sa.answer_value != ''
           
@@ -787,8 +1394,8 @@ Score generously for semantic relevance to ANY topic mentioned in the query.`;
           AND sa.answer_code IS NOT NULL AND sa.answer_code != '' AND sa.answer_code != 'null'
         ) combined_results
         GROUP BY answer_value
-        ORDER BY count DESC
-        LIMIT 15
+      ORDER BY count DESC
+      LIMIT 15
       `;
       params = [
         questionId, surveyId, demographicFilter.questionId, demographicFilter.value, // For percentage calculation
@@ -915,4 +1522,4 @@ Score generously for semantic relevance to ANY topic mentioned in the query.`;
 
     return results;
   }
-}
+} 
