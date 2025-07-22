@@ -46,6 +46,7 @@ import {
   processCompleteResponse 
 } from './utils';
 import { MessageList, ChatInput } from './components';
+import { BreadcrumbNavigation } from './components/breadcrumb-navigation';
 
 
 
@@ -1489,96 +1490,44 @@ FORMATTING REQUIREMENTS:
       {/* Main Content Area */}
       <div className="flex-1 p-1">
         <div className="h-full rounded-lg bg-card text-card-foreground shadow-lg">
-          {/* Header */}
-          <div className="px-6 py-2">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center relative">
-                <SidebarTrigger className="-ml-0.5 h-5 w-5 text-muted-foreground hover:text-foreground" />
-                <div className="h-4 border-l border-border mx-4" />
-                {!selectedSurveyId ? (
-                  <button
-                    onClick={() => setShowSurveyDropdown(!showSurveyDropdown)}
-                    className="flex items-center gap-2 text-base font-medium text-card-foreground hover:text-foreground transition-colors"
-                  >
-                    <span>Select Survey</span>
-                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                  </button>
-                ) : (
-                  <h1 className="text-base font-medium text-card-foreground">
-                    {surveys.find(s => s.id === selectedSurveyId)?.title || 'Survey'}
-                  </h1>
-                )}
-                
-                {/* Header Survey Dropdown */}
-                {!selectedSurveyId && showSurveyDropdown && (
-                  <div className="absolute top-full left-16 mt-2 w-80 bg-popover border border-border rounded-md shadow-lg z-50" data-survey-dropdown>
-                    <div className="p-3">
-                      <div className="flex items-center justify-between mb-3">
-                        <h4 className="font-medium text-sm">Select Survey</h4>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-6 w-6"
-                          onClick={() => setShowSurveyDropdown(false)}
-                        >
-                          <X className="h-3 w-3" />
-                        </Button>
-                      </div>
-                      <div className="space-y-1 max-h-60 overflow-y-auto">
-                        {surveys.length === 0 ? (
-                          <div className="text-center py-4 text-muted-foreground text-sm">
-                            No surveys available
-                          </div>
-                        ) : (
-                          surveys.map((survey) => (
-                            <div
-                              key={survey.id}
-                              className={cn(
-                                "flex items-center gap-3 p-2 rounded-md cursor-pointer transition-colors hover:bg-muted",
-                                selectedSurveyId === survey.id && "bg-muted"
-                              )}
-                              onClick={() => {
-                                handleSurveyChange(survey.id);
-                                setShowSurveyDropdown(false);
-                              }}
-                            >
-                              <BarChart3 className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                              <div className="flex-1 min-w-0">
-                                <div className="text-sm font-medium truncate">
-                                  {survey.title}
-                                </div>
-                              </div>
-                            </div>
-                          ))
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                )}
+          {/* Header with Breadcrumb Navigation */}
+          <div className="flex items-center px-6 py-2">
+            <SidebarTrigger className="-ml-0.5 h-5 w-5 text-muted-foreground hover:text-foreground flex-shrink-0" />
+            <div className="h-4 border-l border-border mx-4 flex-shrink-0" />
+            <div className="flex-1 min-w-0 mr-4">
+              <BreadcrumbNavigation
+                surveys={surveys}
+                selectedSurveyId={selectedSurveyId}
+                onSurveyChange={handleSurveyChange}
+                conversations={conversations}
+                currentConversationId={currentConversationId}
+                onConversationSwitch={switchConversation}
+                onNewConversation={createNewConversation}
+                                  conversationsLoading={conversationsLoading}
+                />
               </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-5 w-5 text-muted-foreground hover:text-foreground"
-                  onClick={() => {
-                    createNewConversation();
-                  }}
-                  title="New Conversation"
-                >
-                  <Plus className="h-4 w-4" />
-                  <span className="sr-only">New Conversation</span>
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="-mr-0.5 h-5 w-5 text-muted-foreground hover:text-foreground"
-                  onClick={()=>setIsCollapsed(!isCollapsed)}
-                >
-                  {isCollapsed ? <PanelRight /> : <PanelLeft />}
-                  <span className="sr-only">Toggle Right Panel</span>
-                </Button>
-              </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-5 w-5 text-muted-foreground hover:text-foreground"
+                onClick={() => {
+                  createNewConversation();
+                }}
+                title="New Conversation"
+              >
+                <Plus className="h-4 w-4" />
+                <span className="sr-only">New Conversation</span>
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="-mr-0.5 h-5 w-5 text-muted-foreground hover:text-foreground"
+                onClick={()=>setIsCollapsed(!isCollapsed)}
+              >
+                {isCollapsed ? <PanelRight /> : <PanelLeft />}
+                <span className="sr-only">Toggle Right Panel</span>
+              </Button>
             </div>
           </div>
 
