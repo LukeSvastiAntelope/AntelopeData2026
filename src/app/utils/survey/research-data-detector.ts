@@ -4,6 +4,11 @@ interface DetectionResult {
   recommendations: string[];
   isResearchData: boolean;
   suggestCodebook: boolean;
+  detectedStandard?: {
+    name: string;
+    confidence: number;
+    autoCodebookAvailable: boolean;
+  };
   detectedPatterns: {
     technicalColumns: string[];
     numericOnlyColumns: string[];
@@ -71,6 +76,13 @@ export class ResearchDataDetector {
     confidence += fileAnalysis.score;
     reasons.push(...fileAnalysis.reasons);
 
+    // 5. Survey Standard Detection
+    const standardDetection = this.detectSurveyStandard(analysisInput);
+    if (standardDetection.detected) {
+      confidence += standardDetection.confidenceBonus;
+      reasons.push(...standardDetection.reasons);
+    }
+
     // Generate recommendations based on confidence
     if (confidence >= 90) {
       recommendations.push('This appears to be research data with technical variable names');
@@ -91,7 +103,8 @@ export class ResearchDataDetector {
       reasons, 
       recommendations, 
       confidence >= 70,
-      detectedPatterns
+      detectedPatterns,
+      standardDetection.detected ? standardDetection : undefined
     );
   }
 
@@ -306,6 +319,81 @@ export class ResearchDataDetector {
   }
 
   /**
+   * Detect known survey standards (Pew Research, ANES, etc.)
+   */
+  private static detectSurveyStandard(input: AnalysisInput): {
+    detected: boolean;
+    name?: string;
+    confidence?: number;
+    autoCodebookAvailable?: boolean;
+    confidenceBonus: number;
+    reasons: string[];
+  } {
+    const { headers, fileName } = input;
+    const reasons: string[] = [];
+    let detected = false;
+    let standardName = '';
+    let standardConfidence = 0;
+    let confidenceBonus = 0;
+
+    // Pew Research Center Detection
+    const pewPatterns = {
+      fileName: /^(atp|pew).*w\d+/i,
+      columns: {
+        demographics: ['F_GENDER', 'F_AGECAT', 'F_EDUCCAT', 'F_RACECMB', 'F_PARTY', 'F_IDEO'],
+        wave: /_W\d+$/,
+        weight: /WEIGHT.*W\d+/i
+      }
+    };
+
+    // Check filename patterns
+    if (pewPatterns.fileName.test(fileName)) {
+      standardConfidence += 40;
+      reasons.push(`Filename matches Pew Research pattern: "${fileName}"`);
+    }
+
+    // Check for Pew demographic columns
+    const pewDemographics = pewPatterns.columns.demographics.filter(col => 
+      headers.some(h => h === col)
+    );
+    if (pewDemographics.length >= 3) {
+      standardConfidence += 30;
+      reasons.push(`Found ${pewDemographics.length} Pew demographic columns: ${pewDemographics.join(', ')}`);
+    }
+
+    // Check for wave identifiers
+    const waveColumns = headers.filter(h => pewPatterns.columns.wave.test(h));
+    if (waveColumns.length >= 5) {
+      standardConfidence += 20;
+      reasons.push(`Found ${waveColumns.length} wave identifier columns`);
+    }
+
+    // Check for weight variables
+    const weightColumns = headers.filter(h => pewPatterns.columns.weight.test(h));
+    if (weightColumns.length > 0) {
+      standardConfidence += 10;
+      reasons.push(`Found Pew weight variables: ${weightColumns.join(', ')}`);
+    }
+
+    // Determine if we detected Pew Research
+    if (standardConfidence >= 60) {
+      detected = true;
+      standardName = 'Pew Research Center';
+      confidenceBonus = Math.min(standardConfidence / 2, 15); // Bonus up to 15 points
+      reasons.push(`🎯 **Pew Research format detected** (${standardConfidence}% confidence)`);
+    }
+
+    return {
+      detected,
+      name: standardName,
+      confidence: standardConfidence,
+      autoCodebookAvailable: detected,
+      confidenceBonus,
+      reasons
+    };
+  }
+
+  /**
    * Create standardized result object
    */
   private static createResult(
@@ -313,7 +401,8 @@ export class ResearchDataDetector {
     reasons: string[], 
     recommendations: string[], 
     isResearchData: boolean,
-    detectedPatterns: any = {}
+    detectedPatterns: any = {},
+    detectedStandard?: any
   ): DetectionResult {
     return {
       confidence: Math.round(confidence),
@@ -321,6 +410,7 @@ export class ResearchDataDetector {
       recommendations,
       isResearchData,
       suggestCodebook: confidence >= 70,
+      detectedStandard,
       detectedPatterns
     };
   }
