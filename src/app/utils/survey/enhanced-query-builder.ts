@@ -72,8 +72,11 @@ export class EnhancedSurveyQueryBuilder {
    * Generate consistent demographic field selection that works with both
    * new normalized storage and legacy mixed storage formats
    */
-  private getDemographicFieldSelects(): string {
+  private getDemographicFieldSelects(surveyId?: number): string {
     const fields: string[] = [];
+    
+    // Build survey_id filter for subqueries if provided
+    const surveyFilter = surveyId ? `AND sq.survey_id = ${surveyId}` : '';
     
     // Age field - try multiple sources for compatibility
     fields.push(`
@@ -87,6 +90,7 @@ export class EnhancedSurveyQueryBuilder {
          JOIN survey_questions sq ON sa.question_id = sq.id 
          WHERE sa.response_id = sr.id 
          AND (LOWER(sq.prompt) LIKE '%age%' OR LOWER(sq.prompt) LIKE '%old%')
+         ${surveyFilter}
          LIMIT 1)                                                       -- Survey answer fallback
       ) AS age_val
     `);
@@ -100,6 +104,7 @@ export class EnhancedSurveyQueryBuilder {
          JOIN survey_questions sq ON sa.question_id = sq.id 
          WHERE sa.response_id = sr.id 
          AND (LOWER(sq.prompt) LIKE '%gender%' OR LOWER(sq.prompt) LIKE '%sex%' OR sq.prompt LIKE '%What is your gender%')
+         ${surveyFilter}
          LIMIT 1)                                                       -- Survey answer fallback
       ) AS gender_val
     `);
@@ -108,11 +113,13 @@ export class EnhancedSurveyQueryBuilder {
     fields.push(`
       COALESCE(
         sr.location,                                                     -- New normalized field
-        JSON_UNQUOTE(JSON_EXTRACT(sr.demographics,'$.location')),       -- JSON location string
+        JSON_UNQUOTE(JSON_EXTRACT(sr.demographics,'$.location')),       -- JSON location
+        JSON_UNQUOTE(JSON_EXTRACT(sr.demographics,'$.city')),           -- JSON city
         (SELECT sa.answer_value FROM survey_answers sa 
          JOIN survey_questions sq ON sa.question_id = sq.id 
          WHERE sa.response_id = sr.id 
-         AND (LOWER(sq.prompt) LIKE '%location%' OR LOWER(sq.prompt) LIKE '%country%' OR LOWER(sq.prompt) LIKE '%where%' OR sq.prompt LIKE '%lived in%')
+         AND (LOWER(sq.prompt) LIKE '%location%' OR LOWER(sq.prompt) LIKE '%city%' OR LOWER(sq.prompt) LIKE '%where%' OR LOWER(sq.prompt) LIKE '%live%')
+         ${surveyFilter}
          LIMIT 1)                                                       -- Survey answer fallback
       ) AS location_val
     `);
@@ -122,10 +129,12 @@ export class EnhancedSurveyQueryBuilder {
       COALESCE(
         sr.occupation,                                                   -- New normalized field
         JSON_UNQUOTE(JSON_EXTRACT(sr.demographics,'$.occupation')),     -- JSON occupation
+        JSON_UNQUOTE(JSON_EXTRACT(sr.demographics,'$.job')),            -- JSON job
         (SELECT sa.answer_value FROM survey_answers sa 
          JOIN survey_questions sq ON sa.question_id = sq.id 
          WHERE sa.response_id = sr.id 
-         AND (LOWER(sq.prompt) LIKE '%occupation%' OR LOWER(sq.prompt) LIKE '%job%' OR LOWER(sq.prompt) LIKE '%work%')
+         AND (LOWER(sq.prompt) LIKE '%occupation%' OR LOWER(sq.prompt) LIKE '%job%' OR LOWER(sq.prompt) LIKE '%work%' OR LOWER(sq.prompt) LIKE '%employ%')
+         ${surveyFilter}
          LIMIT 1)                                                       -- Survey answer fallback
       ) AS occupation_val
     `);
@@ -138,7 +147,8 @@ export class EnhancedSurveyQueryBuilder {
         (SELECT sa.answer_value FROM survey_answers sa 
          JOIN survey_questions sq ON sa.question_id = sq.id 
          WHERE sa.response_id = sr.id 
-         AND (LOWER(sq.prompt) LIKE '%education%' OR LOWER(sq.prompt) LIKE '%school%' OR LOWER(sq.prompt) LIKE '%degree%')
+         AND (LOWER(sq.prompt) LIKE '%education%' OR LOWER(sq.prompt) LIKE '%degree%' OR LOWER(sq.prompt) LIKE '%school%')
+         ${surveyFilter}
          LIMIT 1)                                                       -- Survey answer fallback
       ) AS education_val
     `);
@@ -151,25 +161,28 @@ export class EnhancedSurveyQueryBuilder {
         (SELECT sa.answer_value FROM survey_answers sa 
          JOIN survey_questions sq ON sa.question_id = sq.id 
          WHERE sa.response_id = sr.id 
-         AND (LOWER(sq.prompt) LIKE '%income%' OR LOWER(sq.prompt) LIKE '%salary%')
+         AND (LOWER(sq.prompt) LIKE '%income%' OR LOWER(sq.prompt) LIKE '%salary%' OR LOWER(sq.prompt) LIKE '%earn%')
+         ${surveyFilter}
          LIMIT 1)                                                       -- Survey answer fallback
       ) AS income_val
     `);
 
-    // Political views field
+    // Political affiliation field
     fields.push(`
       COALESCE(
-        sr.political_views,                                              -- New normalized field
-        JSON_UNQUOTE(JSON_EXTRACT(sr.demographics,'$.politicalViews')), -- JSON political views
+        sr.political_affiliation,                                        -- New normalized field
+        JSON_UNQUOTE(JSON_EXTRACT(sr.demographics,'$.political')),      -- JSON political
+        JSON_UNQUOTE(JSON_EXTRACT(sr.demographics,'$.politicalAffiliation')),  -- JSON politicalAffiliation
         (SELECT sa.answer_value FROM survey_answers sa 
          JOIN survey_questions sq ON sa.question_id = sq.id 
          WHERE sa.response_id = sr.id 
-         AND (LOWER(sq.prompt) LIKE '%political%' OR LOWER(sq.prompt) LIKE '%ideology%')
+         AND (LOWER(sq.prompt) LIKE '%political%' OR LOWER(sq.prompt) LIKE '%party%' OR LOWER(sq.prompt) LIKE '%republican%' OR LOWER(sq.prompt) LIKE '%democrat%')
+         ${surveyFilter}
          LIMIT 1)                                                       -- Survey answer fallback
       ) AS political_val
     `);
 
-    return fields.join(',\n             ');
+    return fields.join(',\n        ');
   }
 
   /**
@@ -212,7 +225,7 @@ export class EnhancedSurveyQueryBuilder {
       sq.question_order ASC,
       RAND()`;
 
-    const demographicSelects = this.getDemographicFieldSelects();
+    const demographicSelects = this.getDemographicFieldSelects(surveyId);
 
     const sql = `
       SELECT sr.id as rid, sa.answer_value, sq.prompt as question_text, sq.type as question_type,
@@ -266,7 +279,7 @@ export class EnhancedSurveyQueryBuilder {
       sq.question_order ASC,
       RAND()`;
 
-    const demographicSelects = this.getDemographicFieldSelects();
+    const demographicSelects = this.getDemographicFieldSelects(surveyId);
 
     const sql = `
       SELECT sr.id as rid, sa.answer_value, sq.prompt as question_text, sq.type as question_type,
@@ -329,7 +342,7 @@ export class EnhancedSurveyQueryBuilder {
       sq.question_order ASC,
       RAND()`;
 
-    const demographicSelects = this.getDemographicFieldSelects();
+    const demographicSelects = this.getDemographicFieldSelects(surveyId);
 
     const sql = `
       SELECT sr.id as rid, sa.answer_value, sq.prompt as question_text, sq.type as question_type,
@@ -398,7 +411,7 @@ export class EnhancedSurveyQueryBuilder {
       sq.question_order ASC,
       RAND()`;
 
-    const demographicSelects = this.getDemographicFieldSelects();
+    const demographicSelects = this.getDemographicFieldSelects(surveyId);
 
     const sql = `
       SELECT sr.id as rid, sa.answer_value, sq.prompt as question_text, sq.type as question_type,

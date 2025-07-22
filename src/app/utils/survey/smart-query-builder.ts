@@ -84,12 +84,24 @@ export class SmartSurveyQueryBuilder {
       params.push(surveyId);
     }
     
-    // Intent-specific filters for text analysis
+    // Intent-specific filters for meaningful text analysis (exclude metadata)
     whereClause += ` AND sq.type = 'text'`; // Only text questions
     whereClause += ` AND LENGTH(TRIM(sa.answer_value)) >= ${intent.minResponseLength || 15}`; // Substantial responses
     whereClause += ` AND sa.answer_value IS NOT NULL`;
     whereClause += ` AND sa.answer_value != ''`;
     whereClause += ` AND UPPER(TRIM(sa.answer_value)) NOT IN ('N/A', 'NULL', 'NONE')`;
+    // Exclude metadata fields like timestamps, IDs, form data
+    whereClause += ` AND sq.prompt NOT LIKE '%time%'`;
+    whereClause += ` AND sq.prompt NOT LIKE '%ID%'`;
+    whereClause += ` AND sq.prompt NOT LIKE '%start%'`;
+    whereClause += ` AND sq.prompt NOT LIKE '%end%'`;
+    whereClause += ` AND sq.prompt NOT LIKE '%device%'`;
+    whereClause += ` AND sq.prompt NOT LIKE '%language%'`;
+    whereClause += ` AND sq.prompt NOT LIKE '%form%'`;
+    whereClause += ` AND sq.prompt NOT LIKE '%weight%'`;
+    whereClause += ` AND sa.answer_value NOT REGEXP '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$'`; // Exclude timestamps
+    whereClause += ` AND sa.answer_value NOT REGEXP '^[0-9]+$'`; // Exclude pure numbers/IDs
+    whereClause += ` AND sa.answer_value NOT REGEXP '^[0-9]*\\.?[0-9]+$'`; // Exclude decimal numbers
     
     // Exclude patterns from intent config
     if (intent.excludePatterns) {
@@ -110,6 +122,7 @@ export class SmartSurveyQueryBuilder {
                       JSON_UNQUOTE(JSON_EXTRACT(sr.demographics,'$.age')),
                       JSON_UNQUOTE(JSON_EXTRACT(sr.demographics,'$.age_range'))
              ) AS age_val,
+             COALESCE(sr.gender, JSON_UNQUOTE(JSON_EXTRACT(sr.demographics,'$.gender'))) AS gender_val,
              JSON_UNQUOTE(JSON_EXTRACT(sr.demographics,'$.location')) AS location_val,
              JSON_UNQUOTE(JSON_EXTRACT(sr.demographics,'$.occupation')) AS occupation_val,
              JSON_UNQUOTE(JSON_EXTRACT(sr.demographics,'$.education')) AS education_val,
@@ -170,6 +183,7 @@ export class SmartSurveyQueryBuilder {
                       JSON_UNQUOTE(JSON_EXTRACT(sr.demographics,'$.age')),
                       JSON_UNQUOTE(JSON_EXTRACT(sr.demographics,'$.age_range'))
              ) AS age_val,
+             COALESCE(sr.gender, JSON_UNQUOTE(JSON_EXTRACT(sr.demographics,'$.gender'))) AS gender_val,
              JSON_UNQUOTE(JSON_EXTRACT(sr.demographics,'$.location')) AS location_val,
              JSON_UNQUOTE(JSON_EXTRACT(sr.demographics,'$.occupation')) AS occupation_val,
              JSON_UNQUOTE(JSON_EXTRACT(sr.demographics,'$.education')) AS education_val,
@@ -231,6 +245,7 @@ export class SmartSurveyQueryBuilder {
                       JSON_UNQUOTE(JSON_EXTRACT(sr.demographics,'$.age')),
                       JSON_UNQUOTE(JSON_EXTRACT(sr.demographics,'$.age_range'))
              ) AS age_val,
+             COALESCE(sr.gender, JSON_UNQUOTE(JSON_EXTRACT(sr.demographics,'$.gender'))) AS gender_val,
              JSON_UNQUOTE(JSON_EXTRACT(sr.demographics,'$.location')) AS location_val,
              JSON_UNQUOTE(JSON_EXTRACT(sr.demographics,'$.occupation')) AS occupation_val,
              JSON_UNQUOTE(JSON_EXTRACT(sr.demographics,'$.education')) AS education_val,
@@ -291,6 +306,7 @@ export class SmartSurveyQueryBuilder {
                       JSON_UNQUOTE(JSON_EXTRACT(sr.demographics,'$.age')),
                       JSON_UNQUOTE(JSON_EXTRACT(sr.demographics,'$.age_range'))
              ) AS age_val,
+             COALESCE(sr.gender, JSON_UNQUOTE(JSON_EXTRACT(sr.demographics,'$.gender'))) AS gender_val,
              JSON_UNQUOTE(JSON_EXTRACT(sr.demographics,'$.location')) AS location_val,
              JSON_UNQUOTE(JSON_EXTRACT(sr.demographics,'$.occupation')) AS occupation_val,
              JSON_UNQUOTE(JSON_EXTRACT(sr.demographics,'$.education')) AS education_val,
@@ -366,6 +382,7 @@ export class SmartSurveyQueryBuilder {
                       JSON_UNQUOTE(JSON_EXTRACT(sr.demographics,'$.age')),
                       JSON_UNQUOTE(JSON_EXTRACT(sr.demographics,'$.age_range'))
              ) AS age_val,
+             COALESCE(sr.gender, JSON_UNQUOTE(JSON_EXTRACT(sr.demographics,'$.gender'))) AS gender_val,
              JSON_UNQUOTE(JSON_EXTRACT(sr.demographics,'$.location')) AS location_val,
              JSON_UNQUOTE(JSON_EXTRACT(sr.demographics,'$.occupation')) AS occupation_val,
              JSON_UNQUOTE(JSON_EXTRACT(sr.demographics,'$.education')) AS education_val,

@@ -1,377 +1,284 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { openSql } from '@/app/utils/database/db';
-
-// Import the schema analysis functions
-// Import the schema analysis functions
-async function importAnalyzeSurveySchema() {
-  const schemaModule = await import('../../../../../../scripts/analyze-survey-schema.js');
-  return schemaModule.analyzeSurveySchema;
-}
+import { SurveyRepo } from '@/app/utils/database/survey-repo';
+import { openSql as getMySQLConnection } from '@/app/utils/database/db';
+import { RowDataPacket } from 'mysql2/promise';
 
 interface QueryRequest {
   question: string;
-  context?: string;
+  surveyId: string;
 }
 
-interface QueryResponse {
-  answer: string;
-  data: any;
-  query_type: string;
-  confidence: number;
-  source: 'fact_sheet' | 'dynamic_query' | 'schema_analysis';
-  sql_query?: string;
-  execution_time_ms: number;
+interface DatabaseSchema {
+  questionTable: string;
+  responseTable: string;
+  answerTable: string;
+  questionOrderColumn: string;
+  questionTextColumn: string;
+  answerValueColumn: string;
+  responseIdColumn: string;
 }
 
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const startTime = Date.now();
-  
   try {
+    // Auth – user ID should be attached by middleware
     const userIdHeader = request.headers.get('x-user-id');
     if (!userIdHeader) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: 'User not authenticated' }, { status: 401 });
     }
     const userId = parseInt(userIdHeader);
 
-    const resolvedParams = await params;
-    const surveyId = parseInt(resolvedParams.id);
-    
-    if (isNaN(surveyId)) {
-      return NextResponse.json({ error: 'Invalid survey ID' }, { status: 400 });
-    }
+    const { id: surveyId } = await params;
+    const surveyIdNum = parseInt(surveyId);
+    const { question } = await request.json() as QueryRequest;
 
-    const body: QueryRequest = await request.json();
-    
-    if (!body.question || typeof body.question !== 'string') {
-      return NextResponse.json({ error: 'Question is required' }, { status: 400 });
-    }
-
-    // Check if user has access to this survey
-    const db = await openSql();
-    const [surveyCheckRaw] = await db.execute(`
-      SELECT s.id, s.title, s.created_by, s.status
-      FROM surveys s 
-      WHERE s.id = ?
-    `, [surveyId]);
-
-    const surveyCheck = surveyCheckRaw as any[];
-
-    if (!Array.isArray(surveyCheck) || surveyCheck.length === 0) {
+    // Verify the user owns this survey
+    const survey = await SurveyRepo.getSurveyById(surveyIdNum, userId);
+    if (!survey) {
       return NextResponse.json({ error: 'Survey not found' }, { status: 404 });
     }
 
-    const survey = surveyCheck[0] as any;
+    // Discover database schema for this survey
+    const db = await getMySQLConnection();
+    const schema = await discoverDatabaseSchema(db);
     
-    // Check permissions
-    if (survey.created_by !== userId && survey.status !== 'published') {
-      return NextResponse.json({ error: 'Access denied' }, { status: 403 });
-    }
-
-    console.log(`🤔 Processing query for survey ${surveyId}: "${body.question}"`);
-
-    // Get schema analysis using existing database connection (this should be cached in production)
-    const analyzeSurveySchema = await importAnalyzeSurveySchema();
-    const schema = await analyzeSurveySchema(surveyId, db);
+    // Smart routing based on question type
+    const response = await routeQuery(question, surveyIdNum, survey, schema);
     
-    // Process the query using our smart query system
-    const response = await processSmartQuery(body.question, schema, db, surveyId);
-    
-    const executionTime = Date.now() - startTime;
-    response.execution_time_ms = executionTime;
-
-    console.log(`✅ Query processed in ${executionTime}ms, source: ${response.source}`);
-
-    return NextResponse.json(response);
+    return NextResponse.json({
+      question,
+      answer: response.answer,
+      queryType: response.type,
+      data: response.data || null,
+      executedAt: new Date().toISOString(),
+      schemaUsed: schema
+    });
 
   } catch (error) {
-    console.error('Query processing failed:', error);
+    console.error('Error processing survey query:', error);
     return NextResponse.json(
-      { error: 'Failed to process query', details: error.message },
+      { error: 'Failed to process query', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
     );
   }
 }
 
-// Smart query processing system
-async function processSmartQuery(
-  question: string,
-  schema: any,
-  db: any,
-  surveyId: number
-): Promise<QueryResponse> {
-  
+async function discoverDatabaseSchema(db: any): Promise<DatabaseSchema> {
+  try {
+    // Check what tables exist
+    const [tables] = await db.execute(
+      `SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES 
+       WHERE TABLE_SCHEMA = DATABASE() 
+       AND TABLE_NAME IN ('survey_questions', 'survey_responses', 'survey_answers')`
+    ) as [RowDataPacket[], any];
+
+    const tableNames = tables.map((t: any) => t.TABLE_NAME);
+
+    // Check column structures
+    const [questionColumns] = await db.execute(
+      `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS 
+       WHERE TABLE_SCHEMA = DATABASE() 
+       AND TABLE_NAME = 'survey_questions'`
+    ) as [RowDataPacket[], any];
+
+    const [answerColumns] = await db.execute(
+      `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS 
+       WHERE TABLE_SCHEMA = DATABASE() 
+       AND TABLE_NAME = 'survey_answers'`
+    ) as [RowDataPacket[], any];
+
+    const questionColumnNames = questionColumns.map((col: any) => col.COLUMN_NAME);
+    const answerColumnNames = answerColumns.map((col: any) => col.COLUMN_NAME);
+
+    // Determine column mappings
+    let questionOrderColumn = 'question_order';
+    if (questionColumnNames.includes('order')) {
+      questionOrderColumn = 'order';
+    } else if (questionColumnNames.includes('sort_order')) {
+      questionOrderColumn = 'sort_order';
+    }
+
+    let questionTextColumn = 'question_text';
+    if (questionColumnNames.includes('prompt')) {
+      questionTextColumn = 'prompt';
+    } else if (questionColumnNames.includes('text')) {
+      questionTextColumn = 'text';
+    }
+
+    let answerValueColumn = 'answer_value';
+    if (answerColumnNames.includes('value')) {
+      answerValueColumn = 'value';
+    } else if (answerColumnNames.includes('answer_text')) {
+      answerValueColumn = 'answer_text';
+    }
+
+    let responseIdColumn = 'response_id';
+    if (answerColumnNames.includes('survey_response_id')) {
+      responseIdColumn = 'survey_response_id';
+    }
+
+    return {
+      questionTable: 'survey_questions',
+      responseTable: 'survey_responses', 
+      answerTable: 'survey_answers',
+      questionOrderColumn,
+      questionTextColumn,
+      answerValueColumn,
+      responseIdColumn
+    };
+
+  } catch (error) {
+    console.error('Error discovering database schema:', error);
+    // Return default schema
+    return {
+      questionTable: 'survey_questions',
+      responseTable: 'survey_responses',
+      answerTable: 'survey_answers', 
+      questionOrderColumn: 'question_order',
+      questionTextColumn: 'question_text',
+      answerValueColumn: 'answer_value',
+      responseIdColumn: 'response_id'
+    };
+  }
+}
+
+async function routeQuery(question: string, surveyId: number, survey: any, schema: DatabaseSchema) {
   const questionLower = question.toLowerCase();
-  
-  // Step 1: Try to answer from pre-computed fact sheet
-  const factSheetAnswer = tryFactSheetAnswer(questionLower, schema);
-  if (factSheetAnswer) {
-    return factSheetAnswer;
-  }
-  
-  // Step 2: Try pattern-based dynamic queries
-  const dynamicAnswer = await tryDynamicQuery(questionLower, schema, db, surveyId);
-  if (dynamicAnswer) {
-    return dynamicAnswer;
-  }
-  
-  // Step 3: Fallback to schema-based general answer
-  return generateSchemaBasedAnswer(questionLower, schema);
-}
+  const db = await getMySQLConnection();
 
-// Try to answer from pre-computed fact sheet
-function tryFactSheetAnswer(question: string, schema: any): QueryResponse | null {
-  const factSheet = schema.fact_sheet;
-  
-  // Platform adoption questions
-  if (question.includes('popular') && (question.includes('platform') || question.includes('social'))) {
-    const platformStats = Object.values(factSheet.question_stats).find((stats: any) => 
-      stats.adoption_rates && Object.keys(stats.adoption_rates).length > 0
-    ) as any;
-    
-    if (platformStats) {
-      const topPlatforms = Object.entries(platformStats.adoption_rates)
-        .sort(([,a]: any, [,b]: any) => b.percentage - a.percentage)
-        .slice(0, 5);
-      
-      const answer = `The top 5 most popular platforms are:\n${topPlatforms.map(([platform, stats]: any) => 
-        `${stats.rank}. ${platform} - ${stats.percentage}% (${stats.users} users)`
-      ).join('\n')}`;
-      
-      return {
-        answer,
-        data: { top_platforms: Object.fromEntries(topPlatforms) },
-        query_type: 'platform_popularity',
-        confidence: 0.95,
-        source: 'fact_sheet',
-        execution_time_ms: 0
-      };
-    }
-  }
-  
-  // Usage time questions
-  if ((question.includes('hour') || question.includes('time')) && (question.includes('average') || question.includes('mean'))) {
-    const usageStats = Object.values(factSheet.question_stats).find((stats: any) => 
-      stats.statistics && stats.statistics.mean !== undefined
-    ) as any;
-    
-    if (usageStats) {
-      const answer = `The average usage time is ${usageStats.statistics.mean} hours per day. The median is ${usageStats.statistics.median} hours, with usage ranging from ${usageStats.statistics.min} to ${usageStats.statistics.max} hours.`;
-      
-      return {
-        answer,
-        data: usageStats.statistics,
-        query_type: 'usage_statistics',
-        confidence: 0.9,
-        source: 'fact_sheet',
-        execution_time_ms: 0
-      };
-    }
-  }
-  
-  // Demographics questions
-  if (question.includes('age') && (question.includes('distribution') || question.includes('breakdown'))) {
-    const ageDemo = schema.demographics.age;
-    if (ageDemo && ageDemo.distribution) {
-      const answer = `Age distribution:\n${Object.entries(ageDemo.distribution).map(([group, stats]: any) => 
-        `${group}: ${stats.percentage}% (${stats.count} respondents)`
-      ).join('\n')}`;
-      
-      return {
-        answer,
-        data: ageDemo.distribution,
-        query_type: 'demographic_distribution',
-        confidence: 0.9,
-        source: 'fact_sheet',
-        execution_time_ms: 0
-      };
-    }
-  }
-  
-  // Sample size questions
-  if (question.includes('how many') && (question.includes('respondent') || question.includes('people') || question.includes('user'))) {
-    const totalRespondents = schema.survey_meta.total_respondents;
-    const answer = `This survey has ${totalRespondents} respondents with a data quality score of ${(schema.survey_meta.data_quality_score * 100).toFixed(1)}%.`;
-    
+  // Route 1: Survey metadata queries
+  if (questionLower.includes('question') && (questionLower.includes('list') || questionLower.includes('what') || questionLower.includes('show'))) {
+    const questions = survey.questions.map((q: any, index: number) => ({
+      order: q[schema.questionOrderColumn],
+      text: q[schema.questionTextColumn] || q.question_text,
+      type: q.question_type,
+      options: q.options || []
+    }));
+
     return {
-      answer,
-      data: { 
-        total_respondents: totalRespondents,
-        data_quality_score: schema.survey_meta.data_quality_score,
-        completion_rate: schema.survey_meta.response_completion_rate
-      },
-      query_type: 'sample_info',
-      confidence: 1.0,
-      source: 'fact_sheet',
-      execution_time_ms: 0
+      type: 'metadata',
+      answer: `This survey contains ${questions.length} questions:\n\n` + 
+        questions.map((q: any) => `**Q${q.order}**: ${q.text}${q.options.length > 0 ? `\n   Options: ${q.options.join(', ')}` : ''}`).join('\n\n'),
+      data: questions
     };
   }
-  
-  return null;
-}
 
-// Try dynamic SQL queries for more complex questions
-async function tryDynamicQuery(
-  question: string,
-  schema: any,
-  db: any,
-  surveyId: number
-): Promise<QueryResponse | null> {
-  
-  // Age group analysis
-  if (question.includes('age') && (question.includes('group') || question.includes('young') || question.includes('old'))) {
-    try {
-      const query = `
-        SELECT 
-          CASE 
-            WHEN JSON_EXTRACT(demographics, '$.age') BETWEEN 18 AND 29 THEN '18-29'
-            WHEN JSON_EXTRACT(demographics, '$.age') BETWEEN 30 AND 49 THEN '30-49'
-            WHEN JSON_EXTRACT(demographics, '$.age') BETWEEN 50 AND 64 THEN '50-64'
-            WHEN JSON_EXTRACT(demographics, '$.age') >= 65 THEN '65+'
-            ELSE 'Unknown'
-          END as age_group,
-          COUNT(*) as count,
-          ROUND(COUNT(*) * 100.0 / (SELECT COUNT(*) FROM survey_responses WHERE survey_id = ?), 1) as percentage
-        FROM survey_responses 
-        WHERE survey_id = ? AND demographics IS NOT NULL
-        GROUP BY age_group
-        ORDER BY 
-          CASE age_group
-            WHEN '18-29' THEN 1
-            WHEN '30-49' THEN 2  
-            WHEN '50-64' THEN 3
-            WHEN '65+' THEN 4
-            ELSE 5
-          END
-      `;
-      
-      const [results] = await db.execute(query, [surveyId, surveyId]);
-      
-      const answer = `Age group breakdown:\n${results.map((row: any) => 
-        `${row.age_group}: ${row.percentage}% (${row.count} respondents)`
-      ).join('\n')}`;
-      
-      return {
-        answer,
-        data: { age_groups: results },
-        query_type: 'age_group_analysis',
-        confidence: 0.85,
-        source: 'dynamic_query',
-        sql_query: query,
-        execution_time_ms: 0
-      };
-      
-    } catch (error) {
-      console.warn('Dynamic age query failed:', error);
-    }
-  }
-  
-  // Gender analysis
-  if (question.includes('gender') || question.includes('male') || question.includes('female')) {
-    try {
-      const query = `
-        SELECT 
-          JSON_EXTRACT(demographics, '$.gender') as gender,
-          COUNT(*) as count,
-          ROUND(COUNT(*) * 100.0 / (SELECT COUNT(*) FROM survey_responses WHERE survey_id = ?), 1) as percentage
-        FROM survey_responses 
-        WHERE survey_id = ? AND demographics IS NOT NULL
-        GROUP BY gender
-        ORDER BY count DESC
-      `;
-      
-      const [results] = await db.execute(query, [surveyId, surveyId]);
-      
-      const answer = `Gender distribution:\n${results.map((row: any) => 
-        `${row.gender}: ${row.percentage}% (${row.count} respondents)`
-      ).join('\n')}`;
-      
-      return {
-        answer,
-        data: { gender_distribution: results },
-        query_type: 'gender_analysis',
-        confidence: 0.85,
-        source: 'dynamic_query',
-        sql_query: query,
-        execution_time_ms: 0
-      };
-      
-    } catch (error) {
-      console.warn('Dynamic gender query failed:', error);
-    }
-  }
-  
-  return null;
-}
+  // Route 2: Response count queries (schema-aware)
+  if (questionLower.includes('response') && (questionLower.includes('how many') || questionLower.includes('count') || questionLower.includes('total'))) {
+    const [countResult] = await db.execute(
+      `SELECT COUNT(*) as total FROM ${schema.responseTable} WHERE survey_id = ?`,
+      [surveyId]
+    ) as [RowDataPacket[], any];
+    const total = (countResult[0] as any).total;
 
-// Generate schema-based general answers
-function generateSchemaBasedAnswer(question: string, schema: any): QueryResponse {
-  
-  // Question about survey structure
-  if (question.includes('question') && (question.includes('how many') || question.includes('what'))) {
-    const questionTypes = schema.questions.reduce((acc: any, q: any) => {
-      acc[q.detected_type] = (acc[q.detected_type] || 0) + 1;
-      return acc;
-    }, {});
-    
-    const answer = `This survey contains ${schema.questions.length} questions:\n${Object.entries(questionTypes).map(([type, count]) => 
-      `- ${count} ${type.replace('_', ' ')} question(s)`
-    ).join('\n')}\n\nAvailable demographics: ${schema.survey_meta.demographics_available.join(', ')}`;
-    
     return {
-      answer,
-      data: { 
-        question_count: schema.questions.length,
-        question_types: questionTypes,
-        demographics: schema.survey_meta.demographics_available
-      },
-      query_type: 'survey_structure',
-      confidence: 0.8,
-      source: 'schema_analysis',
-      execution_time_ms: 0
+      type: 'database',
+      answer: `This survey has **${total.toLocaleString()} total responses**.`,
+      data: { responseCount: total }
     };
   }
-  
-  // Data quality questions
-  if (question.includes('quality') || question.includes('reliable')) {
-    const dataQuality = schema.survey_meta.data_quality_score;
-    const sampleSize = schema.survey_meta.total_respondents;
-    
-    let qualityAssessment = 'Good';
-    if (dataQuality >= 0.9) qualityAssessment = 'Excellent';
-    else if (dataQuality < 0.7) qualityAssessment = 'Fair';
-    
-    const answer = `Data Quality Assessment: ${qualityAssessment} (${(dataQuality * 100).toFixed(1)}%)\n\nSample Size: ${sampleSize} respondents\nCompletion Rate: ${schema.survey_meta.response_completion_rate}%\n\nThis dataset is ${sampleSize >= 100 ? 'highly' : sampleSize >= 30 ? 'moderately' : 'minimally'} suitable for statistical analysis.`;
+
+  // Route 3: Survey status and metadata
+  if (questionLower.includes('status') || questionLower.includes('when') || questionLower.includes('created')) {
+    const surveyInfo = survey as any;
     
     return {
-      answer,
+      type: 'metadata', 
+      answer: `**Survey Information:**
+- **Title**: ${surveyInfo.title || surveyInfo.slug}
+- **Status**: ${surveyInfo.status}
+- **Created**: ${new Date(surveyInfo.created_at).toLocaleDateString()}
+- **Questions**: ${survey.questions.length}
+- **Type**: ${surveyInfo.survey_type || 'Standard'}
+- **Database Schema**: Using ${schema.questionTable}, ${schema.answerTable}, ${schema.responseTable}`,
       data: {
-        data_quality_score: dataQuality,
-        sample_size: sampleSize,
-        completion_rate: schema.survey_meta.response_completion_rate
-      },
-      query_type: 'data_quality',
-      confidence: 0.9,
-      source: 'schema_analysis',
-      execution_time_ms: 0
+        title: surveyInfo.title,
+        status: surveyInfo.status,
+        createdAt: surveyInfo.created_at,
+        questionCount: survey.questions.length,
+        schema: schema
+      }
     };
   }
-  
-  // Fallback: General survey info
-  const answer = `This is "${schema.survey_meta.title}" with ${schema.survey_meta.total_respondents} respondents and ${schema.questions.length} questions. I can help you analyze platform adoption rates, usage patterns, demographic breakdowns, and more. Try asking specific questions like "What are the most popular platforms?" or "How does usage vary by age group?"`;
-  
+
+  // Route 4: Question-specific analysis (requires aggregation)
+  if (questionLower.includes('breakdown') || questionLower.includes('distribution') || questionLower.includes('answer')) {
+    // For complex analysis, recommend Python analysis
+    return {
+      type: 'recommendation',
+      answer: `For detailed response analysis and breakdowns, I recommend using the **Python Analysis Engine** which can:
+
+📊 **Analyze response distributions**
+📈 **Create visualizations** 
+🔍 **Find correlations**
+📋 **Generate statistical summaries**
+
+The analysis engine has full access to all ${(await getResponseCount(surveyId, db, schema)).toLocaleString()} responses without token limitations.
+
+Would you like me to run a Python analysis on this data?`,
+      data: { recommendPythonAnalysis: true }
+    };
+  }
+
+  // Route 5: Demographics queries
+  if (questionLower.includes('demographic') || questionLower.includes('age') || questionLower.includes('gender') || questionLower.includes('location')) {
+    return {
+      type: 'recommendation',
+      answer: `For demographic analysis, the **Python Analysis Engine** can automatically:
+
+👥 **Identify demographic questions**
+📊 **Create demographic breakdowns**
+🗺️ **Generate cross-tabulations**
+📈 **Show response patterns by demographics**
+
+This provides much richer insights than simple database queries.
+
+Would you like me to analyze demographics using Python?`,
+      data: { recommendPythonAnalysis: true, analysisType: 'demographics' }
+    };
+  }
+
+  // Default: General information
   return {
-    answer,
-    data: { 
-      survey_title: schema.survey_meta.title,
-      respondent_count: schema.survey_meta.total_respondents,
-      question_count: schema.questions.length
-    },
-    query_type: 'general_info',
-    confidence: 0.6,
-    source: 'schema_analysis',
-    execution_time_ms: 0
+    type: 'general',
+    answer: `I can help you with this survey data in several ways:
+
+🔍 **Direct Database Queries** (instant, no token limits):
+- List survey questions
+- Get response counts
+- Check survey status and metadata
+
+🐍 **Python Analysis Engine** (for complex analysis):
+- Response distributions and statistics
+- Correlations and patterns
+- Data visualizations
+- Advanced breakdowns
+
+**Current Survey**: ${survey.questions.length} questions, ${(await getResponseCount(surveyId, db, schema)).toLocaleString()} responses
+**Database Schema**: ${schema.questionTable} → ${schema.answerTable} → ${schema.responseTable}
+
+What specific information would you like to know?`,
+    data: {
+      surveyInfo: {
+        questionCount: survey.questions.length,
+        responseCount: await getResponseCount(surveyId, db, schema)
+      },
+      schema: schema
+    }
   };
+}
+
+async function getResponseCount(surveyId: number, db: any, schema: DatabaseSchema): Promise<number> {
+  try {
+    const [countResult] = await db.execute(
+      `SELECT COUNT(*) as total FROM ${schema.responseTable} WHERE survey_id = ?`,
+      [surveyId]
+    ) as [RowDataPacket[], any];
+    return (countResult[0] as any).total || 0;
+  } catch (error) {
+    console.error('Error getting response count:', error);
+    return 0;
+  }
 } 

@@ -28,7 +28,8 @@ import {
   FileText,
   Brain,
   MessageCircle,
-  FileBarChart
+  FileBarChart,
+  Code
 } from "lucide-react"
 import LogoText from "@/components/logo-text"; // Added import
 import LogoIcon from "@/components/logo-icon"; // Added import
@@ -71,6 +72,11 @@ export function AppSidebar({ className, collapsible = "offcanvas", ...props }: S
       title: "Reports",
       href: "/reports",
       icon: FileBarChart
+    },
+    {
+      title: "Python Analysis",
+      href: "/python-analysis",
+      icon: Code
     }
   ]
 

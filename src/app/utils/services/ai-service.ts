@@ -311,15 +311,29 @@ async function createOpenAIStreamingCompletion(options: AICompletionOptions): Pr
   const readableStream = new ReadableStream({
     async start(controller) {
       try {
+        console.log('🔍 STREAMING DEBUG: Starting OpenAI stream processing');
+        let chunkCount = 0;
+        let contentChunks = 0;
+        
         for await (const chunk of stream as any) {
+          chunkCount++;
+          console.log('🔍 STREAMING DEBUG: Chunk', chunkCount, 'received:', JSON.stringify(chunk));
+          
           const content = chunk.choices[0]?.delta?.content;
           if (content) {
+            contentChunks++;
+            console.log('🔍 STREAMING DEBUG: Content found in chunk', chunkCount, ':', content.length, 'chars');
             controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content })}\n\n`));
+          } else {
+            console.log('🔍 STREAMING DEBUG: No content in chunk', chunkCount, '- delta:', JSON.stringify(chunk.choices[0]?.delta));
           }
         }
+        
+        console.log('🔍 STREAMING DEBUG: Stream complete -', chunkCount, 'total chunks,', contentChunks, 'with content');
         controller.enqueue(encoder.encode('data: [DONE]\n\n'));
         controller.close();
       } catch (error) {
+        console.error('🔍 STREAMING DEBUG: Stream error:', error);
         controller.error(error);
       }
     }
