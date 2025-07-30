@@ -33,7 +33,7 @@ export function ChatInput({
   onUploadClick
 }: ChatInputProps) {
   return (
-    <div className="sticky bottom-0 p-4 pt-0 bg-card">
+    <div className="sticky bottom-0 px-4 py-0 bg-card">
       <div className="relative">
         <div className="relative">
           <Textarea 
