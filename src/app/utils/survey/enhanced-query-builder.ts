@@ -223,7 +223,7 @@ export class EnhancedSurveyQueryBuilder {
 
     const orderBy = `ORDER BY 
       sq.question_order ASC,
-      RAND()`;
+      sr.id ASC`;
 
     const demographicSelects = this.getDemographicFieldSelects(surveyId);
 
@@ -236,8 +236,7 @@ export class EnhancedSurveyQueryBuilder {
       JOIN survey_questions sq ON sa.question_id = sq.id
       JOIN surveys s ON sr.survey_id = s.id
       WHERE ${whereClause}
-      ${orderBy}
-      LIMIT ${Math.min(topK, 10000)}`;
+      ${orderBy}`;
 
     return {
       sql,
@@ -277,7 +276,7 @@ export class EnhancedSurveyQueryBuilder {
 
     const orderBy = `ORDER BY 
       sq.question_order ASC,
-      RAND()`;
+      sr.id ASC`;
 
     const demographicSelects = this.getDemographicFieldSelects(surveyId);
 
@@ -290,8 +289,7 @@ export class EnhancedSurveyQueryBuilder {
       JOIN survey_questions sq ON sa.question_id = sq.id
       JOIN surveys s ON sr.survey_id = s.id
       WHERE ${whereClause}
-      ${orderBy}
-      LIMIT ${Math.min(topK, 10000)}`;
+      ${orderBy}`;
 
     return {
       sql,
@@ -340,7 +338,7 @@ export class EnhancedSurveyQueryBuilder {
 
     const orderBy = `ORDER BY 
       sq.question_order ASC,
-      RAND()`;
+      sr.id ASC`;
 
     const demographicSelects = this.getDemographicFieldSelects(surveyId);
 
@@ -353,8 +351,7 @@ export class EnhancedSurveyQueryBuilder {
       JOIN survey_questions sq ON sa.question_id = sq.id
       JOIN surveys s ON sr.survey_id = s.id
       WHERE ${whereClause}
-      ${orderBy}
-      LIMIT ${Math.min(topK, 10000)}`;
+      ${orderBy}`;
 
     return {
       sql,
@@ -409,7 +406,7 @@ export class EnhancedSurveyQueryBuilder {
 
     const orderBy = `ORDER BY 
       sq.question_order ASC,
-      RAND()`;
+      sr.id ASC`;
 
     const demographicSelects = this.getDemographicFieldSelects(surveyId);
 
@@ -422,8 +419,7 @@ export class EnhancedSurveyQueryBuilder {
       JOIN survey_questions sq ON sa.question_id = sq.id
       JOIN surveys s ON sr.survey_id = s.id
       WHERE ${whereClause}
-      ${orderBy}
-      LIMIT ${Math.min(topK, 10000)}`;
+      ${orderBy}`;
 
     return {
       sql,

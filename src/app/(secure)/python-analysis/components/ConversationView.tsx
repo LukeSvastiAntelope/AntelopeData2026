@@ -2,7 +2,7 @@
 
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Code, Terminal, User, Bot, AlertCircle, CheckCircle, Clock, FileSpreadsheet, File, ChevronDown, ChevronRight } from 'lucide-react';
+import { Code, Terminal, User, Bot, AlertCircle, CheckCircle, Clock, FileSpreadsheet, File, ChevronDown, ChevronRight, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import ReactMarkdown from 'react-markdown';
 import { useState } from 'react';
@@ -11,7 +11,7 @@ interface AnalysisMessage {
   id: string;
   type: 'user' | 'assistant' | 'system' | 'code' | 'result' | 'error';
   content: string;
-  timestamp: Date;
+  timestamp: Date | string;
   metadata?: {
     model?: string;
     analysisType?: string;
@@ -28,6 +28,9 @@ interface AnalysisMessage {
       action: string;
     }>;
     debug?: any;
+    // Recipe-based regeneration properties
+    recipeType?: 'code' | 'plot' | 'large_output' | 'step_summary';
+    needsRegeneration?: boolean;
   };
 }
 
@@ -40,6 +43,7 @@ interface ConversationViewProps {
 
 export function ConversationView({ messages, isLoading, messagesEndRef, onQuickAction }: ConversationViewProps) {
   const [expandedMessages, setExpandedMessages] = useState<Set<string>>(new Set());
+  const [regeneratingSteps, setRegeneratingSteps] = useState<Set<string>>(new Set());
 
   const toggleExpanded = (messageId: string) => {
     const newExpanded = new Set(expandedMessages);
@@ -49,6 +53,42 @@ export function ConversationView({ messages, isLoading, messagesEndRef, onQuickA
       newExpanded.add(messageId);
     }
     setExpandedMessages(newExpanded);
+  };
+
+  const handleRegenerateStep = async (messageId: string, codeContent: string) => {
+    setRegeneratingSteps(prev => new Set([...prev, messageId]));
+    
+    try {
+      // Find the previous code message that should be executed
+      const messageIndex = messages.findIndex(m => m.id === messageId);
+      let codeToExecute = codeContent;
+      
+      // If this is a result message, find the preceding code
+      if (!codeToExecute) {
+        for (let i = messageIndex - 1; i >= 0; i--) {
+          if (messages[i].type === 'code') {
+            codeToExecute = messages[i].content;
+            break;
+          }
+        }
+      }
+      
+      if (codeToExecute && onQuickAction) {
+        // Trigger re-execution of the code
+        onQuickAction(`execute: ${codeToExecute}`);
+      }
+    } catch (error) {
+      console.error('Error regenerating step:', error);
+    } finally {
+      // Remove from regenerating set after a delay
+      setTimeout(() => {
+        setRegeneratingSteps(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(messageId);
+          return newSet;
+        });
+      }, 2000);
+    }
   };
 
   const CollapsibleContent = ({ 
@@ -117,7 +157,7 @@ export function ConversationView({ messages, isLoading, messagesEndRef, onQuickA
         
         {/* Clean code content without container */}
         <div className={cn(
-          "text-sm font-mono rounded border overflow-x-auto",
+          "text-sm font-mono rounded border overflow-x-auto conversation-message-content break-ultra-long",
           isCode 
             ? "bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 border-gray-200 dark:border-gray-700" 
             : "bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-200 border-gray-200 dark:border-gray-700"
@@ -133,7 +173,7 @@ export function ConversationView({ messages, isLoading, messagesEndRef, onQuickA
                 ))}
               </div>
               {/* Code content column */}
-              <div className="flex-1 p-3 whitespace-pre-wrap overflow-x-auto">
+              <div className="flex-1 p-3 break-ultra-long">
                 {displayContent}
                 {!isExpanded && lines.length > previewLines && (
                   <span className="text-gray-500">...</span>
@@ -141,7 +181,7 @@ export function ConversationView({ messages, isLoading, messagesEndRef, onQuickA
               </div>
             </div>
           ) : (
-            <div className="p-3 whitespace-pre-wrap overflow-x-auto">
+            <div className="p-3 break-ultra-long">
               {displayContent}
               {!isExpanded && lines.length > previewLines && (
                 <span className="text-gray-500">...</span>
@@ -215,7 +255,7 @@ export function ConversationView({ messages, isLoading, messagesEndRef, onQuickA
           ) : (
             /* Regular message container */
             <div className={cn(
-              'rounded-lg px-3 py-2 max-w-[85%]',
+              'rounded-lg px-3 py-2 max-w-[85%] conversation-message-content',
               isUser && 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 border border-gray-200 dark:border-gray-700',
               !isUser && 'bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100',
               isCode && 'bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700',
@@ -259,13 +299,35 @@ export function ConversationView({ messages, isLoading, messagesEndRef, onQuickA
                     isCode={true}
                   />
                 ) : (
-                  <pre className="text-sm font-mono whitespace-pre-wrap overflow-x-auto bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 p-2 rounded border border-gray-200 dark:border-gray-700">
+                  <pre className="text-sm font-mono break-ultra-long bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 p-2 rounded border border-gray-200 dark:border-gray-700">
                     {message.content}
                   </pre>
                 )}
               </div>
             ) : isResult ? (
-              // Check if this is an image result (base64 data URL)
+              // Check if this needs regeneration (saved as recipe)
+              message.metadata?.needsRegeneration ? (
+                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2 text-blue-700 dark:text-blue-300">
+                      <RefreshCw className="h-4 w-4" />
+                      <span className="text-sm font-medium">
+                        {message.metadata.recipeType === 'plot' ? 'Plot Available' : 'Full Output Available'}
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => handleRegenerateStep(message.id, '')}
+                      disabled={regeneratingSteps.has(message.id)}
+                      className="text-xs bg-blue-100 hover:bg-blue-200 dark:bg-blue-800 dark:hover:bg-blue-700 text-blue-700 dark:text-blue-300 px-2 py-1 rounded border border-blue-300 dark:border-blue-600 disabled:opacity-50"
+                    >
+                      {regeneratingSteps.has(message.id) ? 'Regenerating...' : 'Show Full Result'}
+                    </button>
+                  </div>
+                  <div className="text-sm text-blue-600 dark:text-blue-400">
+                    {message.content}
+                  </div>
+                </div>
+              ) : // Check if this is an image result (base64 data URL)
               message.content.startsWith('data:image/') ? (
                 <div className="max-w-full">
                   <img 
@@ -283,7 +345,7 @@ export function ConversationView({ messages, isLoading, messagesEndRef, onQuickA
                   isCode={false}
                 />
               ) : (
-                <pre className="text-sm font-mono whitespace-pre-wrap overflow-x-auto bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-200 p-2 rounded border border-green-200 dark:border-green-700">
+                <pre className="text-sm font-mono break-ultra-long bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-200 p-2 rounded border border-green-200 dark:border-green-700">
                   {message.content}
                 </pre>
               )
@@ -292,7 +354,7 @@ export function ConversationView({ messages, isLoading, messagesEndRef, onQuickA
                 {/* Only show text content if it exists */}
                 {message.content.trim() && (
                   <div className={cn(
-                    'text-sm prose prose-sm max-w-none prose-p:py-0 prose-p:my-0.5',
+                    'text-sm prose prose-sm max-w-none prose-p:py-0 prose-p:my-0.5 conversation-message-content',
                     isUser && 'text-gray-900',
                     isError && 'text-red-700 dark:text-red-300',
                     !isUser && !isError && 'text-gray-900'
@@ -300,14 +362,19 @@ export function ConversationView({ messages, isLoading, messagesEndRef, onQuickA
                   <ReactMarkdown
                     components={{
                       code: ({ children, ...props }) => (
-                        <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono" {...props}>
+                        <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono break-all" {...props}>
                           {children}
                         </code>
                       ),
                       pre: ({ children }) => (
-                        <pre className="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 p-3 rounded border border-gray-200 dark:border-gray-700 text-sm font-mono whitespace-pre-wrap overflow-x-auto my-2">
+                        <pre className="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 p-3 rounded border border-gray-200 dark:border-gray-700 text-sm font-mono whitespace-pre-wrap overflow-x-auto my-2 break-all">
                           {children}
                         </pre>
+                      ),
+                      p: ({ children }) => (
+                        <p className="break-all overflow-wrap-anywhere">
+                          {children}
+                        </p>
                       )
                     }}
                   >
@@ -379,7 +446,13 @@ export function ConversationView({ messages, isLoading, messagesEndRef, onQuickA
               'text-xs opacity-50 mt-2',
               isUser && 'text-gray-700'
             )}>
-              {message.timestamp.toLocaleTimeString()}
+              {(() => {
+                // Handle both Date objects and ISO strings
+                const timestamp = message.timestamp instanceof Date 
+                  ? message.timestamp 
+                  : new Date(message.timestamp);
+                return timestamp.toLocaleTimeString();
+              })()}
             </div>
           </div>
           )}
