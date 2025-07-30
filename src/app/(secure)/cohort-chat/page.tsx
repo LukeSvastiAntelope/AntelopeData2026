@@ -22,7 +22,7 @@ import { Separator } from '@/components/ui/separator';
 import { Select, SelectTrigger, SelectItem, SelectContent, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
-import { ChevronLeft, ChevronRight, Send, PanelLeft, PanelRight, Upload, FileText, X, Plus, MessageCircle, Trash2, ChevronDown, ChevronRight as ChevronRightIcon, FolderOpen, Folder, ChevronUp, BarChart3, RefreshCw } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Send, PanelLeft, PanelRight, Upload, FileText, X, Plus, MessageCircle, Trash2, ChevronDown, ChevronRight as ChevronRightIcon, FolderOpen, Folder, ChevronUp, BarChart3, RefreshCw, Code2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from '@/components/ui/sonner';
@@ -47,6 +47,8 @@ import {
 } from './utils';
 import { MessageList, ChatInput } from './components';
 import { BreadcrumbNavigation } from './components/breadcrumb-navigation';
+import { ConversationTypeDialog } from './components/conversation-type-dialog';
+import { CodeConversation } from './components/code-conversation';
 
 
 
@@ -58,6 +60,7 @@ export default function CohortChatPage() {
   const [input, setInput] = useState('');
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [codeMessages, setCodeMessages] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   
   // Conversation management state
@@ -78,6 +81,9 @@ export default function CohortChatPage() {
   const [temperature, setTemperature] = useState(0.0);
   const [sources, setSources] = useState<{survey: boolean; twins: boolean; web: boolean}>({survey: true, twins: true, web: false});
   const [activeTab, setActiveTab] = useState<'chat' | 'stats'>('chat');
+  const [showConversationTypeDialog, setShowConversationTypeDialog] = useState(false);
+  const [currentConversationType, setCurrentConversationType] = useState<'chat' | 'code'>('chat');
+  const [pythonEnvironmentInitialized, setPythonEnvironmentInitialized] = useState(false);
   const [systemPrompt, setSystemPrompt] = useState(`You are an expert survey analyst and data scientist specializing in extracting meaningful insights from survey responses. Your role is to help users understand their survey data through comprehensive analysis and clear communication.
 
 CORE RESPONSIBILITIES:
@@ -287,17 +293,53 @@ Remember: You are not just summarizing data - you are providing expert interpret
     }
   }, [currentConversationId, conversations]);
 
-  // Save conversation whenever messages change
+  // Save conversation whenever messages change (chat or code)
   useEffect(() => {
-    if (currentConversationId && messages.length > 0 && !isLoading) {
+    console.log('🔄 SAVE EFFECT TRIGGERED:', {
+      currentConversationId,
+      messageCount: messages.length,
+      codeMessageCount: codeMessages.length,
+      isLoading,
+      currentConversationType,
+      trigger: 'useEffect dependency change'
+    });
+    
+    // Don't save if we're loading conversations or if we have an empty state that looks like initialization
+    const hasActualMessages = currentConversationType === 'code' ? codeMessages.length > 1 : messages.length > 1;
+    const shouldSave = currentConversationId && hasActualMessages && !isLoading;
+    
+    if (shouldSave) {
+      console.log('⏰ SCHEDULING SAVE in 1 second...');
       // Debounce saving to avoid interfering with streaming
       const timeoutId = setTimeout(() => {
-        saveConversation(currentConversationId, messages);
+        // Double-check we still have messages before saving
+        if (currentConversationType === 'code' && codeMessages.length > 1) {
+          console.log('💾 SAVING CODE CONVERSATION with', codeMessages.length, 'messages');
+          saveConversation(currentConversationId, codeMessages);
+        } else if (currentConversationType === 'chat' && messages.length > 1) {
+          console.log('💾 SAVING CHAT CONVERSATION with', messages.length, 'messages');
+          saveConversation(currentConversationId, messages);
+        } else {
+          console.log('🚫 SKIPPING SAVE - insufficient messages at save time');
+        }
       }, 1000); // Wait 1 second after messages stop changing
       
-      return () => clearTimeout(timeoutId);
+      return () => {
+        console.log('🚫 CANCELLING PREVIOUS SAVE TIMEOUT');
+        clearTimeout(timeoutId);
+      };
+    } else {
+      console.log('❌ NOT SAVING:', {
+        hasConversationId: !!currentConversationId,
+        hasActualMessages,
+        isNotLoading: !isLoading,
+        currentMessageCount: currentConversationType === 'code' ? codeMessages.length : messages.length,
+        reason: !currentConversationId ? 'no conversation ID' : 
+                !hasActualMessages ? 'insufficient messages (need >1)' :
+                isLoading ? 'still loading' : 'unknown'
+      });
     }
-  }, [messages, currentConversationId, isLoading]);
+  }, [messages, codeMessages, currentConversationId, isLoading, currentConversationType]);
   
   // Save model preference when it changes
   const handleModelChange = (model: string) => {
@@ -963,6 +1005,7 @@ FORMATTING REQUIREMENTS:
 
   // Conversation management functions
   const loadConversations = async () => {
+    console.log('📥 LOADING CONVERSATIONS from API...');
     setConversationsLoading(true);
     try {
       const response = await fetch('/api/conversations', {
@@ -973,16 +1016,41 @@ FORMATTING REQUIREMENTS:
       
       if (response.ok) {
         const data = await response.json();
+        console.log('📦 LOADED CONVERSATIONS:', {
+          count: data.conversations?.length || 0,
+          conversations: data.conversations?.map((c: any) => ({
+            id: c.id,
+            title: c.title,
+            type: c.type,
+            messageCount: c.messages?.length || 0,
+            surveyId: c.surveyId
+          })) || []
+        });
+        
         setConversations(data.conversations || []);
         
         // If no current conversation, create a new one
         if (!currentConversationId && data.conversations.length === 0) {
+          console.log('🆕 No conversations found, creating new one');
           createNewConversation();
         } else if (!currentConversationId && data.conversations.length > 0) {
           // Load the most recent conversation
           const mostRecent = data.conversations[0];
+          console.log('🔄 Loading most recent conversation:', mostRecent.id, 'type:', mostRecent.type);
           setCurrentConversationId(mostRecent.id);
-          setMessages(mostRecent.messages || []);
+          setCurrentConversationType(mostRecent.type || 'chat');
+          
+          // Load messages into the appropriate state based on conversation type
+          if (mostRecent.type === 'code') {
+            console.log('💾 LOADING CODE CONVERSATION with', mostRecent.messages?.length || 0, 'messages');
+            setCodeMessages(mostRecent.messages || []);
+            setMessages([]); // Clear chat messages
+            setPythonEnvironmentInitialized(true); // Ensure environment is ready
+          } else {
+            console.log('💬 LOADING CHAT CONVERSATION with', mostRecent.messages?.length || 0, 'messages');
+            setMessages(mostRecent.messages || []);
+            setCodeMessages([]); // Clear code messages
+          }
           
           // Set survey context from the loaded conversation if not already set
           if (!selectedSurveyId && mostRecent.surveyId) {
@@ -995,6 +1063,8 @@ FORMATTING REQUIREMENTS:
             setSelectedCohortId(mostRecent.cohortId);
           }
         }
+      } else {
+        console.log('❌ Failed to load conversations:', response.status, response.statusText);
       }
     } catch (error) {
       console.error('Error loading conversations:', error);
@@ -1004,33 +1074,106 @@ FORMATTING REQUIREMENTS:
   };
 
   const saveConversation = async (conversationId: string, messages: ChatMessage[], title?: string) => {
+    // Convert messages to executable recipes - save the "how" not the "what"
+    const processedMessages = messages.map(m => {
+      const meta = (m as any).metadata || {};
+      const content = m.content;
+      const messageType = (m as any).type;
+
+      // Handle different message types for recipe generation
+      if (messageType === 'code') {
+        // For code messages, save the code itself - this is the recipe!
+        return {
+          ...m,
+          content: content, // Keep the code as-is
+          metadata: { ...meta, recipeType: 'code' }
+        };
+      } 
+      else if (messageType === 'result') {
+        // For result messages, save only a summary + regeneration flag
+        if (typeof content === 'string' && content.startsWith('data:image/')) {
+          // TEMPORARILY: Keep plots as-is to debug the accumulation issue
+          return {
+            ...m,
+            content: content, // Keep the actual plot for now
+            metadata: { ...meta, recipeType: 'plot' }
+          };
+        } 
+        else if (typeof content === 'string' && content.length > 5000) {
+          // Large text output - save summary + regeneration flag
+          const summary = content.substring(0, 500) + '...';
+          return {
+            ...m,
+            content: `📊 **Analysis Output Summary:**\n${summary}\n\n🔄 [Full output will be regenerated on load]`,
+            metadata: { ...meta, recipeType: 'large_output', needsRegeneration: true }
+          };
+        }
+        // Small results - keep as-is
+        return { ...m, content, metadata: meta };
+      }
+      else if (messageType === 'assistant' && content.includes('Step ')) {
+        // Step description - keep as summary
+        return { ...m, content, metadata: { ...meta, recipeType: 'step_summary' } };
+      }
+      else {
+        // User messages, system messages, etc - keep as-is
+        return { ...m, content, metadata: meta };
+      }
+    });
+
+    const finalTitle = title || generateConversationTitle(processedMessages);
+    console.log('💾 SAVING CONVERSATION:', {
+      id: conversationId,
+      title: finalTitle,
+      messageCount: processedMessages.length,
+      type: currentConversationType,
+      firstMessage: processedMessages[0]?.content?.substring(0, 50)
+    });
+
     try {
-      await fetch('/api/conversations', {
+      const response = await fetch('/api/conversations', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           id: conversationId,
-          title: title || generateConversationTitle(messages),
-          messages,
+          title: finalTitle,
+          messages: processedMessages,
           surveyId: selectedSurveyId,
-          cohortId: selectedCohortId
+          cohortId: selectedCohortId,
+          type: currentConversationType
         })
       });
+
+      if (!response.ok) {
+        console.error('❌ SAVE FAILED:', response.status, response.statusText);
+        const error = await response.text();
+        console.error('Error details:', error);
+      } else {
+        console.log('✅ CONVERSATION SAVED SUCCESSFULLY');
+      }
       
       // Update local state
       setConversations(prev => {
         const existing = prev.find(c => c.id === conversationId);
         const updatedConversation = {
           id: conversationId,
-          title: title || generateConversationTitle(messages),
-          messages,
+          title: finalTitle,
+          messages: processedMessages,
           createdAt: existing?.createdAt || new Date().toISOString(),
           updatedAt: new Date().toISOString(),
           surveyId: selectedSurveyId,
-          cohortId: selectedCohortId
+          cohortId: selectedCohortId,
+          type: currentConversationType
         };
+        
+        console.log('🔄 UPDATING LOCAL CONVERSATION STATE:', {
+          id: conversationId,
+          oldTitle: existing?.title,
+          newTitle: finalTitle,
+          messageCount: processedMessages.length
+        });
         
         if (existing) {
           return prev.map(c => c.id === conversationId ? updatedConversation : c);
@@ -1043,15 +1186,25 @@ FORMATTING REQUIREMENTS:
     }
   };
 
-  const createNewConversation = () => {
+  const createNewConversation = (type: 'chat' | 'code' = 'chat') => {
     console.log('🆕 CREATE NEW CONVERSATION DEBUG:');
     console.log('   - selectedSurveyId:', selectedSurveyId);
     console.log('   - selectedCohortId:', selectedCohortId);
+    console.log('   - conversationType:', type);
     console.log('   - Will create conversation with surveyId:', selectedSurveyId || 'NULL');
     
     const newId = `conv_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     setCurrentConversationId(newId);
-    setMessages([]);
+    setCurrentConversationType(type);
+    
+    // Clear messages based on conversation type
+    if (type === 'code') {
+      setCodeMessages([]);
+      setMessages([]); // Also clear chat messages
+    } else {
+      setMessages([]);
+      setCodeMessages([]); // Also clear code messages
+    }
     
     // Create empty conversation in state with current survey context
     const newConversation: Conversation = {
@@ -1061,13 +1214,15 @@ FORMATTING REQUIREMENTS:
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       surveyId: selectedSurveyId,
-      cohortId: selectedCohortId
+      cohortId: selectedCohortId,
+      type: type
     };
     
     console.log('✅ New conversation created:', {
       id: newId,
       surveyId: newConversation.surveyId,
-      cohortId: newConversation.cohortId
+      cohortId: newConversation.cohortId,
+      type: newConversation.type
     });
     
     setConversations(prev => [newConversation, ...prev]);
@@ -1081,11 +1236,58 @@ FORMATTING REQUIREMENTS:
     }
   };
 
+  const handleNewConversation = () => {
+    if (selectedSurveyId) {
+      // If survey is selected, show type dialog
+      setShowConversationTypeDialog(true);
+    } else {
+      // If no survey, create regular chat
+      createNewConversation('chat');
+    }
+  };
+
+  const handleConversationTypeSelect = (type: 'chat' | 'code') => {
+    if (type === 'code' && !pythonEnvironmentInitialized) {
+      // Show loading state immediately for code conversations
+      setPythonEnvironmentInitialized(true);
+    }
+    createNewConversation(type);
+  };
+
   const switchConversation = (conversationId: string) => {
+    console.log('🔄 SWITCHING TO CONVERSATION:', conversationId);
     const conversation = conversations.find(c => c.id === conversationId);
+    console.log('📋 FOUND CONVERSATION:', {
+      found: !!conversation,
+      type: conversation?.type,
+      messageCount: conversation?.messages?.length,
+      title: conversation?.title,
+      surveyId: conversation?.surveyId
+    });
+    
     if (conversation) {
+      // Set loading state to prevent saves during switching
+      console.log('🔒 SETTING LOADING STATE during conversation switch');
+      setIsLoading(true);
+      
       setCurrentConversationId(conversationId);
-      setMessages(conversation.messages || []);
+      setCurrentConversationType(conversation.type || 'chat');
+      
+      // Load messages into the appropriate state based on conversation type
+      if (conversation.type === 'code') {
+        console.log('💾 LOADING CODE CONVERSATION with', conversation.messages?.length || 0, 'messages');
+        setCodeMessages(conversation.messages || []);
+        setMessages([]); // Clear chat messages
+      } else {
+        console.log('💬 LOADING CHAT CONVERSATION with', conversation.messages?.length || 0, 'messages');
+        setMessages(conversation.messages || []);
+        setCodeMessages([]); // Clear code messages
+      }
+      
+      // If switching to a code conversation, ensure environment is initialized
+      if ((conversation.type || 'chat') === 'code') {
+        setPythonEnvironmentInitialized(true);
+      }
       
       // 🚨 FIX: Only update survey if conversation has a VALID surveyId AND it's different
       // NEVER reset selectedSurveyId to null when switching conversations
@@ -1099,6 +1301,14 @@ FORMATTING REQUIREMENTS:
       if (conversation.cohortId !== selectedCohortId) {
         setSelectedCohortId(conversation.cohortId || null);
       }
+      
+      // Clear loading state after state has settled
+      setTimeout(() => {
+        console.log('🔓 CLEARING LOADING STATE after conversation switch');
+        setIsLoading(false);
+      }, 100);
+    } else {
+      console.log('❌ CONVERSATION NOT FOUND:', conversationId);
     }
   };
 
@@ -1122,13 +1332,18 @@ FORMATTING REQUIREMENTS:
     }
   };
 
-  const generateConversationTitle = (messages: ChatMessage[]): string => {
+  const generateConversationTitle = (messages: ChatMessage[] | any[]): string => {
     if (messages.length === 0) return 'New Conversation';
     
-    const firstUserMessage = messages.find(m => m.role === 'user');
+    // Handle both ChatMessage (role) and AnalysisMessage (type) formats
+    const firstUserMessage = messages.find(m => 
+      (m as any).role === 'user' || (m as any).type === 'user'
+    );
+    
     if (firstUserMessage) {
       // Take first 40 characters of the first user message for more concise titles
-      return firstUserMessage.content.slice(0, 40) + (firstUserMessage.content.length > 40 ? '...' : '');
+      const title = firstUserMessage.content.slice(0, 40) + (firstUserMessage.content.length > 40 ? '...' : '');
+      return title;
     }
     
     return 'New Conversation';
@@ -1488,23 +1703,24 @@ FORMATTING REQUIREMENTS:
   return (
     <div className="flex h-full w-full bg-background">
       {/* Main Content Area */}
-      <div className="flex-1 p-1">
-        <div className="h-full rounded-lg bg-card text-card-foreground shadow-lg">
+      <div className="flex-1 p-1 min-w-0 overflow-hidden">
+        <div className="h-full rounded-lg bg-card text-card-foreground shadow-lg min-w-0 overflow-hidden">
           {/* Header with Breadcrumb Navigation */}
-          <div className="flex items-center px-6 py-2">
+          <div className="flex items-center px-6 py-2 min-w-0">
             <SidebarTrigger className="-ml-0.5 h-5 w-5 text-muted-foreground hover:text-foreground flex-shrink-0" />
             <div className="h-4 border-l border-border mx-4 flex-shrink-0" />
             <div className="flex-1 min-w-0 mr-4">
-              <BreadcrumbNavigation
-                surveys={surveys}
-                selectedSurveyId={selectedSurveyId}
-                onSurveyChange={handleSurveyChange}
-                conversations={conversations}
-                currentConversationId={currentConversationId}
-                onConversationSwitch={switchConversation}
-                onNewConversation={createNewConversation}
-                                  conversationsLoading={conversationsLoading}
-                />
+                                    <BreadcrumbNavigation
+                        surveys={surveys}
+                        selectedSurveyId={selectedSurveyId}
+                        onSurveyChange={handleSurveyChange}
+                        conversations={conversations}
+                        currentConversationId={currentConversationId}
+                        onConversationSwitch={switchConversation}
+                        onNewConversation={handleNewConversation}
+                        conversationsLoading={conversationsLoading}
+                        currentConversationType={currentConversationType}
+                      />
               </div>
             <div className="flex items-center gap-2 flex-shrink-0">
               <Button
@@ -1512,7 +1728,7 @@ FORMATTING REQUIREMENTS:
                 size="icon"
                 className="h-5 w-5 text-muted-foreground hover:text-foreground"
                 onClick={() => {
-                  createNewConversation();
+                  handleNewConversation();
                 }}
                 title="New Conversation"
               >
@@ -1533,9 +1749,9 @@ FORMATTING REQUIREMENTS:
 
           <div className="border-b border-border" />
 
-          <div className="p-2">
+          <div className="p-2 min-w-0 overflow-hidden">
             {/* Chat Area - Only show if survey is selected */}
-            <div className="flex flex-col h-full">
+            <div className="flex flex-col h-full min-w-0 overflow-hidden">
               {!selectedSurveyId ? (
                 <OnboardingEmptyState
                   onTryDemo={handleTryDemo}
@@ -1560,12 +1776,21 @@ FORMATTING REQUIREMENTS:
                 />
               ) : (
                 // 🚨 FIX: Always show active chat when survey is selected, regardless of message count
-                <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'chat' | 'stats')} className="flex flex-col flex-1">
+                <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'chat' | 'stats')} className="flex flex-col flex-1 min-w-0 overflow-hidden">
                   <div className="px-4 pt-4">
                     <TabsList className="inline-flex w-fit items-center gap-2">
                       <TabsTrigger value="chat" className="gap-2">
-                        <MessageCircle className="h-4 w-4" />
-                        Chat
+                        {currentConversationType === 'code' ? (
+                          <>
+                            <Code2 className="h-4 w-4" />
+                            Code
+                          </>
+                        ) : (
+                          <>
+                            <MessageCircle className="h-4 w-4" />
+                            Chat
+                          </>
+                        )}
                       </TabsTrigger>
                       <TabsTrigger value="stats" className="gap-2">
                         <BarChart3 className="h-4 w-4" />
@@ -1574,31 +1799,50 @@ FORMATTING REQUIREMENTS:
                     </TabsList>
                   </div>
                   
-                  <TabsContent value="chat" className="flex flex-col flex-1 mt-0">
-                    <div className="flex flex-col flex-1">
-                      <MessageList
-                        messages={messages}
-                        isLoading={isLoading}
-                        messagesEndRef={messagesEndRef}
-                        renderWithCitations={renderWithCitations}
-                        renderDataCards={renderDataCards}
-                      />
-                      
-                      {/* Chat input at bottom of screen for active conversations */}
-                      <ChatInput
-                        input={input}
-                        setInput={setInput}
-                        onSend={handleSend}
-                        onKeyDown={handleKeyDown}
-                        isLoading={isLoading}
-                        showSurveyDropdown={showSurveyDropdown}
-                        setShowSurveyDropdown={setShowSurveyDropdown}
-                        surveys={surveys}
-                        selectedSurveyId={selectedSurveyId}
-                        onInlineSurveySelect={handleInlineSurveySelect}
-                        onUploadClick={handleUploadClick}
-                      />
-                    </div>
+                  <TabsContent value="chat" className="flex flex-col flex-1 mt-0 min-w-0 overflow-hidden">
+                    {currentConversationType === 'code' ? (
+                      <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
+                        <CodeConversation 
+                          surveyId={selectedSurveyId}
+                          surveyTitle={surveys.find(s => s.id === selectedSurveyId)?.title}
+                          environmentInitialized={pythonEnvironmentInitialized}
+                          onEnvironmentReady={() => setPythonEnvironmentInitialized(true)}
+                          messages={codeMessages}
+                          onMessagesChange={(updater) => {
+                            if (typeof updater === 'function') {
+                              setCodeMessages(prev => updater(prev));
+                            } else {
+                              setCodeMessages(updater);
+                            }
+                          }}
+                        />
+                      </div>
+                    ) : (
+                      <div className="flex flex-col flex-1">
+                        <MessageList
+                          messages={messages}
+                          isLoading={isLoading}
+                          messagesEndRef={messagesEndRef}
+                          renderWithCitations={renderWithCitations}
+                          renderDataCards={renderDataCards}
+                        />
+                        
+                        {/* Chat input at bottom of screen for active conversations */}
+                        <ChatInput
+                          input={input}
+                          setInput={setInput}
+                          onSend={handleSend}
+                          onKeyDown={handleKeyDown}
+                          isLoading={isLoading}
+                          showSurveyDropdown={showSurveyDropdown}
+                          setShowSurveyDropdown={setShowSurveyDropdown}
+                          surveys={surveys}
+                          selectedSurveyId={selectedSurveyId}
+                          onInlineSurveySelect={handleInlineSurveySelect}
+                          onUploadClick={handleUploadClick}
+                        />
+                      </div>
+                    )}
                   </TabsContent>
                   
                   <TabsContent value="stats" className="flex-1 mt-0">
@@ -2045,6 +2289,14 @@ Remember: You are not just summarizing data - you are providing expert interpret
           )}
         </div>
       </div>
+
+      {/* Conversation Type Selection Dialog */}
+      <ConversationTypeDialog
+        open={showConversationTypeDialog}
+        onClose={() => setShowConversationTypeDialog(false)}
+        onSelectType={handleConversationTypeSelect}
+        surveyTitle={surveys.find(s => s.id === selectedSurveyId)?.title}
+      />
     </div>
   );
 }
