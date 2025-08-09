@@ -73,6 +73,25 @@ export const GPT_MODELS = [
         type: "openai",
         model: 'gpt-4'
     },
+    // Newer OpenAI models (if available via account)
+    {
+        key: 'gpt-5',
+        label: 'GPT-5',
+        type: "openai",
+        model: 'gpt-5'
+    },
+    {
+        key: 'gpt-4.1',
+        label: 'GPT-4.1',
+        type: "openai",
+        model: 'gpt-4.1'
+    },
+    {
+        key: 'gpt-4.1-mini',
+        label: 'GPT-4.1 Mini',
+        type: "openai",
+        model: 'gpt-4.1-mini'
+    },
     {
         key: 'gpt-3.5-turbo',
         label: 'GPT-3.5 Turbo',
