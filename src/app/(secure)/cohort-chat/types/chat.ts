@@ -17,6 +17,7 @@ export interface Conversation {
   updatedAt: string;
   surveyId?: number | null;
   cohortId?: number | null;
+  type?: 'chat' | 'code';
 }
 
 export type StreamingMode = 'off' | 'smart' | 'buffered' | 'instant';

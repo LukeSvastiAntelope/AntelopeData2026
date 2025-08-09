@@ -262,3 +262,61 @@
   overflow-wrap: break-word;
   word-wrap: break-word;
 }
+
+/* === Layout Safeguards === */
+html,body{
+  max-width:100%;
+  overflow-x:hidden; /* stop unexpected horizontal scroll */
+}
+
+/* Ensure long code blocks wrap instead of forcing scrollbars */
+pre{
+  white-space:pre-wrap; /* allow wrapping */
+  word-break:break-word; /* break long words */
+  max-width: 100%;
+  overflow-x: auto; /* fallback for extremely long lines */
+}
+
+/* Conversation view message content should never overflow */
+.conversation-message-content {
+  max-width: 100%;
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+  word-break: break-word;
+  hyphens: auto;
+}
+
+/* Ensure code and result blocks in conversations are properly constrained */
+.conversation-message-content pre,
+.conversation-message-content code {
+  max-width: 100%;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+/* Force aggressive word breaking for extremely long strings in conversation content */
+.conversation-message-content * {
+  word-break: break-all;
+  overflow-wrap: anywhere;
+}
+
+/* Special handling for stored conversation content that might have very long strings */
+.conversation-message-content .prose,
+.conversation-message-content .prose p,
+.conversation-message-content .prose div {
+  word-break: break-all;
+  overflow-wrap: anywhere;
+  max-width: 100%;
+}
+
+/* Ultra-aggressive breaking for extremely long strings like base64, correlations, etc. */
+.break-ultra-long {
+  word-break: break-all !important;
+  overflow-wrap: anywhere !important;
+  word-wrap: break-word !important;
+  hyphens: auto !important;
+  white-space: pre-wrap !important;
+  max-width: 100% !important;
+  overflow-x: hidden !important;
+}

@@ -104,7 +104,7 @@ export default function FrontLanding() {
         {/* Main content space-y-16 */}
         <div className="py-16 ">
           {/* Hero Section */}
-          <section className="relative w-full h-[50vh] md:h-[50vh] rounded-lg overflow-hidden flex items-start justify-center">
+          <section className="relative w-full h-[30vh] md:h-[35vh] rounded-lg overflow-hidden flex items-start justify-center">
             {/* Content */}
             <div className="relative z-10 flex flex-col items-center text-center max-w-3xl px-4 gap-y-6">
               <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-muted/5 border border-primary/10 text-primary font-medium text-xs">

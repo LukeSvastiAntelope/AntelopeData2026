@@ -29,6 +29,14 @@ const CreatePage = () => {
       href: "/create/survey",
       color: "bg-pink-500/10 text-pink-600 dark:text-pink-400",
       examples: ["Market research surveys", "Opinion polls", "Customer feedback forms"]
+    },
+    {
+      title: "Quiz Survey",
+      description: "Build quizzes with right/wrong answers and configurable reveal behavior",
+      icon: Users,
+      href: "/create/survey/quiz",
+      color: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+      examples: ["Knowledge checks", "Onboarding assessments", "Training certification"]
     }
   ]
 
@@ -48,14 +56,9 @@ const CreatePage = () => {
 
         <div className="p-6">
           {/* Introduction Section */}
-          <div className="text-center mb-8">
-            <div className="flex items-center justify-center mb-4">
-              <div className="p-3 rounded-full bg-primary/10">
-                <Lightbulb className="h-8 w-8 text-primary" />
-              </div>
-            </div>
-            <h2 className="text-2xl font-bold mb-2">Choose Survey Type</h2>
-            <p className="text-muted-foreground text-base max-w-2xl mx-auto">
+          <div className="mb-6">
+            <h2 className="text-3xl font-bold mb-2">Choose Survey Type</h2>
+            <p className="text-muted-foreground text-base max-w-3xl">
               Create surveys to build digital twin agents from real responses. Choose AI-powered generation or manual creation.
             </p>
           </div>

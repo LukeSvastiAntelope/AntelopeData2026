@@ -25,6 +25,9 @@ interface BreadcrumbNavigationProps {
   
   // Loading states
   conversationsLoading: boolean;
+  
+  // UI state
+  currentConversationType?: 'chat' | 'code';
 }
 
 export function BreadcrumbNavigation({
@@ -35,7 +38,8 @@ export function BreadcrumbNavigation({
   currentConversationId,
   onConversationSwitch,
   onNewConversation,
-  conversationsLoading
+  conversationsLoading,
+  currentConversationType = 'chat'
 }: BreadcrumbNavigationProps) {
   // Get current survey data
   const currentSurvey = surveys.find(s => s.id === selectedSurveyId);
@@ -48,15 +52,19 @@ export function BreadcrumbNavigation({
     ? conversations.filter(c => c.surveyId === selectedSurveyId)
     : conversations;
   
-  // Generate conversation title (no truncation for main breadcrumb)
+  // Generate conversation title with type indicator (no truncation for main breadcrumb)
   const getConversationDisplayTitle = (conversation: Conversation) => {
-    return conversation.title || 'New Conversation';
+    const baseTitle = conversation.title || 'New Conversation';
+    const typeIcon = conversation.type === 'code' ? '🐍 ' : '💬 ';
+    return typeIcon + baseTitle;
   };
   
   // Generate conversation title with truncation for dropdown items
   const getConversationDropdownTitle = (conversation: Conversation) => {
     const title = conversation.title || 'New Conversation';
-    return title.length > 30 ? `${title.substring(0, 30)}...` : title;
+    const typeIcon = conversation.type === 'code' ? '🐍 ' : '💬 ';
+    const fullTitle = typeIcon + title;
+    return fullTitle.length > 30 ? `${fullTitle.substring(0, 30)}...` : fullTitle;
   };
   
   // Generate survey title (no truncation for main breadcrumb)
@@ -113,9 +121,10 @@ export function BreadcrumbNavigation({
           {/* Conversation Dropdown */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="text-sm font-medium text-foreground hover:text-primary transition-colors whitespace-nowrap">
-                {currentConversation ? getConversationDisplayTitle(currentConversation) : 'New Conversation'}
-              </button>
+                                  <button className="text-sm font-medium text-foreground hover:text-primary transition-colors whitespace-nowrap">
+                      {currentConversation ? getConversationDisplayTitle(currentConversation) : 
+                       (currentConversationType === 'code' ? '🐍 New Conversation' : '💬 New Conversation')}
+                    </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-[280px]">
               {/* New Conversation Option */}

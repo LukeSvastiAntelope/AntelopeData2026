@@ -1,0 +1,79 @@
+import React from 'react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { MessageCircle, Code2, ArrowRight } from 'lucide-react';
+
+interface ConversationTypeDialogProps {
+  open: boolean;
+  onClose: () => void;
+  onSelectType: (type: 'chat' | 'code') => void;
+  surveyTitle?: string;
+}
+
+export function ConversationTypeDialog({
+  open,
+  onClose,
+  onSelectType,
+  surveyTitle
+}: ConversationTypeDialogProps) {
+  const handleTypeSelect = (type: 'chat' | 'code') => {
+    onSelectType(type);
+    onClose();
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="text-center">Choose Conversation Type</DialogTitle>
+        </DialogHeader>
+        
+        <div className="py-4">
+          <p className="text-center text-muted-foreground mb-6">
+            How would you like to analyze {surveyTitle ? `"${surveyTitle}"` : 'your survey data'}?
+          </p>
+          
+          <div className="space-y-3">
+            {/* Chat Option */}
+            <div 
+              className="border rounded-lg p-4 cursor-pointer hover:border-primary transition-colors group"
+              onClick={() => handleTypeSelect('chat')}
+            >
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-blue-100 rounded-lg group-hover:bg-blue-200 transition-colors">
+                  <MessageCircle className="h-5 w-5 text-blue-600" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-medium text-foreground">💬 Chat</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Ask questions and get AI-powered insights in natural language
+                  </p>
+                </div>
+                <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+              </div>
+            </div>
+
+            {/* Code Option */}
+            <div 
+              className="border rounded-lg p-4 cursor-pointer hover:border-primary transition-colors group"
+              onClick={() => handleTypeSelect('code')}
+            >
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-green-100 rounded-lg group-hover:bg-green-200 transition-colors">
+                  <Code2 className="h-5 w-5 text-green-600" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-medium text-foreground">🐍 Code</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Run Python analysis with your survey data pre-loaded
+                  </p>
+                </div>
+                <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+} 

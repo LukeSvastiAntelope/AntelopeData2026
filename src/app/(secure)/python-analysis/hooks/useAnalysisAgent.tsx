@@ -191,16 +191,13 @@ export function useAnalysisAgent() {
           console.log(`Columns (${columns.length}):`, columns);
           console.log(`Data sample (first row ${data[0]?.length} cols):`, data[0]);
           
-          // Ensure each row has the same number of columns as headers
-          const cleanedData = data.map(row => {
-            if (row.length > columns.length) {
-              console.warn(`Row has ${row.length} columns, truncating to ${columns.length}`);
-              return row.slice(0, columns.length);
-            } else if (row.length < columns.length) {
-              console.warn(`Row has ${row.length} columns, padding to ${columns.length}`);
-              return [...row, ...Array(columns.length - row.length).fill('')];
-            }
-            return row;
+          // Use the data as-is without truncating - let pandas handle any inconsistencies
+          const cleanedData = data;
+          
+          console.log('Data preserved without truncation:', {
+            originalRows: data.length,
+            preservedRows: cleanedData.length,
+            sampleRow: cleanedData[0]
           });
           
           const dataJson = JSON.stringify({
@@ -217,12 +214,35 @@ export function useAnalysisAgent() {
             data_json = '''${dataJson.replace(/'/g, "\\'")}'''
             data_dict = json.loads(data_json)
             
-            print(f"Creating DataFrame with {len(data_dict['columns'])} columns and {len(data_dict['data'])} rows")
-            print(f"Columns: {data_dict['columns']}")
+            print(f"🔍 DEBUGGING: Creating DataFrame with {len(data_dict['columns'])} columns and {len(data_dict['data'])} rows")
+            print(f"🔍 DEBUGGING: Columns: {data_dict['columns']}")
             if len(data_dict['data']) > 0:
-                print(f"First row length: {len(data_dict['data'][0])}")
+                print(f"🔍 DEBUGGING: First row length: {len(data_dict['data'][0])}")
+                print(f"🔍 DEBUGGING: First row sample: {data_dict['data'][0][:10]}")
+                print(f"🔍 DEBUGGING: Last few columns of first row: {data_dict['data'][0][-5:]}")
             
-            df = pd.DataFrame(data_dict['data'], columns=data_dict['columns'])
+            # Handle column mismatch dynamically
+            actual_columns = data_dict['columns']
+            data_rows = data_dict['data']
+            
+            if len(data_rows) > 0:
+                max_cols = max(len(row) for row in data_rows)
+                if max_cols > len(actual_columns):
+                    # Extend column names for extra columns
+                    for i in range(len(actual_columns), max_cols):
+                        actual_columns.append(f'extra_col_{i}')
+                    print(f"🔍 DEBUGGING: Extended columns to {len(actual_columns)} to match data width")
+            
+            df = pd.DataFrame(data_rows, columns=actual_columns)
+            
+            print(f"🔍 DEBUGGING: DataFrame created successfully: {df.shape}")
+            print(f"🔍 DEBUGGING: Column names: {list(df.columns)}")
+            print(f"🔍 DEBUGGING: Data types: {df.dtypes}")
+            print(f"🔍 DEBUGGING: Non-null counts: {df.count()}")
+            
+            # Show first few rows to understand the data
+            print(f"🔍 DEBUGGING: First 3 rows:")
+            print(df.head(3))
             
             # Try to convert numeric columns
             for col in df.columns:
@@ -231,15 +251,10 @@ export function useAnalysisAgent() {
               except:
                 pass
                 
-            print(f"Dataset loaded successfully: {df.shape} - {len(df.columns)} columns")
+            print(f"🔍 DEBUGGING: After numeric conversion - Dataset: {df.shape} - {len(df.columns)} columns")
+            print(f"🔍 DEBUGGING: Final non-null counts: {df.count()}")
           `);
         }
-
-        // Indent code lines so they fit inside the try block
-        const indentedCode = code
-          .split('\n')
-          .map((line) => `    ${line}`) // prepend 4 spaces to each line
-          .join('\n');
 
         // Set up output capture and matplotlib backend for plot capture
         pyodide.runPython(`
@@ -247,6 +262,11 @@ export function useAnalysisAgent() {
           from io import StringIO
           import base64
           from io import BytesIO
+          import ast
+
+          # Capture any print statements
+          old_stdout = sys.stdout
+          sys.stdout = mystdout = StringIO()
           
           # Import matplotlib with proper error handling
           try:
@@ -269,10 +289,6 @@ export function useAnalysisAgent() {
           except Exception as e:
               print(f"Matplotlib setup warning: {e}")
               has_matplotlib = False
-          
-          # Capture any print statements
-          old_stdout = sys.stdout
-          sys.stdout = mystdout = StringIO()
           
           # Store original show function and setup plot capture
           plot_data = []
@@ -303,22 +319,51 @@ export function useAnalysisAgent() {
         let plots: string[] = [];
         
         try {
-          // Execute the indented code
-          pyodide.runPython(`
+          // **NEW**: Logic to capture the last expression's value
+          const result = pyodide.runPython(`
+exec_result = None
 try:
-${indentedCode}
+    # Parse the code to find the last expression
+    parsed_code = ast.parse(${JSON.stringify(code)})
+    if parsed_code.body and isinstance(parsed_code.body[-1], ast.Expr):
+        # Last node is an expression, split the code
+        last_expr_node = parsed_code.body.pop()
+        
+        # Compile and execute the code without the last expression
+        exec_body = ast.unparse(parsed_code)
+        exec(compile(exec_body, '<string>', 'exec'), globals())
+        
+        # Evaluate the last expression separately to capture its result
+        last_expr = ast.unparse(last_expr_node)
+        exec_result = eval(last_expr, globals())
+    else:
+        # No final expression, just execute the whole block
+        exec(compile(${JSON.stringify(code)}, '<string>', 'exec'), globals())
+
 except Exception as e:
     print(f"Execution error: {e}")
     raise e
+
+# Return the result for processing in JS
+exec_result
           `);
           
-          // Get captured output and plots
+          // Get captured stdout
           textOutput = pyodide.runPython(`
             output = mystdout.getvalue()
             sys.stdout = old_stdout
             output
           `);
           
+          // Prepend the exec_result if it exists
+          if (result !== undefined && result !== null) {
+            const resultStr = String(result);
+            // Avoid duplicating output that's already in stdout
+            if (!textOutput.includes(resultStr)) {
+              textOutput = resultStr + '\n' + textOutput;
+            }
+          }
+
           plots = pyodide.runPython(`plot_data`).toJs();
           
           // Restore matplotlib
@@ -340,7 +385,7 @@ except Exception as e:
         }
 
         // Combine text output and plots information
-        let combinedOutput = textOutput || 'Code executed successfully (no text output)';
+        let combinedOutput = textOutput.trim() || 'Code executed successfully (no text output)';
         if (plots.length > 0) {
           combinedOutput += `\n\n📊 Generated ${plots.length} visualization(s)`;
         }

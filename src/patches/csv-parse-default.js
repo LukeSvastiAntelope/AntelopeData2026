@@ -1,3 +1,4 @@
-import { parse } from 'csv-parse'
+import pkg from 'csv-parse'
+const { parse } = pkg
 export default parse
-export * from 'csv-parse' 
+export * from 'csv-parse'
