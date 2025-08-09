@@ -1302,11 +1302,11 @@ FORMATTING REQUIREMENTS:
         setSelectedCohortId(conversation.cohortId || null);
       }
       
-      // Clear loading state after state has settled
+      // Clear loading state after state has settled - use longer timeout for better reliability
       setTimeout(() => {
         console.log('🔓 CLEARING LOADING STATE after conversation switch');
         setIsLoading(false);
-      }, 100);
+      }, 250);
     } else {
       console.log('❌ CONVERSATION NOT FOUND:', conversationId);
     }
@@ -1803,6 +1803,7 @@ FORMATTING REQUIREMENTS:
                     {currentConversationType === 'code' ? (
                       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
                         <CodeConversation 
+                          key={`${selectedSurveyId}-${currentConversationId}`} // Force re-mount when conversation changes
                           surveyId={selectedSurveyId}
                           surveyTitle={surveys.find(s => s.id === selectedSurveyId)?.title}
                           environmentInitialized={pythonEnvironmentInitialized}

@@ -39,6 +39,7 @@ interface Survey {
   description: string
   anonymity_level: AnonymityLevel
   questions: SurveyQuestion[]
+  source_metadata?: any
 }
 
 interface Answer {
@@ -408,6 +409,14 @@ const SurveyPage = () => {
         {/* Survey Header */}
         <Card className="mb-8">
           <CardHeader className="text-center">
+            {/* Cover media if available */}
+            <div className="mb-4">
+              <img
+                src={survey?.source_metadata?.media?.cover?.url || '/assets/images/placeholder-survey.svg'}
+                alt={survey?.source_metadata?.media?.cover?.alt || 'Survey cover'}
+                className="mx-auto h-40 w-full max-w-3xl rounded object-cover ring-1 ring-border"
+              />
+            </div>
             <div className="flex items-center justify-center gap-2 mb-4">
               <Users className="h-8 w-8 text-primary" />
               <Badge variant="secondary">Survey</Badge>
@@ -723,7 +732,11 @@ const SurveyPage = () => {
             return (
               <Card key={question.id}>
                 <CardContent className="pt-6">
-                  <div className="mb-4">
+                  <div className="mb-4 space-y-3">
+                    {/* Per-question media */}
+                    {(question as any)?.media?.url && (
+                      <img src={(question as any).media.url} alt={(question as any).media.alt || 'Question media'} className="w-full max-h-64 object-cover rounded ring-1 ring-border" />
+                    )}
                     <Label className="text-lg font-medium">
                       {index + 1}. {question.prompt}
                       {Boolean(question.is_required) && <span className="text-destructive ml-1">*</span>}
@@ -745,12 +758,16 @@ const SurveyPage = () => {
                       onValueChange={(value) => updateAnswer(question.id, value)}
                     >
                       {question.options?.map((option, optionIndex) => (
-                        <RadioGroupItem 
-                          key={optionIndex}
-                          value={option} 
-                          label={option}
-                          id={`${question.id}-${optionIndex}`} 
-                        />
+                        <div key={optionIndex} className="flex items-center gap-3 py-1">
+                          {(question as any)?.optionMedia?.[optionIndex]?.url && (
+                            <img src={(question as any)?.optionMedia?.[optionIndex]?.url || ''} alt={(question as any)?.optionMedia?.[optionIndex]?.alt || ''} className="h-10 w-10 rounded object-cover ring-1 ring-border" />
+                          )}
+                          <RadioGroupItem 
+                            value={option} 
+                            label={option}
+                            id={`${question.id}-${optionIndex}`} 
+                          />
+                        </div>
                       ))}
                     </RadioGroup>
                   )}
@@ -758,15 +775,20 @@ const SurveyPage = () => {
                   {question.type === 'multiple-choice' && (
                     <div className="space-y-2">
                       {question.options?.map((option, optionIndex) => (
-                        <div key={optionIndex} className="flex items-center space-x-2">
-                          <Checkbox
-                            id={`${question.id}-${optionIndex}`}
-                            checked={(answer?.value as string[] || []).includes(option)}
-                            onCheckedChange={(checked) => 
-                              handleMultipleChoiceChange(question.id, option, checked as boolean)
-                            }
-                          />
-                          <Label htmlFor={`${question.id}-${optionIndex}`}>{option}</Label>
+                        <div key={optionIndex} className="flex items-center gap-3">
+                          {(question as any)?.optionMedia?.[optionIndex]?.url && (
+                            <img src={(question as any)?.optionMedia?.[optionIndex]?.url || ''} alt={(question as any)?.optionMedia?.[optionIndex]?.alt || ''} className="h-10 w-10 rounded object-cover ring-1 ring-border" />
+                          )}
+                          <div className="flex items-center gap-2">
+                            <Checkbox
+                              id={`${question.id}-${optionIndex}`}
+                              checked={(answer?.value as string[] || []).includes(option)}
+                              onCheckedChange={(checked) => 
+                                handleMultipleChoiceChange(question.id, option, checked as boolean)
+                              }
+                            />
+                            <Label htmlFor={`${question.id}-${optionIndex}`}>{option}</Label>
+                          </div>
                         </div>
                       ))}
                     </div>

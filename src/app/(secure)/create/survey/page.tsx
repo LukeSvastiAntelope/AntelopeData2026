@@ -45,6 +45,8 @@ interface SurveyQuestion {
   options?: string[]
   isRequired: boolean
   order: number
+  media?: { url: string; alt: string }
+  optionMedia?: ({ url: string; alt: string } | null)[]
 }
 
 interface Survey {
@@ -57,6 +59,8 @@ interface Survey {
   startAt?: string
   endAt?: string
   autoPublish?: boolean
+  source?: string
+  sourceMetadata?: any
 }
 
 const CreateSurveyPage = () => {
@@ -72,6 +76,9 @@ const CreateSurveyPage = () => {
   })
   const [isLoading, setIsLoading] = useState(false)
   const [showPreview, setShowPreview] = useState(false)
+  const [coverMedia, setCoverMedia] = useState<{url:string; alt:string} | null>({ url: '/assets/images/placeholder-survey.svg', alt: 'Placeholder cover' })
+  const [presentationMode, setPresentationMode] = useState<'all_at_once'|'one_by_one'|'sections'>('all_at_once')
+  const [sections, setSections] = useState<Array<{ id: string; title: string }>>([])
 
   const questionTypes = [
     { value: 'text', label: 'Text Response', description: 'Open-ended text input' },
@@ -88,7 +95,9 @@ const CreateSurveyPage = () => {
       prompt: '',
       options: [],
       isRequired: true,
-      order: survey.questions.length + 1
+      order: survey.questions.length + 1,
+      // @ts-expect-error sectionId is editor-only
+      sectionId: sections[0]?.id || undefined
     }
     setSurvey(prev => ({
       ...prev,
@@ -115,7 +124,8 @@ const CreateSurveyPage = () => {
 
   const addOption = (questionId: string) => {
     updateQuestion(questionId, {
-      options: [...(survey.questions.find(q => q.id === questionId)?.options || []), '']
+      options: [...(survey.questions.find(q => q.id === questionId)?.options || []), ''],
+      optionMedia: [...(survey.questions.find(q => q.id === questionId)?.optionMedia || []), null]
     })
   }
 
@@ -133,7 +143,8 @@ const CreateSurveyPage = () => {
     if (!question?.options) return
     
     const newOptions = question.options.filter((_, index) => index !== optionIndex)
-    updateQuestion(questionId, { options: newOptions })
+    const newOptionMedia = (question.optionMedia || []).filter((_, index) => index !== optionIndex)
+    updateQuestion(questionId, { options: newOptions, optionMedia: newOptionMedia })
   }
 
   const saveSurvey = async () => {
@@ -150,7 +161,22 @@ const CreateSurveyPage = () => {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         },
-        body: JSON.stringify(survey)
+        body: JSON.stringify({
+          ...survey,
+          source: 'native',
+          sourceMetadata: { 
+            media: { cover: coverMedia },
+            settings: {
+              presentation: {
+                mode: presentationMode,
+                sections: presentationMode === 'sections' ? sections.map(s=> ({ title: s.title || 'Section', questionOrders: survey.questions
+                  .map((q, idx)=> ({ q, idx }))
+                  .filter(({q})=> (q as any).sectionId === s.id)
+                  .map(({idx})=> idx+1) })) : []
+              }
+            }
+          }
+        })
       })
 
       if (response.ok) {
@@ -238,6 +264,64 @@ const CreateSurveyPage = () => {
                       onChange={(e) => setSurvey(prev => ({ ...prev, description: e.target.value }))}
                     />
                   </div>
+
+                  {/* Cover Media */}
+                  <div className="pt-2">
+                    <Label>Cover Media</Label>
+                    <div className="mt-2 flex items-start gap-3">
+                      <img src={coverMedia?.url || '/assets/images/placeholder-survey.svg'} alt={coverMedia?.alt || 'Cover'} className="h-20 w-20 rounded object-cover ring-1 ring-border" />
+                      <div className="space-y-2">
+                        <Input placeholder="Alt text" value={coverMedia?.alt || ''} onChange={e=>setCoverMedia(prev=>({ ...(prev||{url:'/assets/images/placeholder-survey.svg', alt:''}), alt: e.target.value }))} />
+                        <div className="flex items-center gap-2">
+                          <Button type="button" variant="outline" onClick={async ()=>{
+                            const input = document.createElement('input');
+                            input.type = 'file';
+                            input.accept = 'image/png,image/jpeg,image/webp,image/gif';
+                            input.onchange = async ()=>{
+                              const file = input.files?.[0];
+                              if (!file) return;
+                              const fd = new FormData();
+                              fd.append('file', file);
+                              const res = await fetch('/api/media/upload', { method: 'POST', body: fd });
+                              const data = await res.json();
+                              if (data.status) setCoverMedia({ url: data.url, alt: coverMedia?.alt || '' });
+                            }
+                            input.click();
+                          }}>Upload image</Button>
+                          <Button type="button" variant="ghost" onClick={()=>setCoverMedia({ url: '/assets/images/placeholder-survey.svg', alt: 'Placeholder cover' })}>Reset</Button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Presentation */}
+                  <div className="pt-2 grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div>
+                      <Label>Presentation Mode</Label>
+                      <select value={presentationMode} onChange={e=>setPresentationMode(e.target.value as any)} className="w-full mt-1 px-3 py-2 border border-input bg-background rounded-md">
+                        <option value="all_at_once">All questions at once</option>
+                        <option value="one_by_one">One question at a time</option>
+                        <option value="sections">Sections</option>
+                      </select>
+                    </div>
+                  </div>
+                  {presentationMode === 'sections' && (
+                    <div className="space-y-2 mt-2">
+                      <div className="flex items-center justify-between">
+                        <Label>Sections</Label>
+                        <Button type="button" size="sm" variant="outline" onClick={()=> setSections(prev=> [...prev, { id: `${Date.now()}_${Math.random().toString(36).slice(2,6)}`, title: `Section ${prev.length+1}` }])}>+ Add Section</Button>
+                      </div>
+                      <div className="space-y-2">
+                        {sections.length === 0 && <p className="text-sm text-muted-foreground">No sections yet. Add one and assign questions below.</p>}
+                        {sections.map((s, si)=> (
+                          <div key={s.id} className="flex items-center gap-2">
+                            <Input value={s.title} onChange={e=> setSections(prev=> prev.map((sec, idx)=> idx===si ? ({ ...sec, title: e.target.value }) : sec))} className="flex-1" />
+                            <Button variant="ghost" size="sm" onClick={()=> setSections(prev=> prev.filter((_, idx)=> idx!==si))}>Remove</Button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Anonymity Level Section */}
                   <div className="border-t pt-4 space-y-4">
@@ -484,6 +568,15 @@ const CreateSurveyPage = () => {
                                       />
                                       <Label htmlFor={`required-${question.id}`} className="text-sm">Required</Label>
                                     </div>
+                                    {presentationMode === 'sections' && (
+                                      <div className="flex items-center gap-2">
+                                        <Label className="text-sm">Section</Label>
+                                        <select value={(question as any).sectionId || ''} onChange={e=> updateQuestion(question.id, { ...(question as any), sectionId: e.target.value || undefined } as any)} className="px-2 py-1 border border-input bg-background rounded-md">
+                                          <option value="">Unassigned</option>
+                                          {sections.map(s=> (<option key={s.id} value={s.id}>{s.title}</option>))}
+                                        </select>
+                                      </div>
+                                    )}
                                   </div>
                                 </div>
 
@@ -518,6 +611,20 @@ const CreateSurveyPage = () => {
                                             onChange={(e) => updateOption(question.id, optionIndex, e.target.value)}
                                           />
                                           <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={async ()=>{
+                                              const input = document.createElement('input'); input.type='file'; input.accept='image/png,image/jpeg,image/webp,image/gif';
+                                              input.onchange = async ()=>{ const file=input.files?.[0]; if(!file) return; const fd=new FormData(); fd.append('file',file); const res=await fetch('/api/media/upload',{method:'POST',body:fd}); const data=await res.json(); if(data.status){
+                                                setSurvey(prev=>({ ...prev, questions: prev.questions.map(q=> q.id===question.id ? ({ ...q, optionMedia: (()=>{ const arr=[...(q.optionMedia||[])]; arr[optionIndex]={ url:data.url, alt:''}; return arr; })() }) : q) }))
+                                              }}; input.click();
+                                            }}
+                                          >Img</Button>
+                                          {question.optionMedia?.[optionIndex]?.url && (
+                                            <img src={question.optionMedia?.[optionIndex]?.url || ''} alt="" className="h-8 w-8 rounded object-cover ring-1 ring-border" />
+                                          )}
+                                          <Button
                                             variant="ghost"
                                             size="sm"
                                             onClick={() => removeOption(question.id, optionIndex)}
@@ -545,6 +652,18 @@ const CreateSurveyPage = () => {
                                     </p>
                                   </div>
                                 )}
+
+                                {/* Question media */}
+                                <div className="pt-1">
+                                  <Label>Question Media (optional)</Label>
+                                  <div className="mt-2 flex items-center gap-2">
+                                    <img src={question.media?.url || '/assets/images/placeholder-survey.svg'} alt={question.media?.alt || 'Question media'} className="h-12 w-12 rounded object-cover ring-1 ring-border" />
+                                    <Button type="button" variant="outline" size="sm" onClick={async ()=>{
+                                      const input = document.createElement('input'); input.type='file'; input.accept='image/png,image/jpeg,image/webp,image/gif'; input.onchange = async ()=>{ const f=input.files?.[0]; if(!f) return; const fd=new FormData(); fd.append('file',f); const res=await fetch('/api/media/upload',{method:'POST',body:fd}); const data=await res.json(); if(data.status){ setSurvey(prev=>({ ...prev, questions: prev.questions.map(q=> q.id===question.id ? ({ ...q, media: { url:data.url, alt:'' } }) : q) })) } }; input.click();
+                                    }}>Upload</Button>
+                                    <Button type="button" variant="ghost" size="sm" onClick={()=> setSurvey(prev=>({ ...prev, questions: prev.questions.map(q=> q.id===question.id ? ({ ...q, media: undefined }) : q) }))}>Remove</Button>
+                                  </div>
+                                </div>
                               </div>
 
                               <Button
@@ -561,6 +680,26 @@ const CreateSurveyPage = () => {
                       ))}
                     </div>
                   )}
+
+                  {/* Inline sections manager */}
+                  <div className="mt-6 border-t pt-4 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm">Sections</Label>
+                      <Button type="button" size="sm" variant="outline" onClick={()=> setSections(prev=> [...prev, { id: `${Date.now()}_${Math.random().toString(36).slice(2,6)}`, title: `Section ${prev.length+1}` }])}>+ Add Section</Button>
+                    </div>
+                    {sections.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">No sections yet. Add one and use the per-question Section selector to assign.</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {sections.map((s, si)=> (
+                          <div key={s.id} className="flex items-center gap-2">
+                            <Input value={s.title} onChange={e=> setSections(prev=> prev.map((sec, idx)=> idx===si ? ({ ...sec, title: e.target.value }) : sec))} className="flex-1" />
+                            <Button variant="ghost" size="sm" onClick={()=> setSections(prev=> prev.filter((_, idx)=> idx!==si))}>Remove</Button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
             </>
