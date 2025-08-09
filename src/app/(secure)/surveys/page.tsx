@@ -22,11 +22,20 @@ import {
   Trash2,
   Copy,
   Brain,
-  TrendingUp
+  TrendingUp,
+  Share,
+  MessageCircle,
+  MoreVertical
 } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { toast } from "@/components/ui/sonner"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
 // Charts & table utilities
 import { AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, CartesianGrid, XAxis, YAxis, LabelList } from "recharts"
@@ -337,6 +346,16 @@ const SurveysPage = () => {
     toast.success(`Campaign ${newStatus} successfully`)
   }
 
+  const copyShareLink = async (surveySlug: string, surveyTitle: string) => {
+    const shareUrl = `${window.location.origin}/survey/${surveySlug}`
+    try {
+      await navigator.clipboard.writeText(shareUrl)
+      toast.success(`Share link for "${surveyTitle}" copied to clipboard`)
+    } catch (error) {
+      toast.error('Failed to copy link to clipboard')
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex-1 p-2 w-full bg-background">
@@ -390,15 +409,14 @@ const SurveysPage = () => {
         <div className="border-b border-border" />
 
         <div className="p-6 space-y-4">
-          {/* Introduction */}
-          <div className="text-left space-y-2 flex">
-            <div className="flex-col mb-4">  
-              <h2 className="text-3xl font-bold">Survey Management</h2>
-              <p className="text-muted-foreground text-base max-w-2xl mx-auto mt-2">
-                Create, manage, and analyze your surveys in one place. Build engaging surveys with AI assistance, import from popular platforms, and get real-time insights from the responses.
-              </p>
-            </div>
+          {/* Introduction (restored) */}
+          <div className="text-left">
+            <h2 className="text-3xl font-bold">Survey Management</h2>
+            <p className="text-muted-foreground text-base max-w-2xl mt-2">
+              Create, manage, and analyze your surveys in one place. Build engaging surveys with AI assistance, import from popular platforms, and get real-time insights from the responses.
+            </p>
           </div>
+
 
           {surveys.length === 0 ? (
             /* Empty State */
@@ -519,15 +537,23 @@ const SurveysPage = () => {
                         {surveys.map((survey) => (
                           <TableRow key={survey.id}>
                             <TableCell>
-                              <div>
-                                <Link href={`/surveys/${survey.id}/results`} className="font-medium hover:text-primary cursor-pointer">
-                                  {survey.title}
-                                </Link>
-                                {survey.description && (
-                                  <div className="text-sm text-muted-foreground line-clamp-1">
-                                    {survey.description}
-                                  </div>
-                                )}
+                              <div className="flex items-start gap-3">
+                                {/* Thumbnail */}
+                                <img
+                                  src={(survey as any).source_metadata?.media?.cover?.url || '/assets/images/placeholder-survey.svg'}
+                                  alt={(survey as any).source_metadata?.media?.cover?.alt || 'Survey cover'}
+                                  className="h-10 w-10 rounded object-cover ring-1 ring-border"
+                                />
+                                <div>
+                                  <Link href={`/surveys/${survey.id}/results`} className="font-medium hover:text-primary cursor-pointer">
+                                    {survey.title}
+                                  </Link>
+                                  {survey.description && (
+                                    <div className="text-sm text-muted-foreground line-clamp-1">
+                                      {survey.description}
+                                    </div>
+                                  )}
+                                </div>
                               </div>
                             </TableCell>
                             <TableCell>
@@ -576,58 +602,76 @@ const SurveysPage = () => {
                             </TableCell>
                             <TableCell>
                               <div className="flex items-center gap-2">
-                                <Link href={`/surveys/${survey.id}/edit`}>
-                                  <Button variant="ghost" size="sm">
-                                    <Edit className="h-4 w-4" />
-                                  </Button>
-                                </Link>
-                                <Link href={`/surveys/${survey.id}/results`}>
-                                  <Button variant="ghost" size="sm">
-                                    <BarChart3 className="h-4 w-4" />
-                                  </Button>
-                                </Link>
+                                {/* Primary Action Buttons */}
                                 <Link href={`/survey/${survey.slug}`} target="_blank">
                                   <Button variant="ghost" size="sm" title={survey.status === 'draft' ? 'Preview survey' : 'View survey'}>
                                     <Eye className="h-4 w-4" />
                                   </Button>
                                 </Link>
+                                
                                 <Button 
                                   variant="ghost" 
                                   size="sm"
-                                  onClick={() => cloneSurvey(survey.id, survey.title)}
-                                  title="Clone survey"
+                                  onClick={() => copyShareLink(survey.slug, survey.title)}
+                                  title="Copy share link"
                                 >
-                                  <Copy className="h-4 w-4" />
+                                  <Share className="h-4 w-4" />
                                 </Button>
-                                {(survey.status === 'active' || survey.status === 'scheduled') && (
-                                  <Button 
-                                    variant="ghost" 
-                                    size="sm"
-                                    onClick={() => closeSurvey(survey.id)}
-                                    title="Close survey"
-                                  >
-                                    <X className="h-4 w-4" />
+                                
+                                <Link href={`/cohort-chat?survey=${survey.id}`}>
+                                  <Button variant="ghost" size="sm" title="Start cohort chat with this survey">
+                                    <MessageCircle className="h-4 w-4" />
                                   </Button>
-                                )}
-                                {(survey.status === 'closed' || survey.status === 'stopped') && (
-                                  <Button 
-                                    variant="ghost" 
-                                    size="sm"
-                                    onClick={() => reopenSurvey(survey.id)}
-                                    title="Reopen survey"
-                                  >
-                                    <Play className="h-4 w-4" />
-                                  </Button>
-                                )}
-                                <Button 
-                                  variant="ghost" 
-                                  size="sm"
-                                  onClick={() => deleteSurvey(survey.id, survey.title, survey.response_count)}
-                                  title="Delete survey"
-                                  className="text-destructive hover:text-destructive"
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
+                                </Link>
+
+                                {/* Dropdown Menu for Secondary Actions */}
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                      <MoreVertical className="h-4 w-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    <DropdownMenuItem asChild>
+                                      <Link href={`/surveys/${survey.id}/edit`} className="flex items-center cursor-pointer">
+                                        <Edit className="h-4 w-4 mr-2" />
+                                        Edit
+                                      </Link>
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem 
+                                      onClick={() => cloneSurvey(survey.id, survey.title)}
+                                      className="cursor-pointer"
+                                    >
+                                      <Copy className="h-4 w-4 mr-2" />
+                                      Clone
+                                    </DropdownMenuItem>
+                                    {(survey.status === 'active' || survey.status === 'scheduled') && (
+                                      <DropdownMenuItem 
+                                        onClick={() => closeSurvey(survey.id)}
+                                        className="cursor-pointer"
+                                      >
+                                        <X className="h-4 w-4 mr-2" />
+                                        Close Survey
+                                      </DropdownMenuItem>
+                                    )}
+                                    {(survey.status === 'closed' || survey.status === 'stopped') && (
+                                      <DropdownMenuItem 
+                                        onClick={() => reopenSurvey(survey.id)}
+                                        className="cursor-pointer"
+                                      >
+                                        <Play className="h-4 w-4 mr-2" />
+                                        Reopen Survey
+                                      </DropdownMenuItem>
+                                    )}
+                                    <DropdownMenuItem 
+                                      onClick={() => deleteSurvey(survey.id, survey.title, survey.response_count)}
+                                      className="cursor-pointer text-destructive focus:text-destructive"
+                                    >
+                                      <Trash2 className="h-4 w-4 mr-2" />
+                                      Delete
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
                               </div>
                             </TableCell>
                           </TableRow>
@@ -640,25 +684,7 @@ const SurveysPage = () => {
             </>
           )}
 
-          {/* Info Section */}
-          <Card className="bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800">
-            <CardContent className="pt-6">
-              <div className="flex items-start gap-3">
-                <FileText className="h-5 w-5 text-blue-600 mt-0.5" />
-                <div>
-                  <h4 className="font-medium text-blue-900 dark:text-blue-100 mb-2">
-                    Survey Management Features
-                  </h4>
-                  <ul className="text-sm text-blue-700 dark:text-blue-300 space-y-1">
-                    <li>• Create and customize surveys with various question types</li>
-                    <li>• Track responses and analyze results in real-time</li>
-                    <li>• Generate digital twins from survey responses</li>
-                    <li>• Share surveys publicly or keep them private</li>
-                  </ul>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+
         </div>
       </div>
     </div>

@@ -52,6 +52,27 @@ PYODIDE REQUIREMENTS:
 - Include clear print statements to show results
 - Avoid indentation issues - write clean, flat code structure
 
+CRITICAL DATA VALIDATION:
+- ALWAYS check if filtered data is empty before analysis: if filtered_df.empty: print("No data found for this filter")
+- ALWAYS convert numeric columns before statistical operations: pd.to_numeric(df[col], errors='coerce')
+- ALWAYS drop NaN values before correlation/statistical analysis: df.dropna(subset=[col1, col2])
+- ALWAYS check column existence: if 'column_name' in df.columns:
+- ALWAYS validate data types before operations: print(f"Data types: {df.dtypes}")
+- NEVER perform operations on empty datasets - add explicit checks
+
+ERROR PREVENTION:
+- Print data shape and non-null counts before analysis: print(f"Data shape: {df.shape}, Non-null values: {df.count()}")
+- Show actual column names: print(f"Available columns: {list(df.columns)}")
+- Validate filter results: print(f"Filtered data size: {filtered_df.shape[0]} rows")
+- Use .fillna(0) or .dropna() before statistical operations
+- Check for sufficient data: if len(unique_values) < 2: print("Insufficient variation for analysis")
+
+STATISTICAL OPERATIONS SAFETY:
+- Before correlation: ensure both columns are numeric and have >1 unique value
+- Before mean/median: check if column has numeric data after conversion
+- Before groupby: verify grouping column exists and has valid values
+- Always include sample sizes in results: print(f"Analysis based on N={len(data)} observations")
+
 VISUALIZATION REQUIREMENTS:
 - ALWAYS include matplotlib visualizations when analyzing data
 
@@ -120,7 +141,9 @@ CODE GENERATION PRINCIPLES:
 4. **Clear Output**: Print descriptive results and progress with context
 5. **Pyodide Compatible**: Use simple, robust operations (pandas, matplotlib, seaborn)
 6. **Chart Excellence**: Every visualization must be professionally styled, clearly labeled, and directly support insights
-7. **Visual Impact**: Charts should be immediately interpretable and visually appealing`;
+7. **Visual Impact**: Charts should be immediately interpretable and visually appealing
+8. **Data Validation**: ALWAYS validate data before operations to prevent NaN/empty results
+9. **Error Prevention**: Include explicit checks for data existence and validity`;
 
     let userPrompt = '';
 
@@ -178,6 +201,28 @@ Focus on:
 - Calculating key metrics that answer the main question
 - Building on findings from exploration steps
 
+CRITICAL: DATA VALIDATION FIRST
+\`\`\`python
+# ALWAYS start with these validation steps:
+print(f"Dataset shape: {df.shape}")
+print(f"Available columns: {list(df.columns)}")
+print(f"Data types:\\n{df.dtypes}")
+
+# For numeric analysis, convert and validate:
+# numeric_col = pd.to_numeric(df['column_name'], errors='coerce')
+# valid_data = df.dropna(subset=['col1', 'col2'])
+# if valid_data.empty:
+#     print("No valid data for analysis")
+# else:
+#     print(f"Valid data for analysis: {len(valid_data)} rows")
+\`\`\`
+
+STATISTICAL OPERATIONS:
+- NEVER calculate correlation on empty or single-value data
+- ALWAYS check: if len(data.dropna()) < 2: print("Insufficient data for correlation")
+- For group comparisons: ALWAYS verify groups exist and have data
+- Include sample sizes in all results: f"Mean = {mean:.2f} (N={count})"
+
 REQUIRED PROFESSIONAL VISUALIZATIONS for Analysis:
 - Setup: import seaborn as sns; sns.set_style("whitegrid"); plt.rcParams.update({'font.size': 12})
 - Use sns.barplot() with confidence intervals for categorical comparisons
@@ -198,7 +243,26 @@ ANALYSIS EXAMPLES:
 - Correlations: sns.scatterplot() + sns.regplot() with R² annotation
 - Distributions: sns.histplot() with kde=True for smooth curves
 
-Return executable Python code (25-35 lines max including professional styling).`;
+ERROR PREVENTION TEMPLATE:
+\`\`\`python
+# Check if columns exist
+if 'target_col' in df.columns and 'group_col' in df.columns:
+    # Convert to numeric if needed
+    df['target_col'] = pd.to_numeric(df['target_col'], errors='coerce')
+    
+    # Remove missing values
+    clean_data = df.dropna(subset=['target_col', 'group_col'])
+    
+    if not clean_data.empty and len(clean_data['group_col'].unique()) > 1:
+        # Proceed with analysis
+        print(f"Analysis based on {len(clean_data)} valid observations")
+    else:
+        print("Insufficient data for meaningful analysis")
+else:
+    print("Required columns not found")
+\`\`\`
+
+Return executable Python code (25-35 lines max including professional styling and validation).`;
         break;
 
       case 'visualize':

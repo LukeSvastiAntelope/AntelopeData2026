@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
             }, { status: 401 });
         }
 
-        const { prompt, model = 'gpt-4o' } = await req.json();
+        const { prompt, model = 'gpt-4o', mode } = await req.json();
         
         if (!prompt || typeof prompt !== 'string') {
             return NextResponse.json({ 
@@ -79,7 +79,32 @@ export async function POST(req: NextRequest) {
             }, { status: 400 });
         }
 
-        const systemPrompt = `You are an expert survey designer. Create a comprehensive survey based on the user's request. 
+        const systemPrompt = (mode === 'quiz') ? `You are an expert assessment and quiz designer. Create a multiple-question quiz with correct answers based on the user's request.
+
+Return a JSON object with this exact structure:
+{
+  "title": "Quiz Title",
+  "description": "Brief description of the quiz purpose",
+  "questions": [
+    {
+      "type": "single-choice|multiple-choice|true-false|text",
+      "prompt": "The question text WITHOUT numbers",
+      "options": ["option1","option2"],
+      "correctOptionIds": [0],
+      "explanation": "Why the correct answer is correct (optional)",
+      "isRequired": true,
+      "points": 1
+    }
+  ]
+}
+
+Guidelines:
+- Create 6-12 quiz questions focused on knowledge checks
+- Prefer single/multiple choice; allow true/false; include at most 1-2 text questions for manual grading
+- Provide 3-5 options for choice questions
+- Set at least one correct option (multiple allowed for multi-select)
+- Do NOT include numbering in prompts
+` : `You are an expert survey designer. Create a comprehensive survey based on the user's request. 
 
 Return a JSON object with this exact structure:
 {
@@ -200,13 +225,20 @@ Guidelines:
                 cleanPrompt = `Question ${index + 1}`;
             }
             
-            return {
+            const base = {
                 type: q.type || 'text',
                 prompt: cleanPrompt,
                 options: q.options || undefined,
-                isRequired: q.isRequired !== false, // Default to true
-                reasoning: q.reasoning || ''
-            };
+                isRequired: q.isRequired !== false,
+            } as any;
+            if (mode === 'quiz') {
+                base.correctOptionIds = Array.isArray(q.correctOptionIds) ? q.correctOptionIds : [];
+                base.explanation = typeof q.explanation === 'string' ? q.explanation : '';
+                base.points = Number.isFinite(q.points) ? q.points : 1;
+            } else {
+                base.reasoning = q.reasoning || '';
+            }
+            return base;
         });
 
         return NextResponse.json({ 

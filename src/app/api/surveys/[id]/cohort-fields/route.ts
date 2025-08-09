@@ -83,7 +83,7 @@ export async function GET(
           AND sa.answer_value IS NOT NULL 
           AND sa.answer_value != ''
           AND LENGTH(TRIM(sa.answer_value)) > 5
-          ORDER BY RAND()
+          ORDER BY sr.id ASC
           LIMIT 5
         `, [question.id, surveyId]) as any[];
 

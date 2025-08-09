@@ -77,6 +77,8 @@ const AISurveyBuilderPage = () => {
   const [editableTitle, setEditableTitle] = useState('')
   const [editableDescription, setEditableDescription] = useState('')
   const [editableQuestions, setEditableQuestions] = useState<GeneratedQuestion[]>([])
+  type Media = { url: string; alt: string }
+  const [questionMedia, setQuestionMedia] = useState<Array<{ media?: Media; optionMedia?: (Media|null)[] }>>([])
 
   // Anonymity state
   const [anonymityLevel, setAnonymityLevel] = useState<AnonymityLevel>('full')
@@ -86,6 +88,12 @@ const AISurveyBuilderPage = () => {
   const [startAt, setStartAt] = useState('')
   const [endAt, setEndAt] = useState('')
   const [autoPublish, setAutoPublish] = useState(false)
+  // Media (cover)
+  const [coverMedia, setCoverMedia] = useState<{url:string; alt:string; type:'image'|'video'} | null>({ url: '/assets/images/placeholder-survey.svg', alt: 'Placeholder cover', type: 'image' })
+  // Presentation settings
+  const [presentationMode, setPresentationMode] = useState<'all_at_once'|'one_by_one'|'sections'>('all_at_once')
+  const [sections, setSections] = useState<Array<{ id: string; title: string }>>([])
+  const [questionSectionIdByIndex, setQuestionSectionIdByIndex] = useState<Array<string | null>>([])
 
   // Load saved model preference on mount
   useEffect(() => {
@@ -135,6 +143,8 @@ const AISurveyBuilderPage = () => {
         setEditableTitle(data.survey.title)
         setEditableDescription(data.survey.description)
         setEditableQuestions(data.survey.questions)
+        setQuestionSectionIdByIndex((data.survey.questions || []).map(()=> null))
+        setQuestionMedia((data.survey.questions || []).map((q:any)=>({ media: undefined, optionMedia: (q.options||[]).map(()=>null) })))
         setModelUsed(data.modelUsed)
       } else {
         const errorData = await response.json()
@@ -156,6 +166,7 @@ const AISurveyBuilderPage = () => {
 
   const removeQuestion = (index: number) => {
     setEditableQuestions(editableQuestions.filter((_, i) => i !== index))
+    setQuestionMedia(prev => prev.filter((_, i) => i !== index))
   }
 
   const moveQuestion = (index: number, direction: 'up' | 'down') => {
@@ -168,6 +179,11 @@ const AISurveyBuilderPage = () => {
     [newQuestions[index], newQuestions[targetIndex]] = [newQuestions[targetIndex], newQuestions[index]]
     
     setEditableQuestions(newQuestions)
+    setQuestionMedia(prev => {
+      const arr = [...prev]
+      ;[arr[index], arr[targetIndex]] = [arr[targetIndex], arr[index]]
+      return arr
+    })
   }
 
   const addNewQuestion = () => {
@@ -178,6 +194,8 @@ const AISurveyBuilderPage = () => {
       reasoning: 'Manually added question'
     }
     setEditableQuestions([...editableQuestions, newQuestion])
+    setQuestionMedia(prev => [...prev, { media: undefined, optionMedia: [] }])
+    setQuestionSectionIdByIndex(prev => [...prev, sections[0]?.id || null])
   }
 
   const duplicateQuestion = (index: number) => {
@@ -207,6 +225,13 @@ const AISurveyBuilderPage = () => {
     const question = updated[questionIndex]
     question.options = [...(question.options || []), '']
     setEditableQuestions(updated)
+    setQuestionMedia(prev => {
+      const arr = [...prev]
+      const qm = arr[questionIndex] || { media: undefined, optionMedia: [] }
+      qm.optionMedia = [...(qm.optionMedia || []), null]
+      arr[questionIndex] = qm
+      return arr
+    })
   }
 
   const updateOption = (questionIndex: number, optionIndex: number, value: string) => {
@@ -225,6 +250,14 @@ const AISurveyBuilderPage = () => {
       question.options = question.options.filter((_, i) => i !== optionIndex)
     }
     setEditableQuestions(updated)
+    setQuestionMedia(prev => {
+      const arr = [...prev]
+      const qm = arr[questionIndex]
+      if (qm?.optionMedia) {
+        qm.optionMedia = qm.optionMedia.filter((_, i)=> i !== optionIndex)
+      }
+      return arr
+    })
   }
 
   const saveSurvey = async () => {
@@ -265,7 +298,26 @@ const AISurveyBuilderPage = () => {
           startAt: startAt || null,
           endAt: endAt || null,
           autoPublish,
-          questions: questionsToSave
+          questions: questionsToSave,
+          source: 'native',
+          sourceMetadata: {
+            media: { cover: coverMedia, questions: questionMedia },
+            settings: {
+              presentation: {
+                mode: presentationMode,
+                sections: presentationMode === 'sections' ? (()=>{
+                  const map: Record<string, number[]> = {}
+                  editableQuestions.forEach((_, idx)=>{
+                    const secId = questionSectionIdByIndex[idx]
+                    if (!secId) return
+                    map[secId] = map[secId] || []
+                    map[secId].push(idx+1)
+                  })
+                  return sections.map(s=> ({ title: s.title || 'Section', questionOrders: map[s.id] || [] }))
+                })() : []
+              }
+            }
+          }
         })
       })
 
@@ -335,6 +387,82 @@ const AISurveyBuilderPage = () => {
                   </p>
                 </div>
               </div>
+            </CardContent>
+          </Card>
+
+          {/* Cover media */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Cover Media</CardTitle>
+              <CardDescription>Shown in listings and at the top of your survey. Replace the placeholder with your own image.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex items-start gap-4">
+                <img src={coverMedia?.url || '/assets/images/placeholder-survey.svg'} alt={coverMedia?.alt || 'Cover'} className="h-24 w-24 rounded object-cover ring-1 ring-border" />
+                <div className="space-y-2">
+                  <div>
+                    <Label>Alt text</Label>
+                    <Input value={coverMedia?.alt || ''} onChange={e=>setCoverMedia(prev=>({ ...(prev||{url:'/assets/images/placeholder-survey.svg',type:'image',alt:''}), alt: e.target.value }))} />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button type="button" variant="outline" onClick={async ()=>{
+                      const input = document.createElement('input');
+                      input.type = 'file';
+                      input.accept = 'image/png,image/jpeg,image/webp,image/gif';
+                      input.onchange = async ()=>{
+                        const file = input.files?.[0];
+                        if (!file) return;
+                        const fd = new FormData();
+                        fd.append('file', file);
+                        const res = await fetch('/api/media/upload', { method: 'POST', body: fd });
+                        const data = await res.json();
+                        if (data.status) setCoverMedia({ url: data.url, alt: coverMedia?.alt || '', type: 'image' });
+                      }
+                      input.click();
+                    }}>Upload image</Button>
+                    <Button type="button" variant="ghost" onClick={()=>setCoverMedia({ url: '/assets/images/placeholder-survey.svg', alt: 'Placeholder cover', type: 'image' })}>Reset</Button>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Presentation settings */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Presentation</CardTitle>
+              <CardDescription>Choose how questions are presented to respondents.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div>
+                  <Label>Mode</Label>
+                  <select value={presentationMode} onChange={e=>setPresentationMode(e.target.value as any)} className="w-full mt-1 px-3 py-2 border border-input bg-background rounded-md">
+                    <option value="all_at_once">All questions at once</option>
+                    <option value="one_by_one">One question at a time</option>
+                    <option value="sections">Sections</option>
+                  </select>
+                </div>
+              </div>
+              {presentationMode === 'sections' && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label>Sections</Label>
+                    <Button type="button" size="sm" variant="outline" onClick={()=> setSections(prev=> [...prev, { id: `${Date.now()}_${Math.random().toString(36).slice(2,6)}`, title: `Section ${prev.length+1}` }])}>+ Add Section</Button>
+                  </div>
+                  <div className="space-y-2">
+                    {sections.length === 0 && (
+                      <p className="text-sm text-muted-foreground">No sections yet. Click &quot;+ Add Section&quot; to create one, then assign questions.</p>
+                    )}
+                    {sections.map((s, si)=>(
+                      <div key={s.id} className="flex items-center gap-2">
+                        <Input value={s.title} onChange={e=> setSections(prev=> prev.map((sec, idx)=> idx===si ? ({ ...sec, title: e.target.value }) : sec))} className="flex-1" />
+                        <Button type="button" variant="ghost" size="sm" onClick={()=> setSections(prev=> prev.filter((_, idx)=> idx!==si))}>Remove</Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -748,6 +876,18 @@ const AISurveyBuilderPage = () => {
                                 <option value="yes-no">Yes/No</option>
                               </select>
                             </div>
+                            {presentationMode === 'sections' && (
+                              <div>
+                                <Label>Section</Label>
+                                <select value={questionSectionIdByIndex[questionIndex] || ''} onChange={e=>{
+                                  const val = e.target.value || null
+                                  setQuestionSectionIdByIndex(prev=> prev.map((id, idx)=> idx===questionIndex ? val : id))
+                                }} className="w-full mt-1 px-3 py-2 border border-input bg-background rounded-md">
+                                  <option value="">Unassigned</option>
+                                  {sections.map(s=>(<option key={s.id} value={s.id}>{s.title}</option>))}
+                                </select>
+                              </div>
+                            )}
                             <div className="flex items-center space-x-2 mt-6">
                               <Checkbox
                                 checked={question.isRequired}
@@ -796,6 +936,39 @@ const AISurveyBuilderPage = () => {
                                       placeholder={`Option ${optionIndex + 1}`}
                                       className="flex-1"
                                     />
+                                    {/* Per-option image upload */}
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="sm"
+                                      title="Attach image"
+                                      onClick={async ()=>{
+                                        const input = document.createElement('input');
+                                        input.type = 'file';
+                                        input.accept = 'image/png,image/jpeg,image/webp,image/gif';
+                                        input.onchange = async ()=>{
+                                          const file = input.files?.[0];
+                                          if (!file) return;
+                                          const fd = new FormData(); fd.append('file', file);
+                                          const res = await fetch('/api/media/upload', { method: 'POST', body: fd });
+                                          const data = await res.json();
+                                          if (data.status) {
+                                            setQuestionMedia(prev=>{
+                                              const arr=[...prev];
+                                              const qm = arr[questionIndex] || { media: undefined, optionMedia: [] };
+                                              const om = [...(qm.optionMedia||[])];
+                                              om[optionIndex] = { url: data.url, alt: '' };
+                                              arr[questionIndex] = { ...qm, optionMedia: om };
+                                              return arr;
+                                            })
+                                          }
+                                        }
+                                        input.click();
+                                      }}
+                                    >Img</Button>
+                                    {questionMedia[questionIndex]?.optionMedia?.[optionIndex]?.url && (
+                                      <img src={questionMedia[questionIndex]?.optionMedia?.[optionIndex]?.url || ''} alt="" className="h-8 w-8 rounded object-cover ring-1 ring-border" />
+                                    )}
                                     <Button
                                       variant="ghost"
                                       size="sm"
@@ -812,6 +985,26 @@ const AISurveyBuilderPage = () => {
                               </div>
                             </div>
                           )}
+                          {/* Per-question media */}
+                          <div className="pt-1">
+                            <Label>Question Media (optional)</Label>
+                            <div className="mt-2 flex items-center gap-2">
+                              <img src={questionMedia[questionIndex]?.media?.url || '/assets/images/placeholder-survey.svg'} alt={questionMedia[questionIndex]?.media?.alt || 'Question media'} className="h-12 w-12 rounded object-cover ring-1 ring-border" />
+                              <Button type="button" variant="outline" size="sm" onClick={async ()=>{
+                                const input = document.createElement('input');
+                                input.type = 'file'; input.accept = 'image/png,image/jpeg,image/webp,image/gif';
+                                input.onchange = async ()=>{
+                                  const f = input.files?.[0]; if (!f) return; const fd=new FormData(); fd.append('file',f);
+                                  const res = await fetch('/api/media/upload',{method:'POST',body:fd}); const data = await res.json();
+                                  if (data.status) {
+                                    setQuestionMedia(prev=>{ const arr=[...prev]; const qm=arr[questionIndex]||{media:undefined,optionMedia:[]}; arr[questionIndex]={...qm, media:{ url:data.url, alt:''}}; return arr; })
+                                  }
+                                };
+                                input.click();
+                              }}>Upload</Button>
+                              <Button type="button" variant="ghost" size="sm" onClick={()=> setQuestionMedia(prev=>{ const arr=[...prev]; const qm=arr[questionIndex]||{media:undefined,optionMedia:[]}; arr[questionIndex]={...qm, media: undefined}; return arr; })}>Remove</Button>
+                            </div>
+                          </div>
                         </CardContent>
                       </Card>
                     ))
@@ -831,6 +1024,28 @@ const AISurveyBuilderPage = () => {
                         </Button>
                       </CardContent>
                     </Card>
+                  )}
+
+                  {/* Inline sections manager when in sections mode */}
+                  {presentationMode==='sections' && (
+                    <div className="mt-6 border-t pt-4 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-sm">Sections</Label>
+                        <Button type="button" size="sm" variant="outline" onClick={()=> setSections(prev=> [...prev, { id: `${Date.now()}_${Math.random().toString(36).slice(2,6)}`, title: `Section ${prev.length+1}` }])}>+ Add Section</Button>
+                      </div>
+                      {sections.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">No sections yet. Add one and use the per-question Section selector to assign.</p>
+                      ) : (
+                        <div className="space-y-2">
+                          {sections.map((s, si)=> (
+                            <div key={s.id} className="flex items-center gap-2">
+                              <Input value={s.title} onChange={e=> setSections(prev=> prev.map((sec, idx)=> idx===si ? ({ ...sec, title: e.target.value }) : sec))} className="flex-1" />
+                              <Button variant="ghost" size="sm" onClick={()=> setSections(prev=> prev.filter((_, idx)=> idx!==si))}>Remove</Button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   )}
                 </CardContent>
               </Card>
