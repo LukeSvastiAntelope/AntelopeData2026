@@ -1,7 +1,7 @@
 /* eslint-disable react/no-unescaped-entities */
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -102,11 +102,24 @@ const SurveyPage = () => {
   })
   
   const [answers, setAnswers] = useState<Answer[]>([])
+  // Qualitative chat state
+  const [isQualitative, setIsQualitative] = useState<boolean>(false)
+  const [chatMessages, setChatMessages] = useState<{ role: 'agent'|'user'; content: string }[]>([])
+  const [chatInput, setChatInput] = useState<string>('')
+  const [chatLoading, setChatLoading] = useState<boolean>(false)
   const [modalOpen, setModalOpen] = useState<boolean>(true) // Start with modal open
   const [shouldCheckExistingTwin, setShouldCheckExistingTwin] = useState<boolean>(false)
+  const messagesEndRef = useRef<HTMLDivElement>(null)
 
   // Check if we should skip demographics for anonymous surveys
   const shouldSkipDemographics = survey?.anonymity_level === 'anonymous'
+
+  // Auto-scroll to bottom when new messages arrive
+  useEffect(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' })
+    }
+  }, [chatMessages, chatLoading])
 
   useEffect(() => {
     const fetchSurvey = async () => {
@@ -122,6 +135,7 @@ const SurveyPage = () => {
           }
           
           setSurvey(data.survey)
+          setIsQualitative(Boolean(data.survey?.source_metadata?.type === 'qualitative'))
           // Initialize answers array
           if (data.survey && data.survey.questions) {
             setAnswers(data.survey.questions.map((q: SurveyQuestion) => ({
@@ -130,11 +144,26 @@ const SurveyPage = () => {
             })))
           }
           
-          // For anonymous surveys, skip demographics and go straight to questions
+          // For anonymous surveys, skip demographics and go straight to questions (non-qualitative)
           if (data.survey?.anonymity_level === 'anonymous') {
             setCurrentStep('questions')
             setDemographicsCompleted(true)
             setModalOpen(false) // Don't show the modal for anonymous surveys
+          }
+
+          // Initialize qualitative chat session
+          if (data.survey?.source_metadata?.type === 'qualitative') {
+            try {
+              const startRes = await fetch(`/api/public/surveys/${slug}/qual/start`, { method: 'POST' })
+              if (startRes.ok) {
+                const sdata = await startRes.json()
+                if (sdata.firstMessage) {
+                  setChatMessages([{ role: 'agent', content: sdata.firstMessage }])
+                }
+              }
+            } catch (e) {
+              console.warn('Failed to start qualitative session', e)
+            }
           }
         } else {
           setError('Survey not found')
@@ -218,10 +247,20 @@ const SurveyPage = () => {
 
     try {
       // Clean up answers to ensure no undefined values
-      const cleanedAnswers = answers.map(answer => ({
+      let cleanedAnswers = answers.map(answer => ({
         questionId: answer.questionId,
         value: answer.value === undefined || answer.value === null ? '' : answer.value
       }))
+
+      // If qualitative, pack transcript into the single hidden question answer
+      if (isQualitative && survey?.questions?.length === 1) {
+        const transcriptPayload = {
+          transcript: chatMessages,
+          summary: '',
+          insights: [],
+        }
+        cleanedAnswers = [{ questionId: survey.questions[0].id, value: JSON.stringify(transcriptPayload) }]
+      }
 
       const response = await fetch(`/api/public/surveys/${slug}/submit`, {
         method: 'POST',
@@ -248,6 +287,33 @@ const SurveyPage = () => {
       setError('Failed to submit survey')
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  // Qualitative chat handlers
+  const sendQualMessage = async () => {
+    if (!chatInput.trim()) return
+    const userMessage = chatInput
+    setChatInput('')
+    setChatMessages(prev => [...prev, { role: 'user', content: userMessage }])
+    setChatLoading(true)
+    try {
+      const res = await fetch(`/api/public/surveys/${slug}/qual/step`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: [...chatMessages, { role: 'user', content: userMessage }] })
+      })
+      if (res.ok) {
+        const data = await res.json()
+        if (data.reply) setChatMessages(prev => [...prev, { role: 'agent', content: data.reply }])
+        if (data.done) {
+          // Auto-scroll user to demographics/submit if needed
+        }
+      }
+    } catch (e) {
+      console.warn('Qual step failed', e)
+    } finally {
+      setChatLoading(false)
     }
   }
 
@@ -408,8 +474,8 @@ const SurveyPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background py-8">
-      <div className="container mx-auto px-4 max-w-4xl">
+    <div className="min-h-screen bg-background">
+      <div className="container mx-auto px-4 max-w-4xl pb-28">
         {/* Survey Header */}
         <Card className="mb-8">
           <CardHeader className="text-center">
@@ -690,8 +756,8 @@ const SurveyPage = () => {
         </Card>
         )}
 
-        {/* Step 2: Questions Section */}
-        {currentStep === 'questions' && (
+        {/* Step 2: Questions Section or Qualitative Chat */}
+        {currentStep === 'questions' && !isQualitative && (
           <>
             {/* Demographics Summary */}
             {!shouldSkipDemographics && (
@@ -865,6 +931,133 @@ const SurveyPage = () => {
                 </div>
               </CardContent>
             </Card>
+          </>
+        )}
+
+        {currentStep === 'questions' && isQualitative && (
+          <>
+            {/* Full-screen chat interface */}
+            <div className="fixed inset-0 bg-background z-50 flex flex-col">
+              {/* Clean header */}
+              <div className="flex-shrink-0 bg-background">
+                <div className="flex items-center justify-between p-4">
+                  <div className="flex-1" />
+                  <div className="flex items-center gap-2">
+                    <h1 className="font-medium">{survey?.title}</h1>
+                    <Badge variant="secondary" className="text-xs">Interview</Badge>
+                  </div>
+                  <div className="flex-1 flex justify-end">
+                    <Button 
+                      onClick={submitSurvey}
+                      disabled={submitting}
+                      variant="ghost"
+                      size="sm"
+                      className="text-muted-foreground hover:text-foreground"
+                    >
+                      {submitting ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Ending…
+                        </>
+                      ) : (
+                        'End Interview'
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Messages container */}
+              <div className="flex-1 overflow-hidden">
+                <div className="h-full overflow-y-auto">
+                  <div className="p-4 space-y-6 pb-32 max-w-4xl mx-auto">
+                    {chatMessages.map((m, i) => (
+                      <div 
+                        key={i} 
+                        className="animate-in fade-in-50 duration-500"
+                        style={{ 
+                          animationDelay: `${Math.min(i * 50, 500)}ms`,
+                          animationFillMode: 'both'
+                        }}
+                      >
+                        <div className={`max-w-[80%] ${
+                          m.role === 'user' ? 'ml-auto' : 'mr-auto'
+                        }`}>
+                          <div className={`rounded-2xl px-4 py-3 text-sm ${
+                            m.role === 'user' 
+                              ? 'bg-primary text-primary-foreground' 
+                              : 'bg-muted text-foreground'
+                          }`}>
+                            {m.content}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                    
+                    {chatMessages.length === 0 && (
+                      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
+                        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted mb-4">
+                          <Brain className="h-6 w-6 text-muted-foreground" />
+                        </div>
+                        <h3 className="font-semibold text-base mb-2">Ready to begin</h3>
+                        <p className="text-sm text-muted-foreground max-w-sm">
+                          Share your thoughts and experiences. The conversation will adapt based on your responses.
+                        </p>
+                      </div>
+                    )}
+                    
+                    {chatLoading && (
+                      <div className="animate-in fade-in-50 duration-500">
+                        <div className="max-w-[80%] mr-auto">
+                          <div className="bg-muted text-muted-foreground rounded-2xl px-4 py-3 text-sm">
+                            <div className="flex items-center gap-2">
+                              <div className="flex space-x-1">
+                                <div className="w-2 h-2 bg-current rounded-full animate-pulse" />
+                                <div className="w-2 h-2 bg-current rounded-full animate-pulse [animation-delay:0.2s]" />
+                                <div className="w-2 h-2 bg-current rounded-full animate-pulse [animation-delay:0.4s]" />
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    <div ref={messagesEndRef} />
+                  </div>
+                </div>
+              </div>
+
+              {/* Clean floating input */}
+              <div className="absolute bottom-0 left-0 right-0 bg-background/80 backdrop-blur">
+                <div className="p-4">
+                  <div className="relative max-w-4xl mx-auto">
+                    <div className="relative border border-border rounded-xl bg-background/50 backdrop-blur">
+                      <Textarea
+                        placeholder="Share your thoughts..."
+                        value={chatInput}
+                        onChange={(e)=>setChatInput(e.target.value)}
+                        onKeyDown={(e)=>{ 
+                          if (e.key==='Enter' && !e.shiftKey){ 
+                            e.preventDefault(); 
+                            sendQualMessage(); 
+                          } 
+                        }}
+                        className="min-h-[60px] pr-12 resize-none border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
+                        disabled={chatLoading}
+                        rows={2}
+                      />
+                      <Button 
+                        onClick={sendQualMessage} 
+                        disabled={chatLoading || !chatInput.trim()}
+                        size="sm"
+                        className="absolute bottom-2 right-2 h-8 w-8 p-0"
+                      >
+                        <Send className="h-4 w-4"/>
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </>
         )}
       </div>
