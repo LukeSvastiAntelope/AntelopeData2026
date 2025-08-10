@@ -9,7 +9,8 @@ import {
   Lightbulb,
   Target,
   BarChart3,
-  Users
+  Users,
+  MessageCircle
 } from "lucide-react"
 
 const CreatePage = () => {
@@ -37,6 +38,14 @@ const CreatePage = () => {
       href: "/create/survey/quiz",
       color: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
       examples: ["Knowledge checks", "Onboarding assessments", "Training certification"]
+    },
+    {
+      title: "Qualitative Survey",
+      description: "Chat-style interviews that adapt questions to explore a topic in depth",
+      icon: MessageCircle,
+      href: "/create/survey/qualitative",
+      color: "bg-blue-500/10 text-blue-600 dark:text-blue-400",
+      examples: ["User research interviews", "Exploratory discovery", "Open-ended insights"]
     }
   ]
 
