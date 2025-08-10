@@ -1,7 +1,7 @@
 /* eslint-disable react/no-unescaped-entities */
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -34,6 +34,7 @@ import {
   getRecommendedAnonymityLevel,
   canChangeAnonymityLevel
 } from '@/app/utils/anonymity-config'
+import { getAllModels } from '@/app/utils/models'
 
 interface SurveyQuestion {
   id?: number
@@ -57,6 +58,7 @@ interface Survey {
   start_at?: string
   end_at?: string
   questions: SurveyQuestion[]
+  source_metadata?: any
 }
 
 const EditSurveyPage = () => {
@@ -77,6 +79,32 @@ const EditSurveyPage = () => {
   const [questions, setQuestions] = useState<SurveyQuestion[]>([])
   const [startAt, setStartAt] = useState('')
   const [endAt, setEndAt] = useState('')
+  // Qualitative settings
+  const [isQualitative, setIsQualitative] = useState<boolean>(false)
+  const [qGoals, setQGoals] = useState('')
+  const [qThemes, setQThemes] = useState('')
+  const [qRedLines, setQRedLines] = useState('')
+  const [qPersona, setQPersona] = useState('')
+  const [qStrategy, setQStrategy] = useState<'open-ended'|'socratic'|'reflective'>('open-ended')
+  const [qMaxTurns, setQMaxTurns] = useState<number>(12)
+  const [qMaxMinutes, setQMaxMinutes] = useState<number>(15)
+  const [qModel, setQModel] = useState<string>('gpt-4o-mini')
+  const [qTemperature, setQTemperature] = useState<number>(0.3)
+  const [qIntro, setQIntro] = useState<string>('To start, please share a specific experience related to this topic (time, place, context).')
+  const [qClosing, setQClosing] = useState<string>('Before we wrap up: Is there anything important we didn\'t cover? What\'s the one takeaway you want us to remember?')
+  const [qConsent, setQConsent] = useState<string>('This session is an interview-style conversation. Your responses may be analyzed to extract themes and quotes. Do not share sensitive personal information.')
+
+  const qualPreviewItems = useMemo(() => {
+    const split = (s: string) => (s || '').split(/\n|;|,|•|-/g).map(t => t.trim()).filter(Boolean).slice(0, 4)
+    const themes = split(qThemes)
+    const goals = split(qGoals)
+    const items: string[] = []
+    themes.forEach(t => items.push(`Can you walk me through a concrete example related to "${t}"? When did it happen, where, and what led to it?`))
+    goals.forEach(g => items.push(`Thinking about "${g}", what was the most recent moment that shaped your view? What happened next?`))
+    items.push('What trade-offs or constraints influenced your decisions in this area?')
+    items.push('If you could change one thing about your experience, what would it be and why?')
+    return items
+  }, [qThemes, qGoals])
 
   useEffect(() => {
     if (surveyId) {
@@ -104,6 +132,26 @@ const EditSurveyPage = () => {
         setQuestions(surveyData.questions || [])
         setStartAt(surveyData.start_at ? new Date(surveyData.start_at).toISOString().slice(0, 16) : '')
         setEndAt(surveyData.end_at ? new Date(surveyData.end_at).toISOString().slice(0, 16) : '')
+
+        // Qualitative metadata
+        const sm = (surveyData as any).source_metadata
+        const isQual = Boolean(sm?.type === 'qualitative')
+        setIsQualitative(isQual)
+        const qcfg = sm?.settings?.qualitative || {}
+        if (isQual) {
+          setQGoals(qcfg.goals || '')
+          setQThemes(qcfg.themes || '')
+          setQRedLines(qcfg.redLines || '')
+          setQPersona(qcfg.persona || '')
+          setQStrategy(qcfg.strategy || 'open-ended')
+          setQMaxTurns(qcfg.limits?.maxTurns ?? 12)
+          setQMaxMinutes(qcfg.limits?.maxMinutes ?? 15)
+          setQModel(qcfg.model || 'gpt-4o-mini')
+          setQTemperature(typeof qcfg.temperature === 'number' ? qcfg.temperature : 0.3)
+          setQIntro(qcfg.intro || 'To start, please share a specific experience related to this topic (time, place, context).')
+          setQClosing(qcfg.closing || 'Before we wrap up: Is there anything important we didn\'t cover? What\'s the one takeaway you want us to remember?')
+          setQConsent(qcfg.consent || 'This session is an interview-style conversation. Your responses may be analyzed to extract themes and quotes. Do not share sensitive personal information.')
+        }
       } else {
         setError('Failed to load survey')
       }
@@ -195,7 +243,25 @@ const EditSurveyPage = () => {
           questions: questions.map((q, index) => ({
             ...q,
             order: index + 1
-          }))
+          })),
+          sourceMetadata: isQualitative ? {
+            type: 'qualitative',
+            settings: {
+              qualitative: {
+                goals: qGoals,
+                themes: qThemes,
+                redLines: qRedLines,
+                persona: qPersona,
+                strategy: qStrategy,
+                limits: { maxTurns: qMaxTurns, maxMinutes: qMaxMinutes },
+                model: qModel,
+                temperature: qTemperature,
+                intro: qIntro,
+                closing: qClosing,
+                consent: qConsent
+              }
+            }
+          } : undefined
         })
       })
 
@@ -245,7 +311,25 @@ const EditSurveyPage = () => {
           questions: questions.map((q, index) => ({
             ...q,
             order: index + 1
-          }))
+          })),
+          sourceMetadata: isQualitative ? {
+            type: 'qualitative',
+            settings: {
+              qualitative: {
+                goals: qGoals,
+                themes: qThemes,
+                redLines: qRedLines,
+                persona: qPersona,
+                strategy: qStrategy,
+                limits: { maxTurns: qMaxTurns, maxMinutes: qMaxMinutes },
+                model: qModel,
+                temperature: qTemperature,
+                intro: qIntro,
+                closing: qClosing,
+                consent: qConsent
+              }
+            }
+          } : undefined
         })
       })
 
@@ -557,124 +641,226 @@ const EditSurveyPage = () => {
             </CardContent>
           </Card>
 
+          {/* Qualitative Settings */}
+          {isQualitative && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">Qualitative Interview Settings</CardTitle>
+                <CardDescription>Adjust the interview agent prompts and behavior</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <Label>Opening Question</Label>
+                  <Textarea value={qIntro} onChange={e=>setQIntro(e.target.value)} placeholder="Targeted first question" />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label>Goals / Hypotheses</Label>
+                    <Textarea value={qGoals} onChange={e=>setQGoals(e.target.value)} />
+                  </div>
+                  <div>
+                    <Label>Themes</Label>
+                    <Textarea value={qThemes} onChange={e=>setQThemes(e.target.value)} />
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label>Red Lines (avoid)</Label>
+                    <Textarea value={qRedLines} onChange={e=>setQRedLines(e.target.value)} />
+                  </div>
+                  <div>
+                    <Label>Participant Persona</Label>
+                    <Input value={qPersona} onChange={e=>setQPersona(e.target.value)} />
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label>Strategy</Label>
+                    <Select value={qStrategy} onValueChange={(v)=>setQStrategy(v as any)}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="open-ended">Open-ended</SelectItem>
+                        <SelectItem value="socratic">Socratic (probing)</SelectItem>
+                        <SelectItem value="reflective">Reflective listening</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label>Max Turns</Label>
+                      <Input type="number" min={4} max={40} value={qMaxTurns} onChange={e=>setQMaxTurns(Number(e.target.value))} />
+                    </div>
+                    <div>
+                      <Label>Max Minutes</Label>
+                      <Input type="number" min={5} max={60} value={qMaxMinutes} onChange={e=>setQMaxMinutes(Number(e.target.value))} />
+                    </div>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label>Model</Label>
+                    <Select value={qModel} onValueChange={setQModel}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent className="max-h-72">
+                        {getAllModels().map(m => (
+                          <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label>Temperature</Label>
+                    <Input type="number" step={0.1} min={0} max={1} value={qTemperature} onChange={e=>setQTemperature(Number(e.target.value))} />
+                  </div>
+                </div>
+                <div>
+                  <Label>Closing Prompt</Label>
+                  <Textarea value={qClosing} onChange={e=>setQClosing(e.target.value)} />
+                </div>
+                <div>
+                  <Label>Consent</Label>
+                  <Textarea value={qConsent} onChange={e=>setQConsent(e.target.value)} />
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Questions */}
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between">
                 <div>
                   <CardTitle>Questions</CardTitle>
                   <CardDescription>
                     Add and configure your survey questions
                   </CardDescription>
                 </div>
-                <Button onClick={addQuestion}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Question
-                </Button>
+                  {!isQualitative && (
+                    <Button onClick={addQuestion}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Question
+                    </Button>
+                  )}
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              {questions.map((question, questionIndex) => (
-                <Card key={questionIndex} className="border-2">
-                  <CardHeader className="pb-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-muted-foreground">
-                          Question {questionIndex + 1}
-                        </span>
-                        <Badge variant="outline">
-                          {getQuestionTypeLabel(question.type)}
-                        </Badge>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => removeQuestion(questionIndex)}
-                        className="text-red-600 hover:text-red-700"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <Label>Question Type</Label>
-                        <select
-                          value={question.type}
-                          onChange={(e) => updateQuestion(questionIndex, 'type', e.target.value)}
-                          className="w-full mt-1 px-3 py-2 border border-input bg-background rounded-md"
-                        >
-                          <option value="text">Text Input</option>
-                          <option value="single-choice">Single Choice</option>
-                          <option value="multiple-choice">Multiple Choice</option>
-                          <option value="rating">Rating Scale</option>
-                          <option value="yes-no">Yes/No</option>
-                        </select>
-                      </div>
-                      <div className="flex items-center space-x-2 mt-6">
-                        <Checkbox
-                          checked={question.isRequired}
-                          onCheckedChange={(checked) => updateQuestion(questionIndex, 'isRequired', checked)}
-                        />
-                        <Label>Required</Label>
-                      </div>
-                    </div>
-
-                    <div>
-                      <Label>Question Text</Label>
-                      <Textarea
-                        value={question.prompt}
-                        onChange={(e) => updateQuestion(questionIndex, 'prompt', e.target.value)}
-                        placeholder="Enter your question"
-                        className="mt-1"
-                        rows={2}
-                      />
-                    </div>
-
-                    {(question.type === 'single-choice' || question.type === 'multiple-choice') && (
-                      <div>
-                        <div className="flex items-center justify-between mb-2">
-                          <Label>Options</Label>
+              {isQualitative ? (
+                <div className="space-y-3">
+                  <div className="rounded-lg border p-4 bg-muted/30">
+                    <p className="text-sm text-muted-foreground mb-2">This qualitative interview stores a single hidden transcript internally. Instead of editing raw questions, the agent will ask targeted, adaptive questions based on your settings above. Here is a preview of the questioning style:</p>
+                    <ol className="space-y-2 list-decimal ml-5">
+                      <li className="font-medium">{qIntro || 'To start, please share a specific experience related to this topic (time, place, context).'}</li>
+                      {qualPreviewItems.map((q, i) => (<li key={i} className="text-foreground">{q}</li>))}
+                      <li className="font-medium">{qClosing || "Before we wrap up: Is there anything important we didn't cover? What's the one takeaway you want us to remember?"}</li>
+                    </ol>
+                  </div>
+                  <p className="text-xs text-muted-foreground">Note: The agent will use short probes (e.g., “What led to that?”, “What happened next?”) and avoid leading questions.</p>
+                </div>
+              ) : (
+                <>
+                  {questions.map((question, questionIndex) => (
+                    <Card key={questionIndex} className="border-2">
+                      <CardHeader className="pb-3">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium text-muted-foreground">
+                              Question {questionIndex + 1}
+                            </span>
+                            <Badge variant="outline">
+                              {getQuestionTypeLabel(question.type)}
+                            </Badge>
+                          </div>
                           <Button
-                            variant="outline"
+                            variant="ghost"
                             size="sm"
-                            onClick={() => addOption(questionIndex)}
+                            onClick={() => removeQuestion(questionIndex)}
+                            className="text-red-600 hover:text-red-700"
                           >
-                            <Plus className="h-3 w-3 mr-1" />
-                            Add Option
+                            <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
-                        <div className="space-y-2">
-                          {(question.options || []).map((option, optionIndex) => (
-                            <div key={optionIndex} className="flex items-center gap-2">
-                              <Input
-                                value={option}
-                                onChange={(e) => updateOption(questionIndex, optionIndex, e.target.value)}
-                                placeholder={`Option ${optionIndex + 1}`}
-                                className="flex-1"
-                              />
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <Label>Question Type</Label>
+                            <select
+                              value={question.type}
+                              onChange={(e) => updateQuestion(questionIndex, 'type', e.target.value)}
+                              className="w-full mt-1 px-3 py-2 border border-input bg-background rounded-md"
+                            >
+                              <option value="text">Text Input</option>
+                              <option value="single-choice">Single Choice</option>
+                              <option value="multiple-choice">Multiple Choice</option>
+                              <option value="rating">Rating Scale</option>
+                              <option value="yes-no">Yes/No</option>
+                            </select>
+                          </div>
+                          <div className="flex items-center space-x-2 mt-6">
+                            <Checkbox
+                              checked={question.isRequired}
+                              onCheckedChange={(checked) => updateQuestion(questionIndex, 'isRequired', checked)}
+                            />
+                            <Label>Required</Label>
+                          </div>
+                        </div>
+
+                        <div>
+                          <Label>Question Text</Label>
+                          <Textarea
+                            value={question.prompt}
+                            onChange={(e) => updateQuestion(questionIndex, 'prompt', e.target.value)}
+                            placeholder="Enter your question"
+                            className="mt-1"
+                            rows={2}
+                          />
+                        </div>
+
+                        {(question.type === 'single-choice' || question.type === 'multiple-choice') && (
+                          <div>
+                            <div className="flex items-center justify-between mb-2">
+                              <Label>Options</Label>
                               <Button
-                                variant="ghost"
+                                variant="outline"
                                 size="sm"
-                                onClick={() => removeOption(questionIndex, optionIndex)}
-                                className="text-red-600 hover:text-red-700"
+                                onClick={() => addOption(questionIndex)}
                               >
-                                <Trash2 className="h-3 w-3" />
+                                <Plus className="h-3 w-3 mr-1" />
+                                Add Option
                               </Button>
                             </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              ))}
+                            <div className="space-y-2">
+                              {(question.options || []).map((option, optionIndex) => (
+                                <div key={optionIndex} className="flex items-center gap-2">
+                                  <Input
+                                    value={option}
+                                    onChange={(e) => updateOption(questionIndex, optionIndex, e.target.value)}
+                                    placeholder={`Option ${optionIndex + 1}`}
+                                    className="flex-1"
+                                  />
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => removeOption(questionIndex, optionIndex)}
+                                    className="text-red-600 hover:text-red-700"
+                                  >
+                                    <Trash2 className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  ))}
 
-              {questions.length === 0 && (
-                <div className="text-center py-8 text-muted-foreground">
-                  No questions added yet. Click &quot;Add Question&quot; to get started.
-                </div>
+                  {(questions.length === 0 && !isQualitative) && (
+                    <div className="text-center py-8 text-muted-foreground">
+                      No questions added yet. Click &quot;Add Question&quot; to get started.
+                    </div>
+                  )}
+                </>
               )}
             </CardContent>
           </Card>
