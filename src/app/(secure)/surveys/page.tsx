@@ -618,7 +618,7 @@ const SurveysPage = () => {
                                   <Share className="h-4 w-4" />
                                 </Button>
                                 
-                                <Link href={`/cohort-chat?survey=${survey.id}`}>
+                                <Link href={`/cohort-chat/chat?survey=${survey.id}`}>
                                   <Button variant="ghost" size="sm" title="Start cohort chat with this survey">
                                     <MessageCircle className="h-4 w-4" />
                                   </Button>
