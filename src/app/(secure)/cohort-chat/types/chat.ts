@@ -1,4 +1,5 @@
 export type ChatMessage = { 
+  id?: string;
   role: 'user' | 'agent'; 
   content: string; 
   citations?: Record<string, string>; 
