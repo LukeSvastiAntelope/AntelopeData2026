@@ -94,7 +94,7 @@ const SecureLayout = ({ children }: { children: React.ReactNode }) => {
             const data = await response.json();
             if (data.status) {
                 toast.success("Welcome! Your account has been set up successfully.");
-                router.push('/cohort-chat');
+                router.push('/cohort-chat/chat');
             } else {
                 toast.error(data.message || "Failed to save your name. Please try again.");
             }
@@ -258,7 +258,7 @@ const SecureLayout = ({ children }: { children: React.ReactNode }) => {
             if (response.status) {
                 toast.success("Wager principles saved! Onboarding complete.");
                 // Removed fetchAgentProfile() call - AgentContext will handle the update
-                router.push('/cohort-chat');
+                router.push('/cohort-chat/chat');
             } else {
                 toast.error(response.message || "Failed to save principles.");
             }

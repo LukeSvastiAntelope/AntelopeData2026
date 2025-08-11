@@ -13,7 +13,19 @@ export function useConversations() {
       const response = await fetch('/api/conversations');
       if (response.ok) {
         const data = await response.json();
-        setConversations(data.conversations || []);
+        // Only store metadata without large messages to reduce memory footprint
+        const metaOnly = (data.conversations || []).map((c: any) => ({
+          id: c.id,
+          title: c.title,
+          messages: [], // lazy-loaded on selection
+          createdAt: c.createdAt,
+          updatedAt: c.updatedAt,
+          surveyId: c.surveyId,
+          cohortId: c.cohortId,
+          type: c.type,
+          userId: c.userId,
+        }));
+        setConversations(metaOnly);
       }
     } catch (error) {
       console.error('Error fetching conversations:', error);
@@ -47,7 +59,8 @@ export function useConversations() {
       if (response.ok) {
         const result = await response.json();
         if (!currentConversationId) {
-          setCurrentConversationId(result.conversationId);
+          // backend returns { conversation }, normalize id here
+          setCurrentConversationId(result.conversation?.id || result.conversationId);
         }
         await fetchConversations();
       }
@@ -57,9 +70,18 @@ export function useConversations() {
     }
   }, [currentConversationId, fetchConversations]);
 
-  const loadConversation = useCallback((conversation: Conversation) => {
+  const loadConversation = useCallback(async (conversation: Conversation) => {
     setCurrentConversationId(conversation.id);
-    return conversation.messages;
+    try {
+      const res = await fetch(`/api/conversations/${conversation.id}`);
+      if (res.ok) {
+        const data = await res.json();
+        return data.conversation?.messages || [];
+      }
+    } catch (e) {
+      console.error('Failed to load conversation messages', e);
+    }
+    return [];
   }, []);
 
   const startNewConversation = useCallback(() => {
