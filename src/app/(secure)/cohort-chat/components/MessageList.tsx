@@ -4,28 +4,26 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import ChartRenderer from '@/components/ChartRenderer';
 import { cn } from '@/lib/utils';
 import { ChatMessage } from '../types';
+import MarkdownWithCitations from './MarkdownWithCitations';
+import DataCards from './DataCards';
 
 interface MessageListProps {
   messages: ChatMessage[];
   isLoading: boolean;
   messagesEndRef: React.RefObject<HTMLDivElement>;
-  renderWithCitations: (content: string, citations?: Record<string, string>, isUpload?: boolean) => React.ReactNode;
-  renderDataCards: (dataCards: any[]) => React.ReactNode;
 }
 
 export function MessageList({ 
   messages, 
   isLoading, 
-  messagesEndRef, 
-  renderWithCitations, 
-  renderDataCards 
+  messagesEndRef
 }: MessageListProps) {
   return (
-    <ScrollArea className="flex-1 min-h-0" style={{ minHeight: 'calc(100vh - 200px)' }}>
+    <ScrollArea className="flex-1 min-h-0" style={{ paddingBottom: '96px' }}>
       <div className="p-4 space-y-6">
         {messages.map((m, idx) => (
           <div 
-            key={idx} 
+            key={(m as any).id ?? idx}
             className="text-sm animate-in fade-in duration-500"
             style={{ 
               animationDelay: `${Math.min(idx * 50, 500)}ms`,
@@ -40,8 +38,8 @@ export function MessageList({
                 <TooltipProvider delayDuration={150}>
                   <div className="space-y-1">
                     {/* Content first, then charts - updated order */}
-                    {renderWithCitations(m.content, m.citations, m.isUpload)}
-                    {m.dataCards && renderDataCards(m.dataCards)}
+                    <MarkdownWithCitations text={m.content} citations={m.citations} isUpload={m.isUpload} />
+                    {m.dataCards && <DataCards dataCards={m.dataCards} />}
                   </div>
                 </TooltipProvider>
               ) : (

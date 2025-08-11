@@ -117,7 +117,7 @@ export default auth((req) => {
     }
 
     // Protect pages that require authentication
-    const protectedPages = ['/cohort-chat', '/surveys', '/admin', '/digital-twins', '/profile', '/setup-profile'];
+    const protectedPages = ['/cohort-chat', '/cohort-chat/chat', '/surveys', '/admin', '/digital-twins', '/profile', '/setup-profile'];
     if (protectedPages.some(page => path.startsWith(page))) {
         if (!session) {
             return NextResponse.redirect(new URL('/login', req.url));

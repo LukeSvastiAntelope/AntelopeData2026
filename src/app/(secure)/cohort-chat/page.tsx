@@ -29,12 +29,14 @@ import { toast } from '@/components/ui/sonner';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import ReactMarkdown from 'react-markdown';
+import dynamic from 'next/dynamic';
 import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import ChartRenderer from '@/components/ChartRenderer'
 import { getAllModels } from '@/app/utils/models'
 import OnboardingEmptyState from '@/components/OnboardingEmptyState'
 import SurveyStatsView from '@/components/SurveyStatsView'
+import { DEFAULT_SYSTEM_PROMPT } from './constants';
 import { DynamicCohortBuilder } from '@/components/DynamicCohortBuilder'
 import { 
   optionalRemark, 
@@ -45,10 +47,17 @@ import {
   processPartialResponse, 
   processCompleteResponse 
 } from './utils';
-import { MessageList, ChatInput } from './components';
-import { BreadcrumbNavigation } from './components/breadcrumb-navigation';
+import { useSurveyPrompts } from './hooks/useSurveyPrompts';
+import { extractAvailableFields as extractFieldsUtil } from './utils/extractAvailableFields';
+import { MessageList, ChatInput, ConfigurationPanel, ConversationManager, CohortPanel, ChatView, HeaderBar } from './components';
+import { useChatStreaming } from './hooks/useChatStreaming';
+import { useSaveConversation } from './hooks/useSaveConversation';
 import { ConversationTypeDialog } from './components/conversation-type-dialog';
-import { CodeConversation } from './components/code-conversation';
+// Lazy-load heavy code analysis UI to reduce initial bundle size
+const CodeConversation = dynamic(() =>
+  import('./components/code-conversation').then((m) => m.CodeConversation),
+  { ssr: false }
+);
 
 
 
@@ -75,6 +84,7 @@ export default function CohortChatPage() {
   const [selectedSurveyId, setSelectedSurveyId] = useState<number | null>(null);
   const [selectedSurveyData, setSelectedSurveyData] = useState<any>(null);
   const [dynamicPrompts, setDynamicPrompts] = useState<string[]>([]);
+  const { prompts: surveyPrompts, refresh: refreshSurveyPrompts } = useSurveyPrompts(selectedSurveyData);
   const [availableFields, setAvailableFields] = useState<{name: string, label: string, type: string}[]>([]);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [selectedModel, setSelectedModel] = useState('gpt-4o');
@@ -84,36 +94,7 @@ export default function CohortChatPage() {
   const [showConversationTypeDialog, setShowConversationTypeDialog] = useState(false);
   const [currentConversationType, setCurrentConversationType] = useState<'chat' | 'code'>('chat');
   const [pythonEnvironmentInitialized, setPythonEnvironmentInitialized] = useState(false);
-  const [systemPrompt, setSystemPrompt] = useState(`You are an expert survey analyst and data scientist specializing in extracting meaningful insights from survey responses. Your role is to help users understand their survey data through comprehensive analysis and clear communication.
-
-CORE RESPONSIBILITIES:
-• Analyze survey responses to identify patterns, trends, and key insights
-• Provide data-driven answers with specific evidence from the survey data
-• Highlight demographic differences and segment variations when relevant
-• Offer actionable recommendations based on findings
-• Present complex data in accessible, easy-to-understand language
-
-ANALYSIS APPROACH:
-• Always ground your analysis in the actual survey data provided
-• Use statistical measures (percentages, correlations, distributions) when appropriate
-• Identify outliers, unexpected findings, or interesting patterns
-• Compare responses across different demographic groups or cohorts
-• Look for sentiment patterns, satisfaction levels, and behavioral indicators
-
-RESPONSE STYLE:
-• Start with key findings or executive summary for complex queries
-• Use clear headings and bullet points for readability
-• Include specific data points and percentages to support your insights
-• Explain the significance of findings in practical terms
-• Suggest follow-up questions or areas for deeper investigation when relevant
-
-WHEN CITING DATA:
-• Reference specific response patterns with citation numbers
-• Explain methodology when discussing statistical analysis
-• Acknowledge limitations or potential biases in the data
-• Distinguish between correlation and causation in your interpretations
-
-Remember: You are not just summarizing data - you are providing expert interpretation that helps users make informed decisions based on their survey insights.`);
+  const [systemPrompt, setSystemPrompt] = useState(DEFAULT_SYSTEM_PROMPT);
   const [streamingMode, setStreamingMode] = useState<'off' | 'smart' | 'buffered' | 'instant'>('off');
 
   const [showCohortCreator, setShowCohortCreator] = useState(false);
@@ -216,6 +197,11 @@ Remember: You are not just summarizing data - you are providing expert interpret
       });
   }, []);
 
+  // Sync prompts from hook
+  useEffect(() => {
+    setDynamicPrompts(surveyPrompts || []);
+  }, [surveyPrompts]);
+
   // Fetch survey details when selectedSurveyId changes
   useEffect(() => {
     if (selectedSurveyId) {
@@ -224,9 +210,9 @@ Remember: You are not just summarizing data - you are providing expert interpret
         .then(data => {
           if (data.status && data.survey) {
             setSelectedSurveyData(data.survey);
-            const prompts = generateDynamicPrompts(data.survey);
-            setDynamicPrompts(prompts);
-            const fields = extractAvailableFields(data.survey);
+            // refresh prompts cache for this survey
+            refreshSurveyPrompts(true);
+            const fields = extractFieldsUtil(data.survey);
             setAvailableFields(fields);
           }
         })
@@ -400,6 +386,19 @@ Remember: You are not just summarizing data - you are providing expert interpret
     }
   };
 
+  const streamAbortRef = useRef<AbortController | null>(null);
+  const { appendChunk, finalize } = useChatStreaming({
+    streamingMode,
+    processPartialResponse,
+  });
+
+  const { saveConversation } = useSaveConversation({
+    currentConversationType,
+    selectedSurveyId,
+    selectedCohortId,
+    setConversations,
+  });
+
   const handleSend = async () => {
     if (!input.trim()) {
       toast.error('Please enter a question');
@@ -407,7 +406,7 @@ Remember: You are not just summarizing data - you are providing expert interpret
     }
     const question = input.trim();
     setInput('');
-    setMessages(prev=>[...prev,{role:'user',content:question}]);
+    setMessages(prev=>[...prev,{id: `user-${Date.now()}`, role:'user',content:question}]);
     setIsLoading(true);
 
     // Enhance system prompt with formatting instructions for consistent markdown
@@ -460,10 +459,17 @@ FORMATTING REQUIREMENTS:
       payload.stream = false;
     }
 
+    // Abort any in-flight request
+    if (streamAbortRef.current) {
+      try { streamAbortRef.current.abort(); } catch {}
+    }
+    streamAbortRef.current = new AbortController();
+
     const res = await fetch('/api/cohort/query', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
+      signal: streamAbortRef.current.signal,
     });
 
     const isEventStream = res.headers.get('content-type')?.includes('text/event-stream');
@@ -507,14 +513,15 @@ FORMATTING REQUIREMENTS:
       return;
     }
 
-    // add placeholder agent message
-    setMessages(prev=>[...prev,{role:'agent',content:'', citations:{}}]);
+    // add placeholder agent message with stable id
+    const agentId = `agent-${Date.now()}`;
+    setMessages(prev=>[...prev,{id: agentId, role:'agent',content:'', citations:{}}]);
     console.log('🎬 Added placeholder agent message, starting stream processing...');
 
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
     let buffer = '';
-    let accumulatedContent = '';
+    const accumulatedContent = '';
     console.log('📖 Stream reader initialized');
 
     while (true) {
@@ -577,106 +584,41 @@ FORMATTING REQUIREMENTS:
             }
             
             if (data.content) {
-              console.log('📝 Content found in data:', data.content.slice(0, 100));
-              accumulatedContent += data.content;
-              console.log('📚 Accumulated content length:', accumulatedContent.length);
-              
-              // Different streaming modes
-              let shouldUpdate = false;
-              
-              if (streamingMode === 'instant') {
-                shouldUpdate = true; // Update on every token
-              } else if (streamingMode === 'smart') {
-                shouldUpdate = isCompleteUnit(accumulatedContent); // Smart buffering
-              } else if (streamingMode === 'buffered') {
-                shouldUpdate = accumulatedContent.length % 200 === 0; // Update every 200 chars
-              }
-              else {
-                // Default case - always update for fact sheet responses
-                shouldUpdate = true;
-              }
-              
-              console.log('🔄 Should update UI:', shouldUpdate, 'Mode:', streamingMode);
-              
-              if (shouldUpdate) {
-                console.log('🎨 Updating messages with content:', accumulatedContent.slice(0, 100));
-                setMessages(prev => {
-                  const updated = [...prev];
-                  const last = updated[updated.length - 1];
-                  if (last && last.role === 'agent') {
-                    // Process partial content for citations during streaming
-                    const partialProcessed = processPartialResponse(accumulatedContent, last);
-                    console.log('🔧 Partial processing result:', {
-                      originalLength: accumulatedContent.length,
-                      processedLength: partialProcessed.content.length,
-                      hasContent: !!partialProcessed.content,
-                      contentPreview: partialProcessed.content.slice(0, 100)
-                    });
-                    last.content = partialProcessed.content;
-                    last.citations = partialProcessed.citations;
-                    // Keep existing chartSpec and dataCards during streaming
-                    updated[updated.length - 1] = last;
-                  }
-                  console.log('✅ Messages updated, new length:', updated.length);
-                  return updated;
-                });
-              }
+                appendChunk(data.content, setMessages, streamingMode);
             }
           } catch (error) {
             console.error('❌ JSON parse failed for dataStr:', JSON.stringify(dataStr), 'Error:', error);
             console.error('❌ Original line was:', JSON.stringify(line));
             // If not JSON, treat as plain text (fallback for non-streaming responses)
             if (dataStr.trim()) {
-              accumulatedContent += dataStr;
-              console.log('📝 Added plain text to accumulated content');
-              setMessages(prev => {
-                const updated = [...prev];
-                const last = updated[updated.length - 1];
-                if (last && last.role === 'agent') {
-                  const partialProcessed = processPartialResponse(accumulatedContent, last);
-                  last.content = partialProcessed.content;
-                  last.citations = partialProcessed.citations;
-                  updated[updated.length - 1] = last;
-                }
-                return updated;
-              });
+              appendChunk(dataStr, setMessages, streamingMode);
             }
           }
         } else if (line.trim() && !line.startsWith('data: ')) {
           console.log('📄 Non-SSE line found:', line);
           // Handle non-SSE content (fallback for plain text responses)
-          accumulatedContent += line + '\n';
-          setMessages(prev => {
-            const updated = [...prev];
-            const last = updated[updated.length - 1];
-            if (last && last.role === 'agent') {
-              const partialProcessed = processPartialResponse(accumulatedContent, last);
-              last.content = partialProcessed.content;
-              last.citations = partialProcessed.citations;
-              updated[updated.length - 1] = last;
-            }
-            return updated;
-          });
+          appendChunk(line + '\n', setMessages, streamingMode);
         }
       }
     }
     
     // Append any remaining buffered data that wasn't followed by a newline (e.g. single-chunk plain text)
     if (buffer.trim()) {
-      console.log('📝 Processing remaining buffer:', buffer);
-      accumulatedContent += buffer;
+      appendChunk(buffer, setMessages, streamingMode);
     }
     
     console.log('🏁 Stream processing complete, final accumulated content:', accumulatedContent.length, 'chars');
     
     // Final update with complete content and post-processing
+    finalize(setMessages);
+    let aggregatedContent = '';
+    // Join all chunks processed so far by reading from the last agent message
     setMessages(prev => {
       const updated = [...prev];
       const last = updated[updated.length - 1];
       if (last && last.role === 'agent') {
-        // Process the complete content
-        console.log('🎯 Final processing - raw content length:', accumulatedContent.length);
-        const processedContent = processCompleteResponse(accumulatedContent, last);
+        aggregatedContent = last.content || '';
+        const processedContent = processCompleteResponse(aggregatedContent, last);
         console.log('🎯 Final processing result:', {
           content: processedContent.content,
           citations: processedContent.citations,
@@ -872,136 +814,9 @@ FORMATTING REQUIREMENTS:
     setUploadLoading(false);
   };
 
-  // Extract available fields from survey data for cohort filtering
-  const extractAvailableFields = (surveyData: any) => {
-    if (!surveyData) return [];
-    
-    const fields: {name: string, label: string, type: string}[] = [];
-    
-    // Add common demographic fields
-    const commonDemographics = [
-      { name: 'age', label: 'Age', type: 'demographic' },
-      { name: 'gender', label: 'Gender', type: 'demographic' },
-      { name: 'location', label: 'Location', type: 'demographic' },
-      { name: 'occupation', label: 'Occupation', type: 'demographic' },
-      { name: 'education', label: 'Education', type: 'demographic' },
-      { name: 'income', label: 'Income', type: 'demographic' }
-    ];
-    
-    fields.push(...commonDemographics);
-    
-    // Add survey questions as filterable fields
-    if (surveyData.questions) {
-      surveyData.questions.forEach((question: any, index: number) => {
-        const fieldName = question.field_name || `question_${index + 1}`;
-        const label = question.prompt || question.title || `Question ${index + 1}`;
-        const shortLabel = label.length > 30 ? label.substring(0, 30) + '...' : label;
-        
-        fields.push({
-          name: fieldName,
-          label: shortLabel,
-          type: question.type || 'question'
-        });
-      });
-    }
-    
-    return fields;
-  };
+  // moved: extractAvailableFields util
 
-  // Generate dynamic prompts based on survey data and advanced analytics
-  const generateDynamicPrompts = (surveyData: any, forceRefresh = false) => {
-    if (!surveyData || !surveyData.questions) return [];
-    
-    const prompts: string[] = [];
-    
-    // Check if we already have cached prompts for this survey
-    const cacheKey = `survey-prompts-${surveyData.id}`;
-    const cachedPrompts = localStorage.getItem(cacheKey);
-    const cacheTimestamp = localStorage.getItem(`${cacheKey}-timestamp`);
-    
-    // Use cached prompts if they exist and are less than 1 hour old (unless force refresh)
-    if (!forceRefresh && cachedPrompts && cacheTimestamp) {
-      const cacheAge = Date.now() - parseInt(cacheTimestamp);
-      if (cacheAge < 60 * 60 * 1000) { // 1 hour cache
-        try {
-          const parsedPrompts = JSON.parse(cachedPrompts);
-          if (parsedPrompts.length > 0) {
-            setDynamicPrompts(parsedPrompts);
-            console.log('📊 Using cached dynamic prompts for survey', surveyData.id);
-            return;
-          }
-        } catch (error) {
-          console.log('Error parsing cached prompts:', error);
-        }
-      }
-    }
-    
-    // Generate simple, effective prompts without heavy schema analysis
-    const generateSimplePrompts = () => {
-      const simplePrompts = [
-        "What are the most interesting insights from this survey?",
-        "Show me some key statistics and trends",
-        "What do the demographics tell us?"
-      ];
-      
-      console.log('📊 Using simple prompts for survey', surveyData.id);
-      setDynamicPrompts(simplePrompts);
-      
-      // Cache the prompts
-      localStorage.setItem(cacheKey, JSON.stringify(simplePrompts));
-      localStorage.setItem(`${cacheKey}-timestamp`, Date.now().toString());
-    };
-    
-    const generateBasicPrompts = () => {
-      const questions = surveyData.questions;
-      
-      // Analyze question types and content to generate relevant prompts
-      const hasRatingQuestions = questions.some((q: any) => q.type === 'rating' || q.type === 'scale');
-      const hasChoiceQuestions = questions.some((q: any) => q.type === 'single-choice' || q.type === 'multiple-choice');
-      const hasTextQuestions = questions.some((q: any) => q.type === 'text');
-      
-      // Get first few question prompts for specific analysis
-      const sampleQuestions = questions.slice(0, 3);
-      
-      if (hasRatingQuestions) {
-        prompts.push("What are the average ratings across different demographics?");
-      }
-      
-      if (hasChoiceQuestions) {
-        prompts.push("Show the distribution of responses for multiple choice questions");
-      }
-      
-      if (hasTextQuestions) {
-        prompts.push("What are the common themes in open-ended responses?");
-      }
-      
-      // Add survey-specific prompts based on question content
-      if (sampleQuestions.length > 0) {
-        const firstQuestion = sampleQuestions[0];
-        if (firstQuestion.prompt) {
-          // Create a prompt about the first question
-          const questionSnippet = firstQuestion.prompt.length > 50 
-            ? firstQuestion.prompt.substring(0, 50) + "..." 
-            : firstQuestion.prompt;
-          prompts.push(`Analyze responses to: "${questionSnippet}"`);
-        }
-      }
-      
-      // Add general analysis prompts
-      prompts.push(`Summarize key insights from "${surveyData.title}"`);
-      prompts.push("Compare responses across age groups");
-      
-      setDynamicPrompts(prompts.slice(0, 3));
-    };
-    
-    // Start with basic prompts immediately, then try to enhance with analytics
-    generateBasicPrompts();
-    
-    // Asynchronously try to get better prompts from analytics
-    generateSimplePrompts();
-    
-    return prompts.slice(0, 3); // Return initial basic prompts
-  };
+  // moved: dynamic prompt generation handled by useSurveyPrompts hook
 
   // Conversation management functions
   const loadConversations = async () => {
@@ -1073,118 +888,7 @@ FORMATTING REQUIREMENTS:
     }
   };
 
-  const saveConversation = async (conversationId: string, messages: ChatMessage[], title?: string) => {
-    // Convert messages to executable recipes - save the "how" not the "what"
-    const processedMessages = messages.map(m => {
-      const meta = (m as any).metadata || {};
-      const content = m.content;
-      const messageType = (m as any).type;
-
-      // Handle different message types for recipe generation
-      if (messageType === 'code') {
-        // For code messages, save the code itself - this is the recipe!
-        return {
-          ...m,
-          content: content, // Keep the code as-is
-          metadata: { ...meta, recipeType: 'code' }
-        };
-      } 
-      else if (messageType === 'result') {
-        // For result messages, save only a summary + regeneration flag
-        if (typeof content === 'string' && content.startsWith('data:image/')) {
-          // TEMPORARILY: Keep plots as-is to debug the accumulation issue
-          return {
-            ...m,
-            content: content, // Keep the actual plot for now
-            metadata: { ...meta, recipeType: 'plot' }
-          };
-        } 
-        else if (typeof content === 'string' && content.length > 5000) {
-          // Large text output - save summary + regeneration flag
-          const summary = content.substring(0, 500) + '...';
-          return {
-            ...m,
-            content: `📊 **Analysis Output Summary:**\n${summary}\n\n🔄 [Full output will be regenerated on load]`,
-            metadata: { ...meta, recipeType: 'large_output', needsRegeneration: true }
-          };
-        }
-        // Small results - keep as-is
-        return { ...m, content, metadata: meta };
-      }
-      else if (messageType === 'assistant' && content.includes('Step ')) {
-        // Step description - keep as summary
-        return { ...m, content, metadata: { ...meta, recipeType: 'step_summary' } };
-      }
-      else {
-        // User messages, system messages, etc - keep as-is
-        return { ...m, content, metadata: meta };
-      }
-    });
-
-    const finalTitle = title || generateConversationTitle(processedMessages);
-    console.log('💾 SAVING CONVERSATION:', {
-      id: conversationId,
-      title: finalTitle,
-      messageCount: processedMessages.length,
-      type: currentConversationType,
-      firstMessage: processedMessages[0]?.content?.substring(0, 50)
-    });
-
-    try {
-      const response = await fetch('/api/conversations', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          id: conversationId,
-          title: finalTitle,
-          messages: processedMessages,
-          surveyId: selectedSurveyId,
-          cohortId: selectedCohortId,
-          type: currentConversationType
-        })
-      });
-
-      if (!response.ok) {
-        console.error('❌ SAVE FAILED:', response.status, response.statusText);
-        const error = await response.text();
-        console.error('Error details:', error);
-      } else {
-        console.log('✅ CONVERSATION SAVED SUCCESSFULLY');
-      }
-      
-      // Update local state
-      setConversations(prev => {
-        const existing = prev.find(c => c.id === conversationId);
-        const updatedConversation = {
-          id: conversationId,
-          title: finalTitle,
-          messages: processedMessages,
-          createdAt: existing?.createdAt || new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          surveyId: selectedSurveyId,
-          cohortId: selectedCohortId,
-          type: currentConversationType
-        };
-        
-        console.log('🔄 UPDATING LOCAL CONVERSATION STATE:', {
-          id: conversationId,
-          oldTitle: existing?.title,
-          newTitle: finalTitle,
-          messageCount: processedMessages.length
-        });
-        
-        if (existing) {
-          return prev.map(c => c.id === conversationId ? updatedConversation : c);
-        } else {
-          return [updatedConversation, ...prev];
-        }
-      });
-    } catch (error) {
-      console.error('Error saving conversation:', error);
-    }
-  };
+  // moved: saveConversation logic into useSaveConversation hook
 
   const createNewConversation = (type: 'chat' | 'code' = 'chat') => {
     console.log('🆕 CREATE NEW CONVERSATION DEBUG:');
@@ -1254,7 +958,7 @@ FORMATTING REQUIREMENTS:
     createNewConversation(type);
   };
 
-  const switchConversation = (conversationId: string) => {
+  const switchConversation = async (conversationId: string) => {
     console.log('🔄 SWITCHING TO CONVERSATION:', conversationId);
     const conversation = conversations.find(c => c.id === conversationId);
     console.log('📋 FOUND CONVERSATION:', {
@@ -1273,15 +977,40 @@ FORMATTING REQUIREMENTS:
       setCurrentConversationId(conversationId);
       setCurrentConversationType(conversation.type || 'chat');
       
-      // Load messages into the appropriate state based on conversation type
+      // Lazy-load messages from API to avoid heavy initial payloads
+      try {
+        const res = await fetch(`/api/conversations/${conversationId}`);
+        if (res.ok) {
+          const data = await res.json();
+          const loadedMessages = data.conversation?.messages || [];
       if (conversation.type === 'code') {
-        console.log('💾 LOADING CODE CONVERSATION with', conversation.messages?.length || 0, 'messages');
+            console.log('💾 LOADED CODE CONVERSATION with', loadedMessages.length, 'messages');
+            setCodeMessages(loadedMessages);
+            setMessages([]);
+          } else {
+            console.log('💬 LOADED CHAT CONVERSATION with', loadedMessages.length, 'messages');
+            setMessages(loadedMessages);
+            setCodeMessages([]);
+          }
+        } else {
+          console.warn('Failed to load conversation messages, falling back to in-memory');
+          if (conversation.type === 'code') {
         setCodeMessages(conversation.messages || []);
-        setMessages([]); // Clear chat messages
+            setMessages([]);
       } else {
-        console.log('💬 LOADING CHAT CONVERSATION with', conversation.messages?.length || 0, 'messages');
         setMessages(conversation.messages || []);
-        setCodeMessages([]); // Clear code messages
+            setCodeMessages([]);
+          }
+        }
+      } catch (e) {
+        console.warn('Error loading conversation messages, fallback to in-memory', e);
+        if (conversation.type === 'code') {
+          setCodeMessages(conversation.messages || []);
+          setMessages([]);
+        } else {
+          setMessages(conversation.messages || []);
+          setCodeMessages([]);
+        }
       }
       
       // If switching to a code conversation, ensure environment is initialized
@@ -1381,248 +1110,7 @@ FORMATTING REQUIREMENTS:
     });
   };
 
-  // Render data cards (Perplexity-style visualizations)
-  const renderDataCards = (dataCards: any[]) => {
-    if (!dataCards || dataCards.length === 0) return null;
-    
-    return (
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 mt-4 mb-4">
-        {dataCards.map((card, index) => (
-          <div key={index} className="bg-muted/30 rounded-lg p-4 border">
-            <h4 className="font-medium text-sm text-foreground mb-3">{card.title}</h4>
-            
-            {card.chart_type === 'horizontal_bar' && (
-              <div className="space-y-3">
-                {card.data.map((item: any, i: number) => (
-                  <div key={i} className="space-y-1">
-                    <div className="flex justify-between items-center">
-                      <div className="text-xs text-muted-foreground leading-tight">
-                        {item.label}
-                      </div>
-                      <div className="text-xs font-medium">
-                        {item.value}%
-                      </div>
-                    </div>
-                    <div className="w-full bg-muted rounded-full h-2 relative">
-                      <div 
-                        className="bg-primary h-2 rounded-full" 
-                        style={{ width: `${Math.min(item.value, 100)}%` }}
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-            
-            {card.chart_type === 'metric_card' && (
-              <div className="grid grid-cols-3 gap-4 text-center">
-                <div>
-                  <div className="text-lg font-bold text-foreground">{card.data.average}</div>
-                  <div className="text-xs text-muted-foreground">Average</div>
-                </div>
-                <div>
-                  <div className="text-lg font-bold text-foreground">{card.data.median}</div>
-                  <div className="text-xs text-muted-foreground">Median</div>
-                </div>
-                <div>
-                  <div className="text-lg font-bold text-foreground">{card.data.range}</div>
-                  <div className="text-xs text-muted-foreground">Range</div>
-                </div>
-              </div>
-            )}
-            
-            {card.chart_type === 'pie' && (
-              <div className="space-y-1">
-                {card.data.map((item: any, i: number) => (
-                  <div key={i} className="flex justify-between items-center text-sm">
-                    <span className="text-foreground">{item.label}</span>
-                    <span className="font-medium">{item.value}%</span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
-    );
-  };
-
-  const renderWithCitations=(text:string,citations?:Record<string,string>,isUpload?:boolean)=> {
-    const normalizedText = isUpload ? text : normalizeMarkdown(normaliseText(text));
-    
-    console.log('renderWithCitations called with:', {
-      textLength: text.length,
-      textPreview: text.slice(0, 200),
-      citations: citations,
-      citationCount: citations ? Object.keys(citations).length : 0,
-      isUpload
-    });
-    
-    if(!citations || Object.keys(citations).length===0) {
-      // Handle upload messages with simple paragraph splitting
-      if (isUpload) {
-        const paragraphs = normalizedText.split('\n\n').filter(p => p.trim());
-        return (
-          <div className="space-y-2">
-            {paragraphs.map((paragraph, index) => (
-              <div key={index} className="text-foreground">
-                {paragraph.trim()}
-              </div>
-            ))}
-          </div>
-        );
-      }
-      
-      return (
-        <div className="prose prose-sm max-w-none prose-headings:text-foreground prose-headings:font-semibold prose-p:text-foreground prose-p:leading-relaxed prose-strong:text-foreground prose-strong:font-semibold prose-a:text-primary prose-a:no-underline hover:prose-a:underline prose-ul:text-foreground prose-ol:text-foreground prose-li:text-foreground prose-li:my-1 prose-blockquote:text-foreground prose-blockquote:border-l-primary">
-          <ReactMarkdown
-            remarkPlugins={optionalRemark}
-            rehypePlugins={optionalRehype}
-            components={{
-              h1: ({ children }) => <h1 className="text-xl font-bold mb-4 mt-6 first:mt-0 text-foreground border-b border-border pb-2">{children}</h1>,
-              h2: ({ children }) => <h2 className="text-lg font-semibold mb-3 mt-5 first:mt-0 text-foreground">{children}</h2>,
-              h3: ({ children }) => <h3 className="text-base font-medium mb-2 mt-4 first:mt-0 text-foreground">{children}</h3>,
-              p: ({ children }) => <p className="mb-3 leading-relaxed text-foreground">{children}</p>,
-              ul: ({ children }) => <ul className="list-disc ml-0 mb-4 space-y-1">{children}</ul>,
-              ol: ({ children }) => <ol className="list-decimal ml-0 mb-4 space-y-1">{children}</ol>,
-              li: ({ children }) => <li className="text-foreground leading-relaxed">{children}</li>,
-              strong: ({ children }) => <strong className="font-semibold text-foreground">{children}</strong>,
-              em: ({ children }) => <em className="italic text-foreground">{children}</em>,
-              blockquote: ({ children }) => <blockquote className="border-l-4 border-primary pl-4 my-4 italic text-muted-foreground">{children}</blockquote>,
-              hr: () => <hr className="my-6 border-border" />,
-              code: ({ children }) => <code className="bg-muted px-1.5 py-0.5 rounded text-sm font-mono">{children}</code>,
-            }}
-          >
-            {normalizedText}
-          </ReactMarkdown>
-        </div>
-      );
-    }
-    
-    // Custom component to handle inline citations within markdown
-    const CitationMarkdown = ({ children }: { children: React.ReactNode }) => {
-      // Recursive function to extract text from any React node structure
-      const extractText = (node: React.ReactNode): string => {
-        if (typeof node === 'string') return node;
-        if (typeof node === 'number') return String(node);
-        if (node === null || node === undefined) return '';
-        if (typeof node === 'boolean') return '';
-        
-        if (Array.isArray(node)) {
-          return node.map(extractText).join('');
-        }
-        
-        if (React.isValidElement(node)) {
-          // Handle React elements by extracting their children
-          const props = node.props as any;
-          if (props && props.children) {
-            return extractText(props.children);
-          }
-          return '';
-        }
-        
-        // For any other object types, try to stringify safely
-        if (typeof node === 'object') {
-          try {
-            // If it has a toString method that's not the default Object.toString
-            if (node.toString && node.toString !== Object.prototype.toString) {
-              return node.toString();
-            }
-          } catch (e) {
-            // Ignore errors
-          }
-          return '';
-        }
-        
-        return String(node);
-      };
-      
-      const textContent = extractText(children);
-      
-      // Split text by citation markers but keep them in the result
-      const parts = textContent.split(/(\[\d+\])/);
-      
-      return (
-        <>
-          {parts.map((part, index) => {
-            const citationMatch = part.match(/\[(\d+)\]/);
-            if (citationMatch) {
-              const num = citationMatch[1];
-              const quote = citations[num];
-              
-              return (
-                <Tooltip key={`citation-${index}-${num}`}>
-                  <TooltipTrigger asChild>
-                    <span className="inline-flex items-baseline px-1 py-0 mx-0.5 rounded bg-blue-100 cursor-default text-blue-700 hover:bg-blue-200 font-medium text-xs border border-blue-200 leading-none align-baseline">
-                      {num}
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent 
-                    className="max-w-lg text-xs p-3 bg-white border border-gray-200 shadow-lg z-[9999]"
-                    side="top"
-                    align="start"
-                  >
-                    <div className="space-y-1">
-                      {quote ? (
-                        <div className="whitespace-pre-wrap break-words text-gray-900">
-                          {String(quote)}
-                        </div>
-                      ) : (
-                        <div className="text-gray-500">Quote not found for [{num}]</div>
-                      )}
-                    </div>
-                  </TooltipContent>
-                </Tooltip>
-              );
-            } else {
-              return <span key={index}>{part}</span>;
-            }
-          })}
-        </>
-      );
-    };
-    
-    return (
-      <div className="prose prose-sm max-w-none prose-headings:text-foreground prose-headings:font-semibold prose-p:text-foreground prose-p:leading-relaxed prose-strong:text-foreground prose-strong:font-semibold prose-a:text-primary prose-a:no-underline hover:prose-a:underline prose-ul:text-foreground prose-ol:text-foreground prose-li:text-foreground prose-li:my-1 prose-blockquote:text-foreground prose-blockquote:border-l-primary">
-        <ReactMarkdown
-          remarkPlugins={optionalRemark}
-          rehypePlugins={optionalRehype}
-          components={{
-            h1: ({ children }) => <h1 className="text-xl font-bold mb-4 mt-6 first:mt-0 text-foreground border-b border-border pb-2">{children}</h1>,
-            h2: ({ children }) => <h2 className="text-lg font-semibold mb-3 mt-5 first:mt-0 text-foreground">{children}</h2>,
-            h3: ({ children }) => <h3 className="text-base font-medium mb-2 mt-4 first:mt-0 text-foreground">{children}</h3>,
-            p: ({ children }) => (
-              <p className="mb-3 leading-relaxed text-foreground">
-                <CitationMarkdown>{children}</CitationMarkdown>
-              </p>
-            ),
-            ul: ({ children }) => <ul className="list-disc ml-0 mb-4 space-y-1">{children}</ul>,
-            ol: ({ children }) => <ol className="list-decimal ml-0 mb-4 space-y-1">{children}</ol>,
-            li: ({ children }) => (
-              <li className="text-foreground leading-relaxed">
-                <CitationMarkdown>{children}</CitationMarkdown>
-              </li>
-            ),
-            strong: ({ children }) => (
-              <strong className="font-semibold text-foreground">
-                <CitationMarkdown>{children}</CitationMarkdown>
-              </strong>
-            ),
-            em: ({ children }) => (
-              <em className="italic text-foreground">
-                <CitationMarkdown>{children}</CitationMarkdown>
-              </em>
-            ),
-            blockquote: ({ children }) => <blockquote className="border-l-4 border-primary pl-4 my-4 italic text-muted-foreground">{children}</blockquote>,
-            hr: () => <hr className="my-6 border-border" />,
-            code: ({ children }) => <code className="bg-muted px-1.5 py-0.5 rounded text-sm font-mono">{children}</code>,
-          }}
-        >
-          {normalizedText}
-        </ReactMarkdown>
-      </div>
-    );
-  };
+  // moved to components: DataCards, MarkdownWithCitations
 
   // Add new state for inline survey selector
   const [showSurveyDropdown, setShowSurveyDropdown] = useState(false);
@@ -1703,14 +1191,10 @@ FORMATTING REQUIREMENTS:
   return (
     <div className="flex h-full w-full bg-background">
       {/* Main Content Area */}
-      <div className="flex-1 p-1 min-w-0 overflow-hidden">
-        <div className="h-full rounded-lg bg-card text-card-foreground shadow-lg min-w-0 overflow-hidden">
-          {/* Header with Breadcrumb Navigation */}
-          <div className="flex items-center px-6 py-2 min-w-0">
-            <SidebarTrigger className="-ml-0.5 h-5 w-5 text-muted-foreground hover:text-foreground flex-shrink-0" />
-            <div className="h-4 border-l border-border mx-4 flex-shrink-0" />
-            <div className="flex-1 min-w-0 mr-4">
-                                    <BreadcrumbNavigation
+      <div className="flex-1 p-1 min-w-0">
+        <div className="relative min-h-screen rounded-lg bg-card text-card-foreground shadow-lg min-w-0">
+          {/* Header */}
+          <HeaderBar
                         surveys={surveys}
                         selectedSurveyId={selectedSurveyId}
                         onSurveyChange={handleSurveyChange}
@@ -1720,38 +1204,15 @@ FORMATTING REQUIREMENTS:
                         onNewConversation={handleNewConversation}
                         conversationsLoading={conversationsLoading}
                         currentConversationType={currentConversationType}
-                      />
-              </div>
-            <div className="flex items-center gap-2 flex-shrink-0">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-5 w-5 text-muted-foreground hover:text-foreground"
-                onClick={() => {
-                  handleNewConversation();
-                }}
-                title="New Conversation"
-              >
-                <Plus className="h-4 w-4" />
-                <span className="sr-only">New Conversation</span>
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="-mr-0.5 h-5 w-5 text-muted-foreground hover:text-foreground"
-                onClick={()=>setIsCollapsed(!isCollapsed)}
-              >
-                {isCollapsed ? <PanelRight /> : <PanelLeft />}
-                <span className="sr-only">Toggle Right Panel</span>
-              </Button>
-            </div>
-          </div>
+            isCollapsed={isCollapsed}
+            onToggleRightPanel={() => setIsCollapsed(!isCollapsed)}
+          />
 
           <div className="border-b border-border" />
 
-          <div className="p-2 min-w-0 overflow-hidden">
+          <div className="p-2 min-w-0">
             {/* Chat Area - Only show if survey is selected */}
-            <div className="flex flex-col h-full min-w-0 overflow-hidden">
+            <div className="flex flex-col h-full min-w-0">
               {!selectedSurveyId ? (
                 <OnboardingEmptyState
                   onTryDemo={handleTryDemo}
@@ -1776,7 +1237,7 @@ FORMATTING REQUIREMENTS:
                 />
               ) : (
                 // 🚨 FIX: Always show active chat when survey is selected, regardless of message count
-                <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'chat' | 'stats')} className="flex flex-col flex-1 min-w-0 overflow-hidden">
+                <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'chat' | 'stats')} className="flex flex-col flex-1 min-w-0">
                   <div className="px-4 pt-4">
                     <TabsList className="inline-flex w-fit items-center gap-2">
                       <TabsTrigger value="chat" className="gap-2">
@@ -1799,7 +1260,7 @@ FORMATTING REQUIREMENTS:
                     </TabsList>
                   </div>
                   
-                  <TabsContent value="chat" className="flex flex-col flex-1 mt-0 min-w-0 overflow-hidden">
+                  <TabsContent value="chat" className="flex flex-col flex-1 mt-0 min-w-0">
                     {currentConversationType === 'code' ? (
                       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
                         <CodeConversation 
@@ -1819,22 +1280,14 @@ FORMATTING REQUIREMENTS:
                         />
                       </div>
                     ) : (
-                      <div className="flex flex-col flex-1">
-                        <MessageList
+                      <ChatView
                           messages={messages}
                           isLoading={isLoading}
                           messagesEndRef={messagesEndRef}
-                          renderWithCitations={renderWithCitations}
-                          renderDataCards={renderDataCards}
-                        />
-                        
-                        {/* Chat input at bottom of screen for active conversations */}
-                        <ChatInput
                           input={input}
                           setInput={setInput}
                           onSend={handleSend}
                           onKeyDown={handleKeyDown}
-                          isLoading={isLoading}
                           showSurveyDropdown={showSurveyDropdown}
                           setShowSurveyDropdown={setShowSurveyDropdown}
                           surveys={surveys}
@@ -1842,7 +1295,6 @@ FORMATTING REQUIREMENTS:
                           onInlineSurveySelect={handleInlineSurveySelect}
                           onUploadClick={handleUploadClick}
                         />
-                      </div>
                     )}
                   </TabsContent>
                   
@@ -1870,209 +1322,38 @@ FORMATTING REQUIREMENTS:
               </TabsList>
 
               <TabsContent value="conversations" className="space-y-4 mt-4">
-                <div className="space-y-1">
                   {conversationsLoading ? (
                     <div className="text-center py-4">
                       <div className="text-muted-foreground">Loading conversations...</div>
                     </div>
-                  ) : conversations.length === 0 ? (
-                    <div className="text-center py-8 space-y-2">
-                      <MessageCircle className="h-8 w-8 text-muted-foreground mx-auto" />
-                      <p className="text-muted-foreground text-sm">No conversations yet</p>
-                      <p className="text-xs text-muted-foreground">Start a new conversation to see it here</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-1">
-                      {(() => {
-                        const groupedConversations = groupConversationsBySurvey();
-                        const surveyGroups = Object.keys(groupedConversations).filter(key => key !== 'no-survey');
-                        const noSurveyConversations = groupedConversations['no-survey'] || [];
-                        
-                        return (
-                          <>
-                            {/* Survey-grouped conversations */}
-                            {surveyGroups.map((groupKey) => {
-                              const surveyId = parseInt(groupKey.replace('survey-', ''));
-                              const survey = surveys.find(s => s.id === surveyId);
-                              const groupConversations = groupedConversations[groupKey];
-                              const isExpanded = expandedSurveys.has(surveyId);
-                              
-                              return (
-                                <div key={groupKey} className="space-y-1">
-                                  {/* Survey Header */}
-                                  <div
-                                    className="flex items-center gap-2 px-2 py-0.5 rounded-md hover:bg-muted/50 cursor-pointer group"
-                                    onClick={() => toggleSurveyExpansion(surveyId)}
-                                  >
-                                    <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                                      {isExpanded ? (
-                                        <ChevronDown className="h-3 w-3 text-muted-foreground" />
-                                      ) : (
-                                        <ChevronRightIcon className="h-3 w-3 text-muted-foreground" />
-                                      )}
-                                      {isExpanded ? (
-                                        <FolderOpen className="h-3 w-3 text-muted-foreground" />
-                                      ) : (
-                                        <Folder className="h-3 w-3 text-muted-foreground" />
-                                      )}
-                                      <span className="text-xs font-medium text-foreground truncate">
-                                        {survey?.title || 'Unknown Survey'}
-                                      </span>
-                                    </div>
-                                    <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded-md">
-                                      {groupConversations.length}
-                                    </span>
-                                  </div>
-                                  
-                                  {/* Conversations under this survey */}
-                                  {isExpanded && (
-                                    <div className="ml-6 space-y-1">
-                                      {groupConversations.map((conversation) => (
-                                        <div
-                                          key={conversation.id}
-                                          className={cn(
-                                            "flex items-center gap-2 px-2 py-0 cursor-pointer transition-colors group rounded-md",
-                                            currentConversationId === conversation.id
-                                              ? "text-primary font-semibold"
-                                              : "text-foreground hover:text-primary hover:bg-muted/50"
-                                          )}
-                                          onClick={() => switchConversation(conversation.id)}
-                                        >
-                                          <MessageCircle className="h-3 w-3 text-muted-foreground flex-shrink-0" />
-                                          <div className="flex-1 min-w-0 text-xs truncate">
-                                            {conversation.title}
-                                          </div>
-                                          <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            className="h-4 w-4 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive"
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              deleteConversation(conversation.id);
-                                            }}
-                                          >
-                                            <Trash2 className="h-3 w-3" />
-                                          </Button>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  )}
-                                </div>
-                              );
-                            })}
-                            
-                            {/* Conversations without a survey */}
-                            {noSurveyConversations.length > 0 && (
-                              <div className="space-y-1">
-                                <div className="flex items-center gap-2 px-2 py-0.5">
-                                  <Folder className="h-3 w-3 text-muted-foreground" />
-                                  <span className="text-xs font-medium text-muted-foreground">
-                                    General Conversations
-                                  </span>
-                                  <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded-md">
-                                    {noSurveyConversations.length}
-                                  </span>
-                                </div>
-                                <div className="ml-6 space-y-1">
-                                  {noSurveyConversations.map((conversation) => (
-                                    <div
-                                      key={conversation.id}
-                                      className={cn(
-                                        "flex items-center gap-2 px-2 py-0 cursor-pointer transition-colors group rounded-md",
-                                        currentConversationId === conversation.id
-                                          ? "text-primary font-semibold"
-                                          : "text-foreground hover:text-primary hover:bg-muted/50"
-                                      )}
-                                      onClick={() => switchConversation(conversation.id)}
-                                    >
-                                      <MessageCircle className="h-3 w-3 text-muted-foreground flex-shrink-0" />
-                                      <div className="flex-1 min-w-0 text-xs truncate">
-                                        {conversation.title}
-                                      </div>
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-4 w-4 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          deleteConversation(conversation.id);
-                                        }}
-                                      >
-                                        <Trash2 className="h-3 w-3" />
-                                      </Button>
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-                          </>
-                        );
-                      })()}
-                    </div>
-                  )}
-                </div>
+                ) : (
+                  <ConversationManager
+                    conversations={conversations}
+                    surveys={surveys}
+                    expandedSurveys={expandedSurveys}
+                    currentConversationId={currentConversationId}
+                    onToggleSurvey={(id) => toggleSurveyExpansion(id)}
+                    onSwitchConversation={switchConversation}
+                    onNewConversation={handleNewConversation}
+                    onDeleteConversation={deleteConversation}
+                  />
+                )}
               </TabsContent>
 
               <TabsContent value="cohort" className="space-y-4 mt-4">
-                <div className="space-y-4">
-                  {/* Survey select */}
-                  <div className="space-y-2">
-                    <Label>Survey</Label>
-                    <Select value={selectedSurveyId? String(selectedSurveyId):'all'} onValueChange={val=>handleSurveyChange(val==='all'? null: Number(val))}>
-                      <SelectTrigger><SelectValue placeholder="All"/></SelectTrigger>
-                      <SelectContent className="z-50">
-                        <SelectItem value="all">All</SelectItem>
-                        {surveys.map(s=> <SelectItem key={s.id} value={String(s.id)}>{s.title}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  {/* Cohort select */}
-                  <div className="space-y-2">
-                    <Label>Cohort (Filter Respondents)</Label>
-                    <Select 
-                      value={showCohortCreator ? 'create-new' : (selectedCohortId? String(selectedCohortId):'all')} 
-                      onValueChange={val=> {
-                        if (val === 'create-new') {
-                          setShowCohortCreator(true);
-                          setSelectedCohortId(null);
-                          // Initialize with one empty rule if none exist
-                          if (filterRules.length === 0) {
-                            setFilterRules([{ field: '', op: '=', value: '' }]);
-                          }
-                        } else {
-                          setShowCohortCreator(false);
-                          setSelectedCohortId(val==='all'? null: Number(val));
-                        }
-                      }}
-                    >
-                      <SelectTrigger><SelectValue placeholder="All Respondents"/></SelectTrigger>
-                      <SelectContent className="z-50">
-                        <SelectItem value="all">All Respondents</SelectItem>
-                        {cohorts
-                          .filter(c => !selectedSurveyId || c.surveyId === selectedSurveyId)
-                          .map(c=> <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>)
-                        }
-                        {selectedSurveyId && (
-                          <SelectItem value="create-new" className="text-primary font-medium">
-                            + Create New Cohort
-                          </SelectItem>
-                        )}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  {/* Dynamic Cohort Creator */}
-                  {showCohortCreator && selectedSurveyId && (
-                    <div className="mt-4">
-                      <DynamicCohortBuilder
-                        surveyId={selectedSurveyId}
-                        onSave={async (name, filters) => {
-                          // Convert dynamic filters to the format expected by the API
-                          const cohortFilterRules: CohortFilterRule[] = filters.map(filter => ({
-                            field: filter.field,
-                            op: filter.op,
-                            value: filter.value
-                          }));
-                          
+                <CohortPanel
+                  surveys={surveys}
+                  selectedSurveyId={selectedSurveyId}
+                  onSurveyChange={handleSurveyChange}
+                  cohorts={cohorts}
+                  selectedCohortId={selectedCohortId}
+                  onSelectCohort={(id) => setSelectedCohortId(id)}
+                  showCohortCreator={showCohortCreator}
+                  setShowCohortCreator={setShowCohortCreator}
+                  filterRules={filterRules}
+                  setFilterRules={setFilterRules}
+                  saving={saving}
+                  onCreateCohort={async (name, cohortFilterRules) => {
                           setSaving(true);
                           try {
                             const res = await fetch('/api/cohorts', {
@@ -2085,7 +1366,6 @@ FORMATTING REQUIREMENTS:
                                 surveyId: selectedSurveyId 
                               }),
                             });
-                            
                             const data = await res.json();
                             if (data.status) {
                               const newCohort = { 
@@ -2098,13 +1378,12 @@ FORMATTING REQUIREMENTS:
                                 createdAt: '', 
                                 updatedAt: '' 
                               } as any;
-                              
                               setCohorts([...cohorts, newCohort]);
                               setSelectedCohortId(data.id);
                               setShowCohortCreator(false);
                               setNewCohortName('');
                               setFilterRules([]);
-                              toast.success(`Cohort "${name}" created successfully!`);
+                        toast.success(`Cohort \"${name}\" created successfully!`);
                             } else {
                               throw new Error(data.message || 'Failed to create cohort');
                             }
@@ -2115,176 +1394,24 @@ FORMATTING REQUIREMENTS:
                             setSaving(false);
                           }
                         }}
-                        onCancel={() => {
-                          setShowCohortCreator(false);
-                          setFilterRules([]);
-                          setNewCohortName('');
-                        }}
-                        isLoading={saving}
-                      />
-                    </div>
-                  )}
-                  
-                  {/* Fallback message when no survey selected */}
-                  {showCohortCreator && !selectedSurveyId && (
-                    <div className="space-y-4 mt-4 p-4 border rounded-lg bg-muted/50">
-                      <div className="flex items-center justify-between">
-                        <div className="space-y-1">
-                          <h3 className="text-sm font-medium">Create New Cohort</h3>
-                          <p className="text-xs text-muted-foreground">
-                            Please select a survey above to create cohorts for that specific survey
-                          </p>
-                        </div>
-                        <Button 
-                          size="sm" 
-                          variant="ghost" 
-                          onClick={() => setShowCohortCreator(false)}
-                          className="h-8 w-8 p-0"
-                        >
-                          ×
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-                  {messages.length>0 && selectedCohortId && (<Button variant="destructive" onClick={handleDeleteCohort}>Delete</Button>)}
-                </div>
+                  onDeleteCohort={handleDeleteCohort}
+                  canDelete={messages.length > 0 && !!selectedCohortId}
+                />
               </TabsContent>
               
               <TabsContent value="agent" className="space-y-4 mt-4">
-                <div className="space-y-4">
-                  {/* Model select */}
-                  <div className="space-y-2">
-                    <Label>Model</Label>
-                    <Select value={selectedModel} onValueChange={handleModelChange}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent className="z-50">
-                        {getAllModels().map((model) => (
-                          <SelectItem key={model.id} value={model.id}>
-                            {model.name} ({model.provider})
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {/* Temperature control */}
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <Label>Temperature</Label>
-                      <span className="text-xs text-muted-foreground">{temperature}</span>
-                    </div>
-                    <div className="space-y-2">
-                      <input
-                        type="range"
-                        min="0"
-                        max="1"
-                        step="0.1"
-                        value={temperature}
-                        onChange={(e) => handleTemperatureChange(Number(e.target.value))}
-                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-                      />
-                      <div className="flex justify-between text-xs text-muted-foreground">
-                        <span>0.0 (Precise)</span>
-                        <span>1.0 (Creative)</span>
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        {temperature === 0.0 && "Maximum precision for data analysis"}
-                        {temperature > 0.0 && temperature <= 0.3 && "Low creativity, focused on facts"}
-                        {temperature > 0.3 && temperature <= 0.7 && "Balanced creativity and accuracy"}
-                        {temperature > 0.7 && "High creativity, more interpretive"}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Streaming Mode control */}
-                  <div className="space-y-2">
-                    <Label>Streaming Quality</Label>
-                    <Select value={streamingMode} onValueChange={(value: 'off' | 'smart' | 'buffered' | 'instant') => {
-                      setStreamingMode(value);
-                      localStorage.setItem('cohort-chat-streaming-mode', value);
-                    }}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent className="z-50">
-                        <SelectItem value="off">Off (no streaming)</SelectItem>
-                        <SelectItem value="smart">Smart (recommended)</SelectItem>
-                        <SelectItem value="buffered">Buffered</SelectItem>
-                        <SelectItem value="instant">Instant</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <p className="text-xs text-muted-foreground">
-                      {streamingMode === 'off' && "Waits for full response - safest formatting"}
-                      {streamingMode === 'smart' && "Updates on complete sentences/blocks - best markdown quality"}
-                      {streamingMode === 'buffered' && "Updates every 200 characters - balanced speed/quality"}
-                      {streamingMode === 'instant' && "Updates on every word - fastest but may break formatting"}
-                    </p>
-                  </div>
-
-                  {/* Sources */}
-                  <div className="space-y-2">
-                    <Label>Sources</Label>
-                    {['survey','twins','web'].map(src=> (
-                      <div key={src} className="flex items-center gap-2">
-                        <Checkbox checked={sources[src as keyof typeof sources]} onCheckedChange={val=>setSources({...sources,[src]:!!val})}/>
-                        <span className="text-sm capitalize">{src}</span>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Prompt Editor */}
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <Label>Agent Instructions</Label>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-6 text-xs text-muted-foreground hover:text-foreground"
-                        onClick={() => {
-                          setSystemPrompt(`You are an expert survey analyst and data scientist specializing in extracting meaningful insights from survey responses. Your role is to help users understand their survey data through comprehensive analysis and clear communication.
-
-CORE RESPONSIBILITIES:
-• Analyze survey responses to identify patterns, trends, and key insights
-• Provide data-driven answers with specific evidence from the survey data
-• Highlight demographic differences and segment variations when relevant
-• Offer actionable recommendations based on findings
-• Present complex data in accessible, easy-to-understand language
-
-ANALYSIS APPROACH:
-• Always ground your analysis in the actual survey data provided
-• Use statistical measures (percentages, correlations, distributions) when appropriate
-• Identify outliers, unexpected findings, or interesting patterns
-• Compare responses across different demographic groups or cohorts
-• Look for sentiment patterns, satisfaction levels, and behavioral indicators
-
-RESPONSE STYLE:
-• Start with key findings or executive summary for complex queries
-• Use clear headings and bullet points for readability
-• Include specific data points and percentages to support your insights
-• Explain the significance of findings in practical terms
-• Suggest follow-up questions or areas for deeper investigation when relevant
-
-WHEN CITING DATA:
-• Reference specific response patterns with citation numbers
-• Explain methodology when discussing statistical analysis
-• Acknowledge limitations or potential biases in the data
-• Distinguish between correlation and causation in your interpretations
-
-Remember: You are not just summarizing data - you are providing expert interpretation that helps users make informed decisions based on their survey insights.`);
-                        }}
-                      >
-                        Reset to Default
-                      </Button>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      Customize how the AI agent analyzes and presents survey insights. The default instruction provides comprehensive analytical capabilities.
-                    </p>
-                    <Textarea 
-                      value={systemPrompt} 
-                      onChange={e=>handleSystemPromptChange(e.target.value)} 
-                      className="min-h-32"
-                      placeholder="Enter custom instructions for how the AI should analyze and respond to survey questions..."
-                    />
-                  </div>
-                </div>
+                <ConfigurationPanel
+                  selectedModel={selectedModel}
+                  onModelChange={handleModelChange}
+                  temperature={temperature}
+                  onTemperatureChange={handleTemperatureChange}
+                  streamingMode={streamingMode}
+                  onStreamingModeChange={(value) => { setStreamingMode(value); localStorage.setItem('cohort-chat-streaming-mode', value); }}
+                  sources={sources}
+                  onSourcesChange={setSources}
+                  systemPrompt={systemPrompt}
+                  onSystemPromptChange={handleSystemPromptChange}
+                />
               </TabsContent>
             </Tabs>
           )}

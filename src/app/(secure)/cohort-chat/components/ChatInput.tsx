@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Plus, Upload, Send, BarChart3, X } from 'lucide-react';
@@ -17,6 +17,7 @@ interface ChatInputProps {
   selectedSurveyId: number | null;
   onInlineSurveySelect: (surveyId: number) => void;
   onUploadClick: () => void;
+  containerRef?: React.RefObject<HTMLElement>;
 }
 
 export function ChatInput({
@@ -30,14 +31,37 @@ export function ChatInput({
   surveys,
   selectedSurveyId,
   onInlineSurveySelect,
-  onUploadClick
+  onUploadClick,
+  containerRef
 }: ChatInputProps) {
+  const [fixedStyles, setFixedStyles] = useState<{left:number;width:number}>({ left: 0, width: 0 });
+
+  useEffect(() => {
+    const update = () => {
+      const el = containerRef?.current as HTMLElement | null;
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      // Account for right sidebar by clamping to rect width
+      setFixedStyles({ left: rect.left, width: rect.width });
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    if (containerRef?.current) ro.observe(containerRef.current as Element);
+    window.addEventListener('resize', update);
+    window.addEventListener('scroll', update, true);
+    return () => {
+      window.removeEventListener('resize', update);
+      window.removeEventListener('scroll', update, true);
+      ro.disconnect();
+    };
+  }, [containerRef]);
+
   return (
-    <div className="sticky bottom-0 px-4 py-0 bg-card">
+    <div style={{ position: 'fixed', bottom: 12, left: fixedStyles.left, width: fixedStyles.width, zIndex: 40 }} className="px-4 py-0 bg-card">
       <div className="relative">
         <div className="relative">
           <Textarea 
-            className="min-h-[80px] pl-4 pr-4 resize-none" 
+            className="min-h-[80px] pl-12 pr-12 resize-none shadow-lg border" 
             placeholder="Ask the cohort…" 
             value={input} 
             onChange={e => setInput(e.target.value)} 

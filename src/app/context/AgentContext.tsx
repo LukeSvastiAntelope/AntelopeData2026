@@ -70,7 +70,7 @@ export const AgentProvider = ({ children }: { children: React.ReactNode }) => {
         if (session && isLoginPage) {
             // Redirect immediately when session is available, don't wait for user data
             console.log('AgentProvider: Redirecting from login page to cohort-chat');
-                router.push("/cohort-chat");
+                router.push("/cohort-chat/chat");
             return;
         }
         
