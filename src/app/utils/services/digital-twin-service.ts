@@ -132,6 +132,82 @@ Guidelines:
   }
 
   /**
+   * Generate survey answers for a twin with strict JSON, enforcing option choices where applicable
+   */
+  static async generateSurveyAnswersForUserTwin(
+    agentToken: string,
+    userId: string,
+    questions: Array<{
+      id: number;
+      prompt: string;
+      type: 'text' | 'single-choice' | 'multiple-choice' | 'rating' | 'yes-no' | 'number';
+      options?: string[] | null;
+    }>
+  ): Promise<Array<{ questionId: number; value: string | string[] }>> {
+    // Fetch twin metadata and validate ownership
+    const index = pinecone.index('prediction-results');
+    const fetchResult = await index.fetch([`digital-twin-${agentToken}`]);
+    const record = fetchResult.records[`digital-twin-${agentToken}`];
+    if (!record) throw new Error('Digital twin not found');
+    if (record.metadata?.createdBy !== userId) throw new Error('Access denied');
+
+    const metadata = record.metadata as any;
+    const demographics = typeof metadata?.demographics === 'string' ? JSON.parse(metadata.demographics) : (metadata?.demographics || {});
+    const principles = typeof metadata?.principles === 'string' ? JSON.parse(metadata.principles) : (metadata?.principles || {});
+
+    const typedQuestions = questions.map(q => ({
+      id: q.id,
+      prompt: q.prompt,
+      type: q.type,
+      options: q.options || []
+    }));
+
+    const instruction = `You are a digital twin of a specific person. Answer the following survey questions as this person would.
+Return ONLY valid JSON matching this exact TypeScript type:
+{
+  "answers": Array<{"questionId": number, "value": string | string[]}>
+}
+Rules:
+- For type "single-choice": value MUST be exactly one of the provided options.
+- For type "multiple-choice": value MUST be an array of provided options.
+- For type "yes-no": value MUST be "Yes" or "No" (capitalized).
+- For type "rating": value MUST be a string integer 1-5 (inclusive).
+- For type "number": value MUST be a string number.
+- For type "text": value is a concise sentence.
+- If uncertain, choose "No" or skip with an empty string.
+`;
+
+    const personaContext = `Demographics: ${JSON.stringify(demographics)}\nPersona: ${JSON.stringify(principles)}`;
+    const surveyContext = `Questions: ${JSON.stringify(typedQuestions)}`;
+
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4o',
+      temperature: 0.3,
+      messages: [
+        { role: 'system', content: instruction },
+        { role: 'user', content: personaContext },
+        { role: 'user', content: surveyContext }
+      ]
+    });
+
+    const content = completion.choices[0]?.message?.content || '';
+    const cleaned = content.replace(/```json\n?|```/g, '').trim();
+    let parsed: any;
+    try {
+      parsed = JSON.parse(cleaned);
+    } catch (e) {
+      throw new Error('Failed to parse answers JSON');
+    }
+
+    const answers = Array.isArray(parsed?.answers) ? parsed.answers : [];
+    // Normalize types to strings/arrays of strings only
+    return answers.map((a: any) => ({
+      questionId: Number(a.questionId),
+      value: Array.isArray(a.value) ? a.value.map((v: any) => String(v)) : String(a.value)
+    }));
+  }
+
+  /**
    * Update existing digital twin with new survey data
    */
   static async updateDigitalTwin(
@@ -175,6 +251,29 @@ Guidelines:
         `${existingMetadata?.surveyTitle}, ${surveyTitle}`, createdBy);
       
       console.log(`🔄 Updated existing digital twin ${agentToken} with new survey data`);
+
+      // Derive persona summary and capability map for DB persistence (read-only M1)
+      try {
+        const personaProfile = {
+          summary: `${updatedPrinciples.worldview}`.slice(0, 600),
+          core_traits: updatedPrinciples.personalityTraits,
+          communication_style: updatedPrinciples.communicationStyle,
+          worldview: updatedPrinciples.worldview,
+          interests: updatedPrinciples.interests,
+        };
+        const capabilityMap = {
+          topics: updatedPrinciples.coreValues,
+          topic_confidence: Object.fromEntries(updatedPrinciples.coreValues.map(v => [v, 0.7])),
+          question_type_proficiency: { text: 0.7, single_choice: 0.6, multiple_choice: 0.6, rating: 0.6, yes_no: 0.6, number: 0.5 },
+          coverage_gaps: [],
+          freshness_score: 1.0,
+          data_sources_count: allAnswers.length,
+        };
+        const { SurveyRepo } = await import('../database/survey-repo');
+        await SurveyRepo.updateResponderAgentPersona(agentToken, personaProfile, capabilityMap);
+      } catch (e) {
+        console.warn('Persona/capability persistence failed (non-blocking):', e);
+      }
     } catch (error) {
       console.error('Error updating digital twin:', error);
       throw new Error('Failed to update digital twin');
@@ -273,6 +372,29 @@ Guidelines:
       ]);
 
       console.log(`✅ Digital twin ${agentToken} stored in Pinecone`);
+
+      // Also persist a basic persona/capability snapshot into DB for UI (non-blocking best-effort)
+      try {
+        const personaProfile = {
+          summary: `${principles.worldview}`.slice(0, 600),
+          core_traits: principles.personalityTraits,
+          communication_style: principles.communicationStyle,
+          worldview: principles.worldview,
+          interests: principles.interests,
+        };
+        const capabilityMap = {
+          topics: principles.coreValues,
+          topic_confidence: Object.fromEntries(principles.coreValues.map(v => [v, 0.7])),
+          question_type_proficiency: { text: 0.7, single_choice: 0.6, multiple_choice: 0.6, rating: 0.6, yes_no: 0.6, number: 0.5 },
+          coverage_gaps: [],
+          freshness_score: 1.0,
+          data_sources_count: answers.length,
+        };
+        const { SurveyRepo } = await import('../database/survey-repo');
+        await SurveyRepo.updateResponderAgentPersona(agentToken, personaProfile, capabilityMap);
+      } catch (e) {
+        console.warn('Persona/capability snapshot persistence failed (non-blocking):', e);
+      }
     } catch (error) {
       console.error('Error storing in Pinecone:', error);
       throw new Error('Failed to store digital twin in Pinecone');

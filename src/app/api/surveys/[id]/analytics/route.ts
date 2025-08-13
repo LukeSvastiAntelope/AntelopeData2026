@@ -19,13 +19,18 @@ export async function GET(
       return NextResponse.json({ error: 'Invalid survey ID' }, { status: 400 })
     }
 
-    // Get survey analytics data
+    const includeSynthetic = request.nextUrl.searchParams.get('includeSynthetic') !== '0'
+    // Get survey analytics data (respect includeSynthetic)
     const analytics = await SurveyRepo.getSurveyAnalytics(surveyId, parseInt(userId))
     
     if (!analytics) {
       return NextResponse.json({ error: 'Survey not found or access denied' }, { status: 404 })
     }
 
+    // If includeSynthetic is false, filter responses client-side fallback (for now)
+    if (includeSynthetic === false && Array.isArray((analytics as any).responses)) {
+      (analytics as any).responses = (analytics as any).responses.filter((r: any) => !r.response_origin || r.response_origin === 'human')
+    }
     return NextResponse.json(analytics)
 
   } catch (error) {
