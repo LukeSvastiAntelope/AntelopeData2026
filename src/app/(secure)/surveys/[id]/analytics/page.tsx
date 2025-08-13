@@ -2,7 +2,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useParams } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -66,11 +66,13 @@ interface Survey {
 
 const SurveyAnalyticsPage = () => {
   const params = useParams()
+  const router = useRouter()
   const surveyId = params.id as string
   
   const [survey, setSurvey] = useState<Survey | null>(null)
   const [responses, setResponses] = useState<SurveyResponse[]>([])
   const [loading, setLoading] = useState(true)
+  const [includeSynthetic, setIncludeSynthetic] = useState<boolean>(true)
   const [selectedResponse, setSelectedResponse] = useState<SurveyResponse | null>(null)
   const [question, setQuestion] = useState('')
   const [twinResponse, setTwinResponse] = useState('')
@@ -80,7 +82,7 @@ const SurveyAnalyticsPage = () => {
   useEffect(() => {
     const fetchSurveyAnalytics = async () => {
       try {
-        const response = await fetch(`/api/surveys/${surveyId}/analytics`, {
+        const response = await fetch(`/api/surveys/${surveyId}/analytics?includeSynthetic=${includeSynthetic ? '1' : '0'}`, {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`
           }
@@ -101,7 +103,7 @@ const SurveyAnalyticsPage = () => {
     if (surveyId) {
       fetchSurveyAnalytics()
     }
-  }, [surveyId])
+  }, [surveyId, includeSynthetic])
 
   const queryDigitalTwin = async () => {
     if (!selectedResponse || !question.trim()) return
@@ -207,6 +209,15 @@ const SurveyAnalyticsPage = () => {
                   <div className="flex items-center gap-1">
                     <Brain className="h-4 w-4" />
                     {responses.length} Digital Twins Created
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2">
+                      <Label className="text-xs">Include synthetic</Label>
+                      <input type="checkbox" checked={includeSynthetic} onChange={(e)=>setIncludeSynthetic(e.target.checked)} />
+                    </div>
+                    <Button variant="outline" onClick={()=>router.push(`/surveys/${surveyId}/twins`)}>
+                      Manage Twin Cohort
+                    </Button>
                   </div>
                 </div>
               </CardHeader>

@@ -141,6 +141,55 @@ export async function POST(
 
         // Generate digital twin persona and store in Pinecone with retry logic
         await ensureDigitalTwinInPinecone(result.agentToken, body, survey as any);
+
+        // Fire-and-forget enrichment: aggregate all answers across this twin and regenerate persona/capabilities
+        (async () => {
+            try {
+                const { openSql } = await import('@/app/utils/database/db');
+                const db = await openSql();
+                // Get latest demographics and survey title
+                const [latestRows] = await db.execute<any[]>(
+                    `SELECT sr.demographics, s.title
+                     FROM survey_responses sr
+                     JOIN surveys s ON s.id = sr.survey_id
+                     WHERE sr.agent_token = ?
+                     ORDER BY sr.submitted_at DESC
+                     LIMIT 1`,
+                    [result.agentToken]
+                );
+                if (!latestRows?.[0]) return;
+                const latest = {
+                    demographics: latestRows[0].demographics,
+                    surveyTitle: latestRows[0].title || (survey as any).title || 'Multiple Surveys'
+                };
+
+                // Aggregate all answers for this twin
+                const [answerRows] = await db.execute<any[]>(
+                    `SELECT sq.prompt AS question_text, sa.answer_value
+                     FROM survey_responses sr
+                     JOIN survey_answers sa ON sa.response_id = sr.id
+                     JOIN survey_questions sq ON sq.id = sa.question_id
+                     WHERE sr.agent_token = ?
+                     ORDER BY sr.submitted_at ASC, sa.id ASC`,
+                    [result.agentToken]
+                );
+                if (!answerRows || answerRows.length === 0) return;
+                const answers = answerRows.map((r: any, idx: number) => ({ questionId: idx + 1, questionText: r.question_text, value: r.answer_value }));
+
+                // Regenerate persona from aggregated data and persist
+                const principles = await DigitalTwinService.generatePersonaPrinciples(latest.demographics, answers, latest.surveyTitle);
+                await DigitalTwinService.storeInPinecone(
+                    result.agentToken,
+                    latest.demographics,
+                    principles,
+                    answers,
+                    latest.surveyTitle,
+                    String((survey as any).created_by)
+                );
+            } catch (e) {
+                console.warn('[Enrichment] Non-blocking enrichment failed:', e);
+            }
+        })();
         
         // Send confirmation email (non-blocking) - different email for new vs returning users
         if (body.demographics?.email) {

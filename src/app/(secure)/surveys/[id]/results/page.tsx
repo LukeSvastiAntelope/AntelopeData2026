@@ -253,6 +253,16 @@ const SurveyResultsPage = () => {
                   Edit Survey
                 </Button>
               </Link>
+              <Link href={`/surveys/${surveyId}/analytics`}>
+                <Button size="sm" variant="outline">
+                  Analytics
+                </Button>
+              </Link>
+              <Link href={`/surveys/${surveyId}/twins`}>
+                <Button size="sm" variant="outline">
+                  Deploy Twins
+                </Button>
+              </Link>
             </div>
           </div>
         </div>

@@ -638,6 +638,24 @@ const SurveysPage = () => {
                                         Edit
                                       </Link>
                                     </DropdownMenuItem>
+                                    <DropdownMenuItem asChild>
+                                      <Link href={`/surveys/${survey.id}/results`} className="flex items-center cursor-pointer">
+                                        <BarChart3 className="h-4 w-4 mr-2" />
+                                        Results
+                                      </Link>
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem asChild>
+                                      <Link href={`/surveys/${survey.id}/analytics`} className="flex items-center cursor-pointer">
+                                        <BarChart3 className="h-4 w-4 mr-2" />
+                                        Analytics
+                                      </Link>
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem asChild>
+                                      <Link href={`/surveys/${survey.id}/twins`} className="flex items-center cursor-pointer">
+                                        <Users className="h-4 w-4 mr-2" />
+                                        Deploy Twins
+                                      </Link>
+                                    </DropdownMenuItem>
                                     <DropdownMenuItem 
                                       onClick={() => cloneSurvey(survey.id, survey.title)}
                                       className="cursor-pointer"
