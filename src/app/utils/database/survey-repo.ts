@@ -25,6 +25,27 @@ import {
 } from "../anonymity-config";
 
 export const SurveyRepo = {
+    /**
+     * Update responder agent persona/capability profile and increment version
+     */
+    updateResponderAgentPersona: async (
+        agentToken: string,
+        personaProfile: Record<string, any>,
+        capabilityMap: Record<string, any>
+    ) => {
+        const db = await getMySQLConnection();
+        await db.execute(
+            `UPDATE responder_agents
+             SET persona_profile = ?,
+                 capability_map = ?,
+                 last_enriched_at = NOW(),
+                 persona_version = IFNULL(persona_version, 0) + 1,
+                 updated_at = CURRENT_TIMESTAMP
+             WHERE agent_token = ?`,
+            [JSON.stringify(personaProfile), JSON.stringify(capabilityMap), agentToken]
+        );
+        return true;
+    },
     createSurvey: async (data: any, createdBy: number) => {
         const db = await getMySQLConnection();
         const connection = await db.getConnection();

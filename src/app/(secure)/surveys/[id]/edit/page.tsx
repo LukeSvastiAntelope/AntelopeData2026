@@ -24,7 +24,9 @@ import {
   AlertCircle,
   Shield,
   Info,
-  Brain
+  Brain,
+  Rocket,
+  ListChecks
 } from "lucide-react"
 import { AnonymityLevel } from '@/app/utils/interface'
 import { 
@@ -93,6 +95,11 @@ const EditSurveyPage = () => {
   const [qIntro, setQIntro] = useState<string>('To start, please share a specific experience related to this topic (time, place, context).')
   const [qClosing, setQClosing] = useState<string>('Before we wrap up: Is there anything important we didn\'t cover? What\'s the one takeaway you want us to remember?')
   const [qConsent, setQConsent] = useState<string>('This session is an interview-style conversation. Your responses may be analyzed to extract themes and quotes. Do not share sensitive personal information.')
+  // Phase 2: Twin deployment controls (preview + threshold)
+  const [deploying, setDeploying] = useState(false)
+  const [threshold, setThreshold] = useState<number>(0.6)
+  const [previewMatches, setPreviewMatches] = useState<any[]>([])
+  const [loadingPreview, setLoadingPreview] = useState(false)
 
   const qualPreviewItems = useMemo(() => {
     const split = (s: string) => (s || '').split(/\n|;|,|•|-/g).map(t => t.trim()).filter(Boolean).slice(0, 4)
@@ -160,6 +167,46 @@ const EditSurveyPage = () => {
       setError('Failed to load survey')
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const handlePreviewTwins = async () => {
+    setLoadingPreview(true)
+    setError(null)
+    try {
+      const res = await fetch(`/api/surveys/${surveyId}/twins/preview-matches`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` },
+        body: JSON.stringify({ topK: 100 })
+      })
+      const data = await res.json()
+      if (!data.status) throw new Error(data.message || 'Failed to preview')
+      setPreviewMatches(data.results)
+    } catch (e:any) {
+      setError(e.message || 'Preview failed')
+    } finally {
+      setLoadingPreview(false)
+    }
+  }
+
+  const handleDeployTwins = async () => {
+    setDeploying(true)
+    setError(null)
+    try {
+      const eligible = previewMatches.filter(m => (m.readiness ?? 0) >= threshold)
+      const res = await fetch(`/api/surveys/${surveyId}/twins/deploy`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` },
+        body: JSON.stringify({ threshold, candidates: eligible })
+      })
+      const data = await res.json()
+      if (!data.status) throw new Error(data.message || 'Deploy failed')
+      // For dry-run, just reflect summary in UI
+      setPreviewMatches(eligible)
+    } catch (e:any) {
+      setError(e.message || 'Deploy failed')
+    } finally {
+      setDeploying(false)
     }
   }
 
@@ -474,6 +521,65 @@ const EditSurveyPage = () => {
                 />
                 <Label htmlFor="isPublic">Make this survey publicly accessible</Label>
               </div>
+            </CardContent>
+          </Card>
+
+          {/* Phase 2: Digital Twin Deployment */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <Rocket className="h-5 w-5" />
+                    Deploy Digital Twins (Preview)
+                  </CardTitle>
+                  <CardDescription>Use twins as synthetic responders with a readiness threshold</CardDescription>
+                </div>
+                <div className="flex gap-2">
+                  <Button variant="outline" onClick={handlePreviewTwins} disabled={loadingPreview}>
+                    <ListChecks className="h-4 w-4 mr-2" />
+                    {loadingPreview ? 'Loading...' : 'Preview Matches'}
+                  </Button>
+                  <Button onClick={handleDeployTwins} disabled={deploying || previewMatches.length === 0}>
+                    <Rocket className="h-4 w-4 mr-2" />
+                    {deploying ? 'Deploying...' : 'Deploy (Dry-run)'}
+                  </Button>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label>Readiness Threshold: {Math.round(threshold * 100)}%</Label>
+                <input type="range" min="0" max="1" step="0.05" value={threshold} onChange={(e)=>setThreshold(Number(e.target.value))} className="w-full" />
+                <p className="text-xs text-muted-foreground mt-1">Only twins with readiness above this value are eligible.</p>
+              </div>
+
+              {previewMatches.length > 0 ? (
+                <div className="rounded-lg border overflow-hidden">
+                  <div className="grid grid-cols-6 gap-2 p-2 bg-muted text-xs font-medium">
+                    <div>Agent</div>
+                    <div>Similarity</div>
+                    <div>Completion</div>
+                    <div>Readiness</div>
+                    <div>Survey Title</div>
+                    <div>Reasons</div>
+                  </div>
+                  {previewMatches.map((m, idx) => (
+                    <div key={m.agentToken || idx} className="grid grid-cols-6 gap-2 p-2 border-t text-xs items-center">
+                      <div className="font-mono truncate" title={m.agentToken}>{m.agentToken?.slice(0,8)}...{m.agentToken?.slice(-6)}</div>
+                      <div>{(m.similarity ?? 0).toFixed(2)}</div>
+                      <div>{Math.round(m.completionPercentage ?? 0)}%</div>
+                      <div className={((m.readiness ?? 0) >= threshold) ? 'text-green-600' : 'text-muted-foreground'}>
+                        {Math.round(((m.readiness ?? 0) * 100))}%
+                      </div>
+                      <div className="truncate" title={m.surveyTitle}>{m.surveyTitle || '—'}</div>
+                      <div className="truncate" title={(m.reasons||[]).join('; ')}>{(m.reasons||[]).slice(0,2).join('; ')}</div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">No preview yet. Click "Preview Matches" to see eligible twins.</p>
+              )}
             </CardContent>
           </Card>
 

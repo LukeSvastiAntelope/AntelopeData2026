@@ -36,6 +36,8 @@ interface TwinData {
   created_from_response_id: number
   created_at: string
   principles?: any
+  persona_profile?: any
+  capability_map?: any
 }
 
 interface Survey {
@@ -148,6 +150,8 @@ export default function DigitalTwinDashboard() {
   }
 
   const demographics = twin.baseProfile?.demographics || {}
+  const persona = (twin as any).persona_profile || {}
+  const capabilities = (twin as any).capability_map || {}
   const completionScore = calculateCompletionScore()
 
   return (
@@ -270,6 +274,21 @@ export default function DigitalTwinDashboard() {
                 </p>
               </CardContent>
             </Card>
+
+            {/* Persona Summary */}
+            {(persona.summary || persona.worldview) && (
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Persona Summary</CardTitle>
+                  <Brain className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground">
+                    {persona.summary || persona.worldview}
+                  </p>
+                </CardContent>
+              </Card>
+            )}
           </div>
 
           <div className="grid gap-6 lg:grid-cols-2">
@@ -366,6 +385,35 @@ export default function DigitalTwinDashboard() {
                 )}
               </CardContent>
             </Card>
+
+            {/* Capabilities */}
+            {(capabilities.topics || capabilities.question_type_proficiency) && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <TrendingUp className="h-5 w-5 text-blue-600" />
+                    Capabilities
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {Array.isArray(capabilities.topics) && capabilities.topics.length > 0 && (
+                    <div className="mb-3">
+                      <div className="text-xs text-muted-foreground mb-1">Topics</div>
+                      <div className="flex flex-wrap gap-1">
+                        {capabilities.topics.slice(0, 8).map((t: string, i: number) => (
+                          <Badge key={`${t}-${i}`} variant="secondary" className="text-xs">{t}</Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {capabilities.question_type_proficiency && (
+                    <div className="text-xs text-muted-foreground">
+                      Question-type proficiency captured; improves as more surveys are completed.
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
           </div>
 
 
