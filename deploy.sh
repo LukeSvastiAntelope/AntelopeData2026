@@ -6,7 +6,7 @@ echo "=== Checking Node Version ==="
 node -v
 
 echo "=== Installing Dependencies ==="
-npm ci
+npm install
 
 echo "=== Using runtime environment variables from GitHub Actions ==="
 
@@ -23,7 +23,7 @@ export DB_PORT=${MYSQL_PORT}
 node scripts/run-channels-migration.js || echo "Migration completed or tables already exist"
 
 echo "=== Building Project ==="
-npm run build
+NODE_OPTIONS="--max-old-space-size=4096" npm run build
 
 echo "=== Restarting Application with updated env ==="
 pm2 restart 4 --update-env
