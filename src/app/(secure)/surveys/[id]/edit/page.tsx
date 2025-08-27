@@ -98,6 +98,10 @@ const EditSurveyPage = () => {
   // Phase 2: Twin deployment controls (preview + threshold)
   const [deploying, setDeploying] = useState(false)
   const [threshold, setThreshold] = useState<number>(0.6)
+
+  // Channels
+  const [telegramEnabled, setTelegramEnabled] = useState<boolean>(false)
+  const [telegramWelcome, setTelegramWelcome] = useState<string>('Welcome! Ready to start the survey?')
   const [previewMatches, setPreviewMatches] = useState<any[]>([])
   const [loadingPreview, setLoadingPreview] = useState(false)
 
@@ -116,6 +120,17 @@ const EditSurveyPage = () => {
   useEffect(() => {
     if (surveyId) {
       fetchSurvey()
+      // Load saved telegram channel config (enabled + welcome message)
+      fetch(`/api/surveys/${surveyId}/channels/telegram`, { headers: { 'Content-Type': 'application/json' } })
+        .then(r=>r.json())
+        .then(data => {
+          if (data?.status && data?.channel) {
+            setTelegramEnabled((data.channel.status === 'enabled'))
+            const cfg = data.channel.config || {}
+            if (cfg.welcome) setTelegramWelcome(cfg.welcome)
+          }
+        })
+        .catch(()=>{})
     }
   }, [surveyId])
 
@@ -471,6 +486,64 @@ const EditSurveyPage = () => {
         <div className="border-b border-border" />
 
         <div className="p-6 space-y-6">
+          {/* Channels Tab (minimal first version) */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2"><ListChecks className="h-4 w-4" /> Channels</CardTitle>
+              <CardDescription>Enable distribution channels for this survey. Telegram uses private chat with your bot.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="font-medium">Telegram</div>
+                  <div className="text-xs text-muted-foreground">Private 1:1 chat via deep link</div>
+                </div>
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm">Enable</label>
+                    <input
+                      type="checkbox"
+                      checked={telegramEnabled}
+                      onChange={async (e)=>{
+                        const checked = e.target.checked
+                        setTelegramEnabled(checked)
+                        try {
+                          const url = `/api/surveys/${surveyId}/channels/telegram/enable`
+                          const res = await fetch(url, { method: checked ? 'POST' : 'DELETE' })
+                          const data = await res.json().catch(()=>({}))
+                          if (!res.ok || data?.status === false) {
+                            throw new Error(data?.message || 'Failed to update channel')
+                          }
+                        } catch (err) {
+                          // revert on error
+                          setTelegramEnabled(!checked)
+                          console.error(err)
+                        }
+                      }}
+                    />
+                  </div>
+              </div>
+              {telegramEnabled && (
+                <div className="space-y-2">
+                  <Label htmlFor="twelcome">Welcome message</Label>
+                  <Textarea id="twelcome" value={telegramWelcome} onChange={e=>setTelegramWelcome(e.target.value)} />
+                  <div className="text-xs text-muted-foreground">Shown before the first question.</div>
+                  <Button size="sm" variant="outline" onClick={async()=>{
+                    try {
+                      const res = await fetch(`/api/surveys/${surveyId}/channels/telegram/enable`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ config: { welcome: telegramWelcome } })
+                      })
+                      const data = await res.json()
+                      if (!res.ok || !data.status) throw new Error(data.message || 'Failed')
+                    } catch (e) {
+                      console.error(e)
+                    }
+                  }}>Save Telegram Settings</Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
           {error && (
             <div className="flex items-center gap-2 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
               <AlertCircle className="h-4 w-4 text-red-600" />

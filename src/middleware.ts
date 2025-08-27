@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { auth } from "@/auth"
+import NextAuth from 'next-auth'
+import { authConfig } from '@/auth.config'
 
 const publicRoutes = [
     '/api/signin',
@@ -45,10 +46,14 @@ const publicRoutes = [
     '/api/digital-twin/check-email', // Check for existing digital twin by email
     '/api/digital-twin/magic-link', // Send magic link for digital twin access
     '/api/surveys/cron/close-expired', // Cron job to close expired surveys
+    '/api/channels/telegram/webhook', // Telegram webhook must be public
     // '/api/cohorts',           // (was public during early dev; now requires auth)
     // '/api/cohort/query',      // (was public during v1 testing; now requires auth)
     '/api/public/surveys', // List surveys
 ]
+
+// Use edge-safe config to create an auth middleware wrapper without importing Node-only modules
+const { auth } = NextAuth(authConfig)
 
 export default auth((req) => {
     const path = req.nextUrl.pathname;
