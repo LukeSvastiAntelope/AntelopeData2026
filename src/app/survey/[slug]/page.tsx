@@ -51,6 +51,8 @@ interface Demographics {
   name: string
   email: string
   age: string
+  gender?: string
+  ethnicity?: string
   location: string
   occupation: string
   politicalViews: string
@@ -84,6 +86,8 @@ const SurveyPage = () => {
     name: '',
     email: '',
     age: '',
+    gender: '',
+    ethnicity: '',
     location: '',
     occupation: '',
     politicalViews: '',
