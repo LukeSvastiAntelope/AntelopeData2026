@@ -156,6 +156,7 @@ const LoginPage = () => {
                                     name="password"
                                     type="password"
                                     placeholder="Password"
+                                    autoComplete="current-password"
                                     value={formData.password}
                                     onChange={handleChange}
                                     required

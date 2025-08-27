@@ -69,6 +69,11 @@ export function AppSidebar({ className, collapsible = "offcanvas", ...props }: S
       icon: Brain
     },
     {
+      title: "Channels",
+      href: "/channels",
+      icon: MessageCircle
+    },
+    {
       title: "Reports",
       href: "/reports",
       icon: FileBarChart
