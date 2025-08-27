@@ -193,6 +193,42 @@ export const SurveyRepo = {
         };
     },
 
+    // Fetch survey by id regardless of creator/status (server-internal use)
+    getSurveyByIdAny: async (surveyId: number) => {
+        const db = await getMySQLConnection();
+        const [rows] = await db.execute<RowDataPacket[]>(
+            'SELECT * FROM surveys WHERE id = ? LIMIT 1',
+            [surveyId]
+        );
+        if (!rows[0]) return null;
+        const survey = rows[0];
+        const [questionRows] = await db.execute<RowDataPacket[]>(
+            'SELECT * FROM survey_questions WHERE survey_id = ? ORDER BY question_order ASC',
+            [survey.id]
+        );
+        return {
+            ...survey,
+            questions: questionRows.map((q: any) => ({
+                ...q,
+                options: q.options
+            }))
+        };
+    },
+
+    // Check if a respondent with the given email has already answered this survey
+    hasRespondedByEmail: async (surveyId: number, email: string) => {
+        const db = await getMySQLConnection();
+        // Prefer JSON_EXTRACT when column is JSON; fallback to LIKE for text
+        const [rows] = await db.execute<RowDataPacket[]>(
+            `SELECT id FROM survey_responses 
+             WHERE survey_id = ? 
+               AND (JSON_EXTRACT(demographics, '$.email') = ? OR demographics LIKE CONCAT('%', '"email"', ':', '"', ?, '"', '%'))
+             LIMIT 1`,
+            [surveyId, email, email]
+        );
+        return Boolean(rows && rows[0]);
+    },
+
     submitSurveyResponse: async (data: any, ipAddress: string, userAgent: string) => {
         const db = await getMySQLConnection();
         const connection = await db.getConnection();
@@ -222,7 +258,22 @@ export const SurveyRepo = {
             let responseResult: ResultSetHeader;
             
             if (hasResponseSourceTracking) {
-                const source = data.source || 'native';
+                // Defensive fallback: if provided source is not in enum, coerce to 'native'
+                let source = data.source || 'native';
+                try {
+                    const [enumRows] = await connection.execute<RowDataPacket[]>(
+                        `SELECT COLUMN_TYPE FROM INFORMATION_SCHEMA.COLUMNS 
+                         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'survey_responses' AND COLUMN_NAME = 'source'`
+                    );
+                    const colType = (enumRows as any)[0]?.COLUMN_TYPE as string | undefined
+                    if (colType && colType.toLowerCase().startsWith('enum(')) {
+                        const allowed = colType
+                          .slice(colType.indexOf('(') + 1, colType.lastIndexOf(')'))
+                          .split(',')
+                          .map(s => s.trim().replace(/^'(.*)'$/, '$1'))
+                        if (!allowed.includes(source)) source = 'native'
+                    }
+                } catch {}
                 [responseResult] = await connection.execute<ResultSetHeader>(
                     `INSERT INTO survey_responses (survey_id, demographics, anonymity_level, ip_address, user_agent, source) 
                      VALUES (?, ?, ?, ?, ?, ?)`,

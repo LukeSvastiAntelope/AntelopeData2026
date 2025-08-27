@@ -42,6 +42,13 @@ import { AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, CartesianGrid, XAx
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@/components/ui/table"
 import { formatDistanceToNow } from "date-fns"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog"
 
 
 interface Survey {
@@ -76,6 +83,9 @@ const SurveysPage = () => {
   const [stats, setStats] = useState<DashboardStats | null>(null)
   const [loading, setLoading] = useState(true)
   const router = useRouter()
+  const [shareOpen, setShareOpen] = useState(false)
+  const [shareFor, setShareFor] = useState<Survey | null>(null)
+  const [telegramUsername, setTelegramUsername] = useState<string | null>(null)
 
   const grayscalePalette = [
     'hsl(0, 0%, 9%)',   // Very dark gray (almost black)
@@ -356,6 +366,22 @@ const SurveysPage = () => {
     }
   }
 
+  const openShareModal = async (survey: Survey) => {
+    setShareFor(survey)
+    setShareOpen(true)
+    try {
+      const res = await fetch('/api/channels/telegram/status')
+      const data = await res.json()
+      if (data?.status && data.connected) {
+        setTelegramUsername(data.botUsername || null)
+      } else {
+        setTelegramUsername(null)
+      }
+    } catch {
+      setTelegramUsername(null)
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex-1 p-2 w-full bg-background">
@@ -409,6 +435,44 @@ const SurveysPage = () => {
         <div className="border-b border-border" />
 
         <div className="p-6 space-y-4">
+          <Dialog open={shareOpen} onOpenChange={setShareOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Share survey</DialogTitle>
+                <DialogDescription>Use these links to distribute your survey.</DialogDescription>
+              </DialogHeader>
+              {shareFor && (
+                <div className="space-y-3">
+                  <div className="rounded border p-3">
+                    <div className="text-sm font-medium mb-1">Web</div>
+                    <div className="flex items-center gap-2">
+                      <input readOnly className="w-full px-2 py-1 border rounded bg-muted/50" value={`${window.location.origin}/survey/${shareFor.slug}`} />
+                      <Button size="sm" variant="outline" onClick={() => copyShareLink(shareFor.slug, shareFor.title)}>Copy</Button>
+                    </div>
+                  </div>
+                  <div className="rounded border p-3">
+                    <div className="text-sm font-medium mb-1">Telegram</div>
+                    {telegramUsername ? (
+                      <div className="flex items-center gap-2">
+                        <input readOnly className="w-full px-2 py-1 border rounded bg-muted/50" value={`https://t.me/${telegramUsername}?start=survey_${shareFor.slug}`} />
+                        <Button size="sm" variant="outline" onClick={async()=>{
+                          await navigator.clipboard.writeText(`https://t.me/${telegramUsername}?start=survey_${shareFor.slug}`)
+                          toast.success('Telegram deep link copied')
+                        }}>Copy</Button>
+                        <a href={`https://t.me/${telegramUsername}?start=survey_${shareFor.slug}`} target="_blank" rel="noreferrer">
+                          <Button size="sm">Open</Button>
+                        </a>
+                      </div>
+                    ) : (
+                      <div className="text-xs text-muted-foreground">
+                        Telegram not connected. Configure under Channels to enable deep links.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </DialogContent>
+          </Dialog>
           {/* Introduction (restored) */}
           <div className="text-left">
             <h2 className="text-3xl font-bold">Survey Management</h2>
@@ -612,8 +676,8 @@ const SurveysPage = () => {
                                 <Button 
                                   variant="ghost" 
                                   size="sm"
-                                  onClick={() => copyShareLink(survey.slug, survey.title)}
-                                  title="Copy share link"
+                                  onClick={() => openShareModal(survey)}
+                                  title="Share"
                                 >
                                   <Share className="h-4 w-4" />
                                 </Button>
