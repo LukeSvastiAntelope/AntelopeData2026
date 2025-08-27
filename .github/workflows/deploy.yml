@@ -64,10 +64,41 @@ jobs:
     
     - name: Deploy to Digital Ocean
       uses: appleboy/ssh-action@master
+      env:
+        PUBLIC_BASE_URL: ${{ secrets.PUBLIC_BASE_URL }}
+        NEXT_PUBLIC_APP_URL: ${{ secrets.NEXT_PUBLIC_APP_URL }}
+        SECURE_STORAGE_KEY: ${{ secrets.SECURE_STORAGE_KEY }}
+        TELEGRAM_WEBHOOK_SECRET: ${{ secrets.TELEGRAM_WEBHOOK_SECRET }}
+        MYSQL_HOST: ${{ secrets.MYSQL_HOST }}
+        MYSQL_PORT: ${{ secrets.MYSQL_PORT }}
+        MYSQL_USER: ${{ secrets.MYSQL_USER }}
+        MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
+        MYSQL_DATABASE: ${{ secrets.MYSQL_DATABASE }}
+        JWT_SECRET: ${{ secrets.JWT_SECRET }}
+        OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+        GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        SERPAPI_API_KEY: ${{ secrets.SERPAPI_API_KEY }}
+        PINECONE_API_KEY: ${{ secrets.PINECONE_API_KEY }}
+        COINMARKETCAP_API_KEY: ${{ secrets.COINMARKETCAP_API_KEY }}
+        TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        TELEGRAM_BOT_USERNAME: ${{ secrets.TELEGRAM_BOT_USERNAME }}
+        TELEGRAM_CHANNEL_ID: ${{ secrets.TELEGRAM_CHANNEL_ID }}
+        ESCROW_SOLANA_ADDRESS: ${{ secrets.ESCROW_SOLANA_ADDRESS }}
+        ESCROW_SOLANA_PRIVATE: ${{ secrets.ESCROW_SOLANA_PRIVATE }}
+        STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+        STRIPE_PUBLIC_KEY: ${{ secrets.STRIPE_PUBLIC_KEY }}
+        STRIPE_SECRET_WEBHOOK_KEY: ${{ secrets.STRIPE_SECRET_WEBHOOK_KEY }}
+        SPORTS_DB_API_KEY: ${{ secrets.SPORTS_DB_API_KEY }}
+        PINATA_KEY: ${{ secrets.PINATA_KEY }}
+        PINATA_SECRET: ${{ secrets.PINATA_SECRET }}
+        PINATA_JWT: ${{ secrets.PINATA_JWT }}
+        PINATA_GATEWAY: ${{ secrets.PINATA_GATEWAY }}
       with:
         host: ${{ secrets.DROPLET_HOST }}
         username: root
         key: ${{ secrets.DROPLET_SSH_KEY }}
+        envs: PUBLIC_BASE_URL,NEXT_PUBLIC_APP_URL,SECURE_STORAGE_KEY,TELEGRAM_WEBHOOK_SECRET,MYSQL_HOST,MYSQL_PORT,MYSQL_USER,MYSQL_PASSWORD,MYSQL_DATABASE,JWT_SECRET,OPENAI_API_KEY,DEEPSEEK_API_KEY,GEMINI_API_KEY,SERPAPI_API_KEY,PINECONE_API_KEY,COINMARKETCAP_API_KEY,TELEGRAM_BOT_TOKEN,TELEGRAM_BOT_USERNAME,TELEGRAM_CHANNEL_ID,ESCROW_SOLANA_ADDRESS,ESCROW_SOLANA_PRIVATE,STRIPE_SECRET_KEY,STRIPE_PUBLIC_KEY,STRIPE_SECRET_WEBHOOK_KEY,SPORTS_DB_API_KEY,PINATA_KEY,PINATA_SECRET,PINATA_JWT,PINATA_GATEWAY
         script: |
           cd /root/marketmaker
           echo "=== Pulling Latest Changes ==="
