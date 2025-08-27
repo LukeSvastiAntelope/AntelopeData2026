@@ -6,6 +6,10 @@ export const AVAILABLE_MODELS = {
     { id: 'o3', name: 'o3', provider: 'OpenAI' },
     { id: 'o1', name: 'o1', provider: 'OpenAI' },
     { id: 'o1-mini', name: 'o1-mini', provider: 'OpenAI' },
+    // GPT-5 family (requires access)
+    { id: 'gpt-5', name: 'GPT-5', provider: 'OpenAI' },
+    { id: 'gpt-5-mini', name: 'GPT-5 Mini', provider: 'OpenAI' },
+    { id: 'gpt-5-turbo', name: 'GPT-5 Turbo', provider: 'OpenAI' },
     // GPT-4 family
     { id: 'gpt-4o', name: 'GPT-4o', provider: 'OpenAI' },
     { id: 'gpt-4o-mini', name: 'GPT-4o Mini', provider: 'OpenAI' },
