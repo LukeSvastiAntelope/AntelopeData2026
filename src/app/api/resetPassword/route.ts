@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
             });
         }
 
-        const user = await UserRepo.getUserByUsername(jwtPayload.email as string);
+        const user = await UserRepo.getUserByEmail(jwtPayload.email as string);
         if (!user) {
             return Response.json({
                 status: false,
