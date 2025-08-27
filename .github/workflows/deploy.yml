@@ -24,6 +24,7 @@ jobs:
       run: npm run build
       env:
         CI: false
+        NODE_OPTIONS: "--max-old-space-size=4096"
         # Add your environment variables here
         NODE_ENV: production
         NEXT_PUBLIC_APP_URL: https://getantelope.com
