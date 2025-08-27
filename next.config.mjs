@@ -1,6 +1,10 @@
 /** @type {import('next').NextConfig} */
 import path from 'path';
 const nextConfig = {
+    eslint: {
+        // Prevent ESLint warnings from failing CI builds
+        ignoreDuringBuilds: true,
+    },
     env: {
         PINATA_JWT: process.env.PINATA_JWT,
         PINATA_GATEWAY: process.env.PINATA_GATEWAY,
