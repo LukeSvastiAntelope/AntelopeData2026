@@ -14,15 +14,17 @@ jobs:
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '20'
+        node-version: '22'
         cache: 'npm'
     
     - name: Install Dependencies
       run: npm install
     
     - name: Build
-      run: NODE_OPTIONS="--max-old-space-size=4096" npm run build
+      run: npm run build
       env:
+        CI: false
+        NODE_OPTIONS: "--max-old-space-size=4096"
         # Add your environment variables here
         NODE_ENV: production
         NEXT_PUBLIC_APP_URL: https://getantelope.com
