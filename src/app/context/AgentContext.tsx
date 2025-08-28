@@ -69,8 +69,8 @@ export const AgentProvider = ({ children }: { children: React.ReactNode }) => {
         // Only redirect from login page if user has a session (allow register page even with session)
         if (session && isLoginPage) {
             // Redirect immediately when session is available, don't wait for user data
-            console.log('AgentProvider: Redirecting from login page to cohort-chat');
-                router.push("/cohort-chat/chat");
+            console.log('AgentProvider: Redirecting from login page to surveys');
+                router.push("/surveys");
             return;
         }
         
