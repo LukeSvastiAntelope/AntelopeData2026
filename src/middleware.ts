@@ -88,7 +88,7 @@ export default auth((req) => {
             // Allow access to login if coming from logout
             return NextResponse.next();
         }
-        return NextResponse.redirect(new URL('/cohort-chat', req.url));
+        return NextResponse.redirect(new URL('/surveys', req.url));
     }
     
     // Allow access to register page for all users (logged in or not)
