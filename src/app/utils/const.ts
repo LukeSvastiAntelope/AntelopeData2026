@@ -73,12 +73,24 @@ export const GPT_MODELS = [
         type: "openai",
         model: 'gpt-4'
     },
-    // Newer OpenAI models (if available via account)
+    // GPT-5 family (if available via account)
     {
         key: 'gpt-5',
         label: 'GPT-5',
         type: "openai",
         model: 'gpt-5'
+    },
+    {
+        key: 'gpt-5-turbo',
+        label: 'GPT-5 Turbo',
+        type: "openai",
+        model: 'gpt-5-turbo'
+    },
+    {
+        key: 'gpt-5-mini',
+        label: 'GPT-5 Mini',
+        type: "openai",
+        model: 'gpt-5-mini'
     },
     {
         key: 'gpt-4.1',
