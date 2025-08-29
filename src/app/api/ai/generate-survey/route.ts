@@ -156,11 +156,14 @@ Guidelines:
                 .join('');
         } else {
             // Use OpenAI-compatible API
-            // o1 and o3 models don't support temperature and use max_completion_tokens
-            // Other models support temperature and use max_tokens
-            const isReasoningModel = modelConfig.model.includes('o1') || modelConfig.model.includes('o3');
-            const useNewTokenParam = modelConfig.type === "openai" && 
-                (isReasoningModel || modelConfig.model.includes('gpt-4o'));
+            // Newer OpenAI models (o1, o3, gpt-5, gpt-4o) use max_completion_tokens and may not support temperature
+            const isReasoningModel = (
+                modelConfig.model.includes('o1') ||
+                modelConfig.model.includes('o3') ||
+                modelConfig.model.includes('gpt-5') ||
+                modelConfig.model.includes('gpt-4o')
+            );
+            const useNewTokenParam = modelConfig.type === "openai" && isReasoningModel;
             
             const requestParams: any = {
                 model: modelConfig.model,
