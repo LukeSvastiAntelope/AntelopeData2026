@@ -126,7 +126,11 @@ async function createOpenAICompletion(options: AICompletionOptions): Promise<AIC
   const client = getOpenAIClient();
   
   // Determine if this is a newer model that uses max_completion_tokens
-  const usesCompletionTokens = options.model.startsWith('o1') || options.model.startsWith('o3');
+  const usesCompletionTokens =
+    options.model.startsWith('o1') ||
+    options.model.startsWith('o3') ||
+    options.model.startsWith('gpt-5') ||
+    options.model.includes('gpt-4o');
   
   const requestParams: any = {
     model: options.model,
@@ -284,7 +288,11 @@ async function createOpenAIStreamingCompletion(options: AICompletionOptions): Pr
   const client = getOpenAIClient();
   
   // Determine if this is a newer model that uses max_completion_tokens
-  const usesCompletionTokens = options.model.startsWith('o1') || options.model.startsWith('o3');
+  const usesCompletionTokens =
+    options.model.startsWith('o1') ||
+    options.model.startsWith('o3') ||
+    options.model.startsWith('gpt-5') ||
+    options.model.includes('gpt-4o');
   
   const requestParams: any = {
     model: options.model,
