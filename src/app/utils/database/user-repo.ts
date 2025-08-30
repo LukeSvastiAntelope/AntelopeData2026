@@ -57,6 +57,7 @@ export const UserRepo = {
     upsertPredictionTopicConfig,
     deleteUserById,
     getAllPredictions,
+    getAllUsersBasic,
 }
 
 async function getBetsStatsByAgentId(agentId: number) {
@@ -1105,6 +1106,15 @@ async function getLeaderboard() {
             agents.total_winnings`
     );
     return rows;
+}
+
+// Basic user listing for admin views
+async function getAllUsersBasic(): Promise<Array<Pick<UserDB, 'id' | 'email' | 'display_name' | 'role'>>> {
+    const db = await getMySQLConnection();
+    const [rows] = await db.execute<(UserDB & RowDataPacket)[]>(
+        'SELECT id, email, display_name, role FROM users ORDER BY id DESC'
+    );
+    return rows as any;
 }
 
 async function getPredictionTopicConfigs() {
