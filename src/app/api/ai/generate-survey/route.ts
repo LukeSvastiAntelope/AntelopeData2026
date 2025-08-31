@@ -217,7 +217,43 @@ Guidelines:
                         ms: Date.now() - tStart,
                         usage: completion.usage,
                     });
-                    aiResponse = completion.choices[0]?.message?.content;
+                    const firstChoice: any = completion?.choices?.[0]?.message ?? {};
+                    let content: any = firstChoice.content;
+                    if (Array.isArray(content)) {
+                        try {
+                            content = content
+                                .map((part: any) =>
+                                    typeof part === 'string' ? part : (part?.text ?? '')
+                                )
+                                .join('');
+                        } catch {}
+                    }
+                    if (!content || (typeof content === 'string' && content.trim() === '')) {
+                        // Attempt to extract reasoning text if present (seen on newer models)
+                        const reasoning: any = (firstChoice as any).reasoning;
+                        if (Array.isArray(reasoning)) {
+                            try {
+                                const reasoningText = reasoning
+                                    .map((r: any) => {
+                                        if (typeof r === 'string') return r;
+                                        if (Array.isArray(r?.content)) {
+                                            return r.content
+                                                .map((c: any) => c?.text ?? '')
+                                                .join('');
+                                        }
+                                        return r?.text ?? '';
+                                    })
+                                    .join('');
+                                if (reasoningText && reasoningText.trim()) {
+                                    content = reasoningText;
+                                }
+                            } catch {}
+                        }
+                    }
+                    aiResponse = typeof content === 'string' ? content : (content ?? '');
+                    if (!aiResponse || aiResponse.trim() === '') {
+                        console.warn('[gen-survey] Empty assistant content after completion; falling back');
+                    }
                     break;
                 } catch (err: any) {
                     lastError = err;
