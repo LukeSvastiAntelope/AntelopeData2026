@@ -3,6 +3,9 @@ import OpenAI from 'openai';
 import Anthropic from '@anthropic-ai/sdk';
 import { GPT_MODELS } from '@/app/utils/const';
 
+// Allow longer processing time during generation
+export const maxDuration = 120;
+
 // POST /api/ai/generate-survey - Generate survey using AI
 export async function POST(req: NextRequest) {
     try {
@@ -15,6 +18,7 @@ export async function POST(req: NextRequest) {
         }
 
         const { prompt, model = 'gpt-4o', mode } = await req.json();
+        const t0 = Date.now();
         
         if (!prompt || typeof prompt !== 'string') {
             return NextResponse.json({ 
@@ -42,9 +46,10 @@ export async function POST(req: NextRequest) {
             }
             aiClient = new OpenAI({
                 apiKey: process.env.OPENAI_API_KEY,
-                timeout: 60000,
+                timeout: 120000,
                 maxRetries: 0,
             });
+            console.log('[gen-survey] Using OpenAI', { model: modelConfig.model, timeoutMs: 120000 });
         } else if (modelConfig.type === "deepseek") {
             if (!process.env.DEEPSEEK_API_KEY) {
                 return NextResponse.json({ 
@@ -54,9 +59,10 @@ export async function POST(req: NextRequest) {
             aiClient = new OpenAI({
                 apiKey: process.env.DEEPSEEK_API_KEY,
                 baseURL: 'https://api.deepseek.com',
-                timeout: 60000,
+                timeout: 120000,
                 maxRetries: 0,
             });
+            console.log('[gen-survey] Using DeepSeek', { model: modelConfig.model });
         } else if (modelConfig.type === "gemini") {
             if (!process.env.GEMINI_API_KEY) {
                 return NextResponse.json({ 
@@ -66,9 +72,10 @@ export async function POST(req: NextRequest) {
             aiClient = new OpenAI({
                 apiKey: process.env.GEMINI_API_KEY,
                 baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai/',
-                timeout: 60000,
+                timeout: 120000,
                 maxRetries: 0,
             });
+            console.log('[gen-survey] Using Gemini', { model: modelConfig.model });
         } else if (modelConfig.type === "anthropic") {
             if (!process.env.ANTHROPIC_API_KEY) {
                 return NextResponse.json({ 
@@ -179,23 +186,37 @@ Guidelines:
                 ],
             };
             
-            // Add temperature only for models that support it
+            // Remove temperature for reasoning models like gpt-5; keep it only for classic models
             if (!isReasoningModel) {
                 requestParams.temperature = 0.7;
             }
             
+            const tokenBudget = 800; // lower budget to reduce latency
             if (useNewTokenParam) {
-                requestParams.max_completion_tokens = 2000;
+                requestParams.max_completion_tokens = tokenBudget;
             } else {
-                requestParams.max_tokens = 2000;
+                requestParams.max_tokens = tokenBudget;
             }
+
+            console.log('[gen-survey] Request params', {
+                model: requestParams.model,
+                hasTemperature: requestParams.temperature !== undefined,
+                max_completion_tokens: requestParams.max_completion_tokens,
+                max_tokens: requestParams.max_tokens,
+                promptLen: prompt.length
+            });
             
             // Retry wrapper for transient errors (DNS, timeouts, rate limits)
             const maxAttempts = 3;
             let lastError: any = null;
             for (let attempt = 1; attempt <= maxAttempts; attempt++) {
                 try {
+                    const tStart = Date.now();
                     const completion = await (aiClient as OpenAI).chat.completions.create(requestParams);
+                    console.log('[gen-survey] OpenAI completion ok', {
+                        ms: Date.now() - tStart,
+                        usage: completion.usage,
+                    });
                     aiResponse = completion.choices[0]?.message?.content;
                     break;
                 } catch (err: any) {
@@ -203,6 +224,12 @@ Guidelines:
                     const code = err?.code;
                     const status = err?.status;
                     const isTransient = code === 'ENOTFOUND' || code === 'ETIMEDOUT' || status === 429 || (status >= 500 && status < 600);
+                    console.warn('[gen-survey] OpenAI completion error', {
+                        attempt,
+                        code,
+                        status,
+                        message: err?.message
+                    });
                     if (attempt < maxAttempts && isTransient) {
                         const delayMs = 500 * Math.pow(2, attempt - 1);
                         await new Promise(res => setTimeout(res, delayMs));
@@ -214,6 +241,7 @@ Guidelines:
         }
         
         if (!aiResponse) {
+            console.error('[gen-survey] No aiResponse', { elapsedMs: Date.now() - t0 });
             return NextResponse.json({ 
                 error: 'Failed to generate survey content' 
             }, { status: 500 });
@@ -226,11 +254,45 @@ Guidelines:
             const cleanedResponse = aiResponse.replace(/```json\n?|\n?```/g, '').trim();
             surveyData = JSON.parse(cleanedResponse);
         } catch (parseError) {
-            console.error('Failed to parse AI response:', parseError);
-            console.error('AI Response:', aiResponse);
-            return NextResponse.json({ 
-                error: 'Failed to parse AI response. Please try again.' 
-            }, { status: 500 });
+            console.error('[gen-survey] JSON parse failed on first attempt:', parseError);
+            // Heuristic JSON extraction for reasoning models (e.g., gpt-5) that may wrap JSON in analysis
+            const isReasoningModel = (
+                modelConfig.model.includes('o1') ||
+                modelConfig.model.includes('o3') ||
+                modelConfig.model.includes('gpt-5') ||
+                modelConfig.model.includes('gpt-4o')
+            );
+            if (isReasoningModel) {
+                try {
+                    const text = aiResponse || '';
+                    const fenceCleaned = text.replace(/```json\n?|```/g, '').trim();
+                    // Try to find the largest JSON object in the text
+                    const start = fenceCleaned.indexOf('{');
+                    const end = fenceCleaned.lastIndexOf('}');
+                    if (start !== -1 && end !== -1 && end > start) {
+                        const candidate = fenceCleaned.slice(start, end + 1);
+                        surveyData = JSON.parse(candidate);
+                        console.warn('[gen-survey] Parsed JSON via heuristic extraction for reasoning model');
+                    }
+                } catch (e2) {
+                    console.error('[gen-survey] Heuristic JSON extraction failed:', e2);
+                }
+                // As a final fallback for GPT-5/4o, return raw text so UI can show something instead of 500
+                if (!surveyData) {
+                    console.warn('[gen-survey] Returning raw text fallback for reasoning model');
+                    return NextResponse.json({
+                        status: true,
+                        modelUsed: modelConfig.label,
+                        surveyRaw: aiResponse,
+                        note: 'Model returned non-JSON content; showing raw output.'
+                    });
+                }
+            } else {
+                console.error('AI Response:', aiResponse);
+                return NextResponse.json({ 
+                    error: 'Failed to parse AI response. Please try again.' 
+                }, { status: 500 });
+            }
         }
 
         // Validate the structure
@@ -268,6 +330,7 @@ Guidelines:
             return base;
         });
 
+        console.log('[gen-survey] Success', { elapsedMs: Date.now() - t0 });
         return NextResponse.json({ 
             status: true, 
             survey: surveyData,
