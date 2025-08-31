@@ -995,6 +995,20 @@ const EditSurveyPage = () => {
                           />
                         </div>
 
+                        {/* Question media upload */}
+                        <div className="pt-1">
+                          <Label>Question Media (optional)</Label>
+                          <div className="mt-2 flex items-center gap-2">
+                            <img src={(question as any).media?.url || '/assets/images/placeholder-survey.svg'} alt={(question as any).media?.alt || 'Question media'} className="h-12 w-12 rounded object-cover ring-1 ring-border" />
+                            <Button type="button" variant="outline" size="sm" onClick={async ()=>{
+                              const input = document.createElement('input'); input.type='file'; input.accept='image/png,image/jpeg,image/webp,image/gif';
+                              input.onchange = async ()=>{ const f=input.files?.[0]; if(!f) return; const fd=new FormData(); fd.append('file',f); const res=await fetch('/api/media/upload',{method:'POST',body:fd}); const data=await res.json(); if(data.status){ const updated=[...questions]; (updated[questionIndex] as any).media = { url:data.url, alt:'' }; setQuestions(updated); } };
+                              input.click();
+                            }}>Upload</Button>
+                            <Button type="button" variant="ghost" size="sm" onClick={()=>{ const updated=[...questions]; (updated[questionIndex] as any).media = undefined; setQuestions(updated); }}>Remove</Button>
+                          </div>
+                        </div>
+
                         {(question.type === 'single-choice' || question.type === 'multiple-choice') && (
                           <div>
                             <div className="flex items-center justify-between mb-2">
@@ -1017,6 +1031,19 @@ const EditSurveyPage = () => {
                                     placeholder={`Option ${optionIndex + 1}`}
                                     className="flex-1"
                                   />
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={async ()=>{
+                                      const input = document.createElement('input'); input.type='file'; input.accept='image/png,image/jpeg,image/webp,image/gif';
+                                      input.onchange = async ()=>{ const f=input.files?.[0]; if(!f) return; const fd=new FormData(); fd.append('file',f); const res=await fetch('/api/media/upload',{method:'POST',body:fd}); const data=await res.json(); if(data.status){ const updated=[...questions]; const q:any = updated[questionIndex]; q.optionMedia = q.optionMedia || []; q.optionMedia[optionIndex] = { url:data.url, alt:'' }; setQuestions(updated); } };
+                                      input.click();
+                                    }}
+                                  >Img</Button>
+                                  {((questions[questionIndex] as any).optionMedia?.[optionIndex]?.url) && (
+                                    <img src={(questions[questionIndex] as any).optionMedia?.[optionIndex]?.url || ''} alt="" className="h-8 w-8 rounded object-cover ring-1 ring-border" />
+                                  )}
                                   <Button
                                     variant="ghost"
                                     size="sm"

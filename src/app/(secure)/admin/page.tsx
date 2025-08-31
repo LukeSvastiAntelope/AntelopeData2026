@@ -64,7 +64,7 @@ const AdminPage = () => {
     const [hasMoreUpcomingPredictions, setHasMoreUpcomingPredictions] = useState<boolean>(true);
     const [hasMoreResolvedPredictions, setHasMoreResolvedPredictions] = useState<boolean>(true);
 
-    const [users, setUsers] = useState<IAgentProfile[]>([]);
+    const [users, setUsers] = useState<any[]>([]);
     const [isLoadingUsers, setIsLoadingUsers] = useState<boolean>(false);
 
     const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
@@ -547,10 +547,10 @@ const AdminPage = () => {
                 activeTab === "users" && (
                     <div className="flex flex-col gap-2 py-4">
                         <div className="grid grid-cols-5 font-semibold px-2 pb-2 border-b border-gray-700">
-                            <div>Agent Name</div>
                             <div>User ID</div>
-                            <div>Username</div>
-                            <div>Interests</div>
+                            <div>Email</div>
+                            <div>Display Name</div>
+                            <div>Role</div>
                             <div>Actions</div>
                         </div>
                         {isLoadingUsers && users.length === 0 && (
@@ -563,18 +563,18 @@ const AdminPage = () => {
                                 No users found
                             </div>
                         )}
-                        {users.map((user: IAgentProfile) => (
-                            <div key={user.id} className="grid grid-cols-5 gap-4 hover:bg-gray-800 p-2 rounded-md items-center">
-                                <div>{user.name || "N/A"}</div>
-                                <div>{user.user_id}</div>
-                                <div>{user.username || "N/A"}</div>
-                                <div>{user.interests && user.interests.length > 0 ? user.interests.join(", ") : "No interests specified"}</div>
+                        {users.map((u: any) => (
+                            <div key={u.id} className="grid grid-cols-5 gap-4 hover:bg-gray-800 p-2 rounded-md items-center">
+                                <div>{u.id}</div>
+                                <div>{u.email || "N/A"}</div>
+                                <div>{u.display_name || "N/A"}</div>
+                                <div className="uppercase text-xs">{u.role || "user"}</div>
                                 <div>
                                     <Button 
                                         size="sm" 
                                         color="danger" 
                                         variant="light"
-                                        onPress={() => handleDeleteUserClick(user)}
+                                        onPress={() => handleDeleteUserClick({ user_id: u.id, name: u.display_name } as any)}
                                     >
                                         Delete
                                     </Button>
