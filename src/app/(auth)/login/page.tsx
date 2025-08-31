@@ -28,8 +28,8 @@ const LoginPage = () => {
     useEffect(() => {
         console.log('Login page useEffect - status:', status, 'session:', !!session);
         if (status === "authenticated" && session) {
-            console.log('Redirecting to cohort-chat from login page');
-            router.push("/cohort-chat");
+            console.log('Redirecting to surveys from login page');
+            router.push("/surveys");
         }
     }, [status, session, router]);
 
@@ -64,7 +64,7 @@ const LoginPage = () => {
                 await getSession(); // This will trigger a session refresh
                 
                 // Use router.push after session refresh
-                router.push("/cohort-chat");
+                router.push("/surveys");
             } else {
                 console.error('Server action auth error:', result.error);
                 toast.error(result.error);

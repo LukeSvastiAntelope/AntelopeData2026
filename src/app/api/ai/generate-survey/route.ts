@@ -3,6 +3,9 @@ import OpenAI from 'openai';
 import Anthropic from '@anthropic-ai/sdk';
 import { GPT_MODELS } from '@/app/utils/const';
 
+// Allow longer processing time during generation
+export const maxDuration = 300;
+
 // POST /api/ai/generate-survey - Generate survey using AI
 export async function POST(req: NextRequest) {
     try {
@@ -15,6 +18,7 @@ export async function POST(req: NextRequest) {
         }
 
         const { prompt, model = 'gpt-4o', mode } = await req.json();
+        const t0 = Date.now();
         
         if (!prompt || typeof prompt !== 'string') {
             return NextResponse.json({ 
@@ -42,7 +46,10 @@ export async function POST(req: NextRequest) {
             }
             aiClient = new OpenAI({
                 apiKey: process.env.OPENAI_API_KEY,
+                timeout: 240000,
+                maxRetries: 0,
             });
+            console.log('[gen-survey] Using OpenAI', { model: modelConfig.model, timeoutMs: 240000 });
         } else if (modelConfig.type === "deepseek") {
             if (!process.env.DEEPSEEK_API_KEY) {
                 return NextResponse.json({ 
@@ -51,8 +58,11 @@ export async function POST(req: NextRequest) {
             }
             aiClient = new OpenAI({
                 apiKey: process.env.DEEPSEEK_API_KEY,
-                baseURL: 'https://api.deepseek.com'
+                baseURL: 'https://api.deepseek.com',
+                timeout: 120000,
+                maxRetries: 0,
             });
+            console.log('[gen-survey] Using DeepSeek', { model: modelConfig.model });
         } else if (modelConfig.type === "gemini") {
             if (!process.env.GEMINI_API_KEY) {
                 return NextResponse.json({ 
@@ -61,8 +71,11 @@ export async function POST(req: NextRequest) {
             }
             aiClient = new OpenAI({
                 apiKey: process.env.GEMINI_API_KEY,
-                baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai/'
+                baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai/',
+                timeout: 120000,
+                maxRetries: 0,
             });
+            console.log('[gen-survey] Using Gemini', { model: modelConfig.model });
         } else if (modelConfig.type === "anthropic") {
             if (!process.env.ANTHROPIC_API_KEY) {
                 return NextResponse.json({ 
@@ -156,11 +169,14 @@ Guidelines:
                 .join('');
         } else {
             // Use OpenAI-compatible API
-            // o1 and o3 models don't support temperature and use max_completion_tokens
-            // Other models support temperature and use max_tokens
-            const isReasoningModel = modelConfig.model.includes('o1') || modelConfig.model.includes('o3');
-            const useNewTokenParam = modelConfig.type === "openai" && 
-                (isReasoningModel || modelConfig.model.includes('gpt-4o'));
+            // Newer OpenAI models (o1, o3, gpt-5, gpt-4o) use max_completion_tokens and may not support temperature
+            const isReasoningModel = (
+                modelConfig.model.includes('o1') ||
+                modelConfig.model.includes('o3') ||
+                modelConfig.model.includes('gpt-5') ||
+                modelConfig.model.includes('gpt-4o')
+            );
+            const useNewTokenParam = modelConfig.type === "openai" && isReasoningModel;
             
             const requestParams: any = {
                 model: modelConfig.model,
@@ -170,23 +186,146 @@ Guidelines:
                 ],
             };
             
-            // Add temperature only for models that support it
+            // Remove temperature for reasoning models like gpt-5; keep it only for classic models
             if (!isReasoningModel) {
                 requestParams.temperature = 0.7;
             }
             
+            const tokenBudget = modelConfig.model.includes('gpt-5') ? 8000 : 800;
             if (useNewTokenParam) {
-                requestParams.max_completion_tokens = 2000;
+                requestParams.max_completion_tokens = tokenBudget;
             } else {
-                requestParams.max_tokens = 2000;
+                requestParams.max_tokens = tokenBudget;
             }
-            
-            const completion = await (aiClient as OpenAI).chat.completions.create(requestParams);
 
-            aiResponse = completion.choices[0]?.message?.content;
+            console.log('[gen-survey] Request params', {
+                model: requestParams.model,
+                hasTemperature: requestParams.temperature !== undefined,
+                max_completion_tokens: requestParams.max_completion_tokens,
+                max_tokens: requestParams.max_tokens,
+                promptLen: prompt.length
+            });
+            
+            // Retry wrapper for transient errors (DNS, timeouts, rate limits)
+            const maxAttempts = 3;
+            let lastError: any = null;
+            for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+                try {
+                    const tStart = Date.now();
+                    if (isReasoningModel) {
+                        // Prefer Responses API for GPT-5/4o/o1/o3
+                        const resp: any = await (aiClient as OpenAI).responses.create({
+                            model: modelConfig.model,
+                            input: [
+                                { role: 'system', content: systemPrompt },
+                                { role: 'user', content: prompt }
+                            ],
+                            max_output_tokens: tokenBudget,
+                        } as any);
+                        console.log('[gen-survey] OpenAI responses ok', { ms: Date.now() - tStart });
+                        let content: any = (resp as any).output_text;
+                        if (!content || (typeof content === 'string' && content.trim() === '')) {
+                            const parts = (((resp as any).output || [])
+                                .flatMap((o: any) => (o?.content || []))
+                                .map((c: any) => c?.text ?? '')).join('');
+                            if (parts && parts.trim()) content = parts;
+                        }
+                        // Fallback to Chat Completions if still empty
+                        if (!content || (typeof content === 'string' && content.trim() === '')) {
+                            const t2 = Date.now();
+                            const completion = await (aiClient as OpenAI).chat.completions.create(requestParams);
+                            console.log('[gen-survey] OpenAI completion fallback ok', {
+                                ms: Date.now() - t2,
+                                usage: completion.usage,
+                            });
+                            const firstChoice: any = completion?.choices?.[0]?.message ?? {};
+                            content = firstChoice.content;
+                            if (Array.isArray(content)) {
+                                try {
+                                    content = content
+                                        .map((part: any) => typeof part === 'string' ? part : (part?.text ?? ''))
+                                        .join('');
+                                } catch {}
+                            }
+                            if (!content || (typeof content === 'string' && content.trim() === '')) {
+                                const reasoning: any = (firstChoice as any).reasoning;
+                                if (Array.isArray(reasoning)) {
+                                    try {
+                                        const reasoningText = reasoning
+                                            .map((r: any) => {
+                                                if (typeof r === 'string') return r;
+                                                if (Array.isArray(r?.content)) {
+                                                    return r.content.map((c: any) => c?.text ?? '').join('');
+                                                }
+                                                return r?.text ?? '';
+                                            })
+                                            .join('');
+                                        if (reasoningText && reasoningText.trim()) content = reasoningText;
+                                    } catch {}
+                                }
+                            }
+                        }
+                        aiResponse = typeof content === 'string' ? content : (content ?? '');
+                    } else {
+                        // Classic Chat Completions
+                        const completion = await (aiClient as OpenAI).chat.completions.create(requestParams);
+                        console.log('[gen-survey] OpenAI completion ok', {
+                            ms: Date.now() - tStart,
+                            usage: completion.usage,
+                        });
+                        const firstChoice: any = completion?.choices?.[0]?.message ?? {};
+                        let content: any = firstChoice.content;
+                        if (Array.isArray(content)) {
+                            try {
+                                content = content
+                                    .map((part: any) => typeof part === 'string' ? part : (part?.text ?? ''))
+                                    .join('');
+                            } catch {}
+                        }
+                        aiResponse = typeof content === 'string' ? content : (content ?? '');
+                    }
+                    if (!aiResponse || aiResponse.trim() === '') {
+                        console.warn('[gen-survey] Empty assistant content after request; falling back if possible');
+                    }
+                    break;
+                } catch (err: any) {
+                    lastError = err;
+                    const code = err?.code;
+                    const status = err?.status;
+                    const isTransient = code === 'ENOTFOUND' || code === 'ETIMEDOUT' || status === 429 || (status >= 500 && status < 600);
+                    console.warn('[gen-survey] OpenAI completion error', {
+                        attempt,
+                        code,
+                        status,
+                        message: err?.message
+                    });
+                    if (attempt < maxAttempts && isTransient) {
+                        const delayMs = 500 * Math.pow(2, attempt - 1);
+                        await new Promise(res => setTimeout(res, delayMs));
+                        continue;
+                    }
+                    throw err;
+                }
+            }
         }
         
         if (!aiResponse) {
+            const isReasoningOverall = (
+                modelConfig.model.includes('o1') ||
+                modelConfig.model.includes('o3') ||
+                modelConfig.model.includes('gpt-5') ||
+                modelConfig.model.includes('gpt-4o')
+            );
+            console.error('[gen-survey] No aiResponse', { elapsedMs: Date.now() - t0, model: modelConfig.model });
+            if (isReasoningOverall) {
+                // Return a non-fatal response so UI can show raw/fallback content instead of a 500
+                return NextResponse.json({
+                    status: true,
+                    modelUsed: modelConfig.label,
+                    surveyRaw: '',
+                    note: 'Model returned empty content; please retry or switch model. UI may parse raw output when available.'
+                });
+            }
             return NextResponse.json({ 
                 error: 'Failed to generate survey content' 
             }, { status: 500 });
@@ -199,11 +338,45 @@ Guidelines:
             const cleanedResponse = aiResponse.replace(/```json\n?|\n?```/g, '').trim();
             surveyData = JSON.parse(cleanedResponse);
         } catch (parseError) {
-            console.error('Failed to parse AI response:', parseError);
-            console.error('AI Response:', aiResponse);
-            return NextResponse.json({ 
-                error: 'Failed to parse AI response. Please try again.' 
-            }, { status: 500 });
+            console.error('[gen-survey] JSON parse failed on first attempt:', parseError);
+            // Heuristic JSON extraction for reasoning models (e.g., gpt-5) that may wrap JSON in analysis
+            const isReasoningModel = (
+                modelConfig.model.includes('o1') ||
+                modelConfig.model.includes('o3') ||
+                modelConfig.model.includes('gpt-5') ||
+                modelConfig.model.includes('gpt-4o')
+            );
+            if (isReasoningModel) {
+                try {
+                    const text = aiResponse || '';
+                    const fenceCleaned = text.replace(/```json\n?|```/g, '').trim();
+                    // Try to find the largest JSON object in the text
+                    const start = fenceCleaned.indexOf('{');
+                    const end = fenceCleaned.lastIndexOf('}');
+                    if (start !== -1 && end !== -1 && end > start) {
+                        const candidate = fenceCleaned.slice(start, end + 1);
+                        surveyData = JSON.parse(candidate);
+                        console.warn('[gen-survey] Parsed JSON via heuristic extraction for reasoning model');
+                    }
+                } catch (e2) {
+                    console.error('[gen-survey] Heuristic JSON extraction failed:', e2);
+                }
+                // As a final fallback for GPT-5/4o, return raw text so UI can show something instead of 500
+                if (!surveyData) {
+                    console.warn('[gen-survey] Returning raw text fallback for reasoning model');
+                    return NextResponse.json({
+                        status: true,
+                        modelUsed: modelConfig.label,
+                        surveyRaw: aiResponse,
+                        note: 'Model returned non-JSON content; showing raw output.'
+                    });
+                }
+            } else {
+                console.error('AI Response:', aiResponse);
+                return NextResponse.json({ 
+                    error: 'Failed to parse AI response. Please try again.' 
+                }, { status: 500 });
+            }
         }
 
         // Validate the structure
@@ -212,6 +385,32 @@ Guidelines:
                 error: 'Invalid survey structure generated. Please try again.' 
             }, { status: 500 });
         }
+
+        // Helper: detect numeric scale in prompt like "On a scale of 1 to 5" and return option strings
+        const detectScaleOptions = (prompt: string): string[] | null => {
+            if (!prompt) return null;
+            const lower = prompt.toLowerCase();
+            // common: "on a scale of 1 to N" or "1-5"
+            const m1 = lower.match(/scale\s+of\s+1\s*(?:to|\-|–)\s*(\d{1,2})/i);
+            if (m1) {
+                const max = parseInt(m1[1], 10);
+                if (Number.isFinite(max) && max >= 3 && max <= 11) {
+                    return Array.from({ length: max }, (_, i) => String(i + 1));
+                }
+            }
+            const m2 = lower.match(/\b1\s*(?:to|\-|–)\s*(\d{1,2})\b/);
+            if (m2) {
+                const max = parseInt(m2[1], 10);
+                if (Number.isFinite(max) && max >= 3 && max <= 11) {
+                    return Array.from({ length: max }, (_, i) => String(i + 1));
+                }
+            }
+            // Likert wording heuristic
+            if (lower.includes('strongly disagree') && lower.includes('strongly agree')) {
+                return ['1', '2', '3', '4', '5'];
+            }
+            return null;
+        };
 
         // Ensure all questions have required fields and clean up any numbering
         surveyData.questions = surveyData.questions.map((q: any, index: number) => {
@@ -238,9 +437,17 @@ Guidelines:
             } else {
                 base.reasoning = q.reasoning || '';
             }
+
+            // Normalize: convert numeric scale prompts into rating options (radio UI)
+            const scaleOpts = detectScaleOptions(cleanPrompt);
+            if (scaleOpts) {
+                base.type = 'rating';
+                base.options = scaleOpts;
+            }
             return base;
         });
 
+        console.log('[gen-survey] Success', { elapsedMs: Date.now() - t0 });
         return NextResponse.json({ 
             status: true, 
             survey: surveyData,
