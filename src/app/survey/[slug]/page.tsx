@@ -870,18 +870,17 @@ const SurveyPage = () => {
                       onValueChange={(value) => updateAnswer(question.id, value)}
                     >
                       <div className="flex items-center space-x-6">
-                        {[1, 2, 3, 4, 5].map(rating => (
+                        {((question.options && question.options.length > 0)
+                          ? question.options
+                          : ['1','2','3','4','5']
+                        ).map((opt, idx) => (
                           <RadioGroupItem 
-                            key={rating}
-                            value={rating.toString()} 
-                            label={rating.toString()}
-                            id={`${question.id}-${rating}`} 
+                            key={idx}
+                            value={(typeof opt === 'string' ? opt : String(opt))}
+                            label={(typeof opt === 'string' ? opt : String(opt))}
+                            id={`${question.id}-${idx}`} 
                           />
                         ))}
-                      </div>
-                      <div className="flex justify-between text-xs text-muted-foreground mt-2">
-                        <span>Poor</span>
-                        <span>Excellent</span>
                       </div>
                     </RadioGroup>
                   )}

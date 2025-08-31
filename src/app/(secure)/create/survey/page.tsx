@@ -755,10 +755,13 @@ const CreateSurveyPage = () => {
 
                         {question.type === 'rating' && (
                           <div className="flex items-center space-x-4">
-                            {[1, 2, 3, 4, 5].map(rating => (
-                              <div key={rating} className="flex flex-col items-center">
+                            {((question.options && question.options.length > 0)
+                              ? question.options
+                              : ['1','2','3','4','5']
+                            ).map((opt, idx) => (
+                              <div key={idx} className="flex flex-col items-center">
                                 <input type="radio" disabled />
-                                <Label className="text-xs mt-1">{rating}</Label>
+                                <Label className="text-xs mt-1">{typeof opt === 'string' ? opt : String(opt)}</Label>
                               </div>
                             ))}
                           </div>
