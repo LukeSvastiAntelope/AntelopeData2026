@@ -117,6 +117,38 @@ const EditSurveyPage = () => {
     return items
   }, [qThemes, qGoals])
 
+  const [showGenModal, setShowGenModal] = useState<{ open: boolean; qIndex: number|null; prompt: string }>({ open: false, qIndex: null, prompt: '' })
+  const [genLoading, setGenLoading] = useState(false)
+
+  const openGenerateFor = (i: number, seed?: string) => {
+    setShowGenModal({ open: true, qIndex: i, prompt: seed || questions[i]?.prompt || '' })
+  }
+
+  const handleGenerateImage = async () => {
+    if (showGenModal.qIndex == null) return
+    setGenLoading(true)
+    try {
+      const res = await fetch('/api/media/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: showGenModal.prompt, size: '1024x1024' })
+      })
+      const data = await res.json()
+      if (data.status && data.url) {
+        const updated = [...questions]
+        ;(updated[showGenModal.qIndex] as any).media = { url: data.url, alt: '' }
+        setQuestions(updated)
+        setShowGenModal({ open: false, qIndex: null, prompt: '' })
+      } else {
+        setError(data.message || 'Failed to generate image')
+      }
+    } catch (e:any) {
+      setError(e.message || 'Failed to generate image')
+    } finally {
+      setGenLoading(false)
+    }
+  }
+
   useEffect(() => {
     if (surveyId) {
       fetchSurvey()
@@ -915,10 +947,17 @@ const EditSurveyPage = () => {
                   </CardDescription>
                 </div>
                   {!isQualitative && (
-                    <Button onClick={addQuestion}>
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add Question
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button variant="outline" onClick={()=>{
+                        // Batch generate modal uses first question prompt as seed; user can edit before run
+                        const seed = (questions[0]?.prompt || '').slice(0, 500)
+                        setShowGenModal({ open: true, qIndex: -1, prompt: seed })
+                      }}>Generate images for all</Button>
+                      <Button onClick={addQuestion}>
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Question
+                      </Button>
+                    </div>
                   )}
               </div>
             </CardHeader>
@@ -949,14 +988,19 @@ const EditSurveyPage = () => {
                               {getQuestionTypeLabel(question.type)}
                             </Badge>
                           </div>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => removeQuestion(questionIndex)}
-                            className="text-red-600 hover:text-red-700"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          <div className="flex gap-2">
+                            <Button variant="outline" size="sm" onClick={()=> openGenerateFor(questionIndex)} title="Generate image with AI">
+                              Generate image
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => removeQuestion(questionIndex)}
+                              className="text-red-600 hover:text-red-700"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </div>
                       </CardHeader>
                       <CardContent className="space-y-4">
@@ -1107,6 +1151,45 @@ const EditSurveyPage = () => {
           </div>
         </div>
       </div>
+
+        {/* Generate Image Modal */}
+        {showGenModal.open && (
+          <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center">
+            <div className="bg-card text-card-foreground rounded-lg shadow-lg w-full max-w-lg p-4">
+              <div className="mb-3">
+                <h3 className="text-lg font-medium">Generate image</h3>
+                <p className="text-xs text-muted-foreground">Enter a description for the image. By default we use the question prompt.</p>
+              </div>
+              <div className="space-y-3">
+                <Label>Prompt</Label>
+                <Textarea rows={4} value={showGenModal.prompt} onChange={e=> setShowGenModal(prev=> ({ ...prev, prompt: e.target.value }))} />
+              </div>
+              <div className="mt-4 flex justify-end gap-2">
+                <Button variant="outline" onClick={()=> setShowGenModal({ open:false, qIndex:null, prompt:'' })}>Cancel</Button>
+                <Button onClick={async()=>{
+                  if (showGenModal.qIndex === -1) {
+                    // Batch: iterate through questions
+                    setGenLoading(true)
+                    try {
+                      for (let i=0;i<questions.length;i++){
+                        const prompt = `${questions[i]?.prompt || ''}`.trim() || showGenModal.prompt
+                        if (!prompt) continue
+                        const res = await fetch('/api/media/generate', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ prompt, size: '1024x1024' }) })
+                        const data = await res.json()
+                        if (data?.status && data?.url){
+                          setQuestions(prev=>{ const arr=[...prev]; (arr[i] as any).media = { url: data.url, alt: '' }; return arr })
+                        }
+                      }
+                      setShowGenModal({ open:false, qIndex:null, prompt:'' })
+                    } catch (e:any){ setError(e.message || 'Batch generation failed') } finally { setGenLoading(false) }
+                  } else {
+                    await handleGenerateImage()
+                  }
+                }} disabled={genLoading}>{genLoading ? 'Generating…' : (showGenModal.qIndex===-1 ? 'Generate All' : 'Generate')}</Button>
+              </div>
+            </div>
+          </div>
+        )}
     </div>
   )
 }
