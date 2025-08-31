@@ -42,6 +42,8 @@ export async function POST(req: NextRequest) {
             }
             aiClient = new OpenAI({
                 apiKey: process.env.OPENAI_API_KEY,
+                timeout: 60000,
+                maxRetries: 0,
             });
         } else if (modelConfig.type === "deepseek") {
             if (!process.env.DEEPSEEK_API_KEY) {
@@ -51,7 +53,9 @@ export async function POST(req: NextRequest) {
             }
             aiClient = new OpenAI({
                 apiKey: process.env.DEEPSEEK_API_KEY,
-                baseURL: 'https://api.deepseek.com'
+                baseURL: 'https://api.deepseek.com',
+                timeout: 60000,
+                maxRetries: 0,
             });
         } else if (modelConfig.type === "gemini") {
             if (!process.env.GEMINI_API_KEY) {
@@ -61,7 +65,9 @@ export async function POST(req: NextRequest) {
             }
             aiClient = new OpenAI({
                 apiKey: process.env.GEMINI_API_KEY,
-                baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai/'
+                baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai/',
+                timeout: 60000,
+                maxRetries: 0,
             });
         } else if (modelConfig.type === "anthropic") {
             if (!process.env.ANTHROPIC_API_KEY) {
@@ -184,9 +190,27 @@ Guidelines:
                 requestParams.max_tokens = 2000;
             }
             
-            const completion = await (aiClient as OpenAI).chat.completions.create(requestParams);
-
-            aiResponse = completion.choices[0]?.message?.content;
+            // Retry wrapper for transient errors (DNS, timeouts, rate limits)
+            const maxAttempts = 3;
+            let lastError: any = null;
+            for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+                try {
+                    const completion = await (aiClient as OpenAI).chat.completions.create(requestParams);
+                    aiResponse = completion.choices[0]?.message?.content;
+                    break;
+                } catch (err: any) {
+                    lastError = err;
+                    const code = err?.code;
+                    const status = err?.status;
+                    const isTransient = code === 'ENOTFOUND' || code === 'ETIMEDOUT' || status === 429 || (status >= 500 && status < 600);
+                    if (attempt < maxAttempts && isTransient) {
+                        const delayMs = 500 * Math.pow(2, attempt - 1);
+                        await new Promise(res => setTimeout(res, delayMs));
+                        continue;
+                    }
+                    throw err;
+                }
+            }
         }
         
         if (!aiResponse) {
