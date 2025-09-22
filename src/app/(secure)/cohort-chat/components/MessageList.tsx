@@ -18,6 +18,9 @@ export function MessageList({
   isLoading, 
   messagesEndRef
 }: MessageListProps) {
+  // Detect if the last message is an agent placeholder awaiting streamed content
+  const lastMessage = messages[messages.length - 1];
+  const hasAgentPlaceholder = !!lastMessage && lastMessage.role === 'agent' && (!lastMessage.content || lastMessage.content.trim() === '');
   return (
     <ScrollArea className="flex-1 min-h-0" style={{ paddingBottom: '96px' }}>
       <div className="p-4 space-y-6">
@@ -37,8 +40,15 @@ export function MessageList({
               {m.role === 'agent' ? (
                 <TooltipProvider delayDuration={150}>
                   <div className="space-y-1">
-                    {/* Content first, then charts - updated order */}
-                    <MarkdownWithCitations text={m.content} citations={m.citations} isUpload={m.isUpload} />
+                    {/* If this is the pending agent placeholder, show the inline loader where content will appear */}
+                    {(!m.content || m.content.trim() === '') ? (
+                      <div className="flex items-center gap-2">
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                        <span className="text-sm text-muted-foreground">Thinking...</span>
+                      </div>
+                    ) : (
+                      <MarkdownWithCitations text={m.content} citations={m.citations} isUpload={m.isUpload} />
+                    )}
                     {m.dataCards && <DataCards dataCards={m.dataCards} />}
                   </div>
                 </TooltipProvider>
@@ -55,7 +65,7 @@ export function MessageList({
             </div>
           </div>
         ))}
-        {isLoading && (
+        {(isLoading && !hasAgentPlaceholder) && (
           <div className="text-sm animate-in fade-in duration-500">
             <div className="rounded-lg px-4 py-3 max-w-[85%] chat-message text-foreground">
               <div className="flex items-center gap-2">

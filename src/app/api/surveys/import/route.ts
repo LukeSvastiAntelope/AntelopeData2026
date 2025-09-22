@@ -202,39 +202,78 @@ function detectQuestionType(columnName: string, uniqueValues: string[]): string 
   return 'text';
 }
 
-// Helper function to parse CSV data
-function parseCSV(buffer: Buffer): Promise<any[]> {
-  return new Promise((resolve, reject) => {
-    const csvString = buffer.toString('utf-8');
-    
-    Papa.parse(csvString, {
-      header: true,
-      skipEmptyLines: true,
-      transformHeader: (header: string, index: number) => {
-        // Handle duplicate headers by appending index
-        const cleanHeader = header.trim();
-        return cleanHeader || `Column_${index}`;
-      },
-      complete: (results) => {
-        if (results.errors.length > 0) {
-          console.warn('CSV parsing warnings:', results.errors.map(e => e.message));
-          // Only reject on critical errors, not warnings
-          const criticalErrors = results.errors.filter(e => e.type === 'Delimiter' || e.type === 'Quotes');
-          if (criticalErrors.length > 0) {
-            reject(new Error(`CSV parsing errors: ${criticalErrors.map(e => e.message).join(', ')}`));
-          } else {
-            console.log('CSV parsed with warnings, continuing...');
-            resolve(results.data);
-          }
-        } else {
-          resolve(results.data);
-        }
-      },
-      error: (error) => {
-        console.error('CSV parsing error:', error);
-        reject(error);
+// Trim CSV text to the last newline that occurs outside of quoted fields
+function trimToLastBalancedLine(csvString: string): string {
+  let insideQuotes = false;
+  let lastSafeNewline = -1;
+  for (let i = 0; i < csvString.length; i++) {
+    const ch = csvString[i];
+    if (ch === '"') {
+      // Handle doubled quotes inside a quoted field
+      if (insideQuotes && csvString[i + 1] === '"') {
+        i++; // skip escaped quote
+      } else {
+        insideQuotes = !insideQuotes;
       }
+    } else if (ch === '\n' && !insideQuotes) {
+      lastSafeNewline = i;
+    }
+  }
+  if (lastSafeNewline >= 0) {
+    return csvString.slice(0, lastSafeNewline + 1);
+  }
+  return csvString; // fallback, nothing to trim
+}
+
+// Helper function to parse CSV data with tolerant fallback (for chunked previews)
+function parseCSV(buffer: Buffer, opts?: { tolerantForChunk?: boolean }): Promise<any[]> {
+  const { tolerantForChunk = false } = opts || {};
+  return new Promise((resolve, reject) => {
+    let csvString = buffer.toString('utf-8');
+
+    // For chunked uploads, trim trailing partial records to avoid unterminated quotes
+    if (tolerantForChunk) {
+      csvString = trimToLastBalancedLine(csvString);
+    }
+
+    const tryParse = (text: string): Promise<any[]> => new Promise((resolveInner, rejectInner) => {
+      Papa.parse(text, {
+        header: true,
+        skipEmptyLines: 'greedy' as const,
+        transformHeader: (header: string, index: number) => {
+          const cleanHeader = header.trim();
+          return cleanHeader || `Column_${index}`;
+        },
+        complete: (results: any) => {
+          const errors = results.errors || [];
+          const hasCritical = errors.some((e: any) => e?.type === 'Delimiter' || e?.type === 'Quotes');
+          if (hasCritical) {
+            rejectInner(new Error(errors.map((e: any) => e.message).join(', ')));
+          } else {
+            resolveInner(results.data);
+          }
+        },
+        error: (error: any) => {
+          rejectInner(error);
+        }
+      } as any);
     });
+
+    const parseFlow = async () => {
+      try {
+        return await tryParse(csvString);
+      } catch (_err) {
+        const trimmed = trimToLastBalancedLine(csvString);
+        if (trimmed && trimmed.length < csvString.length) {
+          return await tryParse(trimmed);
+        }
+        throw _err;
+      }
+    };
+
+    parseFlow()
+      .then(resolve)
+      .catch(reject);
   });
 }
 
@@ -306,7 +345,7 @@ export async function POST(req: NextRequest) {
     // Parse based on file type
     try {
       if (isCSV) {
-        rawData = await parseCSV(buffer);
+        rawData = await parseCSV(buffer, { tolerantForChunk: chunkIndex !== null });
       } else {
         // Excel file
         const workbook = XLSX.read(buffer, { type: 'buffer' });

@@ -121,7 +121,10 @@ const EditSurveyPage = () => {
   const [genLoading, setGenLoading] = useState(false)
 
   const openGenerateFor = (i: number, seed?: string) => {
-    setShowGenModal({ open: true, qIndex: i, prompt: seed || questions[i]?.prompt || '' })
+    const q = questions[i]
+    const base = seed || q?.prompt || ''
+    const crafted = craftImagePromptFromQuestion(base)
+    setShowGenModal({ open: true, qIndex: i, prompt: crafted })
   }
 
   const handleGenerateImage = async () => {
@@ -147,6 +150,31 @@ const EditSurveyPage = () => {
     } finally {
       setGenLoading(false)
     }
+  }
+
+  function craftImagePromptFromQuestion(questionText: string): string {
+    const text = (questionText || '').trim()
+    if (!text) return 'Create a clean, modern, minimal illustration that matches the question topic. Abstract and metaphorical, neutral background, no text, high contrast, 3:2 aspect.'
+
+    // Heuristics to simplify boilerplate and detect scales/spectrums
+    const simplified = text
+      .replace(/on a scale of\s*\d+\s*(?:to|\-|–)\s*\d+[^,\.]*(,|\.)?/gi, '')
+      .replace(/\bwhere\s*\d+\s*=\s*[^,\.]*(,|\.)?/gi, '')
+      .replace(/\bin\s*general[,\s]*/gi, '')
+      .replace(/^please\s*/i, '')
+      .replace(/^overall[,\s]*/i, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+
+    const isScale = /on a scale|scale of|1\s*[-–]?\s*5|1\s*to\s*5|strongly\s*(agree|disagree)/i.test(text)
+
+    const subject = simplified.slice(0, 240)
+
+    return (
+      `Create a clean, modern, minimal illustration that captures the essence of: "${subject}". ` +
+      `${isScale ? 'Convey a neutral, balanced spectrum without numbers or text. ' : ''}` +
+      'Use abstract, metaphorical shapes and lighting. No text, no faces, no logos. Neutral background, high contrast, soft shadows. 3:2 aspect, web-ready.'
+    )
   }
 
   useEffect(() => {
@@ -336,7 +364,9 @@ const EditSurveyPage = () => {
           endAt: endAt || null,
           questions: questions.map((q, index) => ({
             ...q,
-            order: index + 1
+            order: index + 1,
+            media: (q as any).media || undefined,
+            optionMedia: (q as any).optionMedia || undefined
           })),
           sourceMetadata: isQualitative ? {
             type: 'qualitative',
@@ -1172,7 +1202,8 @@ const EditSurveyPage = () => {
                     setGenLoading(true)
                     try {
                       for (let i=0;i<questions.length;i++){
-                        const prompt = `${questions[i]?.prompt || ''}`.trim() || showGenModal.prompt
+                        const base = `${questions[i]?.prompt || ''}`.trim() || showGenModal.prompt
+                        const prompt = craftImagePromptFromQuestion(base)
                         if (!prompt) continue
                         const res = await fetch('/api/media/generate', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ prompt, size: '1024x1024' }) })
                         const data = await res.json()

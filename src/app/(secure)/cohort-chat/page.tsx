@@ -406,7 +406,15 @@ export default function CohortChatPage() {
     }
     const question = input.trim();
     setInput('');
-    setMessages(prev=>[...prev,{id: `user-${Date.now()}`, role:'user',content:question}]);
+    // Create stable IDs first
+    const userId = `user-${Date.now()}`;
+    const agentId = `agent-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    // In a single update, append the user message first, then the assistant placeholder
+    setMessages(prev => [
+      ...prev,
+      { id: userId, role: 'user', content: question } as any,
+      { id: agentId, role: 'agent', content: '', citations: {} } as any,
+    ]);
     setIsLoading(true);
 
     // Enhance system prompt with formatting instructions for consistent markdown
@@ -439,18 +447,19 @@ FORMATTING REQUIREMENTS:
       console.log('✅ FRONTEND DEBUG: Including surveyId in payload:', selectedSurveyId);
     } else {
       console.log('❌ FRONTEND DEBUG: No surveyId selected - will use old code path');
-      
-      // 🚨 SMART FIX: Show user-friendly message if no survey selected
+      // Replace the placeholder agent message with a helpful prompt instead of adding another bubble
       const noSurveyMessage = `Please select a survey from the dropdown above to analyze your question. Without a survey selection, I can only provide general demographic information.`;
-      
-      setMessages(prev => [...prev, {
-        id: Date.now().toString(),
-        content: noSurveyMessage,
-        role: 'agent',
-        timestamp: new Date(),
-        isFromDataAnalysis: false
-      }]);
-      
+      setMessages(prev => {
+        const updated = [...prev];
+        const last = updated[updated.length - 1];
+        if (last && last.role === 'agent' && (last as any).id === agentId) {
+          (last as any).content = noSurveyMessage;
+          updated[updated.length - 1] = last;
+        } else {
+          updated.push({ role: 'agent', content: noSurveyMessage } as any);
+        }
+        return updated;
+      });
       setIsLoading(false);
       return; // Exit early
     }
@@ -483,12 +492,17 @@ FORMATTING REQUIREMENTS:
       if (json.reportId) {
         // This is a report generation - show immediate response and report status
         const immediateResponse = json.immediateResponse || 'I\'m generating a comprehensive analysis for you. This will take a moment...';
-        setMessages(prev=>[...prev,{
-          role:'agent',
-          content: immediateResponse + '\n\n📊 **Generating detailed report...**',
-          reportId: json.reportId,
-          reportStatus: 'initiated'
-        }]);
+        setMessages(prev => {
+          const updated = [...prev];
+          const last = updated[updated.length - 1];
+          if (last && last.role === 'agent' && (last as any).id === agentId) {
+            (last as any).content = immediateResponse + '\n\n📊 **Generating detailed report...**';
+            (last as any).reportId = json.reportId;
+            (last as any).reportStatus = 'initiated';
+            updated[updated.length - 1] = last;
+          }
+          return updated;
+        });
         setIsLoading(false);
         return;
       }
@@ -496,27 +510,48 @@ FORMATTING REQUIREMENTS:
       // Regular response
       const finalContent = json.content || json.result || json.text || '';
       const processed = processCompleteResponse(String(finalContent), {});
-      setMessages(prev=>[...prev,{
-        role:'agent',
-        content:processed.content,
-        citations:processed.citations,
-        chartSpec:processed.chartSpec,
-        dataCards: json.dataCards || processed.dataCards  // Use dataCards from API response
-      }]);
+      setMessages(prev => {
+        const updated = [...prev];
+        const last = updated[updated.length - 1];
+        if (last && last.role === 'agent' && (last as any).id === agentId) {
+          (last as any).content = processed.content;
+          (last as any).citations = processed.citations;
+          (last as any).chartSpec = processed.chartSpec;
+          (last as any).dataCards = json.dataCards || processed.dataCards;
+          updated[updated.length - 1] = last;
+        } else {
+          updated.push({
+            role: 'agent',
+            content: processed.content,
+            citations: processed.citations,
+            chartSpec: processed.chartSpec,
+            dataCards: json.dataCards || processed.dataCards
+          } as any);
+        }
+        return updated;
+      });
       setIsLoading(false);
       return;
     }
 
     if (!res.body) {
       toast.error('No response');
+      // Replace placeholder with an error message so no extra bubbles linger
+      setMessages(prev => {
+        const updated = [...prev];
+        const last = updated[updated.length - 1];
+        if (last && last.role === 'agent' && (last as any).id === agentId) {
+          (last as any).content = 'No response received from the server.';
+          updated[updated.length - 1] = last;
+        }
+        return updated;
+      });
       setIsLoading(false);
       return;
     }
 
-    // add placeholder agent message with stable id
-    const agentId = `agent-${Date.now()}`;
-    setMessages(prev=>[...prev,{id: agentId, role:'agent',content:'', citations:{}}]);
-    console.log('🎬 Added placeholder agent message, starting stream processing...');
+    // placeholder already added above
+    console.log('🎬 Placeholder agent message already added, starting stream processing...');
 
     const reader = res.body.getReader();
     const decoder = new TextDecoder();

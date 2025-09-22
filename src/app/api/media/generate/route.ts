@@ -23,22 +23,32 @@ export async function POST(req: NextRequest) {
 
     const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY, timeout: 240000, maxRetries: 0 })
 
-    // Generate image as base64
+    // Generate image
     const img = await client.images.generate({
       model: 'gpt-image-1',
       prompt,
       size,
-      response_format: 'b64_json',
     } as any)
 
-    const b64 = img?.data?.[0]?.b64_json
-    if (!b64) {
+    // Prefer b64 if present, else fetch URL
+    const b64 = img?.data?.[0]?.b64_json as string | undefined
+    let buffer: Buffer
+    let mime = format === 'jpeg' ? 'image/jpeg' : format === 'webp' ? 'image/webp' : 'image/png'
+    let ext = format === 'jpeg' ? '.jpg' : format === 'webp' ? '.webp' : '.png'
+    if (b64 && typeof b64 === 'string') {
+      buffer = Buffer.from(b64, 'base64')
+    } else if (img?.data?.[0]?.url) {
+      const u = img.data[0].url as string
+      const resp = await fetch(u)
+      const ab = await resp.arrayBuffer()
+      buffer = Buffer.from(ab)
+      const ct = resp.headers.get('content-type') || ''
+      if (ct.includes('image/jpeg')) { mime = 'image/jpeg'; ext = '.jpg' }
+      else if (ct.includes('image/webp')) { mime = 'image/webp'; ext = '.webp' }
+      else if (ct.includes('image/png')) { mime = 'image/png'; ext = '.png' }
+    } else {
       return NextResponse.json({ status: false, message: 'Image generation failed' }, { status: 502 })
     }
-
-    const buffer = Buffer.from(b64, 'base64')
-    const mime = format === 'jpeg' ? 'image/jpeg' : format === 'webp' ? 'image/webp' : 'image/png'
-    const ext = format === 'jpeg' ? '.jpg' : format === 'webp' ? '.webp' : '.png'
 
     // Save to public/uploads like the normal upload route
     const userId = userIdHeader
