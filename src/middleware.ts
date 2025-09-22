@@ -47,13 +47,20 @@ const publicRoutes = [
     '/api/digital-twin/magic-link', // Send magic link for digital twin access
     '/api/surveys/cron/close-expired', // Cron job to close expired surveys
     '/api/channels/telegram/webhook', // Telegram webhook must be public
+    // Local testing: allow direct access to Google Sheets import endpoints;
+    // the handlers themselves still require 'x-user-id' header.
+    '/api/surveys/import/google-sheets',
     // '/api/cohorts',           // (was public during early dev; now requires auth)
     // '/api/cohort/query',      // (was public during v1 testing; now requires auth)
     '/api/public/surveys', // List surveys
 ]
 
-// Use edge-safe config to create an auth middleware wrapper without importing Node-only modules
-const { auth } = NextAuth(authConfig)
+// Use an edge-safe config to create an auth middleware wrapper.
+// Ensure providers is always an array (middleware cannot load Node-only providers).
+const { auth } = NextAuth({
+    ...authConfig,
+    providers: authConfig.providers || [],
+})
 
 export default auth((req) => {
     const path = req.nextUrl.pathname;

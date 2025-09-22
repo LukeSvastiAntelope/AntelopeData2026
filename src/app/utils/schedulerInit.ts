@@ -8,6 +8,11 @@ export function initializeScheduler() {
         // Don't run on client side
         return;
     }
+    // Only run in production server environment
+    if (process.env.NODE_ENV !== 'production') {
+        console.log('📅 Scheduler disabled in non-production environment');
+        return;
+    }
     
     if (schedulerInitialized) {
         console.log('📅 Scheduler already initialized, skipping...');
@@ -23,7 +28,7 @@ export function initializeScheduler() {
     }
 }
 
-// Auto-initialize when this module is imported (server-side only)
-if (typeof window === 'undefined') {
+// Auto-initialize only in production server
+if (typeof window === 'undefined' && process.env.NODE_ENV === 'production') {
     initializeScheduler();
-} 
+}
