@@ -5,6 +5,7 @@ import { SurveyRepo } from "@/app/utils/database/survey-repo";
 import { promises as fs } from 'fs';
 import path from 'path';
 import { tmpdir } from 'os';
+// Remove hard dependency on csv-parse/sync; rely on Papa with retry
 
 // Configure route for longer timeout
 export const runtime = 'nodejs';
@@ -118,25 +119,63 @@ async function getImportData(file: File, config: ImportConfig, userId: string): 
 // Helper function to parse file data again (since we don't store it from preview)
 async function parseFileData(file: File): Promise<any[]> {
   const buffer = Buffer.from(await file.arrayBuffer());
+  const fileName = (file.name || '').toLowerCase();
+  const mimeType = (file.type || '').toLowerCase();
+  const isCSV = fileName.endsWith('.csv') || mimeType === 'text/csv' || mimeType === 'application/csv';
   
-  if (file.type === 'text/csv') {
+  if (isCSV) {
     return new Promise((resolve, reject) => {
       const csvString = buffer.toString('utf-8');
-      
+
+      const balanced = (text: string) => {
+        let inside = false; let last = -1;
+        for (let i = 0; i < text.length; i++) {
+          const ch = text[i];
+          if (ch === '"') { if (inside && text[i+1] === '"') { i++; } else { inside = !inside; } }
+          else if (ch === '\n' && !inside) { last = i; }
+        }
+        return last >= 0 ? text.slice(0, last + 1) : text;
+      };
+
       Papa.parse(csvString, {
         header: true,
-        skipEmptyLines: true,
+        skipEmptyLines: 'greedy',
         complete: (results) => {
-          if (results.errors.length > 0) {
-            reject(new Error(`CSV parsing errors: ${results.errors.map(e => e.message).join(', ')}`));
+          const errors = results.errors || [];
+          const hasCritical = errors.some((e: any) => e?.type === 'Delimiter' || e?.type === 'Quotes');
+          if (hasCritical) {
+            // Retry once with trimmed balanced text
+            const trimmed = balanced(csvString);
+            Papa.parse(trimmed, {
+              header: true,
+              skipEmptyLines: 'greedy',
+              complete: (r2) => {
+                const e2 = r2.errors || [];
+                const crit2 = e2.some((e: any) => e?.type === 'Delimiter' || e?.type === 'Quotes');
+                if (crit2) return reject(new Error(e2.map((e: any) => e.message).join(', ')));
+                resolve(r2.data);
+              },
+              error: (err2: any) => reject(err2)
+            } as any);
           } else {
             resolve(results.data);
           }
         },
-        error: (error) => {
-          reject(error);
+        error: (err: any) => {
+          const trimmed = balanced(csvString);
+          Papa.parse(trimmed, {
+            header: true,
+            skipEmptyLines: 'greedy',
+            complete: (r2) => {
+              const e2 = r2.errors || [];
+              const crit2 = e2.some((e: any) => e?.type === 'Delimiter' || e?.type === 'Quotes');
+              if (crit2) return reject(new Error(e2.map((e: any) => e.message).join(', ')));
+              resolve(r2.data);
+            },
+            error: (err2: any) => reject(err2)
+          } as any);
         }
-      });
+      } as any);
     });
   } else {
     // Excel file

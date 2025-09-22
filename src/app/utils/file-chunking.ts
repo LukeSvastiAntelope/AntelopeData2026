@@ -112,6 +112,7 @@ export class FileChunker {
     let currentPosition = 0;
     let chunkIndex = 0;
     let headerLine = '';
+    let insideQuotesState = false; // track quote state across chunks to avoid splitting inside quoted fields
     
     // Read the header line first
     if (opts.preserveHeaders) {
@@ -128,17 +129,51 @@ export class FileChunker {
       const remainingSize = file.size - currentPosition;
       const chunkSize = Math.min(opts.maxChunkSize, remainingSize);
       
-      // Read the chunk
+      // Read a buffer slightly larger than desired chunk to find a safe newline outside quotes
       let chunkEnd = currentPosition + chunkSize;
-      
-      // If not the last chunk, find the last complete line
       if (chunkEnd < file.size) {
-        const bufferBlob = file.slice(currentPosition, chunkEnd + 1024); // Read a bit extra
+        const lookaheadSize = 4096; // extra bytes to improve chance of finding safe newline
+        const bufferBlob = file.slice(currentPosition, Math.min(file.size, chunkEnd + lookaheadSize));
         const bufferText = await bufferBlob.text();
-        const lastNewlineIndex = bufferText.lastIndexOf('\n', chunkSize);
-        
-        if (lastNewlineIndex !== -1) {
-          chunkEnd = currentPosition + lastNewlineIndex + 1;
+
+        // Scan buffer to find the last newline that occurs while not inside quotes,
+        // starting with the carried quote state from previous chunk
+        let localInsideQuotes = insideQuotesState;
+        let lastSafeNewline = -1;
+        for (let i = 0; i < bufferText.length && i <= chunkSize; i++) {
+          const ch = bufferText[i];
+          if (ch === '"') {
+            // if doubled quotes inside quoted field, skip the escape and do not toggle
+            if (localInsideQuotes && bufferText[i + 1] === '"') {
+              i++;
+            } else {
+              localInsideQuotes = !localInsideQuotes;
+            }
+          } else if (ch === '\n' && !localInsideQuotes) {
+            lastSafeNewline = i;
+          }
+        }
+
+        if (lastSafeNewline !== -1) {
+          chunkEnd = currentPosition + lastSafeNewline + 1;
+          // Update insideQuotesState by scanning the accepted slice fully
+          let state = insideQuotesState;
+          const accepted = bufferText.slice(0, lastSafeNewline + 1);
+          for (let i = 0; i < accepted.length; i++) {
+            const ch = accepted[i];
+            if (ch === '"') {
+              if (state && accepted[i + 1] === '"') { i++; }
+              else { state = !state; }
+            }
+          }
+          insideQuotesState = state;
+        } else {
+          // Fallback: use last newline regardless of quotes within the original chunk window
+          const naiveLastNewline = bufferText.lastIndexOf('\n', chunkSize);
+          if (naiveLastNewline !== -1) {
+            chunkEnd = currentPosition + naiveLastNewline + 1;
+          }
+          // We keep insideQuotesState unchanged in this conservative fallback
         }
       }
       

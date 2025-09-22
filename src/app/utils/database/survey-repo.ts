@@ -113,15 +113,17 @@ export const SurveyRepo = {
                 const question = data.questions[i];
                 
                 await connection.execute(
-                    `INSERT INTO survey_questions (survey_id, type, prompt, options, is_required, question_order) 
-                     VALUES (?, ?, ?, ?, ?, ?)`,
+                    `INSERT INTO survey_questions (survey_id, type, prompt, options, media, option_media, is_required, question_order) 
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
                     [
                         surveyId,
                         question.type || 'text',
                         question.prompt || '',
                         question.options ? JSON.stringify(question.options) : null,
+                        question.media ? JSON.stringify(question.media) : null,
+                        question.optionMedia ? JSON.stringify(question.optionMedia) : null,
                         question.isRequired ? 1 : 0,
-                        question.order || (i + 1)  // Use index + 1 if order is not provided
+                        question.order || (i + 1)
                     ]
                 );
             }
@@ -160,7 +162,9 @@ export const SurveyRepo = {
             ...survey,
             questions: questionRows.map((q: any) => ({
                 ...q,
-                options: q.options // MySQL JSON field already returns parsed data
+                options: q.options, // MySQL JSON field already returns parsed data
+                media: q.media || undefined,
+                optionMedia: q.option_media || undefined
             }))
         };
     },
@@ -188,7 +192,9 @@ export const SurveyRepo = {
             ...survey,
             questions: questionRows.map((q: any) => ({
                 ...q,
-                options: q.options // MySQL JSON field already returns parsed data
+                options: q.options,
+                media: q.media || undefined,
+                optionMedia: q.option_media || undefined
             }))
         };
     },
@@ -817,15 +823,17 @@ export const SurveyRepo = {
                 const question = data.questions[i];
                 
                 await connection.execute(
-                    `INSERT INTO survey_questions (survey_id, type, prompt, options, is_required, question_order) 
-                     VALUES (?, ?, ?, ?, ?, ?)`,
+                    `INSERT INTO survey_questions (survey_id, type, prompt, options, media, option_media, is_required, question_order) 
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
                     [
                         surveyId,
                         question.type || 'text',
                         question.prompt || '',
                         question.options ? JSON.stringify(question.options) : null,
+                        question.media ? JSON.stringify(question.media) : null,
+                        question.optionMedia ? JSON.stringify(question.optionMedia) : null,
                         question.isRequired ? 1 : 0,
-                        question.order || (i + 1)  // Use index + 1 if order is not provided
+                        question.order || (i + 1)
                     ]
                 );
             }
@@ -933,15 +941,17 @@ export const SurveyRepo = {
             for (let i = 0; i < data.questions.length; i++) {
                 const question = data.questions[i];
                 await connection.execute(
-                    `INSERT INTO survey_questions (survey_id, type, prompt, options, is_required, question_order) 
-                     VALUES (?, ?, ?, ?, ?, ?)`,
+                    `INSERT INTO survey_questions (survey_id, type, prompt, options, media, option_media, is_required, question_order) 
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
                     [
                         surveyId,
                         question.type || 'text',
                         question.prompt || '',
                         question.options ? JSON.stringify(question.options) : null,
+                        question.media ? JSON.stringify(question.media) : null,
+                        question.optionMedia ? JSON.stringify(question.optionMedia) : null,
                         question.isRequired ? 1 : 0,
-                        question.order || (i + 1)  // Use index + 1 if order is not provided
+                        question.order || (i + 1)
                     ]
                 );
             }

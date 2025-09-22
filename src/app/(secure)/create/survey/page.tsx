@@ -721,6 +721,9 @@ const CreateSurveyPage = () => {
                     <Card key={question.id}>
                       <CardContent className="pt-4">
                         <div className="mb-3">
+                          {(question as any)?.media?.url && (
+                            <img src={(question as any).media.url} alt={(question as any).media.alt || 'Question image'} className="w-full max-h-64 object-cover rounded ring-1 ring-border mb-3" />
+                          )}
                           <Label className="text-base font-medium">
                             {index + 1}. {question.prompt || 'Question prompt'}
                             {question.isRequired && <span className="text-destructive ml-1">*</span>}
@@ -736,6 +739,9 @@ const CreateSurveyPage = () => {
                             {question.options?.map((option, optionIndex) => (
                               <div key={optionIndex} className="flex items-center space-x-2">
                                 <input type="radio" disabled />
+                                {(question as any)?.optionMedia?.[optionIndex]?.url && (
+                                  <img src={(question as any).optionMedia?.[optionIndex]?.url || ''} alt={(question as any).optionMedia?.[optionIndex]?.alt || ''} className="h-8 w-8 rounded object-cover ring-1 ring-border" />
+                                )}
                                 <Label>{option || `Option ${optionIndex + 1}`}</Label>
                               </div>
                             )) || <p className="text-muted-foreground">No options added</p>}
@@ -747,6 +753,9 @@ const CreateSurveyPage = () => {
                             {question.options?.map((option, optionIndex) => (
                               <div key={optionIndex} className="flex items-center space-x-2">
                                 <input type="checkbox" disabled />
+                                {(question as any)?.optionMedia?.[optionIndex]?.url && (
+                                  <img src={(question as any).optionMedia?.[optionIndex]?.url || ''} alt={(question as any).optionMedia?.[optionIndex]?.alt || ''} className="h-8 w-8 rounded object-cover ring-1 ring-border" />
+                                )}
                                 <Label>{option || `Option ${optionIndex + 1}`}</Label>
                               </div>
                             )) || <p className="text-muted-foreground">No options added</p>}
