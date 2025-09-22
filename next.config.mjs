@@ -48,7 +48,7 @@ const nextConfig = {
         contentDispositionType: 'attachment',
         contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
     },
-    webpack: (config) => {
+    webpack: (config, { dev }) => {
         // Existing rule for Wallet Adapter CSS
         config.module.rules.push({
             test: /node_modules\/@solana\/wallet-adapter-react-ui\/styles\.css$/,
@@ -62,6 +62,22 @@ const nextConfig = {
             // Using process.cwd() because __dirname is not available in ESM config
             'csv-parse': path.resolve(process.cwd(), 'src/patches/csv-parse-default.js'),
         };
+
+        // Minimal dev optimizations - too much breaks file discovery
+        if (dev) {
+            // Basic file watching without breaking Next.js file discovery
+            config.watchOptions = {
+                poll: 1000,
+                aggregateTimeout: 300,
+                ignored: [
+                    '**/node_modules/**',
+                    '**/.git/**',
+                    '**/*.mp4',
+                    '**/*.zip',
+                    '**/*.pkg'
+                ]
+            }
+        }
 
         return config;
     },

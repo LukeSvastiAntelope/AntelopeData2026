@@ -25,6 +25,8 @@ CREATE TABLE survey_questions (
     type ENUM('text', 'single-choice', 'multi-choice', 'scale', 'email', 'number') NOT NULL,
     prompt TEXT NOT NULL,
     options JSON, -- For choice-based questions
+    media JSON, -- { url, alt }
+    option_media JSON, -- array of { url, alt }
     is_required BOOLEAN DEFAULT FALSE,
     question_order INT NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

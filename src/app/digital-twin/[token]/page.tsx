@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Progress } from '@/components/ui/progress'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 import { 
   Loader2, 
@@ -62,6 +63,7 @@ export default function DigitalTwinDashboard() {
   const [twin, setTwin] = useState<TwinData | null>(null)
   const [completedSurveys, setCompletedSurveys] = useState<Survey[]>([])
   const [activeSurveys, setActiveSurveys] = useState<PublicSurvey[]>([])
+  const [tab, setTab] = useState<'mine' | 'available'>('mine')
 
   useEffect(() => {
     const fetchData = async () => {
@@ -100,6 +102,15 @@ export default function DigitalTwinDashboard() {
 
     if (token) fetchData()
   }, [token])
+
+  // Pick default tab once data arrives
+  useEffect(() => {
+    if (completedSurveys.length === 0 && activeSurveys.length > 0) {
+      setTab('available')
+    } else if (completedSurveys.length > 0) {
+      setTab('mine')
+    }
+  }, [completedSurveys.length, activeSurveys.length])
 
   // Calculate completion score based on available demographic fields
   const calculateCompletionScore = () => {
@@ -155,277 +166,159 @@ export default function DigitalTwinDashboard() {
   const completionScore = calculateCompletionScore()
 
   return (
-    <div className="flex-1 p-2 w-full bg-background">
-      <div className="mx-auto rounded-lg bg-card text-card-foreground shadow-lg max-w-6xl">
-        {/* Header */}
-        <div className="px-6 py-4">
-          <h1 className="text-base font-medium text-card-foreground">Digital Twin Dashboard</h1>
-        </div>
+    <div className="flex-1 w-full relative overflow-hidden">
+      {/* Colorful background gradients */}
+      <div className="pointer-events-none absolute inset-0 -z-10">
+        <div className="absolute -top-32 -left-24 h-80 w-80 rounded-full bg-gradient-to-br from-fuchsia-500/30 via-pink-500/20 to-orange-400/20 blur-3xl" />
+        <div className="absolute -bottom-40 -right-24 h-96 w-96 rounded-full bg-gradient-to-br from-sky-400/20 via-indigo-500/20 to-purple-500/25 blur-3xl" />
+      </div>
 
-        <div className="border-b border-border" />
-
-        <div className="p-6">
-          {/* Call to Action Section */}
-          <Card className="mb-8 bg-gradient-to-br from-primary/5 via-background to-secondary/5 border-primary/20">
-            <CardContent className="p-6">
-              <div className="text-center space-y-4">
-                <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-primary/10 mb-2">
-                  <Brain className="w-6 h-6 text-primary" />
+      <div className="p-2">
+        <div className="mx-auto max-w-6xl">
+          {/* Hero / Profile header with glass effect */}
+          <div className="rounded-2xl border border-white/20 bg-white/60 dark:bg-white/5 backdrop-blur-xl shadow-xl p-6">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+              <div className="relative">
+                <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-gradient-to-br from-purple-500/30 to-blue-500/30 flex items-center justify-center ring-2 ring-white/40">
+                  <User className="w-10 h-10 text-white drop-shadow" />
                 </div>
-                
-                <h3 className="text-lg font-semibold">Enhance Your Digital Twin</h3>
-                <p className="text-muted-foreground max-w-2xl mx-auto text-sm">
-                  Your digital twin becomes more accurate and insightful as you complete more surveys and update your profile. 
-                  Each interaction helps create a richer representation of your perspectives and values.
-                </p>
-                
-                <div className="flex flex-col sm:flex-row gap-2 justify-center mt-4">
-                  {completionScore < 70 && (
-                    <Button size="sm" className="gap-2" onClick={handleEditProfile}>
-                      <Edit3 className="w-3 h-3" />
-                      Complete Your Profile
-                    </Button>
-                  )}
-                  <Button size="sm" variant="outline" className="gap-2" onClick={handleBrowseAllSurveys}>
-                    <Users className="w-3 h-3" />
-                    Browse All Surveys
-                  </Button>
+                <div className="absolute -bottom-1 -right-1 bg-green-500 rounded-full p-1 border-2 border-white/70">
+                  <Sparkles className="w-3 h-3 text-white" />
                 </div>
               </div>
-            </CardContent>
-          </Card>
-
-          {/* Profile Section with Completion Score */}
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mb-8">
-            {/* Profile Card */}
-            <Card className="md:col-span-2">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-base font-medium">Your Digital Twin</CardTitle>
-                <div className="flex items-center gap-2">
-                  <Button variant="outline" size="sm" onClick={handleEditProfile} className="gap-1">
-                    <Edit3 className="w-3 h-3" />
-                    Edit
-                  </Button>
-                  <Brain className="h-4 w-4 text-muted-foreground" />
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center space-x-4">
-                  <div className="relative">
-                    <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center">
-                      <User className="w-8 h-8 text-primary" />
-                    </div>
-                    <div className="absolute -bottom-1 -right-1 bg-green-500 rounded-full p-1 border-2 border-background">
-                      <Sparkles className="w-3 h-3 text-white" />
-                    </div>
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="text-lg font-semibold">{demographics.name || 'Anonymous'}</h3>
-                    <div className="flex items-center gap-4 text-sm text-muted-foreground mt-1">
+              <div className="flex-1 min-w-0">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <div>
+                    <h2 className="text-xl font-semibold truncate">{demographics.name || 'Anonymous'}</h2>
+                    <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground mt-1">
                       {demographics.age && (
-                        <span className="flex items-center gap-1">
-                          <Calendar className="w-3 h-3" />
-                          {demographics.age}
-                        </span>
+                        <span className="flex items-center gap-1"><Calendar className="w-3 h-3" />{demographics.age}</span>
                       )}
                       {demographics.location && (
-                        <span className="flex items-center gap-1">
-                          <MapPin className="w-3 h-3" />
-                          {demographics.location}
-                        </span>
+                        <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{demographics.location}</span>
+                      )}
+                      {demographics.occupation && (
+                        <span className="flex items-center gap-1"><Briefcase className="w-3 h-3" />{demographics.occupation}</span>
                       )}
                     </div>
-                    {demographics.occupation && (
-                      <div className="flex items-center gap-1 text-sm text-muted-foreground mt-1">
-                        <Briefcase className="w-3 h-3" />
-                        {demographics.occupation}
-                      </div>
+                  </div>
+                  <div className="flex gap-2">
+                    {completionScore < 70 && (
+                      <Button size="sm" onClick={handleEditProfile} className="gap-2"><Edit3 className="w-3 h-3" />Edit Profile</Button>
                     )}
+                    <Button size="sm" variant="outline" onClick={handleBrowseAllSurveys} className="gap-2"><Users className="w-3 h-3" />Browse Surveys</Button>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-
-            {/* Completion Score */}
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Profile Complete</CardTitle>
-                <Target className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{completionScore}%</div>
-                <Progress value={completionScore} className="mt-2" />
-                <p className="text-xs text-muted-foreground mt-2">
-                  {completionScore < 70 ? 'Complete your profile for better insights' : 'Profile well completed!'}
-                </p>
-              </CardContent>
-            </Card>
-
-            {/* Surveys Completed */}
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Surveys Completed</CardTitle>
-                <CheckCircle className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{completedSurveys.length}</div>
-                <p className="text-xs text-muted-foreground mt-2">
-                  {completedSurveys.length === 0 ? 'No surveys yet' : 'Contributing to your digital twin'}
-                </p>
-              </CardContent>
-            </Card>
-
-            {/* Persona Summary */}
-            {(persona.summary || persona.worldview) && (
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Persona Summary</CardTitle>
-                  <Brain className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground">
-                    {persona.summary || persona.worldview}
-                  </p>
-                </CardContent>
-              </Card>
-            )}
+                <div className="mt-3 max-w-md">
+                  <div className="flex items-center justify-between text-xs mb-1">
+                    <span className="text-muted-foreground">Profile complete</span>
+                    <span className="font-medium">{completionScore}%</span>
+                  </div>
+                  <Progress value={completionScore} />
+                </div>
+              </div>
+            </div>
           </div>
 
-          <div className="grid gap-6 lg:grid-cols-2">
-            {/* Completed Surveys */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <CheckCircle className="h-5 w-5 text-green-600" />
-                  Your Survey History
-                </CardTitle>
-                <CardDescription>
-                  Surveys you've completed that built your digital twin
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {completedSurveys.length === 0 ? (
-                  <div className="text-center py-8">
-                    <FileText className="h-8 w-8 text-muted-foreground mx-auto mb-3" />
-                    <p className="text-sm text-muted-foreground">No surveys completed yet</p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Complete surveys to enhance your digital twin
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {completedSurveys.slice(0, 5).map((survey) => (
-                      <div key={survey.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors">
-                        <div>
-                          <h4 className="font-medium text-sm">{survey.title}</h4>
-                          {survey.submitted_at && (
-                            <p className="text-xs text-muted-foreground">
-                              Completed {new Date(survey.submitted_at).toLocaleDateString()}
-                            </p>
-                          )}
-                        </div>
-                        <Badge variant="secondary" className="text-xs">
-                          <CheckCircle className="w-3 h-3 mr-1" />
-                          Done
-                        </Badge>
-                      </div>
-                    ))}
-                    {completedSurveys.length > 5 && (
-                      <p className="text-xs text-muted-foreground text-center pt-2">
-                        And {completedSurveys.length - 5} more surveys...
-                      </p>
-                    )}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+          {/* Persona Summary & Capabilities */}
+          {(persona.summary || persona.worldview || capabilities.topics) && (
+            <div className="grid gap-4 md:grid-cols-2 mt-6">
+              {(persona.summary || persona.worldview) && (
+                <Card className="border-white/20 bg-white/60 dark:bg-white/5 backdrop-blur-xl">
+                  <CardHeader className="pb-2"><CardTitle className="text-sm">Persona Summary</CardTitle></CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-muted-foreground">{persona.summary || persona.worldview}</p>
+                  </CardContent>
+                </Card>
+              )}
+              {Array.isArray(capabilities.topics) && capabilities.topics.length > 0 && (
+                <Card className="border-white/20 bg-white/60 dark:bg-white/5 backdrop-blur-xl">
+                  <CardHeader className="pb-2"><CardTitle className="text-sm">Capabilities</CardTitle></CardHeader>
+                  <CardContent>
+                    <div className="flex flex-wrap gap-1">
+                      {capabilities.topics.slice(0, 10).map((t: string, i: number) => (
+                        <Badge key={`${t}-${i}`} variant="secondary" className="text-xs">{t}</Badge>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          )}
 
-            {/* Active Surveys */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <TrendingUp className="h-5 w-5 text-blue-600" />
-                  Available Surveys
-                </CardTitle>
-                <CardDescription>
-                  Active surveys from organizations using Antelope
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {activeSurveys.length === 0 ? (
-                  <div className="text-center py-8">
-                    <Users className="h-8 w-8 text-muted-foreground mx-auto mb-3" />
-                    <p className="text-sm text-muted-foreground">No active surveys available</p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Check back later for new opportunities
-                    </p>
+          {/* Surveys Tabs */}
+          <Card className="mt-6 border-white/20 bg-white/60 dark:bg-white/5 backdrop-blur-xl">
+            <CardContent className="pt-6">
+              <Tabs value={tab} onValueChange={(v) => setTab(v as 'mine' | 'available')} className="w-full">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <TabsList className="h-10 bg-white/40 dark:bg-white/10 backdrop-blur">
+                    <TabsTrigger value="mine">My Surveys</TabsTrigger>
+                    <TabsTrigger value="available">Available Surveys</TabsTrigger>
+                  </TabsList>
+                  <div className="text-xs text-muted-foreground">
+                    <span className="mr-3">Completed: {completedSurveys.length}</span>
+                    <span>Available: {activeSurveys.length}</span>
                   </div>
-                ) : (
-                  <div className="space-y-3">
-                    {activeSurveys.slice(0, 5).map((survey) => (
-                      <div key={survey.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors">
-                        <div className="flex-1">
-                          <h4 className="font-medium text-sm">{survey.title}</h4>
-                          <p className="text-xs text-muted-foreground">
-                            Contribute to research and enhance your digital twin
-                          </p>
-                        </div>
-                        <Button size="sm" variant="outline" className="ml-3" onClick={() => handleTakeSurvey(survey.slug)}>
-                          <ArrowRight className="w-3 h-3 mr-1" />
-                          Take Survey
-                        </Button>
-                      </div>
-                    ))}
-                    {activeSurveys.length > 5 && (
-                      <Button variant="ghost" className="w-full mt-3 text-xs" onClick={handleBrowseAllSurveys}>
-                        View all {activeSurveys.length} surveys
-                      </Button>
-                    )}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                </div>
 
-            {/* Capabilities */}
-            {(capabilities.topics || capabilities.question_type_proficiency) && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <TrendingUp className="h-5 w-5 text-blue-600" />
-                    Capabilities
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {Array.isArray(capabilities.topics) && capabilities.topics.length > 0 && (
-                    <div className="mb-3">
-                      <div className="text-xs text-muted-foreground mb-1">Topics</div>
-                      <div className="flex flex-wrap gap-1">
-                        {capabilities.topics.slice(0, 8).map((t: string, i: number) => (
-                          <Badge key={`${t}-${i}`} variant="secondary" className="text-xs">{t}</Badge>
-                        ))}
-                      </div>
+                <TabsContent value="mine" className="mt-4">
+                  {completedSurveys.length === 0 ? (
+                    <div className="text-center py-10">
+                      <FileText className="h-8 w-8 text-muted-foreground mx-auto mb-3" />
+                      <p className="text-sm text-muted-foreground">No surveys completed yet</p>
+                      <p className="text-xs text-muted-foreground mt-1">Complete surveys to enhance your digital twin</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {completedSurveys.map((survey) => (
+                        <div key={survey.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors">
+                          <div>
+                            <h4 className="font-medium text-sm">{survey.title}</h4>
+                            {survey.submitted_at && (
+                              <p className="text-xs text-muted-foreground">Completed {new Date(survey.submitted_at).toLocaleDateString()}</p>
+                            )}
+                          </div>
+                          <Badge variant="secondary" className="text-xs"><CheckCircle className="w-3 h-3 mr-1" />Done</Badge>
+                        </div>
+                      ))}
                     </div>
                   )}
-                  {capabilities.question_type_proficiency && (
-                    <div className="text-xs text-muted-foreground">
-                      Question-type proficiency captured; improves as more surveys are completed.
+                </TabsContent>
+
+                <TabsContent value="available" className="mt-4">
+                  {activeSurveys.length === 0 ? (
+                    <div className="text-center py-10">
+                      <Users className="h-8 w-8 text-muted-foreground mx-auto mb-3" />
+                      <p className="text-sm text-muted-foreground">No active surveys available</p>
+                      <p className="text-xs text-muted-foreground mt-1">Check back later for new opportunities</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {activeSurveys.map((survey) => (
+                        <div key={survey.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors">
+                          <div className="flex-1">
+                            <h4 className="font-medium text-sm">{survey.title}</h4>
+                            <p className="text-xs text-muted-foreground">Contribute to research and enhance your digital twin</p>
+                          </div>
+                          <Button size="sm" variant="outline" className="ml-3" onClick={() => handleTakeSurvey(survey.slug)}>
+                            <ArrowRight className="w-3 h-3 mr-1" />
+                            Take Survey
+                          </Button>
+                        </div>
+                      ))}
                     </div>
                   )}
-                </CardContent>
-              </Card>
-            )}
-          </div>
-
-
+                </TabsContent>
+              </Tabs>
+            </CardContent>
+          </Card>
 
           {/* Technical Details */}
           <Card className="mt-6 bg-muted/20">
             <CardContent className="p-4">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">Digital Twin ID:</span>
-                <Badge variant="secondary" className="font-mono text-xs">
-                  {twin.agent_token.slice(0, 8)}...{twin.agent_token.slice(-8)}
-                </Badge>
+                <Badge variant="secondary" className="font-mono text-xs">{twin.agent_token.slice(0, 8)}...{twin.agent_token.slice(-8)}</Badge>
               </div>
             </CardContent>
           </Card>

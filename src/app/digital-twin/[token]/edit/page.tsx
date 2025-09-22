@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
+import { Badge } from '@/components/ui/badge'
+import { Progress } from '@/components/ui/progress'
 import { 
   Loader2, 
   AlertCircle, 
@@ -89,6 +91,12 @@ export default function EditDigitalTwinPage() {
     setDemographics((prev: any) => ({ ...prev, [field]: value }))
   }
 
+  const completionScore = (() => {
+    const totalFields = ['name','email','age','gender','ethnicity','location','occupation','education','income','interests','politicalViews']
+    const filled = totalFields.filter((f) => demographics?.[f] && String(demographics[f]).trim() !== '')
+    return Math.round((filled.length / totalFields.length) * 100)
+  })()
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -127,6 +135,39 @@ export default function EditDigitalTwinPage() {
         <div className="border-b border-border" />
 
         <div className="p-6">
+          {/* Cohesive profile preview header */}
+          <Card className="mb-6">
+            <CardContent className="p-6">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center">
+                  <User className="w-8 h-8 text-primary" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h2 className="text-lg font-semibold truncate">{demographics?.name || 'Your Name'}</h2>
+                        {demographics?.location && (
+                          <Badge variant="secondary" className="text-xs">{demographics.location}</Badge>
+                        )}
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        {demographics?.occupation || 'Add your occupation'}
+                      </div>
+                    </div>
+                    <div className="min-w-[160px]">
+                      <div className="flex items-center justify-between text-[11px] mb-1 text-muted-foreground">
+                        <span>Profile complete</span>
+                        <span className="text-foreground font-medium">{completionScore}%</span>
+                      </div>
+                      <Progress value={completionScore} />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -307,6 +348,53 @@ export default function EditDigitalTwinPage() {
                 </div>
               </div>
 
+              {/* Household & Additional (Optional) */}
+              <div>
+                <h4 className="font-medium mb-3 text-sm text-muted-foreground">Household & Additional (Optional)</h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <Label htmlFor="householdSize">Household Size</Label>
+                    <Input
+                      id="householdSize"
+                      type="number"
+                      placeholder="2"
+                      value={demographics.householdSize || ''}
+                      onChange={(e) => updateField('householdSize', e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="maritalStatus">Marital Status</Label>
+                    <select
+                      id="maritalStatus"
+                      value={demographics.maritalStatus || ''}
+                      onChange={(e) => updateField('maritalStatus', e.target.value)}
+                      className="w-full px-3 py-2 border border-input bg-background rounded-md"
+                    >
+                      <option value="">Select status</option>
+                      <option value="single">Single</option>
+                      <option value="married">Married</option>
+                      <option value="divorced">Divorced</option>
+                      <option value="widowed">Widowed</option>
+                    </select>
+                  </div>
+                  <div>
+                    <Label htmlFor="children">Children</Label>
+                    <select
+                      id="children"
+                      value={demographics.children || ''}
+                      onChange={(e) => updateField('children', e.target.value)}
+                      className="w-full px-3 py-2 border border-input bg-background rounded-md"
+                    >
+                      <option value="">Select</option>
+                      <option value="none">None</option>
+                      <option value="one">One</option>
+                      <option value="two">Two</option>
+                      <option value="three-plus">Three or more</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
               {/* Social Media */}
               <div>
                 <h4 className="font-medium mb-3 text-sm text-muted-foreground">Social Media (Optional)</h4>
@@ -384,6 +472,9 @@ export default function EditDigitalTwinPage() {
                 </Button>
                 <Button variant="outline" onClick={handleCancel} disabled={saving}>
                   Cancel
+                </Button>
+                <Button variant="secondary" onClick={handleSave} disabled={saving}>
+                  Enrich Profile
                 </Button>
               </div>
             </CardContent>
