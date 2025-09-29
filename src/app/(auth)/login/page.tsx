@@ -9,8 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2 } from "lucide-react";
-import { signIn, signOut, getSession } from "next-auth/react";
-import { authenticate } from "@/app/actions/auth";
+import { signIn } from "next-auth/react";
 import { useSession } from "next-auth/react";
 
 const LoginPage = () => {
@@ -42,28 +41,27 @@ const LoginPage = () => {
         }
         setIsLoading(true);
         try {
-            console.log('Attempting authentication with server action...');
-            
-            // Use server action
-            const result = await authenticate(formData.email, formData.password);
-            
+            console.log('Attempting authentication with next-auth signIn...');
+
+            const result = await signIn('credentials', {
+                email: formData.email,
+                password: formData.password,
+                redirect: false,
+                callbackUrl: '/surveys'
+            });
+
             console.log('Authentication result:', result);
-            
-            if (result.success) {
-                console.log('Authentication successful, showing toast and redirecting...');
-                toast.success("Signed in successfully!");
-                
-                // Force session refresh before redirecting
-                console.log('Forcing session refresh...');
-                await getSession(); // This will trigger a session refresh
-                
-                // Use router.push after session refresh
-                router.push("/surveys");
-            } else {
-                console.error('Server action auth error:', result.error);
-                toast.error(result.error);
+
+            if (result?.error) {
+                console.error('Client signIn error:', result.error);
+                toast.error(result.error === 'CredentialsSignin' ? 'Invalid credentials.' : result.error);
+                return;
             }
-            
+
+            console.log('Authentication successful, showing toast and redirecting...');
+            toast.success("Signed in successfully!");
+
+            router.push('/surveys');
         } catch (error: any) {
             console.error("Authentication error:", error);
             toast.error("Authentication failed. Please try again.");
