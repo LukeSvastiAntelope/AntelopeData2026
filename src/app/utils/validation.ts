@@ -24,8 +24,6 @@ export function validateUserName(username: string) {
 }
 
 export const validatePassword = (password: string) => {
-    // Require: 8+ chars, at least one upper, one lower, one digit, and one non-alphanumeric (broader set)
-    const isStrong = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/.test(password);
-    if (!isStrong) return "Password must be at least 8 characters long, contain at least one uppercase letter, one lowercase letter, one number, and one special character.";
+    if (password.length < 8) return "Password must be at least 8 characters long.";
     return null;
 };
