@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { toast } from "@/components/ui/sonner";
 import { useState, useEffect } from "react";
-import { validateEmail, validatePassword } from "@/app/utils/validation";
+import { validateEmail } from "@/app/utils/validation";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,12 +40,6 @@ const LoginPage = () => {
             toast.error(emailCheck);
             return;
         }
-        const passwordCheck = validatePassword(formData.password);
-        if (passwordCheck) {
-            toast.error(passwordCheck);
-            return;
-        }
-
         setIsLoading(true);
         try {
             console.log('Attempting authentication with server action...');
