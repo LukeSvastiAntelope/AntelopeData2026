@@ -364,6 +364,10 @@ async function registerPassword({ email, password, displayName }: { email: strin
         throw new Error('Email "' + email + '" is already registered.');
     }
 
+    if (!password || password.length < 8) {
+        throw new Error('Password must be at least 8 characters long.');
+    }
+
     const hashedPassword = bcrypt.hashSync(password, 10);
     await db.execute(
         'INSERT INTO users (email, display_name, password, is_verified, is_first_login) VALUES (?, ?, ?, 1, 0)', 

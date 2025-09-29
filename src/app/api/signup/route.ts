@@ -5,6 +5,9 @@ import { signIn } from "@/auth";
 export async function POST(req: NextRequest) {
     const { email, password, displayName } = await req.json();
     try {
+        if (!password || password.length < 8) {
+            return Response.json({ status: false, message: 'Password must be at least 8 characters long.' });
+        }
         // Create the user in the database
         await UserRepo.registerPassword({ email, password, displayName });
         
