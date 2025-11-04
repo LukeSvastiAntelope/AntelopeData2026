@@ -5,17 +5,18 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import LogoText from "@/components/logo-text"
 import LogoIcon from "@/components/logo-icon"
-import { 
-  Sidebar, 
-  SidebarContent, 
-  SidebarFooter, 
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
   SidebarHeader,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
   SidebarMenu,
-  SidebarMenuItem,
   SidebarMenuButton,
-  SidebarMenuSub,
-  SidebarMenuSubButton,
-  SidebarMenuSubItem,
+  SidebarMenuItem,
+  SidebarSeparator,
 } from "@/components/ui/sidebar"
 import {
   FileText as FileTextIcon,
@@ -67,7 +68,7 @@ export function PublicAppSidebar({ className, collapsible = "offcanvas", ...prop
     }
   ]
 
-  const footerNavItems = [
+  const resourceNavItems = [
     {
       title: "About Us",
       href: "/about",
@@ -115,62 +116,78 @@ export function PublicAppSidebar({ className, collapsible = "offcanvas", ...prop
         </div>
       </SidebarHeader>
       
-      <SidebarContent className="flex flex-col gap-2">
-        <SidebarMenu className="px-4">
-          {mainNavItems.map((item) => (
-            <SidebarMenuItem key={item.key || item.href}>
-              <SidebarMenuButton
-                asChild
-                isActive={pathname === item.href || pathname.startsWith(`${item.href}/`)}
-                tooltip={item.title}
-              >
-                <Link href={item.href} className="flex items-center gap-2 px-4 py-2 text-sidebar-foreground">
-                  <item.icon className="h-4 w-4 text-sidebar-foreground group-data-[collapsible=offcanvas]:hidden" />
-                  <span className="text-sidebar-foreground">{item.title}</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          ))}
-        </SidebarMenu>
-        
+      <SidebarContent className="flex flex-col gap-4">
+        <SidebarGroup className="px-4">
+          <SidebarGroupLabel>Platform</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {mainNavItems.map((item) => (
+                <SidebarMenuItem key={item.key || item.href}>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={pathname === item.href || pathname.startsWith(`${item.href}/`)}
+                    tooltip={item.title}
+                  >
+                    <Link href={item.href} className="flex items-center gap-2 px-4 py-2 text-sidebar-foreground">
+                      <item.icon className="h-4 w-4 text-sidebar-foreground group-data-[collapsible=offcanvas]:hidden" />
+                      <span className="text-sidebar-foreground">{item.title}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
         {secondaryNavItems.length > 0 && (
-          <SidebarMenu className="px-4">
-            {secondaryNavItems.map((item) => (
-              <SidebarMenuItem key={item.key || item.href}>
-                <SidebarMenuButton
-                  asChild
-                  isActive={pathname === item.href}
-                  tooltip={item.title}
-                >
-                  <Link href={item.href} className="flex items-center gap-2 px-4 py-2 text-sidebar-foreground">
-                    <item.icon className="h-4 w-4 text-sidebar-foreground group-data-[collapsible=offcanvas]:hidden" />
-                    <span className="text-sidebar-foreground">{item.title}</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            ))}
-          </SidebarMenu>
+          <SidebarGroup className="px-4">
+            <SidebarGroupLabel>Workspace</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {secondaryNavItems.map((item) => (
+                  <SidebarMenuItem key={item.key || item.href}>
+                    <SidebarMenuButton
+                      asChild
+                      isActive={pathname === item.href}
+                      tooltip={item.title}
+                    >
+                      <Link href={item.href} className="flex items-center gap-2 px-4 py-2 text-sidebar-foreground">
+                        <item.icon className="h-4 w-4 text-sidebar-foreground group-data-[collapsible=offcanvas]:hidden" />
+                        <span className="text-sidebar-foreground">{item.title}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
         )}
+
+        <SidebarGroup className="px-4">
+          <SidebarGroupLabel>Resources</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {resourceNavItems.map((item) => (
+                <SidebarMenuItem key={item.href}>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={pathname === item.href}
+                    tooltip={item.title}
+                  >
+                    <Link href={item.href} className="flex items-center gap-2 px-4 py-2 text-sidebar-foreground">
+                      <item.icon className="h-4 w-4 text-sidebar-foreground group-data-[collapsible=offcanvas]:hidden" />
+                      <span className="text-sidebar-foreground">{item.title}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
       </SidebarContent>
       
       <SidebarFooter className="py-4 mt-auto">
-        <SidebarMenu className="px-4">
-          {footerNavItems.map((item) => (
-            <SidebarMenuItem key={item.href}>
-              <SidebarMenuButton
-                asChild
-                isActive={pathname === item.href}
-                tooltip={item.title}
-              >
-                <Link href={item.href} className="flex items-center gap-2 px-4 py-2 text-sidebar-foreground">
-                  <item.icon className="h-4 w-4 text-sidebar-foreground group-data-[collapsible=offcanvas]:hidden" />
-                  <span className="text-sidebar-foreground">{item.title}</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          ))}
-        </SidebarMenu>
-
+        <SidebarSeparator className="mx-8" />
         <div className="px-8 pt-4 flex flex-col gap-2">
           <Button 
             asChild

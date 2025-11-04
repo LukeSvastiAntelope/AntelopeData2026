@@ -1,5 +1,41 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+const PRIVATE_HOSTNAME_SUFFIXES = ['.local', '.localhost', '.internal', '.intranet'];
+const BLOCKED_HOSTNAMES = new Set(['localhost', '127.0.0.1', '0.0.0.0', '[::1]', '::1']);
+const IPV4_REGEX = /^(\d{1,3}\.){3}\d{1,3}$/;
+const IPV6_LOOPBACK_REGEX = /^::1$/;
+
+const PRIVATE_IPV4_RANGES = [
+  /^10\./,
+  /^127\./,
+  /^0\./,
+  /^169\.254\./,
+  /^192\.168\./,
+  /^172\.(1[6-9]|2[0-9]|3[0-1])\./,
+];
+
+const allowList = (process.env.IMAGE_PROXY_ALLOWLIST || '')
+  .split(',')
+  .map((host) => host.trim().toLowerCase())
+  .filter(Boolean);
+
+const isHostnameBlocked = (hostname: string) => {
+  const lower = hostname.toLowerCase();
+  if (BLOCKED_HOSTNAMES.has(lower)) {
+    return true;
+  }
+  if (PRIVATE_HOSTNAME_SUFFIXES.some((suffix) => lower.endsWith(suffix))) {
+    return true;
+  }
+  if (IPV6_LOOPBACK_REGEX.test(lower)) {
+    return true;
+  }
+  if (IPV4_REGEX.test(lower)) {
+    return PRIVATE_IPV4_RANGES.some((pattern) => pattern.test(lower));
+  }
+  return false;
+};
+
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const imageUrl = searchParams.get('url');
@@ -13,6 +49,12 @@ export async function GET(request: NextRequest) {
     const url = new URL(imageUrl);
     if (!['http:', 'https:'].includes(url.protocol)) {
       throw new Error('Invalid protocol');
+    }
+    if (allowList.length > 0 && !allowList.includes(url.hostname.toLowerCase())) {
+      return new NextResponse('Domain not allowed by proxy', { status: 403 });
+    }
+    if (isHostnameBlocked(url.hostname)) {
+      return new NextResponse('Domain not allowed by proxy', { status: 403 });
     }
     // Optional: Add domain whitelisting or blacklisting here if needed for extra security,
     // though the primary goal here is flexibility.
@@ -85,4 +127,5 @@ export async function GET(request: NextRequest) {
     }
     return new NextResponse('Error fetching image from source', { status: 500 });
   }
-} 
+}
+

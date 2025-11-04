@@ -120,6 +120,20 @@ export async function POST(
             }, { status: 400 });
         }
 
+        // Extra guard: ensure at least one non-empty answer value
+        const nonEmptyAnswerCount = body.answers.filter((a: any) => {
+            if (!a) return false;
+            const v = a.value;
+            if (Array.isArray(v)) return v.length > 0;
+            if (v === null || v === undefined) return false;
+            return String(v).trim().length > 0;
+        }).length;
+        if (nonEmptyAnswerCount === 0) {
+            return NextResponse.json({ 
+                error: 'No answers provided' 
+            }, { status: 400 });
+        }
+
         // Get IP address and user agent for rate limiting
         const ipAddress = req.headers.get('x-forwarded-for') || 
                          req.headers.get('x-real-ip') || 

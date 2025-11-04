@@ -1,8 +1,14 @@
 import { SignJWT, jwtVerify } from 'jose';
 
-const SECRET_KEY = new TextEncoder().encode(
-  process.env.JWT_SECRET_KEY || 'your-secret-key-at-least-32-characters'
-);
+const rawSecret = process.env.JWT_SECRET_KEY;
+const isDev = process.env.NODE_ENV !== 'production';
+if (!rawSecret) {
+  throw new Error('JWT_SECRET_KEY environment variable must be set for token operations.');
+}
+if (rawSecret.length < 32) {
+  throw new Error('JWT_SECRET_KEY must be at least 32 characters to ensure token security.');
+}
+const SECRET_KEY = new TextEncoder().encode(rawSecret);
 
 export async function generateConfirmationToken(email: string, role = 'user'): Promise<string> {
   const token = await new SignJWT({ email, role })
@@ -17,11 +23,15 @@ export async function generateConfirmationToken(email: string, role = 'user'): P
 export async function verifyConfirmationToken(token: string) {
   try {
     const { payload } = await jwtVerify(token, SECRET_KEY);
-    console.log("payload", payload);
+    if (isDev) {
+      console.log("verifyConfirmationToken payload", payload);
+    }
     
     return payload;
   } catch (e) {
-    console.log(e);
+    if (isDev) {
+      console.log("verifyConfirmationToken error", e);
+    }
     return null;
   }
 }
