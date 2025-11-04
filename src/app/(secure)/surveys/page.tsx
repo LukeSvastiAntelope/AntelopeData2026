@@ -695,7 +695,7 @@ const SurveysPage = () => {
                                       <MoreVertical className="h-4 w-4" />
                                     </Button>
                                   </DropdownMenuTrigger>
-                                  <DropdownMenuContent align="end">
+                                  <DropdownMenuContent align="end" sideOffset={6} className="min-w-48">
                                     <DropdownMenuItem asChild>
                                       <Link href={`/surveys/${survey.id}/edit`} className="flex items-center cursor-pointer">
                                         <Edit className="h-4 w-4 mr-2" />

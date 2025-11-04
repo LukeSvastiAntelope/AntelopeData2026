@@ -269,6 +269,16 @@ html,body{
   overflow-x:hidden; /* stop unexpected horizontal scroll */
 }
 
+/* Reserve scrollbar space to prevent layout shift when popovers/menus open */
+html{
+  scrollbar-gutter: stable both-edges;
+}
+
+/* Always allow vertical scrollbar to avoid content width jumping */
+body{
+  overflow-y: scroll;
+}
+
 /* Ensure long code blocks wrap instead of forcing scrollbars */
 pre{
   white-space:pre-wrap; /* allow wrapping */
