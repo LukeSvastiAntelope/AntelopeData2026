@@ -5,6 +5,7 @@ import { SurveyRepo } from "@/app/utils/database/survey-repo";
 import { promises as fs } from 'fs';
 import path from 'path';
 import { tmpdir } from 'os';
+import { normalizeRecords } from '@/app/utils/survey/import-utils';
 // Remove hard dependency on csv-parse/sync; rely on Papa with retry
 
 // Configure route for longer timeout
@@ -108,12 +109,15 @@ async function getImportData(file: File, config: ImportConfig, userId: string): 
     // Clean up temporary files after successful combination
     await cleanupChunks(userId, config.fileName);
     
-    return combinedData;
+    const normalized = normalizeRecords(combinedData, { dropEmptyRows: true });
+    return normalized.rows;
   }
   
   // No chunked data found, parse the file directly
   console.log(`No chunked data found for ${config.fileName}, parsing file directly...`);
-  return await parseFileData(file);
+  const parsed = await parseFileData(file);
+  const normalized = normalizeRecords(parsed, { dropEmptyRows: true });
+  return normalized.rows;
 }
 
 // Helper function to parse file data again (since we don't store it from preview)

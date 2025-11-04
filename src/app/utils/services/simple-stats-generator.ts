@@ -1,6 +1,11 @@
 // Simple Statistics Generator - Generates basic SQL queries for survey analysis
 import { openSql } from '../database/db';
-import { RowDataPacket } from 'mysql2';
+import {
+  profileQuestions,
+  isProfileInteresting,
+  normalizeQuestionOptions,
+  QuestionProfile
+} from '../survey/question-profiler';
 
 export interface SimpleStatsConfig {
   maxDistributionQueries?: number;
@@ -13,7 +18,10 @@ export interface QuestionAnalysis {
   prompt: string;
   type: string;
   options: string[];
-  detectedType: 'yes_no' | 'rating_scale' | 'multiple_choice' | 'text' | 'numeric' | 'skip';
+  detectedType: QuestionProfile['detectedType'];
+  category: QuestionProfile['category'];
+  demographicField?: string;
+  tags: string[];
   priority: number;
   isInteresting: boolean;
 }
@@ -56,18 +64,19 @@ export class SimpleStatsGenerator {
     // Get survey questions
     const questions = await this.getSurveyQuestions(surveyId);
     
-    // Analyze and categorize questions
-    const analyzedQuestions = this.analyzeQuestions(questions);
+    // Analyze and categorize questions using shared profiler
+    const analyzedQuestions = this.buildQuestionAnalyses(questions);
+    const interestingQuestions = analyzedQuestions.filter((q) => q.isInteresting);
     
     // Generate distribution queries
     const distributionQueries = this.generateDistributionQueries(
-      analyzedQuestions.filter(q => q.isInteresting), 
+      interestingQuestions,
       maxDistributions
     );
     
     // Generate cross-tabulation queries
     const crossTabQueries = this.generateCrossTabQueries(
-      analyzedQuestions.filter(q => q.isInteresting),
+      analyzedQuestions,
       maxCrossTabs
     );
     
@@ -83,7 +92,7 @@ export class SimpleStatsGenerator {
       executedResults,
       metadata: {
         totalQuestions: questions.length,
-        analyzableQuestions: analyzedQuestions.filter(q => q.isInteresting).length,
+        analyzableQuestions: interestingQuestions.length,
         generatedAt: new Date().toISOString()
       }
     };
@@ -105,129 +114,31 @@ export class SimpleStatsGenerator {
       ORDER BY question_order ASC
     `, [surveyId]) as any[];
     
-    return questions.map(q => ({
+    return questions.map((q: any) => ({
       ...q,
-      options: q.options ? (Array.isArray(q.options) ? q.options : JSON.parse(q.options)) : []
+      options: normalizeQuestionOptions(q.options)
     }));
   }
-  
-  private analyzeQuestions(questions: any[]): QuestionAnalysis[] {
-    return questions.map(q => {
-      const analysis: QuestionAnalysis = {
-        id: q.id,
-        prompt: q.prompt,
-        type: q.type,
-        options: q.options || [],
-        detectedType: this.detectQuestionType(q),
-        priority: this.calculatePriority(q),
-        isInteresting: false
-      };
-      
-      analysis.isInteresting = this.isQuestionInteresting(analysis);
-      
-      return analysis;
-    });
-  }
-  
-  private detectQuestionType(question: any): QuestionAnalysis['detectedType'] {
-    const options = question.options || [];
-    const prompt = question.prompt.toLowerCase();
-    
-    // Skip administrative questions
-    if (prompt.includes('respondent id') || 
-        prompt.includes('interview start') || 
-        prompt.includes('interview end') ||
-        options.length === 0) {
-      return 'skip';
-    }
-    
-    // Yes/No questions
-    if (options.length === 2 && 
-        (options.includes('Yes') && options.includes('No'))) {
-      return 'yes_no';
-    }
-    
-    // Yes/No/Not sure questions
-    if (options.length === 3 && 
-        options.includes('Yes') && options.includes('No') && 
-        (options.includes('Not sure') || options.includes('Unsure'))) {
-      return 'yes_no';
-    }
-    
-    // Rating scales (importance, agreement, frequency, etc.)
-    const ratingKeywords = [
-      'very', 'somewhat', 'not very', 'not at all',
-      'extremely', 'moderately', 'slightly',
-      'always', 'often', 'sometimes', 'rarely', 'never',
-      'strongly agree', 'agree', 'disagree', 'strongly disagree',
-      'definitely', 'probably', 'probably not', 'definitely not'
-    ];
-    
-    const hasRatingWords = options.some(opt => 
-      ratingKeywords.some(keyword => opt.toLowerCase().includes(keyword))
-    );
-    
-    if (hasRatingWords || options.length >= 4) {
-      return 'rating_scale';
-    }
-    
-    // Multiple choice (3-6 options, not rating)
-    if (options.length >= 3 && options.length <= 6) {
-      return 'multiple_choice';
-    }
-    
-    // Text questions
-    if (question.type === 'text' || options.length === 0) {
-      return 'text';
-    }
-    
-    return 'multiple_choice'; // Default fallback
-  }
-  
-  private calculatePriority(question: any): number {
-    let priority = 1;
-    const prompt = question.prompt.toLowerCase();
-    
-    // High priority topics
-    const highPriorityTerms = [
-      'trust', 'opinion', 'think', 'believe', 'feel',
-      'important', 'comfortable', 'effective', 'threat',
-      'ai', 'artificial intelligence', 'covid', 'health',
-      'satisfaction', 'experience', 'recommend'
-    ];
-    
-    if (highPriorityTerms.some(term => prompt.includes(term))) {
-      priority += 2;
-    }
-    
-    // Boost for good answer distributions
-    const options = question.options || [];
-    if (options.length >= 3 && options.length <= 6) {
-      priority += 1;
-    }
-    
-    return priority;
-  }
-  
-  private isQuestionInteresting(analysis: QuestionAnalysis): boolean {
-    // Skip administrative questions
-    if (analysis.detectedType === 'skip') return false;
-    
-    // Skip text questions for now (could add sentiment analysis later)
-    if (analysis.detectedType === 'text') return false;
-    
-    // Must have reasonable number of options
-    if (analysis.options.length === 0 || analysis.options.length > 8) return false;
-    
-    // Must be substantive question
-    if (analysis.prompt.length < 10) return false;
-    
-    return true;
+
+  private buildQuestionAnalyses(questions: any[]): QuestionAnalysis[] {
+    const profiles = profileQuestions(questions);
+    return profiles.map((profile) => ({
+      id: profile.id,
+      prompt: profile.prompt,
+      type: profile.rawType,
+      options: profile.options,
+      detectedType: profile.detectedType,
+      category: profile.category,
+      demographicField: profile.demographicField,
+      tags: profile.tags,
+      priority: profile.priority,
+      isInteresting: isProfileInteresting(profile)
+    }));
   }
   
   private generateDistributionQueries(questions: QuestionAnalysis[], maxQueries: number): SimpleStatsQuery[] {
     // Sort by priority and take top questions
-    const topQuestions = questions
+    const topQuestions = [...questions]
       .sort((a, b) => b.priority - a.priority)
       .slice(0, maxQueries);
     
@@ -262,16 +173,25 @@ export class SimpleStatsGenerator {
     const crossTabs: SimpleStatsQuery[] = [];
     
     // Find demographic-like questions (shorter options, basic categories)
-    const demographicQuestions = questions.filter(q => 
-      q.options.length <= 4 && 
-      (q.detectedType === 'multiple_choice' || q.detectedType === 'yes_no')
-    );
+    const demographicQuestions = questions
+      .filter(
+        (q) =>
+          q.category === 'demographic' &&
+          q.options.length > 0 &&
+          q.options.length <= 8
+      )
+      .sort((a, b) => b.priority - a.priority)
+      .slice(0, 4);
     
-    // Find opinion questions (rating scales, longer prompts)
-    const opinionQuestions = questions.filter(q => 
-      q.detectedType === 'rating_scale' && 
-      q.priority >= 2
-    );
+    // Find opinion or behavioral questions with structured responses
+    const opinionQuestions = questions
+      .filter(
+        (q) =>
+          (q.category === 'opinion' || q.category === 'behavioral') &&
+          q.isInteresting
+      )
+      .sort((a, b) => b.priority - a.priority)
+      .slice(0, 6);
     
     let generated = 0;
     
@@ -365,34 +285,6 @@ export class SimpleStatsGenerator {
     return results;
   }
 
-  private parseOptions(optionValue: any): string[] {
-    // Accept a variety of shapes: already-parsed array, JSON string, comma-separated string, null/undefined.
-
-    if (Array.isArray(optionValue)) {
-      return optionValue.map((v) => String(v));
-    }
-
-    if (optionValue === null || optionValue === undefined) return [];
-
-    const optionsString = String(optionValue);
-
-    // Attempt JSON parse first (handles strings that look like '["Yes","No"]')
-    try {
-      const parsed = JSON.parse(optionsString);
-      if (Array.isArray(parsed)) {
-        return parsed;
-      }
-    } catch {
-      // Not JSON – fall through to comma-separated parsing.
-    }
-
-    // Fallback: treat as a comma-separated list (common in legacy surveys)
-    return optionsString
-      .split(',')
-      .map((s) => s.trim())
-      .filter(Boolean);
-  }
-
   private async mapCrossTabLabels(db: any, data: any[], questionIds: number[]): Promise<any[]> {
     if (questionIds.length < 2) return data;
 
@@ -407,8 +299,8 @@ export class SimpleStatsGenerator {
       [questionIds[1]]
     ) as any[];
 
-    const q1OptionsArray = this.parseOptions(q1Options[0]?.options || '');
-    const q2OptionsArray = this.parseOptions(q2Options[0]?.options || '');
+    const q1OptionsArray = normalizeQuestionOptions(q1Options[0]?.options || '');
+    const q2OptionsArray = normalizeQuestionOptions(q2Options[0]?.options || '');
 
     // Map numeric values to text labels (non-numeric values are passed through)
     const mapped = data.map((row: any) => ({
@@ -431,7 +323,7 @@ export class SimpleStatsGenerator {
     if (!questionId) return data;
 
     const [optionsRow] = await db.execute('SELECT options FROM survey_questions WHERE id = ?', [questionId]) as any[];
-    const optionsArray = this.parseOptions(optionsRow[0]?.options || '');
+    const optionsArray = normalizeQuestionOptions(optionsRow[0]?.options || '');
 
     const mapped = data.map((row: any) => ({
       ...row,

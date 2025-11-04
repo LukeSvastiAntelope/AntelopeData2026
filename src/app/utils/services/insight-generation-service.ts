@@ -2,7 +2,7 @@
 import OpenAI from 'openai';
 import { openSql as getMySQLConnection } from '../database/db';
 import { RowDataPacket, ResultSetHeader } from 'mysql2';
-import { SurveyAnalysisResult } from './survey-analysis-engine';
+import { SurveyAnalysisResult } from './survey-analysis-types';
 import { StatisticalQueryResult } from './statistical-query-generator';
 import { createCompletion } from './ai-service';
 

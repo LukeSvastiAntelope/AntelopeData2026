@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { google } from 'googleapis';
+import { analyzeColumns, normalizeRecords } from '@/app/utils/survey/import-utils';
 
 interface GoogleSheetsImportRequest {
   spreadsheetId: string;
@@ -115,30 +116,32 @@ export async function GET(req: NextRequest) {
       }, { status: 400 });
     }
     
-    // Process the data using our existing logic
     const processedData = processGoogleSheetsData(values);
-    
-    // Use our existing column analysis logic
-    const headers = Object.keys(processedData[0]);
-    
-    // Import the detection functions from our main import route
-    // For now, we'll use simplified detection
+    const { rows: normalizedRows } = normalizeRecords(processedData, { dropEmptyRows: true });
+
+    if (normalizedRows.length === 0) {
+      return NextResponse.json({
+        status: false,
+        message: 'The selected sheet does not contain any usable rows.'
+      }, { status: 400 });
+    }
+
+    const columnAnalysis = analyzeColumns(normalizedRows, { sampleSize: 200 });
+    const warnings = [...columnAnalysis.warnings];
+
+    if (normalizedRows.length > 1000) {
+      warnings.push(`Large dataset detected (${normalizedRows.length} responses). Processing may take longer.`);
+    }
+
     const preview = {
       fileName: `${spreadsheet.data.properties?.title || 'Google Sheet'} - ${targetSheet}`,
-      totalRows: processedData.length,
-      columns: headers.map(header => ({
-        name: header,
-        type: 'text', // Simplified for now
-        isDemographic: false,
-        sampleValues: processedData.slice(0, 5).map(row => String(row[header] || '')),
-        uniqueValues: [...new Set(processedData.map(row => String(row[header] || '')))].slice(0, 10),
-        isRequired: false
-      })),
-      previewData: processedData.slice(0, 5),
+      totalRows: normalizedRows.length,
+      columns: columnAnalysis.columns,
+      previewData: normalizedRows.slice(0, 5),
       suggestedTitle: `${spreadsheet.data.properties?.title || 'Imported Survey'} - ${targetSheet}`,
-      detectedDemographics: [],
+      detectedDemographics: columnAnalysis.detectedDemographics,
       errors: [],
-      warnings: [],
+      warnings,
       availableSheets,
       source: 'google_sheets'
     };
@@ -203,6 +206,14 @@ export async function POST(req: NextRequest) {
     }
     
     const processedData = processGoogleSheetsData(values);
+    const { rows: normalizedRows } = normalizeRecords(processedData, { dropEmptyRows: true });
+
+    if (normalizedRows.length === 0) {
+      return NextResponse.json({
+        status: false,
+        message: 'The selected range does not contain any usable rows.'
+      }, { status: 400 });
+    }
     
     // Create the survey using our existing import execution logic
     // This would integrate with the same survey creation process
@@ -212,8 +223,8 @@ export async function POST(req: NextRequest) {
       status: true, 
       result: {
         surveyId: null, // Would be set after actual survey creation
-        responsesCreated: processedData.length,
-        digitalTwinsCreated: createDigitalTwins ? processedData.length : 0,
+        responsesCreated: normalizedRows.length,
+        digitalTwinsCreated: createDigitalTwins ? normalizedRows.length : 0,
         errors: [],
         warnings: [],
         source: 'google_sheets_import'

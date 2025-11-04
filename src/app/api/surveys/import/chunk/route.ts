@@ -4,6 +4,7 @@ import * as XLSX from 'xlsx';
 import { promises as fs } from 'fs';
 import path from 'path';
 import { tmpdir } from 'os';
+import { normalizeRecords } from '@/app/utils/survey/import-utils';
 
 interface ChunkData {
   chunkIndex: number;
@@ -189,13 +190,15 @@ export async function POST(req: NextRequest) {
       }, { status: 400 });
     }
 
+    const { rows: normalizedRows } = normalizeRecords(chunkData, { dropEmptyRows: true });
+
     // Store this chunk
     try {
-      console.log(`Storing chunk ${chunkIndex} with ${chunkData.length} rows`);
+      console.log(`Storing chunk ${chunkIndex} with ${normalizedRows.length} rows`);
       await storeChunk({
         chunkIndex,
         totalChunks,
-        data: chunkData,
+        data: normalizedRows,
         fileName: originalFileName,
         userId: userIdHeader,
         timestamp: Date.now()
@@ -246,7 +249,7 @@ export async function POST(req: NextRequest) {
         chunkInfo: {
           chunkIndex,
           totalChunks,
-          chunkRows: chunkData.length,
+          chunkRows: normalizedRows.length,
           isLastChunk: true
         }
       });
@@ -257,11 +260,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ 
       status: true, 
       isComplete: false,
-      message: `Processed chunk ${chunkIndex + 1} of ${totalChunks} (${chunkData.length} rows)`,
+      message: `Processed chunk ${chunkIndex + 1} of ${totalChunks} (${normalizedRows.length} rows)`,
       chunkInfo: {
         chunkIndex,
         totalChunks,
-        chunkRows: chunkData.length,
+        chunkRows: normalizedRows.length,
         isLastChunk: false
       }
     });

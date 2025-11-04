@@ -1,33 +1,29 @@
 // Survey Analysis Engine - AI-powered survey understanding and analysis planning
 import { openSql } from '../database/db';
 import { createCompletion } from './ai-service';
-import { RowDataPacket, ResultSetHeader } from 'mysql2';
+import {
+  profileQuestions,
+  QuestionProfile,
+  normalizeQuestionOptions
+} from '../survey/question-profiler';
+import {
+  buildAnalysisUserPrompt,
+  buildHeuristicAnalysis,
+  mergeAnalysisWithHeuristics
+} from './survey-analysis-helpers';
+import {
+  SurveyAnalysisConfig,
+  SurveyAnalysisResult
+} from './survey-analysis-types';
+export type { SurveyAnalysisConfig, SurveyAnalysisResult } from './survey-analysis-types';
 
-export interface SurveyAnalysisConfig {
-  analysisModel?: string;
-  forceRegenerate?: boolean;
-}
-
-export interface SurveyAnalysisResult {
-  surveyId: number;
-  surveyType: string;
-  mainThemes: string[];
-  questionCategories: {
-    demographic: string[];
-    opinion: string[];
-    behavioral: string[];
-    categorical: string[];
-  };
-  suggestedAnalyses: {
-    distributions: string[];
-    crossTabs: Array<{ var1: string; var2: string; rationale: string }>;
-    correlations: Array<{ var1: string; var2: string; rationale: string }>;
-    segmentations: Array<{ segmentBy: string; analyzeVars: string[]; rationale: string }>;
-  };
-  demographicFields: string[];
-  keyMetrics: string[];
-  analysisComplexity: 'simple' | 'moderate' | 'complex';
-  estimatedAnalysisTime: number;
+interface SurveyDataPayload {
+  id: number;
+  title: string;
+  description?: string | null;
+  questions: any[];
+  questionProfiles: QuestionProfile[];
+  responseCount: number;
 }
 
 export class SurveyAnalysisEngine {
@@ -64,86 +60,86 @@ export class SurveyAnalysisEngine {
     return analysisResult;
   }
 
-  private async performAIAnalysis(surveyData: any, model: string): Promise<SurveyAnalysisResult> {
+  private async performAIAnalysis(
+    surveyData: SurveyDataPayload,
+    model: string
+  ): Promise<SurveyAnalysisResult> {
     const systemPrompt = `You are a survey analysis expert. Analyze the provided survey data and return a comprehensive analysis in the exact JSON format specified.
 
 Your task is to understand the survey's purpose, categorize questions, and suggest meaningful statistical analyses.
 
 CRITICAL: Return ONLY valid JSON with no additional text, explanations, or markdown formatting.`;
 
-    const userPrompt = `Analyze this survey data:
+    const surveyMeta = {
+      id: surveyData.id,
+      title: surveyData.title,
+      description: surveyData.description,
+      responseCount: surveyData.responseCount,
+      questions: surveyData.questions
+    };
 
-**Survey Title:** ${surveyData.title}
-**Description:** ${surveyData.description || 'No description provided'}
-**Total Questions:** ${surveyData.questions.length}
-**Total Responses:** ${surveyData.responseCount}
+    const heuristicFallback = buildHeuristicAnalysis(
+      surveyMeta,
+      surveyData.questionProfiles
+    );
 
-**Questions and Options:**
-${surveyData.questions.map((q: any, i: number) => `
-${i + 1}. **${q.prompt}** (Type: ${q.type})
-   ${q.options ? `Options: ${q.options.map((opt: any) => `"${typeof opt === 'string' ? opt : JSON.stringify(opt)}"`).join(', ')}` : 'No predefined options'}
-`).join('')}
-
-Return a JSON object with this exact structure:
-{
-  "surveyId": ${surveyData.id},
-  "surveyType": "string - primary category (e.g., 'Customer Satisfaction', 'Political Opinion', 'Employee Engagement')",
-  "mainThemes": ["array", "of", "key", "themes"],
-  "questionCategories": {
-    "demographic": ["question_ids for age, gender, location, etc."],
-    "opinion": ["question_ids for opinions, ratings, satisfaction"],
-    "behavioral": ["question_ids for actions, frequency, usage"],
-    "categorical": ["question_ids for simple categorization"]
-  },
-  "suggestedAnalyses": {
-    "distributions": ["question_ids that need distribution analysis"],
-    "crossTabs": [
-      {"var1": "question_id", "var2": "question_id", "rationale": "why this cross-tab is meaningful"}
-    ],
-    "correlations": [
-      {"var1": "question_id", "var2": "question_id", "rationale": "why this correlation is interesting"}
-    ],
-    "segmentations": [
-      {"segmentBy": "question_id", "analyzeVars": ["question_ids"], "rationale": "why this segmentation is valuable"}
-    ]
-  },
-  "demographicFields": ["question_ids that can be used for demographic segmentation"],
-  "keyMetrics": ["question_ids representing the most important survey outcomes"],
-  "analysisComplexity": "simple|moderate|complex",
-  "estimatedAnalysisTime": number_in_minutes
-}
-
-Use actual question_id values from the survey data. Focus on meaningful statistical relationships.`;
+    const userPrompt = buildAnalysisUserPrompt(
+      surveyMeta,
+      surveyData.questionProfiles
+    );
 
     console.log(`Analyzing survey ${surveyData.id} with model: ${model}`);
-    
-    const response = await createCompletion({
-      model,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt }
-      ],
-      temperature: 0.3,
-      maxTokens: 4000
-    });
 
-    let analysisResult: SurveyAnalysisResult;
+    let aiResult: SurveyAnalysisResult | null = null;
     try {
-      analysisResult = JSON.parse(response.content);
+      const response = await createCompletion({
+        model,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt }
+        ],
+        temperature: 0.3,
+        maxTokens: 4000
+      });
+
+      const rawContent =
+        typeof response.content === 'string'
+          ? response.content
+          : JSON.stringify(response.content);
+
+      aiResult = JSON.parse(rawContent);
+
+      aiResult.questionCategories = aiResult.questionCategories ?? {
+        demographic: [],
+        opinion: [],
+        behavioral: [],
+        categorical: []
+      };
+
+      aiResult.suggestedAnalyses = aiResult.suggestedAnalyses ?? {
+        distributions: [],
+        crossTabs: [],
+        correlations: [],
+        segmentations: []
+      };
+
+      aiResult.mainThemes = aiResult.mainThemes ?? [];
+      aiResult.demographicFields = aiResult.demographicFields ?? [];
+      aiResult.keyMetrics = aiResult.keyMetrics ?? [];
+      aiResult.analysisComplexity =
+        aiResult.analysisComplexity ?? heuristicFallback.analysisComplexity;
+      aiResult.estimatedAnalysisTime =
+        aiResult.estimatedAnalysisTime ?? heuristicFallback.estimatedAnalysisTime;
+      aiResult.surveyType = aiResult.surveyType ?? heuristicFallback.surveyType;
     } catch (error) {
-      console.error('Failed to parse AI analysis response:', response.content);
-      throw new Error('AI returned invalid JSON response');
+      console.warn('AI analysis failed, falling back to heuristics:', error);
+      aiResult = null;
     }
 
-    // Validate the result has required fields
-    if (!analysisResult.surveyType || !analysisResult.questionCategories) {
-      throw new Error('AI analysis missing required fields');
-    }
-
-    return analysisResult;
+    return mergeAnalysisWithHeuristics(aiResult, heuristicFallback);
   }
 
-  private async getSurveyData(surveyId: number) {
+  private async getSurveyData(surveyId: number): Promise<SurveyDataPayload> {
     const db = await openSql();
     
     const [survey] = await db.execute(
@@ -176,8 +172,10 @@ Use actual question_id values from the survey data. Focus on meaningful statisti
     // Parse options JSON if it exists
     const questionsWithOptions = questions.map((q: any) => ({
       ...q,
-      options: q.options ? (Array.isArray(q.options) ? q.options : JSON.parse(q.options)) : null
+      options: normalizeQuestionOptions(q.options)
     }));
+
+    const questionProfiles = profileQuestions(questionsWithOptions);
 
     // Get response count
     const [responseCount] = await db.execute(
@@ -188,6 +186,7 @@ Use actual question_id values from the survey data. Focus on meaningful statisti
     return {
       ...surveyData,
       questions: questionsWithOptions,
+      questionProfiles,
       responseCount: responseCount[0]?.count || 0
     };
   }
