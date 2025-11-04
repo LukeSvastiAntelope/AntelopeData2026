@@ -241,6 +241,21 @@ export const SurveyRepo = {
         
         try {
             await connection.beginTransaction();
+            // Guard: reject empty or whitespace-only answer payloads to prevent orphan response shells
+            const hasAnswersArray = Array.isArray(data?.answers);
+            const nonEmptyAnswerCount = hasAnswersArray
+                ? data.answers.filter((a: any) => {
+                    if (!a) return false;
+                    const v = a.value;
+                    if (Array.isArray(v)) return v.length > 0;
+                    if (v === null || v === undefined) return false;
+                    return String(v).trim().length > 0;
+                }).length
+                : 0;
+            if (!hasAnswersArray || nonEmptyAnswerCount === 0) {
+                console.warn(`[SurveyRepo] Rejecting empty answers payload for survey ${data?.surveyId} from ${ipAddress} ua:${userAgent}`);
+                throw new Error('Empty answers payload');
+            }
             
             // Check if source tracking columns exist in survey_responses
             const [responseSourceColumns] = await connection.execute<RowDataPacket[]>(
@@ -296,11 +311,21 @@ export const SurveyRepo = {
             const responseId = responseResult.insertId;
             
             // Insert answers
+            let answersInserted = 0;
             for (const answer of data.answers) {
+                const v = answer?.value;
+                const isEmpty = Array.isArray(v) ? v.length === 0 : (v === null || v === undefined || String(v).trim().length === 0);
+                if (isEmpty) continue;
                 await connection.execute(
                     'INSERT INTO survey_answers (response_id, question_id, answer_value) VALUES (?, ?, ?)',
-                    [responseId, answer.questionId, Array.isArray(answer.value) ? JSON.stringify(answer.value) : answer.value]
+                    [responseId, answer.questionId, Array.isArray(v) ? JSON.stringify(v) : v]
                 );
+                answersInserted++;
+            }
+            if (answersInserted === 0) {
+                // No valid answers made it through insertion; rollback to avoid orphan shells
+                console.warn(`[SurveyRepo] Rolling back response ${responseId} due to zero inserted answers (survey ${data?.surveyId})`);
+                throw new Error('No answers inserted');
             }
             
             // Handle digital twin creation/linking

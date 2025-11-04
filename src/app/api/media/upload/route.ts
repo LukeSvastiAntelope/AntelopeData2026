@@ -35,35 +35,48 @@ export async function POST(req: NextRequest) {
 
     // Derive target path
     const userId = userIdHeader
+    const safeUserId = userId.replace(/[^a-zA-Z0-9_-]/g, '')
+    if (!safeUserId) {
+      return NextResponse.json({ status: false, message: 'Invalid user identifier' }, { status: 400 })
+    }
     const now = new Date()
     const folder = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`
-    const uploadsRoot = path.join(process.cwd(), 'public', 'uploads', userId, folder)
-    if (!existsSync(uploadsRoot)) {
-      mkdirSync(uploadsRoot, { recursive: true })
+    const uploadsBase = path.resolve(process.cwd(), 'public', 'uploads')
+    const userFolder = path.resolve(uploadsBase, safeUserId, folder)
+    const normalizedUserFolder = path.normalize(userFolder)
+    const allowedBasePrefix = `${uploadsBase}${path.sep}`
+    if (!normalizedUserFolder.startsWith(allowedBasePrefix)) {
+      return NextResponse.json({ status: false, message: 'Invalid upload destination' }, { status: 400 })
+    }
+    if (!existsSync(normalizedUserFolder)) {
+      mkdirSync(normalizedUserFolder, { recursive: true })
     }
 
     const original = file.name || 'upload'
     const ext = path.extname(original) || (mime==='image/png'?'.png': mime==='image/jpeg'?'.jpg': mime==='image/webp'?'.webp': mime==='image/gif'?'.gif': mime==='video/mp4'?'.mp4':'')
     const base = `${Date.now()}_${Math.random().toString(36).slice(2,8)}`
     const filename = `${base}${ext}`
-    const filepath = path.join(uploadsRoot, filename)
+    const filepath = path.resolve(normalizedUserFolder, filename)
+    const normalizedFilepath = path.normalize(filepath)
+    const allowedUserPrefix = `${normalizedUserFolder}${path.sep}`
+    if (!normalizedFilepath.startsWith(allowedUserPrefix)) {
+      return NextResponse.json({ status: false, message: 'Invalid upload destination' }, { status: 400 })
+    }
 
     const arrayBuffer = await file.arrayBuffer()
     const buffer = Buffer.from(arrayBuffer)
     await new Promise<void>((resolve, reject) => {
-      const stream = createWriteStream(filepath)
+      const stream = createWriteStream(normalizedFilepath)
       stream.on('error', reject)
       stream.on('finish', () => resolve())
       stream.write(buffer)
       stream.end()
     })
 
-    const publicUrl = `/uploads/${userId}/${folder}/${filename}`
+    const publicUrl = `/uploads/${safeUserId}/${folder}/${filename}`
     return NextResponse.json({ status: true, url: publicUrl, type: mime })
   } catch (err) {
     console.error('Upload error', err)
     return NextResponse.json({ status: false, message: 'Upload failed' }, { status: 500 })
   }
 }
-
-

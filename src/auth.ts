@@ -5,6 +5,13 @@ import { UserRepo } from "@/app/utils/database/user-repo";
 import { validateEmail } from "@/app/utils/validation";
 import bcrypt from "bcryptjs";
 
+const isDev = process.env.NODE_ENV !== "production";
+const logDebug = (...args: unknown[]) => {
+  if (isDev) {
+    console.log(...args);
+  }
+};
+
 // This file runs in a Node.js runtime (API route). It can safely import mysql2 and bcryptjs.
 export const { handlers, signIn, signOut, auth } = NextAuth({
   ...authConfig,
@@ -16,10 +23,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         password: { label: "Password", type: "password" }
       },
       async authorize(credentials) {
-        console.log('Authorize called with credentials:', { email: credentials?.email, hasPassword: !!credentials?.password });
+        logDebug('Authorize called with credentials:', { email: credentials?.email, hasPassword: !!credentials?.password });
 
         if (!credentials?.email || !credentials?.password) {
-          console.log('Missing credentials');
+          logDebug('Missing credentials');
           return null;
         }
 
@@ -28,30 +35,30 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
         const emailError = validateEmail(email);
         if (emailError) {
-          console.log('Email validation error:', emailError);
+          logDebug('Email validation error:', emailError);
           return null;
         }
 
         try {
-          console.log('Getting user by email:', email);
+          logDebug('Getting user by email:', email);
           const user = await UserRepo.getUserByEmail(email);
           if (!user) {
-            console.log('No user found with email:', email);
+            logDebug('No user found with email:', email);
             return null;
           }
 
-          console.log('User found:', { id: user.id, email: user.email, hasPassword: !!user.password });
+          logDebug('User found:', { id: user.id, email: user.email, hasPassword: !!user.password });
 
           const isPasswordValid = bcrypt.compareSync(password, user.password);
-          console.log('Password validation result:', isPasswordValid);
+          logDebug('Password validation result:', isPasswordValid);
 
           if (!isPasswordValid) {
-            console.log('Invalid password for user:', email);
+            logDebug('Invalid password for user:', email);
             return null;
           }
 
           if (user.is_verified === 0) {
-            console.log('User not verified:', email);
+            logDebug('User not verified:', email);
             return null;
           }
 
@@ -69,3 +76,4 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     })
   ],
 });
+

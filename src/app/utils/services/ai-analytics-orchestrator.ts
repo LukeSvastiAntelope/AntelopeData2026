@@ -1,6 +1,7 @@
 // AI Analytics Orchestrator - Main service that coordinates the entire analytics pipeline
 import { openSql } from '../database/db';
-import { SurveyAnalysisEngine, SurveyAnalysisConfig } from './survey-analysis-engine';
+import { SurveyAnalysisEngine } from './survey-analysis-engine';
+import { SurveyAnalysisConfig } from './survey-analysis-types';
 import { StatisticalQueryGenerator, StatisticalAnalysisConfig } from './statistical-query-generator';
 import { InsightGenerationService, InsightGenerationConfig } from './insight-generation-service';
 import { VisualizationEngine, VisualizationConfig } from './visualization-engine';

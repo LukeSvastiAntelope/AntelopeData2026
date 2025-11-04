@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Plus, Upload, Send, BarChart3, X } from 'lucide-react';
@@ -9,7 +9,7 @@ interface ChatInputProps {
   input: string;
   setInput: (value: string) => void;
   onSend: () => void;
-  onKeyDown: (e: React.KeyboardEvent) => void;
+  onKeyDown: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
   isLoading: boolean;
   showSurveyDropdown: boolean;
   setShowSurveyDropdown: (show: boolean) => void;
@@ -34,30 +34,8 @@ export function ChatInput({
   onUploadClick,
   containerRef
 }: ChatInputProps) {
-  const [fixedStyles, setFixedStyles] = useState<{left:number;width:number}>({ left: 0, width: 0 });
-
-  useEffect(() => {
-    const update = () => {
-      const el = containerRef?.current as HTMLElement | null;
-      if (!el) return;
-      const rect = el.getBoundingClientRect();
-      // Account for right sidebar by clamping to rect width
-      setFixedStyles({ left: rect.left, width: rect.width });
-    };
-    update();
-    const ro = new ResizeObserver(update);
-    if (containerRef?.current) ro.observe(containerRef.current as Element);
-    window.addEventListener('resize', update);
-    window.addEventListener('scroll', update, true);
-    return () => {
-      window.removeEventListener('resize', update);
-      window.removeEventListener('scroll', update, true);
-      ro.disconnect();
-    };
-  }, [containerRef]);
-
   return (
-    <div style={{ position: 'fixed', bottom: 12, left: fixedStyles.left, width: fixedStyles.width, zIndex: 40 }} className="px-4 py-0 bg-card">
+    <div className="sticky bottom-0 left-0 w-full z-40 px-4 pt-2 pb-3 bg-card border-t border-border">
       <div className="relative">
         <div className="relative">
           <Textarea 
