@@ -95,6 +95,10 @@ const AISurveyBuilderPage = () => {
   const [sections, setSections] = useState<Array<{ id: string; title: string }>>([])
   const [questionSectionIdByIndex, setQuestionSectionIdByIndex] = useState<Array<string | null>>([])
 
+  // Drag and drop state
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
+
   // Load saved model preference on mount
   useEffect(() => {
     const savedModel = localStorage.getItem('ai-survey-selected-model');
@@ -366,6 +370,67 @@ const AISurveyBuilderPage = () => {
     newQuestions.splice(toIndex, 0, movedQuestion)
     
     setEditableQuestions(newQuestions)
+    
+    // Also move the media attachments
+    setQuestionMedia(prev => {
+      const arr = [...prev]
+      const [movedMedia] = arr.splice(fromIndex, 1)
+      arr.splice(toIndex, 0, movedMedia)
+      return arr
+    })
+    
+    // Also move section assignments
+    setQuestionSectionIdByIndex(prev => {
+      const arr = [...prev]
+      const [movedSection] = arr.splice(fromIndex, 1)
+      arr.splice(toIndex, 0, movedSection)
+      return arr
+    })
+  }
+
+  // Drag and drop handlers
+  const handleDragStart = (e: React.DragEvent, index: number) => {
+    setDraggedIndex(index)
+    e.dataTransfer.effectAllowed = 'move'
+    // Add a slight transparency to the dragged element
+    if (e.currentTarget instanceof HTMLElement) {
+      e.currentTarget.style.opacity = '0.5'
+    }
+  }
+
+  const handleDragEnd = (e: React.DragEvent) => {
+    if (e.currentTarget instanceof HTMLElement) {
+      e.currentTarget.style.opacity = '1'
+    }
+    setDraggedIndex(null)
+    setDragOverIndex(null)
+  }
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    
+    if (draggedIndex !== null && draggedIndex !== index) {
+      setDragOverIndex(index)
+    }
+  }
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    // Only clear if we're leaving the card entirely
+    if (e.currentTarget === e.target) {
+      setDragOverIndex(null)
+    }
+  }
+
+  const handleDrop = (e: React.DragEvent, dropIndex: number) => {
+    e.preventDefault()
+    
+    if (draggedIndex !== null && draggedIndex !== dropIndex) {
+      moveQuestionToPosition(draggedIndex, dropIndex)
+    }
+    
+    setDraggedIndex(null)
+    setDragOverIndex(null)
   }
 
   const addOption = (questionIndex: number) => {
@@ -951,11 +1016,24 @@ const AISurveyBuilderPage = () => {
                     </div>
                   ) : (
                     editableQuestions.map((question, questionIndex) => (
-                      <Card key={questionIndex} className="border-2">
+                      <Card 
+                        key={questionIndex} 
+                        className={`border-2 transition-all ${
+                          dragOverIndex === questionIndex ? 'border-primary border-dashed bg-primary/5' : ''
+                        } ${draggedIndex === questionIndex ? 'opacity-50' : ''}`}
+                        draggable
+                        onDragStart={(e) => handleDragStart(e, questionIndex)}
+                        onDragEnd={handleDragEnd}
+                        onDragOver={(e) => handleDragOver(e, questionIndex)}
+                        onDragLeave={handleDragLeave}
+                        onDrop={(e) => handleDrop(e, questionIndex)}
+                      >
                         <CardHeader className="pb-3">
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
-                              <GripVertical className="h-4 w-4 text-muted-foreground cursor-move" />
+                              <div title="Drag to reorder">
+                                <GripVertical className="h-4 w-4 text-muted-foreground cursor-move" />
+                              </div>
                               <span className="text-sm font-medium text-muted-foreground">
                                 Question {questionIndex + 1}
                               </span>
