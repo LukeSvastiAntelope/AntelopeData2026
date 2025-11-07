@@ -118,9 +118,103 @@ const AISurveyBuilderPage = () => {
     "Build a survey about social media usage habits"
   ]
 
+  const validateSurveyResponse = (data: any): { isValid: boolean; errors: string[]; survey: GeneratedSurvey | null } => {
+    const errors: string[] = []
+    
+    // Check if survey object exists
+    if (!data || !data.survey) {
+      errors.push('No survey data received from AI')
+      return { isValid: false, errors, survey: null }
+    }
+
+    const survey = data.survey
+
+    // Validate title
+    if (!survey.title || typeof survey.title !== 'string' || survey.title.trim().length === 0) {
+      errors.push('Survey title is missing or empty')
+    }
+
+    // Validate description
+    if (!survey.description || typeof survey.description !== 'string' || survey.description.trim().length === 0) {
+      errors.push('Survey description is missing or empty')
+    }
+
+    // Validate questions array
+    if (!Array.isArray(survey.questions)) {
+      errors.push('Questions array is missing')
+      return { isValid: false, errors, survey: null }
+    }
+
+    if (survey.questions.length === 0) {
+      errors.push('No questions were generated')
+      return { isValid: false, errors, survey: null }
+    }
+
+    // Validate each question
+    const invalidQuestions: number[] = []
+    survey.questions.forEach((q: any, index: number) => {
+      const questionErrors: string[] = []
+      
+      if (!q.prompt || typeof q.prompt !== 'string' || q.prompt.trim().length === 0) {
+        questionErrors.push('missing prompt')
+      }
+      
+      if (!q.type || !['text', 'single-choice', 'multiple-choice', 'rating', 'yes-no'].includes(q.type)) {
+        questionErrors.push('invalid or missing type')
+      }
+      
+      if ((q.type === 'single-choice' || q.type === 'multiple-choice') && (!Array.isArray(q.options) || q.options.length === 0)) {
+        questionErrors.push('missing options')
+      }
+      
+      if (questionErrors.length > 0) {
+        invalidQuestions.push(index + 1)
+        errors.push(`Question ${index + 1}: ${questionErrors.join(', ')}`)
+      }
+    })
+
+    // If there are errors but some questions are valid, it's a partial success
+    const hasValidQuestions = survey.questions.some((q: any) => 
+      q.prompt && q.prompt.trim().length > 0 && q.type
+    )
+
+    return {
+      isValid: errors.length === 0,
+      errors,
+      survey: hasValidQuestions ? survey : null
+    }
+  }
+
+  const sanitizeSurvey = (survey: any): GeneratedSurvey => {
+    // Provide fallback values for incomplete data
+    return {
+      title: survey.title?.trim() || 'Untitled Survey',
+      description: survey.description?.trim() || 'Please add a description for your survey.',
+      questions: (survey.questions || [])
+        .filter((q: any) => q.prompt && q.prompt.trim().length > 0) // Remove completely invalid questions
+        .map((q: any) => ({
+          type: ['text', 'single-choice', 'multiple-choice', 'rating', 'yes-no'].includes(q.type) ? q.type : 'text',
+          prompt: q.prompt?.trim() || 'Question text missing',
+          options: (q.type === 'single-choice' || q.type === 'multiple-choice') 
+            ? (Array.isArray(q.options) && q.options.length > 0 ? q.options : ['Option 1', 'Option 2', 'Option 3'])
+            : undefined,
+          isRequired: typeof q.isRequired === 'boolean' ? q.isRequired : false,
+          reasoning: q.reasoning || undefined
+        })),
+      targetAudience: survey.targetAudience,
+      purpose: survey.purpose
+    }
+  }
+
   const generateSurvey = async () => {
     if (!prompt.trim()) {
       setError('Please enter a description for your survey')
+      return
+    }
+
+    // Check if prompt is too short
+    if (prompt.trim().length < 10) {
+      setError('Please provide a more detailed description (at least 10 characters). Example: "Create a customer satisfaction survey for a restaurant with questions about food quality, service, and ambiance."')
       return
     }
 
@@ -139,20 +233,74 @@ const AISurveyBuilderPage = () => {
 
       if (response.ok) {
         const data = await response.json()
-        setGeneratedSurvey(data.survey)
-        setEditableTitle(data.survey.title)
-        setEditableDescription(data.survey.description)
-        setEditableQuestions(data.survey.questions)
-        setQuestionSectionIdByIndex((data.survey.questions || []).map(()=> null))
-        setQuestionMedia((data.survey.questions || []).map((q:any)=>({ media: undefined, optionMedia: (q.options||[]).map(()=>null) })))
-        setModelUsed(data.modelUsed)
+        
+        // Validate the response
+        const validation = validateSurveyResponse(data)
+        
+        if (!validation.isValid && !validation.survey) {
+          // Complete failure - no usable data
+          console.error('Survey validation errors:', validation.errors)
+          setError(
+            `AI generated incomplete survey data. Please try:\n` +
+            `• Making your prompt more specific and detailed\n` +
+            `• Including what topics you want to cover\n` +
+            `• Specifying the survey purpose\n\n` +
+            `Errors found:\n${validation.errors.slice(0, 3).map(e => `• ${e}`).join('\n')}`
+          )
+          return
+        }
+
+        if (!validation.isValid && validation.survey) {
+          // Partial success - some data is usable but incomplete
+          console.warn('Survey validation warnings:', validation.errors)
+          
+          // Sanitize and use the partial data
+          const sanitizedSurvey = sanitizeSurvey(validation.survey)
+          
+          setGeneratedSurvey(sanitizedSurvey)
+          setEditableTitle(sanitizedSurvey.title)
+          setEditableDescription(sanitizedSurvey.description)
+          setEditableQuestions(sanitizedSurvey.questions)
+          setQuestionSectionIdByIndex(sanitizedSurvey.questions.map(() => null))
+          setQuestionMedia(sanitizedSurvey.questions.map((q: any) => ({ 
+            media: undefined, 
+            optionMedia: (q.options || []).map(() => null) 
+          })))
+          setModelUsed(data.modelUsed)
+          
+          // Show warning about incomplete data
+          setError(
+            `⚠️ Survey generated with warnings:\n${validation.errors.slice(0, 3).map(e => `• ${e}`).join('\n')}\n\n` +
+            `The survey has been created with default values where data was missing. Please review and edit as needed.`
+          )
+        } else {
+          // Complete success
+          const sanitizedSurvey = sanitizeSurvey(data.survey)
+          
+          setGeneratedSurvey(sanitizedSurvey)
+          setEditableTitle(sanitizedSurvey.title)
+          setEditableDescription(sanitizedSurvey.description)
+          setEditableQuestions(sanitizedSurvey.questions)
+          setQuestionSectionIdByIndex(sanitizedSurvey.questions.map(() => null))
+          setQuestionMedia(sanitizedSurvey.questions.map((q: any) => ({ 
+            media: undefined, 
+            optionMedia: (q.options || []).map(() => null) 
+          })))
+          setModelUsed(data.modelUsed)
+        }
       } else {
         const errorData = await response.json()
-        setError(errorData.message || 'Failed to generate survey')
+        setError(errorData.message || 'Failed to generate survey. Please try again with a more detailed prompt.')
       }
     } catch (error) {
       console.error('Error generating survey:', error)
-      setError('Failed to generate survey. Please try again.')
+      setError(
+        'Failed to generate survey. This could be due to:\n' +
+        '• Network connection issues\n' +
+        '• AI service temporarily unavailable\n' +
+        '• Prompt being too vague or complex\n\n' +
+        'Please try again with a clear, specific prompt.'
+      )
     } finally {
       setIsGenerating(false)
     }

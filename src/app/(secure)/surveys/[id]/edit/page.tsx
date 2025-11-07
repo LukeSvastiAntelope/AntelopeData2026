@@ -26,7 +26,11 @@ import {
   Info,
   Brain,
   Rocket,
-  ListChecks
+  ListChecks,
+  ChevronUp,
+  ChevronDown,
+  GripVertical,
+  Copy
 } from "lucide-react"
 import { AnonymityLevel } from '@/app/utils/interface'
 import { 
@@ -104,6 +108,10 @@ const EditSurveyPage = () => {
   const [telegramWelcome, setTelegramWelcome] = useState<string>('Welcome! Ready to start the survey?')
   const [previewMatches, setPreviewMatches] = useState<any[]>([])
   const [loadingPreview, setLoadingPreview] = useState(false)
+
+  // Drag and drop state
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
 
   const qualPreviewItems = useMemo(() => {
     const split = (s: string) => (s || '').split(/\n|;|,|•|-/g).map(t => t.trim()).filter(Boolean).slice(0, 4)
@@ -302,10 +310,84 @@ const EditSurveyPage = () => {
   }
 
   const removeQuestion = (index: number) => {
-    const updatedQuestions = questions.filter((_, i) => i !== index)
-    // Update order numbers
-    updatedQuestions.forEach((q, i) => q.order = i + 1)
-    setQuestions(updatedQuestions)
+    setQuestions(questions.filter((_, i) => i !== index))
+  }
+
+  const moveQuestion = (index: number, direction: 'up' | 'down') => {
+    const newQuestions = [...questions]
+    const targetIndex = direction === 'up' ? index - 1 : index + 1
+    
+    if (targetIndex < 0 || targetIndex >= newQuestions.length) return
+    
+    // Swap questions
+    [newQuestions[index], newQuestions[targetIndex]] = [newQuestions[targetIndex], newQuestions[index]]
+    
+    setQuestions(newQuestions)
+  }
+
+  const duplicateQuestion = (index: number) => {
+    const questionToDuplicate = questions[index]
+    const duplicatedQuestion: SurveyQuestion = {
+      ...questionToDuplicate,
+      prompt: `${questionToDuplicate.prompt} (Copy)`,
+      id: undefined // Remove ID so it creates a new question
+    }
+    const newQuestions = [...questions]
+    newQuestions.splice(index + 1, 0, duplicatedQuestion)
+    setQuestions(newQuestions)
+  }
+
+  const moveQuestionToPosition = (fromIndex: number, toIndex: number) => {
+    if (fromIndex === toIndex) return
+    
+    const newQuestions = [...questions]
+    const [movedQuestion] = newQuestions.splice(fromIndex, 1)
+    newQuestions.splice(toIndex, 0, movedQuestion)
+    
+    setQuestions(newQuestions)
+  }
+
+  // Drag and drop handlers
+  const handleDragStart = (e: React.DragEvent, index: number) => {
+    setDraggedIndex(index)
+    e.dataTransfer.effectAllowed = 'move'
+    if (e.currentTarget instanceof HTMLElement) {
+      e.currentTarget.style.opacity = '0.5'
+    }
+  }
+
+  const handleDragEnd = (e: React.DragEvent) => {
+    if (e.currentTarget instanceof HTMLElement) {
+      e.currentTarget.style.opacity = '1'
+    }
+    setDraggedIndex(null)
+    setDragOverIndex(null)
+  }
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    
+    if (draggedIndex !== null && draggedIndex !== index) {
+      setDragOverIndex(index)
+    }
+  }
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    if (e.currentTarget === e.target) {
+      setDragOverIndex(null)
+    }
+  }
+
+  const handleDrop = (e: React.DragEvent, dropIndex: number) => {
+    e.preventDefault()
+    
+    if (draggedIndex !== null && draggedIndex !== dropIndex) {
+      moveQuestionToPosition(draggedIndex, dropIndex)
+    }
+    
+    setDraggedIndex(null)
+    setDragOverIndex(null)
   }
 
   const addOption = (questionIndex: number) => {
@@ -1007,10 +1089,24 @@ const EditSurveyPage = () => {
               ) : (
                 <>
                   {questions.map((question, questionIndex) => (
-                    <Card key={questionIndex} className="border-2">
+                    <Card 
+                      key={questionIndex} 
+                      className={`border-2 transition-all ${
+                        dragOverIndex === questionIndex ? 'border-primary border-dashed bg-primary/5' : ''
+                      } ${draggedIndex === questionIndex ? 'opacity-50' : ''}`}
+                      draggable
+                      onDragStart={(e) => handleDragStart(e, questionIndex)}
+                      onDragEnd={handleDragEnd}
+                      onDragOver={(e) => handleDragOver(e, questionIndex)}
+                      onDragLeave={handleDragLeave}
+                      onDrop={(e) => handleDrop(e, questionIndex)}
+                    >
                       <CardHeader className="pb-3">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
+                            <div title="Drag to reorder">
+                              <GripVertical className="h-4 w-4 text-muted-foreground cursor-move" />
+                            </div>
                             <span className="text-sm font-medium text-muted-foreground">
                               Question {questionIndex + 1}
                             </span>
@@ -1018,7 +1114,36 @@ const EditSurveyPage = () => {
                               {getQuestionTypeLabel(question.type)}
                             </Badge>
                           </div>
-                          <div className="flex gap-2">
+                          <div className="flex gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => duplicateQuestion(questionIndex)}
+                              className="h-8 w-8 p-0"
+                              title="Duplicate question"
+                            >
+                              <Copy className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => moveQuestion(questionIndex, 'up')}
+                              disabled={questionIndex === 0}
+                              className="h-8 w-8 p-0"
+                              title="Move up"
+                            >
+                              <ChevronUp className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => moveQuestion(questionIndex, 'down')}
+                              disabled={questionIndex === questions.length - 1}
+                              className="h-8 w-8 p-0"
+                              title="Move down"
+                            >
+                              <ChevronDown className="h-4 w-4" />
+                            </Button>
                             <Button variant="outline" size="sm" onClick={()=> openGenerateFor(questionIndex)} title="Generate image with AI">
                               Generate image
                             </Button>
@@ -1026,7 +1151,8 @@ const EditSurveyPage = () => {
                               variant="ghost"
                               size="sm"
                               onClick={() => removeQuestion(questionIndex)}
-                              className="text-red-600 hover:text-red-700"
+                              className="text-red-600 hover:text-red-700 h-8 w-8 p-0"
+                              title="Remove question"
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
