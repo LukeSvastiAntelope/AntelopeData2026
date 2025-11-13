@@ -11,7 +11,10 @@ import {
   SidebarHeader,
   SidebarMenu,
   SidebarMenuItem,
-  SidebarMenuButton
+  SidebarMenuButton,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel
 } from "@/components/ui/sidebar"
 import { useAgent } from "@/app/context/AgentContext"
 import { MinimalThemeToggle } from "@/components/theme-toggle"
@@ -100,7 +103,7 @@ export function AppSidebar({ className, collapsible = "offcanvas", ...props }: S
   // Conditional secondary navigation based on user role
   const secondaryNavItems: { title: string; href: string; icon: any }[] = []
 
-  const footerNavItems = [
+  const resourceNavItems = [
     {
       title: "About Us",
       href: "/about",
@@ -110,11 +113,6 @@ export function AppSidebar({ className, collapsible = "offcanvas", ...props }: S
       title: "Community",
       href: "https://t.me/+F5F2ah0bBzU0ZDAx",
       icon: Users
-    },
-    {
-      title: "Logout",
-      href: "/logout",
-      icon: LogOut
     }
   ]
 
@@ -189,6 +187,28 @@ export function AppSidebar({ className, collapsible = "offcanvas", ...props }: S
             ))}
           </SidebarMenu>
         )}
+
+        <SidebarGroup className="px-4">
+          <SidebarGroupLabel>Resources</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {resourceNavItems.map((item) => (
+                <SidebarMenuItem key={item.href}>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={pathname === item.href}
+                    tooltip={item.title}
+                  >
+                    <Link href={item.href} className="flex items-center gap-2 px-4 py-2 text-sidebar-foreground">
+                      <item.icon className="h-4 w-4 text-sidebar-foreground group-data-[collapsible=offcanvas]:hidden" />
+                      <span className="text-sidebar-foreground">{item.title}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
       </SidebarContent>
       
       <SidebarFooter className="py-4 mt-auto">
