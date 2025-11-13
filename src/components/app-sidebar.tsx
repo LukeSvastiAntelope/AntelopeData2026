@@ -146,7 +146,7 @@ export function AppSidebar({ className, collapsible = "offcanvas", ...props }: S
             className="flex items-center gap-2 w-full px-4 py-2 text-sm font-medium rounded-md bg-foreground text-background border border-border hover:bg-foreground/90 transition-colors"
           >
             <MessageCircle className="h-4 w-4 group-data-[collapsible=offcanvas]:hidden text-background" />
-            <span className="group-data-[collapsible=offcanvas]:hidden text-background">Chat</span>
+            <span className="group-data-[collapsible=offcanvas]:hidden text-background">DataChat(™)</span>
           </Link>
         </div>
       </SidebarHeader>
