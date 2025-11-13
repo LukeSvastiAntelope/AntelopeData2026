@@ -30,7 +30,9 @@ import {
   ChevronUp,
   ChevronDown,
   GripVertical,
-  Copy
+  Copy,
+  Minimize2,
+  Maximize2
 } from "lucide-react"
 import { AnonymityLevel } from '@/app/utils/interface'
 import { 
@@ -112,6 +114,9 @@ const EditSurveyPage = () => {
   // Drag and drop state
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
+  
+  // Collapsed questions state
+  const [collapsedQuestions, setCollapsedQuestions] = useState<Set<number>>(new Set())
 
   const qualPreviewItems = useMemo(() => {
     const split = (s: string) => (s || '').split(/\n|;|,|•|-/g).map(t => t.trim()).filter(Boolean).slice(0, 4)
@@ -1118,6 +1123,29 @@ const EditSurveyPage = () => {
                             <Button
                               variant="ghost"
                               size="sm"
+                              onClick={() => {
+                                setCollapsedQuestions(prev => {
+                                  const newSet = new Set(prev)
+                                  if (newSet.has(questionIndex)) {
+                                    newSet.delete(questionIndex)
+                                  } else {
+                                    newSet.add(questionIndex)
+                                  }
+                                  return newSet
+                                })
+                              }}
+                              className="h-8 w-8 p-0"
+                              title={collapsedQuestions.has(questionIndex) ? "Expand question" : "Collapse question"}
+                            >
+                              {collapsedQuestions.has(questionIndex) ? (
+                                <Maximize2 className="h-4 w-4" />
+                              ) : (
+                                <Minimize2 className="h-4 w-4" />
+                              )}
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
                               onClick={() => duplicateQuestion(questionIndex)}
                               className="h-8 w-8 p-0"
                               title="Duplicate question"
@@ -1159,6 +1187,7 @@ const EditSurveyPage = () => {
                           </div>
                         </div>
                       </CardHeader>
+                      {!collapsedQuestions.has(questionIndex) && (
                       <CardContent className="space-y-4">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <div>
@@ -1258,6 +1287,7 @@ const EditSurveyPage = () => {
                           </div>
                         )}
                       </CardContent>
+                      )}
                     </Card>
                   ))}
 
