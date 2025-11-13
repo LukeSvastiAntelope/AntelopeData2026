@@ -30,6 +30,7 @@ import {
   Settings as SettingsIcon,
   BookOpen as BookOpenIcon,
   Mail as MailIcon,
+  DollarSign as DollarSignIcon,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
@@ -77,6 +78,11 @@ export function PublicAppSidebar({ className, collapsible = "offcanvas", ...prop
   ]
 
   const resourceNavItems = [
+    {
+      title: "Pricing",
+      href: "/pricing",
+      icon: DollarSignIcon
+    },
     {
       title: "About Us",
       href: "/about",
