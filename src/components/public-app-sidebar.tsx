@@ -28,6 +28,7 @@ import {
   UserPlus as UserPlusIcon,
   FileBarChart as FileBarChartIcon,
   Settings as SettingsIcon,
+  BookOpen as BookOpenIcon,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
@@ -56,6 +57,12 @@ export function PublicAppSidebar({ className, collapsible = "offcanvas", ...prop
       href: "/login",
       icon: FileBarChartIcon,
       key: "reports"
+    },
+    {
+      title: "Blog",
+      href: "/blog",
+      icon: BookOpenIcon,
+      key: "blog"
     }
   ]
 
