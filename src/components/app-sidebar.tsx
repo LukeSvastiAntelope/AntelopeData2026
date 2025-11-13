@@ -34,6 +34,7 @@ import {
   CircleUser,
   BookOpen,
   Mail,
+  DollarSign,
 } from "lucide-react"
 import LogoText from "@/components/logo-text"; // Added import
 import LogoIcon from "@/components/logo-icon"; // Added import
@@ -108,6 +109,11 @@ export function AppSidebar({ className, collapsible = "offcanvas", ...props }: S
   const secondaryNavItems: { title: string; href: string; icon: any }[] = []
 
   const footerNavItems = [
+    {
+      title: "Pricing",
+      href: "/pricing",
+      icon: DollarSign
+    },
     {
       title: "About Us",
       href: "/about",
