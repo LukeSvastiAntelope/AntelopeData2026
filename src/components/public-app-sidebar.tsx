@@ -29,6 +29,7 @@ import {
   FileBarChart as FileBarChartIcon,
   Settings as SettingsIcon,
   BookOpen as BookOpenIcon,
+  Mail as MailIcon,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
@@ -80,6 +81,11 @@ export function PublicAppSidebar({ className, collapsible = "offcanvas", ...prop
       title: "About Us",
       href: "/about",
       icon: InfoIcon
+    },
+    {
+      title: "Contact Us",
+      href: "/contact",
+      icon: MailIcon
     },
     {
       title: "Community",

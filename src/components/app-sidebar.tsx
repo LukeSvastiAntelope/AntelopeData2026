@@ -33,6 +33,7 @@ import {
   Code,
   CircleUser,
   BookOpen,
+  Mail,
 } from "lucide-react"
 import LogoText from "@/components/logo-text"; // Added import
 import LogoIcon from "@/components/logo-icon"; // Added import
@@ -111,6 +112,11 @@ export function AppSidebar({ className, collapsible = "offcanvas", ...props }: S
       title: "About Us",
       href: "/about",
       icon: Info
+    },
+    {
+      title: "Contact Us",
+      href: "/contact",
+      icon: Mail
     },
     {
       title: "Community",
