@@ -431,40 +431,47 @@ const SurveyPage = () => {
               <div className="flex items-center gap-2 mb-3">
                 <Brain className="h-5 w-5 text-blue-600" />
                 <span className="font-medium text-blue-900 dark:text-blue-100">
-                  {isExistingTwin ? 'Digital Twin Updated' : 'Digital Twin Created'}
+                  Thanks for participating!
                 </span>
               </div>
               <p className="text-sm text-blue-700 dark:text-blue-300 mb-4">
                 {isExistingTwin 
-                  ? 'Your responses have been added to your existing digital twin, creating an even richer representation of your perspectives across multiple surveys.'
-                  : 'Your responses have been used to create a digital twin agent that represents your perspectives and opinions.'
+                  ? 'Your responses have been saved and tokens earned! Take another survey to earn more.'
+                  : 'Create an account now to save your responses and claim the tokens you earned from answering this survey!'
                 }
               </p>
               {agentToken && (
                 <div className="space-y-4">
                   <div className="bg-white dark:bg-gray-800 p-3 rounded border">
-                    <Label className="text-xs font-medium text-muted-foreground">Your Digital Twin Token:</Label>
+                    <Label className="text-xs font-medium text-muted-foreground">Your Response Token:</Label>
                     <code className="block text-sm font-mono mt-1 break-all">{agentToken}</code>
                     <p className="text-xs text-muted-foreground mt-2">
-                      Save this token for future reference.
+                      Save this token to claim your rewards later.
                     </p>
                   </div>
-                  <Button asChild>
-                    <a href={`/digital-twin/${agentToken}`} target="_blank" rel="noopener noreferrer">
-                      {isExistingTwin 
-                        ? 'View Your Updated Digital Twin Profile'
-                        : 'View & Complete Your Digital Twin Profile'
-                      }
-                    </a>
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button asChild className="flex-1">
+                      <a href="/register">
+                        {isExistingTwin 
+                          ? 'View Your Profile'
+                          : 'Create Account & Claim Tokens'
+                        }
+                      </a>
+                    </Button>
+                    <Button asChild variant="outline" className="flex-1">
+                      <a href="/surveys">
+                        Take Another Survey
+                      </a>
+                    </Button>
+                  </div>
                 </div>
               )}
             </div>
 
             <p className="text-sm text-muted-foreground">
               {isExistingTwin 
-                ? 'Your updated digital twin will continue to be used for research and insights while keeping your personal information private.'
-                : 'Your digital twin will be used for research and insights while keeping your personal information private.'
+                ? 'Continue taking surveys to earn more tokens and contribute to research insights.'
+                : 'Your responses help create valuable research insights while keeping your information private.'
               }
             </p>
           </CardContent>
