@@ -37,7 +37,9 @@ import {
   Calendar,
   Clock,
   Shield,
-  Info
+  Info,
+  Minimize2,
+  Maximize2
 } from "lucide-react"
 import { AnonymityLevel } from '@/app/utils/interface'
 import { 
@@ -98,6 +100,9 @@ const AISurveyBuilderPage = () => {
   // Drag and drop state
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
+  
+  // Collapsed questions state
+  const [collapsedQuestions, setCollapsedQuestions] = useState<Set<number>>(new Set())
 
   // Load saved model preference on mount
   useEffect(() => {
@@ -1084,6 +1089,29 @@ const AISurveyBuilderPage = () => {
                               <Button
                                 variant="ghost"
                                 size="sm"
+                                onClick={() => {
+                                  setCollapsedQuestions(prev => {
+                                    const newSet = new Set(prev)
+                                    if (newSet.has(questionIndex)) {
+                                      newSet.delete(questionIndex)
+                                    } else {
+                                      newSet.add(questionIndex)
+                                    }
+                                    return newSet
+                                  })
+                                }}
+                                className="h-8 w-8 p-0"
+                                title={collapsedQuestions.has(questionIndex) ? "Expand question" : "Collapse question"}
+                              >
+                                {collapsedQuestions.has(questionIndex) ? (
+                                  <Maximize2 className="h-4 w-4" />
+                                ) : (
+                                  <Minimize2 className="h-4 w-4" />
+                                )}
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
                                 onClick={() => duplicateQuestion(questionIndex)}
                                 className="h-8 w-8 p-0"
                                 title="Duplicate question"
@@ -1122,6 +1150,7 @@ const AISurveyBuilderPage = () => {
                             </div>
                           </div>
                         </CardHeader>
+                        {!collapsedQuestions.has(questionIndex) && (
                         <CardContent className="space-y-4">
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
@@ -1268,6 +1297,7 @@ const AISurveyBuilderPage = () => {
                             </div>
                           </div>
                         </CardContent>
+                        )}
                       </Card>
                     ))
                   )}
