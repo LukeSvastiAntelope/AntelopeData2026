@@ -679,6 +679,42 @@ const AISurveyBuilderPage = () => {
             </CardContent>
           </Card>
 
+          {/* Guidelines Card */}
+          <Card className="border-blue-200 bg-blue-50/50 dark:border-blue-900 dark:bg-blue-950/20">
+            <CardContent className="pt-6">
+              <div className="flex items-start gap-3">
+                <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/30">
+                  <Info className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                </div>
+                <div className="flex-1 space-y-3">
+                  <h3 className="font-semibold text-blue-900 dark:text-blue-100">Tips for Best Results</h3>
+                  <ul className="text-sm text-blue-800 dark:text-blue-200 space-y-2">
+                    <li className="flex items-start gap-2">
+                      <span className="text-blue-600 dark:text-blue-400 mt-0.5">•</span>
+                      <span><strong>Specify the number of questions</strong> you want (e.g., "Create 8 questions about...")</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-blue-600 dark:text-blue-400 mt-0.5">•</span>
+                      <span><strong>Mention question types</strong> if you have preferences (multiple choice, rating scales, text input)</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-blue-600 dark:text-blue-400 mt-0.5">•</span>
+                      <span><strong>Include your target audience</strong> (e.g., "for college students" or "for restaurant customers")</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-blue-600 dark:text-blue-400 mt-0.5">•</span>
+                      <span><strong>State the survey purpose</strong> clearly (e.g., "to measure satisfaction" or "to gather feedback")</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-blue-600 dark:text-blue-400 mt-0.5">•</span>
+                      <span><strong>Be specific about topics</strong> you want covered (e.g., "include questions about pricing, quality, and service")</span>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Prompt Input */}
           <Card>
             <CardHeader>
