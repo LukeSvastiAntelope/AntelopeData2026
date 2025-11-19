@@ -302,7 +302,7 @@ const EditSurveyPage = () => {
     const newQuestion: SurveyQuestion = {
       type: 'text',
       prompt: '',
-      isRequired: false,
+      isRequired: true,
       order: questions.length + 1
     }
     setQuestions([...questions, newQuestion])

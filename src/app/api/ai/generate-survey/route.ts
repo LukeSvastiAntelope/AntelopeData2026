@@ -191,7 +191,7 @@ Guidelines:
                 requestParams.temperature = 0.7;
             }
             
-            const tokenBudget = modelConfig.model.includes('gpt-5') ? 8000 : 800;
+            const tokenBudget = modelConfig.model.includes('gpt-5') ? 8000 : 2000;
             if (useNewTokenParam) {
                 requestParams.max_completion_tokens = tokenBudget;
             } else {
@@ -339,31 +339,39 @@ Guidelines:
             surveyData = JSON.parse(cleanedResponse);
         } catch (parseError) {
             console.error('[gen-survey] JSON parse failed on first attempt:', parseError);
-            // Heuristic JSON extraction for reasoning models (e.g., gpt-5) that may wrap JSON in analysis
-            const isReasoningModel = (
-                modelConfig.model.includes('o1') ||
-                modelConfig.model.includes('o3') ||
-                modelConfig.model.includes('gpt-5') ||
-                modelConfig.model.includes('gpt-4o')
-            );
-            if (isReasoningModel) {
-                try {
-                    const text = aiResponse || '';
-                    const fenceCleaned = text.replace(/```json\n?|```/g, '').trim();
-                    // Try to find the largest JSON object in the text
-                    const start = fenceCleaned.indexOf('{');
-                    const end = fenceCleaned.lastIndexOf('}');
-                    if (start !== -1 && end !== -1 && end > start) {
-                        const candidate = fenceCleaned.slice(start, end + 1);
-                        surveyData = JSON.parse(candidate);
-                        console.warn('[gen-survey] Parsed JSON via heuristic extraction for reasoning model');
-                    }
-                } catch (e2) {
-                    console.error('[gen-survey] Heuristic JSON extraction failed:', e2);
+            console.error('[gen-survey] Raw AI response (first 1000 chars):', aiResponse?.substring(0, 1000));
+            
+            // Try more aggressive JSON extraction for all models
+            try {
+                const text = aiResponse || '';
+                
+                // Remove markdown code fences more aggressively
+                let cleaned = text.replace(/```(?:json)?\s*\n?/g, '').replace(/```\s*$/g, '').trim();
+                
+                // Try to find JSON object boundaries
+                const start = cleaned.indexOf('{');
+                const end = cleaned.lastIndexOf('}');
+                
+                if (start !== -1 && end !== -1 && end > start) {
+                    const candidate = cleaned.slice(start, end + 1);
+                    surveyData = JSON.parse(candidate);
+                    console.warn('[gen-survey] Parsed JSON via heuristic extraction');
+                } else {
+                    throw new Error('No JSON object found in response');
                 }
-                // As a final fallback for GPT-5/4o, return raw text so UI can show something instead of 500
-                if (!surveyData) {
-                    console.warn('[gen-survey] Returning raw text fallback for reasoning model');
+            } catch (e2) {
+                console.error('[gen-survey] Heuristic JSON extraction failed:', e2);
+                console.error('[gen-survey] Full AI response:', aiResponse);
+                
+                // Check if it's a reasoning model that might need special handling
+                const isReasoningModel = (
+                    modelConfig.model.includes('o1') ||
+                    modelConfig.model.includes('o3') ||
+                    modelConfig.model.includes('gpt-5') ||
+                    modelConfig.model.includes('gpt-4o')
+                );
+                
+                if (isReasoningModel) {
                     return NextResponse.json({
                         status: true,
                         modelUsed: modelConfig.label,
@@ -371,10 +379,10 @@ Guidelines:
                         note: 'Model returned non-JSON content; showing raw output.'
                     });
                 }
-            } else {
-                console.error('AI Response:', aiResponse);
+                
                 return NextResponse.json({ 
-                    error: 'Failed to parse AI response. Please try again.' 
+                    error: 'Failed to parse AI response. The model did not return valid JSON. Please try again or switch models.',
+                    details: aiResponse?.substring(0, 500) // Include snippet for debugging
                 }, { status: 500 });
             }
         }
