@@ -112,10 +112,10 @@ export default function FrontLanding() {
                 Unlimited surveys &amp; responses
               </div>
               <h1 className="leading-none text-4xl sm:text-5xl lg:text-8xl font-bold tracking-tight text-card-foreground">
-              Turn Your Surveys Into Synthetic Personas.
+              Get Fast Insights From Your Survey Data.
               </h1>
               <p className="font-medium text-2xl mb-6">
-              Chat with your surveys and get insights in real-time.
+              Chat with your surveys without any code and get advanced analytics in seconds for free.
               </p>
               
               {/* Action Buttons */}
@@ -197,6 +197,15 @@ export default function FrontLanding() {
                       )}
                     </DialogContent>
                   </Dialog>
+                  <span className="text-muted-foreground">or</span>
+                  <Button 
+                    size="lg" 
+                    variant="outline"
+                    className="px-8 py-3 text-lg font-medium"
+                    onClick={() => router.push("/login")}
+                  >
+                    Login
+                  </Button>
                   <span className="text-muted-foreground">or</span>
                   <Button 
                     size="lg" 
