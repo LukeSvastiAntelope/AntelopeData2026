@@ -103,8 +103,8 @@ export default function FrontLanding() {
 
         {/* Main content space-y-16 */}
         <div className="">
-          {/* Hero Section - White Background */}
-          <section className="relative w-full py-16 bg-background">
+          {/* Hero Section */}
+          <section className="relative w-full py-16">
           <div className="max-w-7xl mx-auto h-[30vh] md:h-[35vh] flex items-start justify-center">
             {/* Content */}
             <div className="relative z-10 flex flex-col items-center text-center max-w-3xl px-4 gap-y-6">
@@ -242,8 +242,8 @@ export default function FrontLanding() {
             </div> */}
           {/* </section> */}
 
-          {/* Feature Grid - Light Gray Background */}
-          <section className="py-16 bg-muted/20">
+          {/* Feature Grid */}
+          <section className="py-16">
           <div className="max-w-6xl mx-auto">
             <h3 className="text-4xl font-bold text-center mb-2">Simple, powerful and free</h3>
             <p className="text-muted-foreground text-center mb-12 text-lg">
@@ -355,65 +355,6 @@ export default function FrontLanding() {
           </div>
           </section>
 
-          {/* Comparison Table - White Background */}
-          <section className="py-16 bg-background">
-          <div className="max-w-5xl mx-auto">
-            <div className="text-center mb-12">
-              <h3 className="text-4xl font-bold mb-4">See how Antelope stacks up against the competition</h3>
-              <p className="text-lg text-muted-foreground">Features that set us apart from traditional survey tools.</p>
-            </div>
-
-            <div className="bg-card rounded-lg border border-border shadow-sm overflow-hidden">
-              {/* Table Header */}
-              <div className="grid grid-cols-3 gap-4 p-6 border-b border-border bg-muted/30">
-                <div className="text-left font-medium text-muted-foreground">Feature</div>
-                <div className="text-center font-bold text-lg">Antelope</div>
-                <div className="text-center font-medium text-muted-foreground">Traditional Tools</div>
-              </div>
-
-              {/* Table Rows */}
-              {[
-                { feature: "AI-Powered Survey Builder", antelope: true, others: false },
-                { feature: "Chat with Survey Data", antelope: true, others: false },
-                { feature: "Synthetic Personas (Digital Twins)", antelope: true, others: false },
-                { feature: "Advanced Analytics Dashboard", antelope: true, others: false },
-                { feature: "Real-time Insights", antelope: true, others: true },
-                { feature: "Multiple Import Formats", antelope: true, others: true },
-                { feature: "Unlimited Surveys", antelope: true, others: false },
-                { feature: "Unlimited Responses", antelope: true, others: false },
-                { feature: "Export Reports", antelope: true, others: true },
-                { feature: "No Code Required", antelope: true, others: true },
-                { feature: "Free Forever Plan", antelope: true, others: false },
-              ].map((row, index) => (
-                <div 
-                  key={index} 
-                  className={`grid grid-cols-3 gap-4 p-6 border-b border-border last:border-b-0 ${index % 2 === 0 ? 'bg-background' : 'bg-muted/10'}`}
-                >
-                  <div className="text-left text-card-foreground">{row.feature}</div>
-                  <div className="flex justify-center">
-                    {row.antelope ? (
-                      <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center">
-                        <Check className="w-4 h-4 text-primary" />
-                      </div>
-                    ) : (
-                      <X className="w-5 h-5 text-muted-foreground" />
-                    )}
-                  </div>
-                  <div className="flex justify-center">
-                    {row.others ? (
-                      <div className="w-6 h-6 rounded-full bg-muted flex items-center justify-center">
-                        <Check className="w-4 h-4 text-muted-foreground" />
-                      </div>
-                    ) : (
-                      <X className="w-5 h-5 text-muted-foreground" />
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-          </section>
-
         
           {/* <section className="mt-16 space-y-12 max-w-6xl mx-auto">
             <h3 className="text-3xl font-bold text-center mb-8">How Antelope Works</h3>
@@ -456,8 +397,8 @@ export default function FrontLanding() {
             </ul>
           </section> */}
 
-          {/* Final CTA Section - Light Gray Background */}
-          <section className="py-16 bg-muted/20">
+          {/* Final CTA Section */}
+          <section className="py-16">
           <div className="max-w-5xl mx-auto">
             <Card className="relative overflow-hidden border-2 border-border shadow-xl">
               {/* Black border effect */}
