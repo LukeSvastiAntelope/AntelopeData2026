@@ -12,7 +12,6 @@ export default function ContactPage() {
   const [formData, setFormData] = useState({
     name: "",
     email: "",
-    website: "",
     message: ""
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -26,7 +25,7 @@ export default function ContactPage() {
 
     toast.success("Message sent! We'll get back to you as soon as possible.")
 
-    setFormData({ name: "", email: "", website: "", message: "" })
+    setFormData({ name: "", email: "", message: "" })
     setIsSubmitting(false)
   }
 
@@ -48,7 +47,7 @@ export default function ContactPage() {
                 Contact Us
               </h1>
               <p className="text-muted-foreground text-lg">
-                We are committed to processing the information in order to contact you and talk about your project.
+                Have questions about Antelope or want to share feedback? We'd love to hear from you.
               </p>
             </div>
 
@@ -114,19 +113,6 @@ export default function ContactPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="website">Website</Label>
-                <Input
-                  id="website"
-                  name="website"
-                  type="url"
-                  value={formData.website}
-                  onChange={handleChange}
-                  placeholder="https://yourwebsite.com"
-                  className="bg-background"
-                />
-              </div>
-
-              <div className="space-y-2">
                 <Label htmlFor="message">Message*</Label>
                 <Textarea
                   id="message"
@@ -134,7 +120,7 @@ export default function ContactPage() {
                   value={formData.message}
                   onChange={handleChange}
                   required
-                  placeholder="Tell us about your project..."
+                  placeholder="Tell us about your experience with Antelope"
                   rows={6}
                   className="bg-background resize-none"
                 />
