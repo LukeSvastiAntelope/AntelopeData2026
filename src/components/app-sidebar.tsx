@@ -115,6 +115,11 @@ export function AppSidebar({ className, collapsible = "offcanvas", ...props }: S
       icon: DollarSign
     },
     {
+      title: "Our Clients",
+      href: "/clients",
+      icon: Users
+    },
+    {
       title: "About Us",
       href: "/about",
       icon: Info
