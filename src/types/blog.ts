@@ -3,11 +3,10 @@ export interface BlogPost {
   title: string
   excerpt: string
   content: string
-  coverImage: string
   date: string
   readTime: string
   tags: string[]
-  author?: {
+  author: {
     name: string
     avatar?: string
   }

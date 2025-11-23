@@ -9,75 +9,75 @@ import { Mail } from "lucide-react"
 // Mock data - replace with actual data fetching
 const featuredPost: BlogPost = {
   id: "1",
-  title: "How Remote work drastically improved my Design Skills",
-  excerpt: "Remote work has drastically improved my design skills by giving me more flexibility and access to a wider pool of clients and collaborators. Without the daily commute and office distractions, I found more time for deep, uninterrupted work, allowing me to refine my craft and experiment with new techniques. The flexibility of remote work also enabled me to collaborate with talented designers and clients from around the world, exposing me to diverse perspectives and challenging me",
+  title: "Digital Twins: Transform Survey Data Into Intelligent AI Agents",
+  excerpt: "Discover how Antelope's digital twin technology creates AI-powered personas from survey responses. Each respondent becomes a queryable agent that preserves their unique perspectives, values, and decision-making patterns—enabling unprecedented insights without re-surveying your audience.",
   content: "",
-  coverImage: "/uploads/37c62ba0-801e-5cbb-9817-26e7c0828519.jpg",
-  date: "21 July 2024",
-  readTime: "4 min",
-  tags: ["Remote", "Freelancing"]
+  date: "21 Nov 2024",
+  readTime: "6 min",
+  tags: ["Digital Twins", "AI Analytics"],
+  author: { name: "admin" }
 }
 
 const weeklyPosts: BlogPost[] = [
   {
     id: "2",
-    title: "Our SaaS Product Just Launched!",
-    excerpt: "Remote work has drastically improved my design skills by giving me more flexibility and access to a wider pool of clients and collaborators. Without the daily commute and office distractions, I found more time for deep, uninterrupted work, allowing me to refine my experiment, focus, and learn at my very own pace.",
+    title: "Cohort Analysis Made Simple: Segment Your Survey Audience in Seconds",
+    excerpt: "Learn how to create powerful audience segments with Antelope's cohort builder. Filter respondents by demographics, answers, and behaviors to uncover hidden patterns in your data. No SQL required—just point, click, and discover insights that drive better decisions.",
     content: "",
-    coverImage: "/uploads/37c62ba0-801e-5cbb-9817-26e7c0828519.jpg",
-    date: "22 July 2024",
-    readTime: "4 min",
-    tags: ["Sales", "Product"]
+    date: "18 Nov 2024",
+    readTime: "5 min",
+    tags: ["Cohort Analysis", "Survey Analytics"],
+    author: { name: "admin" }
   },
   {
     id: "3",
-    title: "Our SaaS Product Just Launched!",
-    excerpt: "Remote work has drastically improved my design skills by giving me more flexibility and access to a wider pool of clients and collaborators. Without the daily commute and office distractions, I found more time for deep, uninterrupted work, allowing me to refine my experiment, focus, and learn at my very own pace.",
+    title: "AI-Powered Survey Analytics: Get Instant Insights Without Writing Code",
+    excerpt: "Stop spending hours in spreadsheets. Antelope's AI analytics engine automatically generates charts, identifies trends, and surfaces key insights from your survey data. Ask questions in plain English and get comprehensive analysis in seconds—powered by GPT-4 and advanced visualization models.",
     content: "",
-    coverImage: "/uploads/37c62ba0-801e-5cbb-9817-26e7c0828519.jpg",
-    date: "22 July 2024",
-    readTime: "4 min",
-    tags: ["Sales", "Product"]
+    date: "15 Nov 2024",
+    readTime: "5 min",
+    tags: ["AI Analytics", "Data Visualization"],
+    author: { name: "admin" }
   },
   {
     id: "4",
-    title: "Our SaaS Product Just Launched!",
-    excerpt: "Remote work has drastically improved my design skills by giving me more flexibility and access to a wider pool of clients and collaborators. Without the daily commute and office distractions, I found more time for deep, uninterrupted work, allowing me to refine my experiment, focus, and learn at my very own pace.",
+    title: "Chat With Your Survey Data: Natural Language Queries for Research Teams",
+    excerpt: "Imagine asking your survey data questions like you would a colleague. With Antelope's conversational analytics, you can query cohorts, explore trends, and generate reports using natural language. Perfect for researchers who want insights fast without learning complex analytics tools.",
     content: "",
-    coverImage: "/uploads/37c62ba0-801e-5cbb-9817-26e7c0828519.jpg",
-    date: "22 July 2024",
+    date: "12 Nov 2024",
     readTime: "4 min",
-    tags: ["Sales", "Product"]
+    tags: ["Conversational AI", "Research Tools"],
+    author: { name: "admin" }
   },
   {
     id: "5",
-    title: "Our SaaS Product Just Launched!",
-    excerpt: "Remote work has drastically improved my design skills by giving me more flexibility and access to a wider pool of clients and collaborators. Without the daily commute and office distractions, I found more time for deep, uninterrupted work, allowing me to refine my experiment, focus, and learn at my very own pace.",
+    title: "Survey Response Prediction: How Digital Twins Answer New Questions",
+    excerpt: "What if you could predict how your respondents would answer new survey questions without asking them again? Antelope's digital twins use AI to generate accurate predictions based on each person's unique profile, saving time and reducing survey fatigue while maintaining data quality.",
     content: "",
-    coverImage: "/uploads/37c62ba0-801e-5cbb-9817-26e7c0828519.jpg",
-    date: "22 July 2024",
-    readTime: "4 min",
-    tags: ["Sales", "Product"]
+    date: "08 Nov 2024",
+    readTime: "5 min",
+    tags: ["Predictive Analytics", "Digital Twins"],
+    author: { name: "admin" }
   },
   {
     id: "6",
-    title: "Our SaaS Product Just Launched!",
-    excerpt: "Remote work has drastically improved my design skills by giving me more flexibility and access to a wider pool of clients and collaborators. Without the daily commute and office distractions, I found more time for deep, uninterrupted work, allowing me to refine my experiment, focus, and learn at my very own pace.",
+    title: "From Raw Data to Rich Insights: Automated Survey Report Generation",
+    excerpt: "Transform survey responses into professional, comprehensive reports automatically. Antelope analyzes your data, identifies key themes, generates visualizations, and produces executive summaries—all without manual effort. Get publication-ready insights in minutes, not days.",
     content: "",
-    coverImage: "/uploads/37c62ba0-801e-5cbb-9817-26e7c0828519.jpg",
-    date: "22 July 2024",
+    date: "05 Nov 2024",
     readTime: "4 min",
-    tags: ["Sales", "Product"]
+    tags: ["Report Generation", "Automation"],
+    author: { name: "admin" }
   },
   {
     id: "7",
-    title: "Our SaaS Product Just Launched!",
-    excerpt: "Remote work has drastically improved my design skills by giving me more flexibility and access to a wider pool of clients and collaborators. Without the daily commute and office distractions, I found more time for deep, uninterrupted work, allowing me to refine my experiment, focus, and learn at my very own pace.",
+    title: "Multi-Source Intelligence: Combine Survey Data with Digital Twins and Web Research",
+    excerpt: "Go beyond traditional survey analysis. Antelope integrates your survey responses with digital twin predictions and real-time web research to provide context-rich insights. See how your data compares to broader trends and get a complete picture of your audience's perspectives.",
     content: "",
-    coverImage: "/uploads/37c62ba0-801e-5cbb-9817-26e7c0828519.jpg",
-    date: "22 July 2024",
-    readTime: "4 min",
-    tags: ["Sales", "Product"]
+    date: "01 Nov 2024",
+    readTime: "6 min",
+    tags: ["Data Integration", "Market Research"],
+    author: { name: "admin" }
   }
 ]
 
@@ -91,8 +91,7 @@ export default function BlogPage() {
             Catch Up with Our Latest Articles
           </h1>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Catch up with our latest news and stay in the loop on expert updates, insightful articles, and exciting 
-            announcements shaping our journey forward.
+            Discover how Antelope transforms your survey workflow with instant insights and powerful analytics—no code required.
           </p>
         </div>
       </section>
@@ -102,7 +101,7 @@ export default function BlogPage() {
         <div className="max-w-7xl mx-auto">
           <div className="flex items-center justify-between mb-8">
             <h2 className="text-2xl font-semibold">
-              Recent Post <span className="text-muted-foreground">(08)</span>
+              Latest Article
             </h2>
           </div>
           
@@ -114,7 +113,7 @@ export default function BlogPage() {
       <section className="py-12 px-4 md:px-8 lg:px-16">
         <div className="max-w-7xl mx-auto">
           <h2 className="text-2xl font-semibold mb-8">
-            Weekly Most Read 🔥
+            More Articles
           </h2>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
@@ -125,22 +124,22 @@ export default function BlogPage() {
 
           {/* Pagination */}
           <div className="flex justify-center items-center gap-2">
-            <Button variant="ghost" size="sm">
+            <Button variant="ghost" size="sm" disabled>
               ← Previous
             </Button>
             <Button variant="ghost" size="sm" className="bg-foreground text-background hover:bg-foreground/90">
               1
             </Button>
-            <Button variant="ghost" size="sm">
+            <Button variant="ghost" size="sm" disabled>
               2
             </Button>
-            <Button variant="ghost" size="sm">
+            <Button variant="ghost" size="sm" disabled>
               3
             </Button>
-            <Button variant="ghost" size="sm">
+            <Button variant="ghost" size="sm" disabled>
               4
             </Button>
-            <Button variant="ghost" size="sm">
+            <Button variant="ghost" size="sm" disabled>
               Next →
             </Button>
           </div>
