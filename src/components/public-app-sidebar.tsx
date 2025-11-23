@@ -84,6 +84,11 @@ export function PublicAppSidebar({ className, collapsible = "offcanvas", ...prop
       icon: DollarSignIcon
     },
     {
+      title: "Our Clients",
+      href: "/clients",
+      icon: UsersIcon
+    },
+    {
       title: "About Us",
       href: "/about",
       icon: InfoIcon
