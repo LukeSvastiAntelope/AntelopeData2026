@@ -41,7 +41,8 @@ interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> {
 export function PublicAppSidebar({ className, collapsible = "offcanvas", ...props }: SidebarProps) {
   const pathname = usePathname()
 
-  const mainNavItems = [
+  // Platform section - only show when logged in (not shown in public sidebar)
+  const platformNavItems = [
     {
       title: "Surveys",
       href: "/login",
@@ -55,20 +56,27 @@ export function PublicAppSidebar({ className, collapsible = "offcanvas", ...prop
       key: "digital-twins"
     },
     {
+      title: "Channels",
+      href: "/login",
+      icon: MessageCircleIcon,
+      key: "channels"
+    },
+    {
       title: "Reports",
       href: "/login",
       icon: FileBarChartIcon,
       key: "reports"
     },
     {
-      title: "Blog",
-      href: "/blog",
-      icon: BookOpenIcon,
-      key: "blog"
+      title: "Python Analysis",
+      href: "/login",
+      icon: FileTextIcon,
+      key: "python-analysis"
     }
   ]
 
-  const secondaryNavItems = [
+  // Workspace section - only show when logged in (not shown in public sidebar)
+  const workspaceNavItems = [
     {
       title: "Settings",
       href: "/login",
@@ -77,11 +85,17 @@ export function PublicAppSidebar({ className, collapsible = "offcanvas", ...prop
     }
   ]
 
+  // Resources section - accessible both logged in and logged out
   const resourceNavItems = [
     {
       title: "Pricing",
       href: "/pricing",
       icon: DollarSignIcon
+    },
+    {
+      title: "Blog",
+      href: "/blog",
+      icon: BookOpenIcon
     },
     {
       title: "Our Clients",
@@ -141,16 +155,17 @@ export function PublicAppSidebar({ className, collapsible = "offcanvas", ...prop
       </SidebarHeader>
       
       <SidebarContent className="flex flex-col gap-4">
+        {/* Platform Section - Hidden in public sidebar, only shown when logged in */}
         <SidebarGroup className="px-4">
-          <SidebarGroupLabel>Platform</SidebarGroupLabel>
+          <SidebarGroupLabel className="text-muted-foreground">Platform</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {mainNavItems.map((item) => (
+              {platformNavItems.map((item) => (
                 <SidebarMenuItem key={item.key || item.href}>
                   <SidebarMenuButton
                     asChild
-                    isActive={pathname === item.href || pathname.startsWith(`${item.href}/`)}
                     tooltip={item.title}
+                    className="opacity-50 cursor-not-allowed"
                   >
                     <Link href={item.href} className="flex items-center gap-2 px-4 py-2 text-sidebar-foreground">
                       <item.icon className="h-4 w-4 text-sidebar-foreground group-data-[collapsible=offcanvas]:hidden" />
@@ -163,30 +178,30 @@ export function PublicAppSidebar({ className, collapsible = "offcanvas", ...prop
           </SidebarGroupContent>
         </SidebarGroup>
 
-        {secondaryNavItems.length > 0 && (
-          <SidebarGroup className="px-4">
-            <SidebarGroupLabel>Workspace</SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                {secondaryNavItems.map((item) => (
-                  <SidebarMenuItem key={item.key || item.href}>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={pathname === item.href}
-                      tooltip={item.title}
-                    >
-                      <Link href={item.href} className="flex items-center gap-2 px-4 py-2 text-sidebar-foreground">
-                        <item.icon className="h-4 w-4 text-sidebar-foreground group-data-[collapsible=offcanvas]:hidden" />
-                        <span className="text-sidebar-foreground">{item.title}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        )}
+        {/* Workspace Section - Hidden in public sidebar, only shown when logged in */}
+        <SidebarGroup className="px-4">
+          <SidebarGroupLabel className="text-muted-foreground">Workspace</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {workspaceNavItems.map((item) => (
+                <SidebarMenuItem key={item.key || item.href}>
+                  <SidebarMenuButton
+                    asChild
+                    tooltip={item.title}
+                    className="opacity-50 cursor-not-allowed"
+                  >
+                    <Link href={item.href} className="flex items-center gap-2 px-4 py-2 text-sidebar-foreground">
+                      <item.icon className="h-4 w-4 text-sidebar-foreground group-data-[collapsible=offcanvas]:hidden" />
+                      <span className="text-sidebar-foreground">{item.title}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
 
+        {/* Resources Section - Accessible to everyone */}
         <SidebarGroup className="px-4">
           <SidebarGroupLabel>Resources</SidebarGroupLabel>
           <SidebarGroupContent>

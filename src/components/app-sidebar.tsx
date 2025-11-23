@@ -11,7 +11,11 @@ import {
   SidebarHeader,
   SidebarMenu,
   SidebarMenuItem,
-  SidebarMenuButton
+  SidebarMenuButton,
+  SidebarGroup,
+  SidebarGroupLabel,
+  SidebarGroupContent,
+  SidebarSeparator
 } from "@/components/ui/sidebar"
 import { useAgent } from "@/app/context/AgentContext"
 import { MinimalThemeToggle } from "@/components/theme-toggle"
@@ -57,22 +61,8 @@ export function AppSidebar({ className, collapsible = "offcanvas", ...props }: S
   const pathname = usePathname()
   const { agent, user } = useAgent()
 
-  const mainNavItems = [
-    // {
-    //   title: "Overview",
-    //   href: "/overview",
-    //   icon: LayoutDashboard
-    // },
-    // {
-    //   title: "Markets",
-    //   href: "/markets",
-    //   icon: BarChart3
-    // },
-    // {
-    //   title: "Strategy",
-    //   href: "/strategy",
-    //   icon: LineChart
-    // },
+  // Platform section - only accessible when logged in
+  const platformNavItems = [
     {
       title: "Surveys",
       href: "/surveys",
@@ -97,22 +87,29 @@ export function AppSidebar({ className, collapsible = "offcanvas", ...props }: S
       title: "Python Analysis",
       href: "/python-analysis",
       icon: Code
+    }
+  ]
+
+  // Workspace section - only accessible when logged in
+  const workspaceNavItems = [
+    {
+      title: "Settings",
+      href: "/settings",
+      icon: Settings
+    }
+  ]
+
+  // Resources section - accessible both logged in and logged out
+  const resourceNavItems = [
+    {
+      title: "Pricing",
+      href: "/pricing",
+      icon: DollarSign
     },
     {
       title: "Blog",
       href: "/blog",
       icon: BookOpen
-    }
-  ]
-
-  // Conditional secondary navigation based on user role
-  const secondaryNavItems: { title: string; href: string; icon: any }[] = []
-
-  const footerNavItems = [
-    {
-      title: "Pricing",
-      href: "/pricing",
-      icon: DollarSign
     },
     {
       title: "Our Clients",
@@ -133,11 +130,6 @@ export function AppSidebar({ className, collapsible = "offcanvas", ...props }: S
       title: "Community",
       href: "https://t.me/+F5F2ah0bBzU0ZDAx",
       icon: Users
-    },
-    {
-      title: "Logout",
-      href: "/logout",
-      icon: LogOut
     }
   ]
 
@@ -176,46 +168,80 @@ export function AppSidebar({ className, collapsible = "offcanvas", ...props }: S
         </div>
       </SidebarHeader>
       
-      <SidebarContent className="flex flex-col gap-2">
-        <SidebarMenu className="px-4">
-          {mainNavItems.map((item) => (
-            <SidebarMenuItem key={item.href}>
-              <SidebarMenuButton
-                asChild
-                isActive={pathname === item.href || pathname.startsWith(`${item.href}/`)}
-                tooltip={item.title}
-              >
-                <Link href={item.href} className="flex items-center gap-2 px-4 py-2 text-sidebar-foreground">
-                  <item.icon className="h-4 w-4 group-data-[collapsible=offcanvas]:hidden" />
-                  <span>{item.title}</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          ))}
-        </SidebarMenu>
-        
-        {secondaryNavItems.length > 0 && (
-          <SidebarMenu className="px-4">
-            {secondaryNavItems.map((item) => (
-              <SidebarMenuItem key={item.href}>
-                <SidebarMenuButton
-                  asChild
-                  isActive={pathname === item.href}
-                  tooltip={item.title}
-                >
-                  <Link href={item.href} className="flex items-center gap-2 px-4 py-2 text-sidebar-foreground">
-                    <item.icon className="h-4 w-4 group-data-[collapsible=offcanvas]:hidden" />
-                    <span>{item.title}</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            ))}
-          </SidebarMenu>
-        )}
+      <SidebarContent className="flex flex-col gap-4">
+        {/* Platform Section */}
+        <SidebarGroup className="px-4">
+          <SidebarGroupLabel>Platform</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {platformNavItems.map((item) => (
+                <SidebarMenuItem key={item.href}>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={pathname === item.href || pathname.startsWith(`${item.href}/`)}
+                    tooltip={item.title}
+                  >
+                    <Link href={item.href} className="flex items-center gap-2 px-4 py-2 text-sidebar-foreground">
+                      <item.icon className="h-4 w-4 text-sidebar-foreground group-data-[collapsible=offcanvas]:hidden" />
+                      <span className="text-sidebar-foreground">{item.title}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        {/* Workspace Section */}
+        <SidebarGroup className="px-4">
+          <SidebarGroupLabel>Workspace</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {workspaceNavItems.map((item) => (
+                <SidebarMenuItem key={item.href}>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={pathname === item.href}
+                    tooltip={item.title}
+                  >
+                    <Link href={item.href} className="flex items-center gap-2 px-4 py-2 text-sidebar-foreground">
+                      <item.icon className="h-4 w-4 text-sidebar-foreground group-data-[collapsible=offcanvas]:hidden" />
+                      <span className="text-sidebar-foreground">{item.title}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        {/* Resources Section */}
+        <SidebarGroup className="px-4">
+          <SidebarGroupLabel>Resources</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {resourceNavItems.map((item) => (
+                <SidebarMenuItem key={item.href}>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={pathname === item.href}
+                    tooltip={item.title}
+                  >
+                    <Link href={item.href} className="flex items-center gap-2 px-4 py-2 text-sidebar-foreground">
+                      <item.icon className="h-4 w-4 text-sidebar-foreground group-data-[collapsible=offcanvas]:hidden" />
+                      <span className="text-sidebar-foreground">{item.title}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
       </SidebarContent>
       
       <SidebarFooter className="py-4 mt-auto">
-        <SidebarMenu className="px-4">
+        <SidebarSeparator className="mx-8" />
+        <SidebarMenu className="px-4 pt-4">
           <SidebarMenuItem>
             <div className="flex w-full items-center gap-2">
               {user ? (
@@ -237,7 +263,6 @@ export function AppSidebar({ className, collapsible = "offcanvas", ...props }: S
                             {user.email}
                           </span>
                         </div>
-                        {/* removed kebab icon next to name */}
                       </div>
                     </SidebarMenuButton>
                   </DropdownMenuTrigger>
@@ -314,7 +339,6 @@ export function AppSidebar({ className, collapsible = "offcanvas", ...props }: S
                   </div>
                 </SidebarMenuButton>
               )}
-              {/* theme toggle moved into dropdown */}
             </div>
           </SidebarMenuItem>
         </SidebarMenu>

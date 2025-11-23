@@ -52,7 +52,7 @@ export default function ContactPage() {
               </p>
             </div>
 
-            <div className="space-y-6">
+            {/* <div className="space-y-6">
               <div className="flex items-start gap-4">
                 <div className="p-3 rounded-lg bg-primary/10">
                   <Mail className="h-5 w-5 text-primary" />
@@ -80,7 +80,7 @@ export default function ContactPage() {
                   <p className="text-foreground">+44 123 654 7890</p>
                 </div>
               </div>
-            </div>
+            </div> */}
           </div>
 
           {/* Right Column - Contact Form */}
