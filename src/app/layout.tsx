@@ -13,6 +13,9 @@ import Head from 'next/head';
 const notoSans = Noto_Sans({
     subsets: ['latin'],
     variable: '--font-noto-sans',
+    display: 'swap',
+    fallback: ['system-ui', 'arial'],
+    preload: false, // Skip preloading to avoid build-time fetch
 });
 
 export default function RootLayout({
