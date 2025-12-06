@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import * as XLSX from 'xlsx';
 import Papa from 'papaparse';
 
+export const dynamic = 'force-dynamic';
+// Increase body size limit for file uploads (50MB)
+export const maxDuration = 300; // 5 minutes for large file processing
+export const runtime = 'nodejs';
+
 // Demographic field patterns for detection
 const DEMOGRAPHIC_PATTERNS = {
   age: /^(age|years?_old|birth_year|dob|date_of_birth)$/i,
