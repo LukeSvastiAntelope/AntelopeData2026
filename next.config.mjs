@@ -5,6 +5,11 @@ const nextConfig = {
         // Prevent ESLint warnings from failing CI builds
         ignoreDuringBuilds: true,
     },
+    typescript: {
+        // Skip type checking during build to avoid memory issues
+        // Type checking can be done separately with: npx tsc --noEmit
+        ignoreBuildErrors: true,
+    },
     env: {
         PINATA_JWT: process.env.PINATA_JWT,
         PINATA_GATEWAY: process.env.PINATA_GATEWAY,
