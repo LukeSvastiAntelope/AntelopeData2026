@@ -3,6 +3,8 @@ import OpenAI from 'openai';
 import { openSql } from '@/app/utils/database/db';
 import { RowDataPacket } from 'mysql2/promise';
 
+export const dynamic = 'force-dynamic';
+
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
