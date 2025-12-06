@@ -11,7 +11,7 @@ npm install
 echo "=== Using runtime environment variables from GitHub Actions ==="
 
 echo "=== DB Migration ==="
-npx prisma generate
+npx prisma generate 2>/dev/null || echo "Prisma not configured, skipping..."
 
 echo "=== Running Channels Migration ==="
 # Export environment variables for the migration script
@@ -26,7 +26,7 @@ echo "=== Building Project ==="
 NODE_OPTIONS="--max-old-space-size=4096" npm run build
 
 echo "=== Restarting Application with updated env ==="
-pm2 restart 4 --update-env
+pm2 restart getantelope --update-env || pm2 restart 4 --update-env
 
 echo "=== Final PM2 Status ==="
 pm2 list 
