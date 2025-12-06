@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 
+export const dynamic = 'force-dynamic';
+
 export async function POST(req: NextRequest) {
   // Security: Only allow in development or with admin auth
   const userIdHeader = req.headers.get('x-user-id')

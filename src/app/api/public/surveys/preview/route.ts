@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import * as XLSX from 'xlsx';
 import Papa from 'papaparse';
 
+export const dynamic = 'force-dynamic';
+
 // Demographic field patterns for detection
 const DEMOGRAPHIC_PATTERNS = {
   age: /^(age|years?_old|birth_year|dob|date_of_birth)$/i,
