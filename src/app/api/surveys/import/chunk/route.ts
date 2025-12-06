@@ -6,6 +6,8 @@ import path from 'path';
 import { tmpdir } from 'os';
 import { normalizeRecords } from '@/app/utils/survey/import-utils';
 
+export const dynamic = 'force-dynamic';
+
 interface ChunkData {
   chunkIndex: number;
   totalChunks: number;
