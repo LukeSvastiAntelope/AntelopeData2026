@@ -74,9 +74,12 @@ export default function QuizSurveyBuilderPage() {
     setIsGenerating(true)
     setError(null)
     try {
+      const token = localStorage.getItem('token')
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      if (token) headers.Authorization = `Bearer ${token}`
       const res = await fetch('/api/ai/generate-survey', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` },
+        headers,
         body: JSON.stringify({ prompt, model: selectedModel, mode: 'quiz' })
       })
       if (!res.ok) {
@@ -155,9 +158,13 @@ export default function QuizSurveyBuilderPage() {
       meta: { correctOptionIds: q.correctOptionIds, explanation: q.explanation, points: q.points ?? 1 }
     }))
 
+    const token = localStorage.getItem('token')
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+    if (token) headers.Authorization = `Bearer ${token}`
+
     const res = await fetch('/api/surveys', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` },
+      headers,
       body: JSON.stringify({
         title: quiz.title,
         description: quiz.description,

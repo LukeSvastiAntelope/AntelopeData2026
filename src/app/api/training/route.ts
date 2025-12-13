@@ -5,12 +5,14 @@ import OpenAI from 'openai';
 import { UserRepo } from "@/app/utils/database/user-repo";
 import { verifyConfirmationToken } from "@/app/utils/api/token";
 
-const openaiClient = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY!,
-});
+function getOpenAIClient() {
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) throw new Error("OPENAI_API_KEY is missing");
+    return new OpenAI({ apiKey });
+}
 
 const getEmbedding = async (text: string) => {
-    const response = await openaiClient.embeddings.create({
+    const response = await getOpenAIClient().embeddings.create({
         model: "text-embedding-ada-002",
         input: text
     });

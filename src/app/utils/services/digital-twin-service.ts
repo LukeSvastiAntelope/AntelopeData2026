@@ -11,13 +11,17 @@ import {
   categorizeImportedTwin 
 } from '../anonymity-config';
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+function getOpenAIClient() {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) throw new Error('OPENAI_API_KEY is missing');
+  return new OpenAI({ apiKey });
+}
 
-const pinecone = new Pinecone({
-  apiKey: process.env.PINECONE_API_KEY!,
-});
+function getPineconeClient() {
+  const apiKey = process.env.PINECONE_API_KEY;
+  if (!apiKey) throw new Error('PINECONE_API_KEY is missing');
+  return new Pinecone({ apiKey });
+}
 
 interface Demographics {
   name: string;
@@ -105,6 +109,7 @@ Guidelines:
 - Focus on what makes this person unique`;
 
     try {
+      const openai = getOpenAIClient();
       const completion = await openai.chat.completions.create({
         model: "gpt-4o",
         messages: [
@@ -145,7 +150,7 @@ Guidelines:
     }>
   ): Promise<Array<{ questionId: number; value: string | string[] }>> {
     // Fetch twin metadata and validate ownership
-    const index = pinecone.index('prediction-results');
+    const index = getPineconeClient().index('prediction-results');
     const fetchResult = await index.fetch([`digital-twin-${agentToken}`]);
     const record = fetchResult.records[`digital-twin-${agentToken}`];
     if (!record) throw new Error('Digital twin not found');
@@ -180,7 +185,7 @@ Rules:
     const personaContext = `Demographics: ${JSON.stringify(demographics)}\nPersona: ${JSON.stringify(principles)}`;
     const surveyContext = `Questions: ${JSON.stringify(typedQuestions)}`;
 
-    const completion = await openai.chat.completions.create({
+    const completion = await getOpenAIClient().chat.completions.create({
       model: 'gpt-4o',
       temperature: 0.3,
       messages: [
@@ -217,7 +222,7 @@ Rules:
     surveyTitle: string
   ): Promise<void> {
     try {
-      const index = pinecone.index('prediction-results');
+      const index = getPineconeClient().index('prediction-results');
       
       // Get existing digital twin data
       const fetchResult = await index.fetch([`digital-twin-${agentToken}`]);
@@ -294,7 +299,7 @@ Rules:
     completionData?: CompletionCalculationResult
   ): Promise<void> {
     try {
-      const index = pinecone.index('prediction-results');
+      const index = getPineconeClient().index('prediction-results');
 
       // Calculate completion data if not provided
       const completion = completionData || calculateCompletionPercentage(demographics, anonymityLevel);
@@ -324,7 +329,7 @@ Rules:
       `.trim();
 
       // Generate embedding
-      const embeddingResponse = await openai.embeddings.create({
+      const embeddingResponse = await getOpenAIClient().embeddings.create({
         model: "text-embedding-3-small",
         input: textForEmbedding,
       });
@@ -409,7 +414,7 @@ Rules:
     console.warn('🚨 SECURITY WARNING: getAllDigitalTwins is deprecated. Use getUserDigitalTwins instead to prevent cross-user access.');
     
     try {
-      const index = pinecone.index('prediction-results');
+      const index = getPineconeClient().index('prediction-results');
 
       // Query with a generic vector to get all digital twins
       // We'll use a zero vector and rely on filtering
@@ -436,7 +441,7 @@ Rules:
    */
   static async getUserDigitalTwins(userId: string, topK: number = 50): Promise<any[]> {
     try {
-      const index = pinecone.index('prediction-results');
+      const index = getPineconeClient().index('prediction-results');
 
       // Query with a generic vector to get all digital twins for this user
       const zeroVector = new Array(1536).fill(0); // text-embedding-3-small dimension
@@ -506,10 +511,10 @@ Rules:
     console.warn('🚨 SECURITY WARNING: findSimilarTwins is deprecated. Use findSimilarTwinsForUser instead to prevent cross-user access.');
     
     try {
-      const index = pinecone.index('prediction-results');
+      const index = getPineconeClient().index('prediction-results');
 
       // Generate embedding for query
-      const embeddingResponse = await openai.embeddings.create({
+      const embeddingResponse = await getOpenAIClient().embeddings.create({
         model: "text-embedding-3-small",
         input: queryText,
       });
@@ -546,10 +551,10 @@ Rules:
     filter?: Record<string, any>
   ): Promise<any[]> {
     try {
-      const index = pinecone.index('prediction-results');
+      const index = getPineconeClient().index('prediction-results');
 
       // Generate embedding for query
-      const embeddingResponse = await openai.embeddings.create({
+      const embeddingResponse = await getOpenAIClient().embeddings.create({
         model: "text-embedding-3-small",
         input: queryText,
       });
@@ -589,7 +594,7 @@ Rules:
     
     try {
       // First, get the digital twin data from Pinecone
-      const index = pinecone.index('prediction-results');
+      const index = getPineconeClient().index('prediction-results');
       const fetchResult = await index.fetch([`digital-twin-${agentToken}`]);
       
       if (!fetchResult.records[`digital-twin-${agentToken}`]) {
@@ -631,7 +636,7 @@ Instructions:
 - Keep responses conversational and natural
 - Don't mention that you're a digital twin`;
 
-      const completion = await openai.chat.completions.create({
+      const completion = await getOpenAIClient().chat.completions.create({
         model: "gpt-4o",
         messages: [
           { role: "system", content: "You are a digital twin of a real person. Respond authentically as that person would." },
@@ -658,7 +663,7 @@ Instructions:
   ): Promise<string> {
     try {
       // First, get the digital twin data from Pinecone
-      const index = pinecone.index('prediction-results');
+      const index = getPineconeClient().index('prediction-results');
       const fetchResult = await index.fetch([`digital-twin-${agentToken}`]);
       
       if (!fetchResult.records[`digital-twin-${agentToken}`]) {
@@ -706,7 +711,7 @@ Instructions:
 - Keep responses conversational and natural
 - Don't mention that you're a digital twin`;
 
-      const completion = await openai.chat.completions.create({
+      const completion = await getOpenAIClient().chat.completions.create({
         model: "gpt-4o",
         messages: [
           { role: "system", content: "You are a digital twin of a real person. Respond authentically as that person would." },
@@ -737,7 +742,7 @@ Instructions:
     console.warn('🚨 SECURITY WARNING: getDigitalTwinsWithFilters is deprecated. Use getDigitalTwinsWithFiltersForUser instead to prevent cross-user access.');
     
     try {
-      const index = pinecone.index('prediction-results');
+      const index = getPineconeClient().index('prediction-results');
       const zeroVector = new Array(1536).fill(0);
 
       // Build filter object
@@ -790,7 +795,7 @@ Instructions:
     topK?: number;
   } = {}): Promise<any[]> {
     try {
-      const index = pinecone.index('prediction-results');
+      const index = getPineconeClient().index('prediction-results');
       const zeroVector = new Array(1536).fill(0);
 
       // Build filter object with user ownership

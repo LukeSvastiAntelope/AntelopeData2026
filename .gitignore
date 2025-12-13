@@ -40,6 +40,10 @@ Thumbs.db
 *.swp
 *.swo
 
+# SSH keys / deploy keys (never commit)
+.ssh_keys/
+*.pem
+
 # Logs
 logs
 *.log

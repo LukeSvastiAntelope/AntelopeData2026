@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 
-// Ensure your OpenAI API key is set in your environment variables
-const openaiClient = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY!,
-});
+function getOpenAIClient() {
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) throw new Error("OPENAI_API_KEY is missing");
+    return new OpenAI({ apiKey });
+}
 
 export async function POST(req: NextRequest) {
     try {
@@ -42,7 +43,7 @@ Example Format:
 2. Adjust bet sizes according to the [Risk Level] approach, favoring smaller, exploratory bets for higher risk scenarios.
 3. Prioritize predictions with clear, verifiable outcomes and avoid overly speculative markets unless a strong analytical basis exists.`;
 
-        const completion = await openaiClient.chat.completions.create({
+        const completion = await getOpenAIClient().chat.completions.create({
             messages: [{ role: "user", content: prompt }],
             model: "gpt-4o", // Or your preferred model, e.g., gpt-3.5-turbo
             temperature: 0.7,
