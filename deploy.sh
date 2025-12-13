@@ -52,7 +52,13 @@ fi
 
 echo "=== Restarting Application with updated env ==="
 if id -u appuser >/dev/null 2>&1; then
-  su - appuser -c "pm2 restart getantelope --update-env" || true
+  if ! su - appuser -c "pm2 describe getantelope" >/dev/null 2>&1; then
+    echo "PM2 process 'getantelope' not found; starting it..."
+    su - appuser -c "cd \"$(pwd)\" && PORT=${PORT:-3000} NODE_ENV=${NODE_ENV:-production} pm2 start npm --name getantelope -- start"
+    su - appuser -c "pm2 save" || true
+  else
+    su - appuser -c "pm2 restart getantelope --update-env" || true
+  fi
 else
   pm2 restart getantelope --update-env || pm2 restart 4 --update-env
 fi
