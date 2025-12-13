@@ -6,9 +6,9 @@ import { SurveyAnalysisResult } from './survey-analysis-types';
 import { StatisticalQueryResult } from './statistical-query-generator';
 import { createCompletion } from './ai-service';
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY!,
-});
+// NOTE: This file routes LLM calls through `createCompletion()` which lazily
+// initializes provider clients. Do not instantiate OpenAI at module-load time
+// because it makes `next build` fail when keys are not present.
 
 export interface InsightGenerationConfig {
   insightModel?: string;

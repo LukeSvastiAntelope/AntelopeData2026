@@ -5,6 +5,8 @@ import { GPT_MODELS } from '@/app/utils/const';
 
 // Allow longer processing time during generation
 export const maxDuration = 300;
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
 // POST /api/ai/generate-survey - Generate survey using AI
 export async function POST(req: NextRequest) {
@@ -27,12 +29,15 @@ export async function POST(req: NextRequest) {
         }
 
         // Find the model configuration
-        const modelConfig = GPT_MODELS.find(m => m.key === model);
+        let modelConfig = GPT_MODELS.find(m => m.key === model);
         if (!modelConfig) {
             return NextResponse.json({ 
                 error: 'Invalid model specified' 
             }, { status: 400 });
         }
+
+        const isProd = process.env.NODE_ENV === 'production';
+        const originalModelKey = modelConfig.key;
 
         // Initialize the appropriate AI client based on model type
         let aiClient: OpenAI | Anthropic;
@@ -46,10 +51,11 @@ export async function POST(req: NextRequest) {
             }
             aiClient = new OpenAI({
                 apiKey: process.env.OPENAI_API_KEY,
-                timeout: 240000,
+                // Production deployments (serverless) may have strict execution limits; fail fast and let the UI retry/switch models.
+                timeout: isProd ? 12000 : 240000,
                 maxRetries: 0,
             });
-            console.log('[gen-survey] Using OpenAI', { model: modelConfig.model, timeoutMs: 240000 });
+            console.log('[gen-survey] Using OpenAI', { model: modelConfig.model, timeoutMs: isProd ? 12000 : 240000 });
         } else if (modelConfig.type === "deepseek") {
             if (!process.env.DEEPSEEK_API_KEY) {
                 return NextResponse.json({ 
@@ -59,7 +65,7 @@ export async function POST(req: NextRequest) {
             aiClient = new OpenAI({
                 apiKey: process.env.DEEPSEEK_API_KEY,
                 baseURL: 'https://api.deepseek.com',
-                timeout: 120000,
+                timeout: isProd ? 12000 : 120000,
                 maxRetries: 0,
             });
             console.log('[gen-survey] Using DeepSeek', { model: modelConfig.model });
@@ -72,7 +78,7 @@ export async function POST(req: NextRequest) {
             aiClient = new OpenAI({
                 apiKey: process.env.GEMINI_API_KEY,
                 baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai/',
-                timeout: 120000,
+                timeout: isProd ? 12000 : 120000,
                 maxRetries: 0,
             });
             console.log('[gen-survey] Using Gemini', { model: modelConfig.model });
@@ -169,12 +175,13 @@ Guidelines:
                 .join('');
         } else {
             // Use OpenAI-compatible API
-            // Newer OpenAI models (o1, o3, gpt-5, gpt-4o) use max_completion_tokens and may not support temperature
+            // Use Responses API only for "reasoning" models where it's needed (o1/o3/gpt-5 family).
+            // gpt-4o works reliably via Chat Completions, and treating it as a reasoning model can cause
+            // production-only failures depending on runtime/SDK/deployment environment.
             const isReasoningModel = (
                 modelConfig.model.includes('o1') ||
                 modelConfig.model.includes('o3') ||
-                modelConfig.model.includes('gpt-5') ||
-                modelConfig.model.includes('gpt-4o')
+                modelConfig.model.includes('gpt-5')
             );
             const useNewTokenParam = modelConfig.type === "openai" && isReasoningModel;
             
@@ -191,7 +198,10 @@ Guidelines:
                 requestParams.temperature = 0.7;
             }
             
-            const tokenBudget = modelConfig.model.includes('gpt-5') ? 8000 : 800;
+            const tokenBudget =
+                modelConfig.model.includes('gpt-5')
+                    ? (isProd ? 3000 : 8000)
+                    : (isProd ? 700 : 800);
             if (useNewTokenParam) {
                 requestParams.max_completion_tokens = tokenBudget;
             } else {
@@ -293,6 +303,23 @@ Guidelines:
                     const code = err?.code;
                     const status = err?.status;
                     const isTransient = code === 'ENOTFOUND' || code === 'ETIMEDOUT' || status === 429 || (status >= 500 && status < 600);
+                    const isTimeoutLike = (err?.name === 'AbortError') || (String(err?.message || '').toLowerCase().includes('timeout'));
+                    // If production is hitting function timeouts with a slower model, fall back once to a faster model.
+                    if (isProd && attempt === 1 && originalModelKey === 'gpt-4o' && (isTransient || isTimeoutLike)) {
+                        const fallback = GPT_MODELS.find(m => m.key === 'gpt-4o-mini');
+                        if (fallback && fallback.type === modelConfig.type) {
+                            console.warn('[gen-survey] Falling back to faster model due to timeout/transient error', {
+                                from: modelConfig.model,
+                                to: fallback.model,
+                                code,
+                                status
+                            });
+                            modelConfig = fallback;
+                            // Update request params for the fallback model; keep other params the same.
+                            requestParams.model = modelConfig.model;
+                            continue;
+                        }
+                    }
                     console.warn('[gen-survey] OpenAI completion error', {
                         attempt,
                         code,
@@ -313,8 +340,7 @@ Guidelines:
             const isReasoningOverall = (
                 modelConfig.model.includes('o1') ||
                 modelConfig.model.includes('o3') ||
-                modelConfig.model.includes('gpt-5') ||
-                modelConfig.model.includes('gpt-4o')
+                modelConfig.model.includes('gpt-5')
             );
             console.error('[gen-survey] No aiResponse', { elapsedMs: Date.now() - t0, model: modelConfig.model });
             if (isReasoningOverall) {
@@ -343,8 +369,7 @@ Guidelines:
             const isReasoningModel = (
                 modelConfig.model.includes('o1') ||
                 modelConfig.model.includes('o3') ||
-                modelConfig.model.includes('gpt-5') ||
-                modelConfig.model.includes('gpt-4o')
+                modelConfig.model.includes('gpt-5')
             );
             if (isReasoningModel) {
                 try {

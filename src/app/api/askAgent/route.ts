@@ -3,10 +3,16 @@ import { AutomaticBettingAgent } from "@/app/utils/api/automaticBetting";
 import { UserRepo } from "@/app/utils/database/user-repo";
 import { OpenAI } from "openai";
 
-const deepseek = new OpenAI({
-  apiKey: process.env.DEEPSEEK_API_KEY!,
-  baseURL: 'https://api.deepseek.com'
-});
+function getDeepseekClient() {
+  const apiKey = process.env.DEEPSEEK_API_KEY;
+  if (!apiKey) {
+    throw new Error("DEEPSEEK_API_KEY is missing");
+  }
+  return new OpenAI({
+    apiKey,
+    baseURL: "https://api.deepseek.com",
+  });
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -63,6 +69,7 @@ export async function POST(request: NextRequest) {
     // Pass the question to our agent
     const messages = await agent.handleUserQuestion(userQuestion);
 
+    const deepseek = getDeepseekClient();
     const stream = await deepseek.chat.completions.create({
       model: "deepseek-chat",
       messages: messages,
