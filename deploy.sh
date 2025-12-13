@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 
 # echo "=== Starting Deployment ==="
 echo "=== Deployment Info ==="
@@ -11,24 +12,24 @@ echo ""
 echo "=== Working Directory ==="
 pwd
 echo ""
+
+# If this script is invoked as root (e.g., via GitHub Actions SSH),
+# re-exec as appuser while preserving env vars.
+if [ "$(id -u)" = "0" ] && id -u appuser >/dev/null 2>&1 && [ -z "${DEPLOY_AS_APPUSER:-}" ]; then
+  export DEPLOY_AS_APPUSER=1
+  exec sudo -E -u appuser -H bash -lc "cd \"$(pwd)\" && DEPLOY_AS_APPUSER=1 ./deploy.sh"
+fi
+
 echo "=== Checking Node Version ==="
 node -v
 
 echo "=== Installing Dependencies ==="
-if id -u appuser >/dev/null 2>&1; then
-  su - appuser -c "cd \"$(pwd)\" && npm install"
-else
-  npm install
-fi
+npm install
 
 echo "=== Using runtime environment variables from GitHub Actions ==="
 
 echo "=== DB Migration ==="
-if id -u appuser >/dev/null 2>&1; then
-  su - appuser -c "cd \"$(pwd)\" && npx prisma generate" 2>/dev/null || echo "Prisma not configured, skipping..."
-else
-  npx prisma generate 2>/dev/null || echo "Prisma not configured, skipping..."
-fi
+npx prisma generate 2>/dev/null || echo "Prisma not configured, skipping..."
 
 echo "=== Running Channels Migration ==="
 # Export environment variables for the migration script
@@ -37,35 +38,19 @@ export DB_USER=${MYSQL_USER}
 export DB_PASSWORD=${MYSQL_PASSWORD}
 export DB_NAME=${MYSQL_DATABASE}
 export DB_PORT=${MYSQL_PORT}
-if id -u appuser >/dev/null 2>&1; then
-  su - appuser -c "cd \"$(pwd)\" && node scripts/run-channels-migration.js" || echo "Migration completed or tables already exist"
-else
-  node scripts/run-channels-migration.js || echo "Migration completed or tables already exist"
-fi
+node scripts/run-channels-migration.js || echo "Migration completed or tables already exist"
 
 echo "=== Building Project ==="
-if id -u appuser >/dev/null 2>&1; then
-  su - appuser -c "cd \"$(pwd)\" && NODE_OPTIONS=\"--max-old-space-size=4096\" npm run build"
-else
-  NODE_OPTIONS="--max-old-space-size=4096" npm run build
-fi
+NODE_OPTIONS="--max-old-space-size=4096" npm run build
 
 echo "=== Restarting Application with updated env ==="
-if id -u appuser >/dev/null 2>&1; then
-  if ! su - appuser -c "pm2 describe getantelope" >/dev/null 2>&1; then
-    echo "PM2 process 'getantelope' not found; starting it..."
-    su - appuser -c "cd \"$(pwd)\" && PORT=${PORT:-3000} NODE_ENV=${NODE_ENV:-production} pm2 start npm --name getantelope -- start"
-    su - appuser -c "pm2 save" || true
-  else
-    su - appuser -c "pm2 restart getantelope --update-env" || true
-  fi
+if ! pm2 describe getantelope >/dev/null 2>&1; then
+  echo "PM2 process 'getantelope' not found; starting it..."
+  PORT=${PORT:-3000} NODE_ENV=${NODE_ENV:-production} pm2 start npm --name getantelope -- start
+  pm2 save || true
 else
-  pm2 restart getantelope --update-env || pm2 restart 4 --update-env
+  pm2 restart getantelope --update-env || true
 fi
 
 echo "=== Final PM2 Status ==="
-if id -u appuser >/dev/null 2>&1; then
-  su - appuser -c "pm2 list"
-else
-  pm2 list
-fi
+pm2 list
