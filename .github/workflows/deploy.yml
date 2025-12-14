@@ -4,7 +4,9 @@ on:
   push:
     branches:
       - main
-      - feature/surveys
+  # Allow manual deploys from the Actions UI (useful for hotfixes or testing),
+  # without auto-deploying every feature branch push.
+  workflow_dispatch:
 
 jobs:
   deploy:
