@@ -2,7 +2,9 @@ name: Deploy to Digital Ocean
 
 on:
   push:
-    branches: [ main ]  # or your default branch
+    branches:
+      - main
+      - feature/surveys
 
 jobs:
   deploy:
@@ -113,10 +115,13 @@ jobs:
         script: |
           sudo -E -u appuser -H bash -lc '
             set -e
+            BRANCH="${{ github.ref_name }}"
             cd /home/appuser/marketmaker
             echo "=== Pulling Latest Changes ==="
             git stash || true
-            git pull origin main
+            git fetch origin --quiet
+            git checkout "$BRANCH" || git checkout -B "$BRANCH" "origin/$BRANCH"
+            git pull origin "$BRANCH"
             chmod +x deploy.sh
             ./deploy.sh
           '
