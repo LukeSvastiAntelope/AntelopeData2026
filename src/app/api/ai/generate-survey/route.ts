@@ -54,6 +54,13 @@ function classifyUpstreamError(err: any): {
             retryable: false,
         };
     }
+    if (meta.status === 400 || meta.status === 422) {
+        return {
+            httpStatus: 502,
+            clientMessage: 'AI provider rejected the request format. Please retry or switch models.',
+            retryable: false,
+        };
+    }
     if (meta.status === 429) {
         return {
             httpStatus: 429,
@@ -425,6 +432,7 @@ Guidelines:
                 hasTemperature: requestParams.temperature !== undefined,
                 max_completion_tokens: requestParams.max_completion_tokens,
                 max_tokens: requestParams.max_tokens,
+                response_format: requestParams.response_format?.type,
                 promptLen: prompt.length
             });
             
@@ -537,6 +545,21 @@ Guidelines:
                             requestParams.model = modelConfig.model;
                             continue;
                         }
+                    }
+                    // If the provider rejects structured outputs, fall back to JSON object mode once.
+                    if (
+                        modelConfig.type === "openai" &&
+                        !isReasoningModel &&
+                        (status === 400 || status === 422) &&
+                        requestParams?.response_format?.type === 'json_schema'
+                    ) {
+                        console.warn('[gen-survey] Falling back from json_schema to json_object', {
+                            requestId,
+                            status,
+                            message: err?.message,
+                        });
+                        requestParams.response_format = { type: 'json_object' };
+                        continue;
                     }
                     console.warn('[gen-survey] OpenAI completion error', {
                         requestId,
