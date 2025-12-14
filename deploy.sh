@@ -24,7 +24,10 @@ echo "=== Checking Node Version ==="
 node -v
 
 echo "=== Installing Dependencies ==="
-npm install
+# next build requires tooling like tailwindcss/postcss which are in devDependencies.
+# Ensure devDependencies are installed even when NODE_ENV=production.
+export NPM_CONFIG_PRODUCTION=false
+npm install --include=dev
 
 echo "=== Using runtime environment variables from GitHub Actions ==="
 
