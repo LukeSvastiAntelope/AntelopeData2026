@@ -8,8 +8,114 @@ export const maxDuration = 300;
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
+function getRequestId() {
+    try {
+        // Node 18+ / modern runtimes
+        // eslint-disable-next-line no-undef
+        return crypto.randomUUID();
+    } catch {
+        return `${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+    }
+}
+
+function safeErrorMeta(err: any) {
+    const status = err?.status ?? err?.response?.status;
+    const code = err?.code;
+    const name = err?.name;
+    const message = typeof err?.message === 'string' ? err.message : undefined;
+    return { status, code, name, message };
+}
+
+function classifyUpstreamError(err: any): {
+    httpStatus: number;
+    clientMessage: string;
+    retryable: boolean;
+} {
+    const meta = safeErrorMeta(err);
+    const msg = (meta.message || '').toLowerCase();
+    const isTimeoutLike =
+        meta.name === 'AbortError' ||
+        msg.includes('timeout') ||
+        msg.includes('timed out') ||
+        meta.code === 'ETIMEDOUT';
+
+    // OpenAI-compatible SDKs generally set `.status`
+    if (meta.status === 401 || meta.status === 403) {
+        return {
+            httpStatus: 503,
+            clientMessage: 'AI provider authentication failed (server configuration issue).',
+            retryable: false,
+        };
+    }
+    if (meta.status === 404) {
+        return {
+            httpStatus: 400,
+            clientMessage: 'Selected AI model is not available. Please switch models and try again.',
+            retryable: false,
+        };
+    }
+    if (meta.status === 429) {
+        return {
+            httpStatus: 429,
+            clientMessage: 'AI provider is rate limiting requests. Please retry shortly or switch to a faster model.',
+            retryable: true,
+        };
+    }
+    if (isTimeoutLike) {
+        return {
+            httpStatus: 504,
+            clientMessage: 'AI request timed out. Please retry or switch to a faster model.',
+            retryable: true,
+        };
+    }
+    if (typeof meta.status === 'number' && meta.status >= 500 && meta.status < 600) {
+        return {
+            httpStatus: 503,
+            clientMessage: 'AI provider temporarily unavailable. Please retry.',
+            retryable: true,
+        };
+    }
+    if (meta.code === 'ENOTFOUND' || meta.code === 'ECONNRESET') {
+        return {
+            httpStatus: 503,
+            clientMessage: 'Temporary network error contacting AI provider. Please retry.',
+            retryable: true,
+        };
+    }
+    // Fallback: internal server error
+    return {
+        httpStatus: 500,
+        clientMessage: 'Internal server error',
+        retryable: false,
+    };
+}
+
+function stripMarkdownFences(text: string) {
+    return text.replace(/```json\n?|\n?```/g, '').trim();
+}
+
+function tryParseJsonFromText(text: string) {
+    if (!text || typeof text !== 'string') return null;
+    const cleaned = stripMarkdownFences(text);
+    // First: direct parse
+    try {
+        return JSON.parse(cleaned);
+    } catch {}
+    // Second: heuristic extraction (largest {...} block)
+    try {
+        const start = cleaned.indexOf('{');
+        const end = cleaned.lastIndexOf('}');
+        if (start !== -1 && end !== -1 && end > start) {
+            const candidate = cleaned.slice(start, end + 1);
+            return JSON.parse(candidate);
+        }
+    } catch {}
+    return null;
+}
+
 // POST /api/ai/generate-survey - Generate survey using AI
 export async function POST(req: NextRequest) {
+    const requestId = getRequestId();
     try {
         const userId = req.headers.get('x-user-id');
         
@@ -19,7 +125,16 @@ export async function POST(req: NextRequest) {
             }, { status: 401 });
         }
 
-        const { prompt, model = 'gpt-4o', mode } = await req.json();
+        let body: any = {};
+        try {
+            body = await req.json();
+        } catch {
+            return NextResponse.json({
+                error: 'Invalid JSON body',
+            }, { status: 400 });
+        }
+
+        const { prompt, model = 'gpt-4o', mode } = body || {};
         const t0 = Date.now();
         
         if (!prompt || typeof prompt !== 'string') {
@@ -55,7 +170,7 @@ export async function POST(req: NextRequest) {
                 timeout: isProd ? 12000 : 240000,
                 maxRetries: 0,
             });
-            console.log('[gen-survey] Using OpenAI', { model: modelConfig.model, timeoutMs: isProd ? 12000 : 240000 });
+            console.log('[gen-survey] Using OpenAI', { requestId, model: modelConfig.model, timeoutMs: isProd ? 12000 : 240000 });
         } else if (modelConfig.type === "deepseek") {
             if (!process.env.DEEPSEEK_API_KEY) {
                 return NextResponse.json({ 
@@ -68,7 +183,7 @@ export async function POST(req: NextRequest) {
                 timeout: isProd ? 12000 : 120000,
                 maxRetries: 0,
             });
-            console.log('[gen-survey] Using DeepSeek', { model: modelConfig.model });
+            console.log('[gen-survey] Using DeepSeek', { requestId, model: modelConfig.model });
         } else if (modelConfig.type === "gemini") {
             if (!process.env.GEMINI_API_KEY) {
                 return NextResponse.json({ 
@@ -81,7 +196,7 @@ export async function POST(req: NextRequest) {
                 timeout: isProd ? 12000 : 120000,
                 maxRetries: 0,
             });
-            console.log('[gen-survey] Using Gemini', { model: modelConfig.model });
+            console.log('[gen-survey] Using Gemini', { requestId, model: modelConfig.model });
         } else if (modelConfig.type === "anthropic") {
             if (!process.env.ANTHROPIC_API_KEY) {
                 return NextResponse.json({ 
@@ -209,6 +324,7 @@ Guidelines:
             }
 
             console.log('[gen-survey] Request params', {
+                requestId,
                 model: requestParams.model,
                 hasTemperature: requestParams.temperature !== undefined,
                 max_completion_tokens: requestParams.max_completion_tokens,
@@ -302,13 +418,19 @@ Guidelines:
                     lastError = err;
                     const code = err?.code;
                     const status = err?.status;
-                    const isTransient = code === 'ENOTFOUND' || code === 'ETIMEDOUT' || status === 429 || (status >= 500 && status < 600);
                     const isTimeoutLike = (err?.name === 'AbortError') || (String(err?.message || '').toLowerCase().includes('timeout'));
+                    const isTransient =
+                        code === 'ENOTFOUND' ||
+                        code === 'ETIMEDOUT' ||
+                        status === 429 ||
+                        (status >= 500 && status < 600) ||
+                        isTimeoutLike;
                     // If production is hitting function timeouts with a slower model, fall back once to a faster model.
                     if (isProd && attempt === 1 && originalModelKey === 'gpt-4o' && (isTransient || isTimeoutLike)) {
                         const fallback = GPT_MODELS.find(m => m.key === 'gpt-4o-mini');
                         if (fallback && fallback.type === modelConfig.type) {
                             console.warn('[gen-survey] Falling back to faster model due to timeout/transient error', {
+                                requestId,
                                 from: modelConfig.model,
                                 to: fallback.model,
                                 code,
@@ -321,6 +443,7 @@ Guidelines:
                         }
                     }
                     console.warn('[gen-survey] OpenAI completion error', {
+                        requestId,
                         attempt,
                         code,
                         status,
@@ -359,49 +482,23 @@ Guidelines:
 
         // Parse the AI response
         let surveyData;
-        try {
-            // Remove any markdown code blocks if present
-            const cleanedResponse = aiResponse.replace(/```json\n?|\n?```/g, '').trim();
-            surveyData = JSON.parse(cleanedResponse);
-        } catch (parseError) {
-            console.error('[gen-survey] JSON parse failed on first attempt:', parseError);
-            // Heuristic JSON extraction for reasoning models (e.g., gpt-5) that may wrap JSON in analysis
-            const isReasoningModel = (
-                modelConfig.model.includes('o1') ||
-                modelConfig.model.includes('o3') ||
-                modelConfig.model.includes('gpt-5')
-            );
-            if (isReasoningModel) {
-                try {
-                    const text = aiResponse || '';
-                    const fenceCleaned = text.replace(/```json\n?|```/g, '').trim();
-                    // Try to find the largest JSON object in the text
-                    const start = fenceCleaned.indexOf('{');
-                    const end = fenceCleaned.lastIndexOf('}');
-                    if (start !== -1 && end !== -1 && end > start) {
-                        const candidate = fenceCleaned.slice(start, end + 1);
-                        surveyData = JSON.parse(candidate);
-                        console.warn('[gen-survey] Parsed JSON via heuristic extraction for reasoning model');
-                    }
-                } catch (e2) {
-                    console.error('[gen-survey] Heuristic JSON extraction failed:', e2);
-                }
-                // As a final fallback for GPT-5/4o, return raw text so UI can show something instead of 500
-                if (!surveyData) {
-                    console.warn('[gen-survey] Returning raw text fallback for reasoning model');
-                    return NextResponse.json({
-                        status: true,
-                        modelUsed: modelConfig.label,
-                        surveyRaw: aiResponse,
-                        note: 'Model returned non-JSON content; showing raw output.'
-                    });
-                }
-            } else {
-                console.error('AI Response:', aiResponse);
-                return NextResponse.json({ 
-                    error: 'Failed to parse AI response. Please try again.' 
-                }, { status: 500 });
+        surveyData = tryParseJsonFromText(aiResponse);
+        if (!surveyData) {
+            console.error('[gen-survey] JSON parse failed', { requestId });
+            if (!isProd) {
+                // Development-only: include raw output to speed up debugging without impacting production privacy.
+                return NextResponse.json({
+                    status: false,
+                    errorId: requestId,
+                    message: 'Failed to parse AI response as JSON (dev only includes raw output).',
+                    raw: aiResponse,
+                }, { status: 502 });
             }
+            return NextResponse.json({
+                status: false,
+                errorId: requestId,
+                message: 'AI returned an invalid format. Please try again (or switch models).',
+            }, { status: 502 });
         }
 
         // Validate the structure
@@ -472,7 +569,7 @@ Guidelines:
             return base;
         });
 
-        console.log('[gen-survey] Success', { elapsedMs: Date.now() - t0 });
+        console.log('[gen-survey] Success', { requestId, elapsedMs: Date.now() - t0 });
         return NextResponse.json({ 
             status: true, 
             survey: surveyData,
@@ -480,18 +577,22 @@ Guidelines:
         });
 
     } catch (error) {
-        console.error("Error in POST /api/ai/generate-survey:", error);
-        
-        if (error instanceof Error && error.message.includes('API key')) {
-            return NextResponse.json({ 
-                status: false, 
-                message: 'AI service configuration error' 
-            }, { status: 503 });
-        }
-        
-        return NextResponse.json({ 
-            status: false, 
-            message: error instanceof Error ? error.message : 'Internal server error' 
-        }, { status: 500 });
+        const classification = classifyUpstreamError(error);
+        const meta = safeErrorMeta(error);
+
+        console.error("Error in POST /api/ai/generate-survey:", {
+            requestId,
+            status: meta.status,
+            code: meta.code,
+            name: meta.name,
+            // Do not log prompt content; only log the message for server-side debugging.
+            message: meta.message,
+        });
+
+        return NextResponse.json({
+            status: false,
+            errorId: requestId,
+            message: classification.clientMessage,
+        }, { status: classification.httpStatus });
     }
 } 
