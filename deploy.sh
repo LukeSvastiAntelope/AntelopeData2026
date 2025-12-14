@@ -28,6 +28,84 @@ npm install
 
 echo "=== Using runtime environment variables from GitHub Actions ==="
 
+echo "=== Writing .env.production from runtime env (no secrets echoed) ==="
+node <<'NODE'
+const fs = require('fs');
+
+// Only write keys that the app expects at runtime/build time.
+// Values are pulled from process.env (GitHub Actions -> ssh-action envs).
+const REQUIRED = [
+  'NODE_ENV',
+  'NEXT_PUBLIC_APP_URL',
+  'PUBLIC_BASE_URL',
+  'AUTH_SECRET',
+  'MYSQL_HOST',
+  'MYSQL_PORT',
+  'MYSQL_USER',
+  'MYSQL_PASSWORD',
+  'MYSQL_DATABASE',
+  'OPENAI_API_KEY',
+];
+
+const OPTIONAL = [
+  'ENVIRONMENT_MODE',
+  'HOUSE_FEE_RATE',
+  'CREDIT_BALANCE',
+  'JWT_SECRET',
+  'JWT_SECRET_KEY',
+  'DEEPSEEK_API_KEY',
+  'GEMINI_API_KEY',
+  'ANTHROPIC_API_KEY',
+  'SERPAPI_API_KEY',
+  'PINECONE_API_KEY',
+  'COINMARKETCAP_API_KEY',
+  'TELEGRAM_BOT_TOKEN',
+  'TELEGRAM_BOT_USERNAME',
+  'TELEGRAM_CHANNEL_ID',
+  'ESCROW_SOLANA_ADDRESS',
+  'ESCROW_SOLANA_PRIVATE',
+  'STRIPE_SECRET_KEY',
+  'STRIPE_PUBLIC_KEY',
+  'STRIPE_SECRET_WEBHOOK_KEY',
+  'SPORTS_DB_API_KEY',
+  'PINATA_KEY',
+  'PINATA_SECRET',
+  'PINATA_JWT',
+  'PINATA_GATEWAY',
+  'SECURE_STORAGE_KEY',
+  'TELEGRAM_WEBHOOK_SECRET',
+  'ADMIN_TASK_TOKEN',
+];
+
+function esc(v) {
+  return String(v)
+    .replace(/\\/g, '\\\\')
+    .replace(/\n/g, '\\n')
+    .replace(/"/g, '\\"');
+}
+
+const missing = [];
+for (const k of REQUIRED) {
+  const v = process.env[k];
+  if (!v) missing.push(k);
+}
+if (missing.length) {
+  console.error('[deploy] Missing required env vars:', missing.join(', '));
+  process.exit(2);
+}
+
+const keys = [...REQUIRED, ...OPTIONAL];
+const lines = [];
+for (const k of keys) {
+  const v = process.env[k];
+  if (v === undefined || v === null || v === '') continue;
+  lines.push(`${k}="${esc(v)}"`);
+}
+
+fs.writeFileSync('.env.production', lines.join('\n') + '\n', { mode: 0o600 });
+console.log('[deploy] Wrote .env.production with', lines.length, 'keys');
+NODE
+
 echo "=== DB Migration ==="
 npx prisma generate 2>/dev/null || echo "Prisma not configured, skipping..."
 
