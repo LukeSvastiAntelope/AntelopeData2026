@@ -113,6 +113,87 @@ function tryParseJsonFromText(text: string) {
     return null;
 }
 
+function getOpenAiSurveyJsonSchema(mode?: string) {
+    if (mode === 'quiz') {
+        return {
+            name: 'quiz',
+            schema: {
+                type: 'object',
+                additionalProperties: false,
+                required: ['title', 'description', 'questions'],
+                properties: {
+                    title: { type: 'string' },
+                    description: { type: 'string' },
+                    questions: {
+                        type: 'array',
+                        minItems: 1,
+                        items: {
+                            type: 'object',
+                            additionalProperties: false,
+                            required: ['type', 'prompt', 'isRequired', 'correctOptionIds'],
+                            properties: {
+                                type: {
+                                    type: 'string',
+                                    enum: ['single-choice', 'multiple-choice', 'true-false', 'text'],
+                                },
+                                prompt: { type: 'string' },
+                                options: {
+                                    type: 'array',
+                                    items: { type: 'string' },
+                                },
+                                correctOptionIds: {
+                                    type: 'array',
+                                    items: { type: 'integer' },
+                                },
+                                explanation: { type: 'string' },
+                                isRequired: { type: 'boolean' },
+                                points: { type: 'integer' },
+                            },
+                        },
+                    },
+                },
+            },
+        };
+    }
+
+    return {
+        name: 'survey',
+        schema: {
+            type: 'object',
+            additionalProperties: false,
+            required: ['title', 'description', 'questions'],
+            properties: {
+                title: { type: 'string' },
+                description: { type: 'string' },
+                purpose: { type: 'string' },
+                targetAudience: { type: 'string' },
+                questions: {
+                    type: 'array',
+                    minItems: 1,
+                    items: {
+                        type: 'object',
+                        additionalProperties: false,
+                        required: ['type', 'prompt', 'isRequired'],
+                        properties: {
+                            type: {
+                                type: 'string',
+                                enum: ['text', 'single-choice', 'multiple-choice', 'rating', 'yes-no'],
+                            },
+                            prompt: { type: 'string' },
+                            options: {
+                                type: 'array',
+                                items: { type: 'string' },
+                            },
+                            isRequired: { type: 'boolean' },
+                            reasoning: { type: 'string' },
+                        },
+                    },
+                },
+            },
+        },
+    };
+}
+
 // POST /api/ai/generate-survey - Generate survey using AI
 export async function POST(req: NextRequest) {
     const requestId = getRequestId();
@@ -307,6 +388,21 @@ Guidelines:
                     { role: "user", content: prompt }
                 ],
             };
+
+            // Strongly enforce JSON output for OpenAI chat-completions models to avoid parse failures in production.
+            // Only set for OpenAI (not DeepSeek/Gemini) to avoid incompatibilities with OpenAI-compatible providers.
+            if (modelConfig.type === "openai" && !isReasoningModel) {
+                const jsonSchema = getOpenAiSurveyJsonSchema(mode);
+                // Prefer strict schema when supported (Structured Outputs).
+                requestParams.response_format = {
+                    type: "json_schema",
+                    json_schema: {
+                        name: jsonSchema.name,
+                        schema: jsonSchema.schema,
+                        strict: true,
+                    },
+                };
+            }
             
             // Remove temperature for reasoning models like gpt-5; keep it only for classic models
             if (!isReasoningModel) {
@@ -476,7 +572,9 @@ Guidelines:
                 });
             }
             return NextResponse.json({ 
-                error: 'Failed to generate survey content' 
+                status: false,
+                errorId: requestId,
+                message: 'Failed to generate survey content' 
             }, { status: 500 });
         }
 
@@ -504,8 +602,10 @@ Guidelines:
         // Validate the structure
         if (!surveyData.title || !surveyData.questions || !Array.isArray(surveyData.questions)) {
             return NextResponse.json({ 
-                error: 'Invalid survey structure generated. Please try again.' 
-            }, { status: 500 });
+                status: false,
+                errorId: requestId,
+                message: 'Invalid survey structure generated. Please try again.' 
+            }, { status: 502 });
         }
 
         // Helper: detect numeric scale in prompt like "On a scale of 1 to 5" and return option strings
