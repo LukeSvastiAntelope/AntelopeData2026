@@ -120,6 +120,36 @@ function tryParseJsonFromText(text: string) {
     return null;
 }
 
+function normalizeGeneratedSurveyShape(raw: any, prompt: string, mode?: string) {
+    // Some models/providers wrap the payload (e.g. { survey: {...} }).
+    // Normalize to the expected shape { title, description, questions }.
+    let data = raw;
+    if (data && typeof data === 'object') {
+        if (data.survey && typeof data.survey === 'object') data = data.survey;
+        if (data.quiz && typeof data.quiz === 'object') data = data.quiz;
+        if (data.data && typeof data.data === 'object') data = data.data;
+        if (data.result && typeof data.result === 'object') data = data.result;
+    }
+
+    // If questions are nested (rare but seen), unwrap.
+    if (data?.questions && !Array.isArray(data.questions) && Array.isArray((data.questions as any)?.questions)) {
+        data = { ...data, questions: (data.questions as any).questions };
+    }
+
+    // Provide reasonable defaults to avoid hard failures when only title/description are missing.
+    if (data && typeof data === 'object') {
+        if (!data.title || typeof data.title !== 'string') {
+            data.title = mode === 'quiz' ? 'AI Quiz' : 'AI Survey';
+        }
+        if (!data.description || typeof data.description !== 'string') {
+            const trimmed = (prompt || '').trim();
+            data.description = trimmed ? trimmed.slice(0, 180) : (mode === 'quiz' ? 'AI-generated quiz' : 'AI-generated survey');
+        }
+    }
+
+    return data;
+}
+
 function getOpenAiSurveyJsonSchema(mode?: string) {
     if (mode === 'quiz') {
         return {
@@ -626,6 +656,9 @@ Guidelines:
                 message: 'AI returned an invalid format. Please try again (or switch models).',
             }, { status: 502 });
         }
+
+        // Normalize shape + defaults to reduce intermittent "invalid structure" failures.
+        surveyData = normalizeGeneratedSurveyShape(surveyData, prompt, mode);
 
         // Validate the structure
         if (!surveyData.title || !surveyData.questions || !Array.isArray(surveyData.questions)) {
