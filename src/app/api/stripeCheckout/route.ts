@@ -1,11 +1,19 @@
 import { verifyConfirmationToken } from "@/app/utils/api/token";
 import { NextRequest } from "next/server";
 import Stripe from 'stripe';
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string);
+
+function getStripeClient() {
+    const key = process.env.STRIPE_SECRET_KEY;
+    if (!key) {
+        throw new Error('STRIPE_SECRET_KEY is missing');
+    }
+    return new Stripe(key);
+}
 
 export async function POST(req: NextRequest) {
     const token = req.headers.get('Authorization')?.split(' ')[1];
     try {
+        const stripe = getStripeClient();
         const jwtPayload = await verifyConfirmationToken(token as string);
         if (!jwtPayload) {
             return Response.json({ error: 'Invalid token' }, { status: 401 });
