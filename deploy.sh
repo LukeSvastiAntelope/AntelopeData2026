@@ -34,8 +34,10 @@ const fs = require('fs');
 
 // Only write keys that the app expects at runtime/build time.
 // Values are pulled from process.env (GitHub Actions -> ssh-action envs).
+// NODE_ENV: default to production if not provided by deploy runner
+if (!process.env.NODE_ENV) process.env.NODE_ENV = 'production';
+
 const REQUIRED = [
-  'NODE_ENV',
   'NEXT_PUBLIC_APP_URL',
   'PUBLIC_BASE_URL',
   'AUTH_SECRET',
