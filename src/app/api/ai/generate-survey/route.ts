@@ -157,6 +157,8 @@ function getOpenAiSurveyJsonSchema(mode?: string) {
             schema: {
                 type: 'object',
                 additionalProperties: false,
+                // OpenAI Structured Outputs (strict) expects `required` to include every key in `properties`.
+                // Keep fields "optional" by allowing empty values, not by omitting them from `required`.
                 required: ['title', 'description', 'questions'],
                 properties: {
                     title: { type: 'string' },
@@ -167,7 +169,8 @@ function getOpenAiSurveyJsonSchema(mode?: string) {
                         items: {
                             type: 'object',
                             additionalProperties: false,
-                            required: ['type', 'prompt', 'isRequired', 'correctOptionIds'],
+                            // Must include all keys from `properties` when using strict json_schema.
+                            required: ['type', 'prompt', 'options', 'correctOptionIds', 'explanation', 'isRequired', 'points'],
                             properties: {
                                 type: {
                                     type: 'string',
@@ -177,10 +180,13 @@ function getOpenAiSurveyJsonSchema(mode?: string) {
                                 options: {
                                     type: 'array',
                                     items: { type: 'string' },
+                                    // Allow empty for "text" questions, etc.
+                                    minItems: 0,
                                 },
                                 correctOptionIds: {
                                     type: 'array',
                                     items: { type: 'integer' },
+                                    minItems: 0,
                                 },
                                 explanation: { type: 'string' },
                                 isRequired: { type: 'boolean' },
@@ -198,7 +204,8 @@ function getOpenAiSurveyJsonSchema(mode?: string) {
         schema: {
             type: 'object',
             additionalProperties: false,
-            required: ['title', 'description', 'questions'],
+            // OpenAI Structured Outputs (strict) expects `required` to include every key in `properties`.
+            required: ['title', 'description', 'purpose', 'targetAudience', 'questions'],
             properties: {
                 title: { type: 'string' },
                 description: { type: 'string' },
@@ -210,7 +217,8 @@ function getOpenAiSurveyJsonSchema(mode?: string) {
                     items: {
                         type: 'object',
                         additionalProperties: false,
-                        required: ['type', 'prompt', 'isRequired'],
+                        // Must include all keys from `properties` when using strict json_schema.
+                        required: ['type', 'prompt', 'options', 'isRequired', 'reasoning'],
                         properties: {
                             type: {
                                 type: 'string',
@@ -220,6 +228,8 @@ function getOpenAiSurveyJsonSchema(mode?: string) {
                             options: {
                                 type: 'array',
                                 items: { type: 'string' },
+                                // Allow empty for question types that don't use choices (e.g. "text").
+                                minItems: 0,
                             },
                             isRequired: { type: 'boolean' },
                             reasoning: { type: 'string' },
@@ -451,10 +461,12 @@ Guidelines:
                 requestParams.temperature = 0.7;
             }
             
+            // Token budget was previously too low (700), causing truncated JSON and parse failures.
+            // Keep budgets conservative, but large enough to fit 5-12 questions + metadata.
             const tokenBudget =
                 modelConfig.model.includes('gpt-5')
                     ? (isProd ? 3000 : 8000)
-                    : (isProd ? 700 : 800);
+                    : (isProd ? (mode === 'quiz' ? 1400 : 1600) : 2200);
             if (useNewTokenParam) {
                 requestParams.max_completion_tokens = tokenBudget;
             } else {
@@ -640,7 +652,12 @@ Guidelines:
         let surveyData;
         surveyData = tryParseJsonFromText(aiResponse);
         if (!surveyData) {
-            console.error('[gen-survey] JSON parse failed', { requestId });
+            console.error('[gen-survey] JSON parse failed', {
+                requestId,
+                // Do not log full output; include only a small preview for production debugging.
+                preview: (aiResponse || '').slice(0, 220),
+                len: (aiResponse || '').length,
+            });
             if (!isProd) {
                 // Development-only: include raw output to speed up debugging without impacting production privacy.
                 return NextResponse.json({
