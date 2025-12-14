@@ -252,39 +252,44 @@ export async function POST(req: NextRequest) {
                     error: 'OpenAI API key not configured' 
                 }, { status: 503 });
             }
+            // Production needs enough headroom to avoid intermittent timeouts from the provider.
+            // Keep this below typical proxy timeouts, but above common OpenAI p95 latencies.
+            const providerTimeoutMs = isProd ? 30000 : 240000;
             aiClient = new OpenAI({
                 apiKey: process.env.OPENAI_API_KEY,
                 // Production deployments (serverless) may have strict execution limits; fail fast and let the UI retry/switch models.
-                timeout: isProd ? 12000 : 240000,
+                timeout: providerTimeoutMs,
                 maxRetries: 0,
             });
-            console.log('[gen-survey] Using OpenAI', { requestId, model: modelConfig.model, timeoutMs: isProd ? 12000 : 240000 });
+            console.log('[gen-survey] Using OpenAI', { requestId, model: modelConfig.model, timeoutMs: providerTimeoutMs });
         } else if (modelConfig.type === "deepseek") {
             if (!process.env.DEEPSEEK_API_KEY) {
                 return NextResponse.json({ 
                     error: 'DeepSeek API key not configured' 
                 }, { status: 503 });
             }
+            const providerTimeoutMs = isProd ? 25000 : 120000;
             aiClient = new OpenAI({
                 apiKey: process.env.DEEPSEEK_API_KEY,
                 baseURL: 'https://api.deepseek.com',
-                timeout: isProd ? 12000 : 120000,
+                timeout: providerTimeoutMs,
                 maxRetries: 0,
             });
-            console.log('[gen-survey] Using DeepSeek', { requestId, model: modelConfig.model });
+            console.log('[gen-survey] Using DeepSeek', { requestId, model: modelConfig.model, timeoutMs: providerTimeoutMs });
         } else if (modelConfig.type === "gemini") {
             if (!process.env.GEMINI_API_KEY) {
                 return NextResponse.json({ 
                     error: 'Gemini API key not configured' 
                 }, { status: 503 });
             }
+            const providerTimeoutMs = isProd ? 25000 : 120000;
             aiClient = new OpenAI({
                 apiKey: process.env.GEMINI_API_KEY,
                 baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai/',
-                timeout: isProd ? 12000 : 120000,
+                timeout: providerTimeoutMs,
                 maxRetries: 0,
             });
-            console.log('[gen-survey] Using Gemini', { requestId, model: modelConfig.model });
+            console.log('[gen-survey] Using Gemini', { requestId, model: modelConfig.model, timeoutMs: providerTimeoutMs });
         } else if (modelConfig.type === "anthropic") {
             if (!process.env.ANTHROPIC_API_KEY) {
                 return NextResponse.json({ 
