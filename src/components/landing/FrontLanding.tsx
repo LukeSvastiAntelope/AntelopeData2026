@@ -113,10 +113,10 @@ export default function FrontLanding() {
                 Unlimited surveys &amp; responses
               </div>
               <h1 className="leading-none text-4xl sm:text-5xl lg:text-8xl font-bold tracking-tight text-card-foreground">
-              Get Fast Insights From Your Survey Data.
+              Advanced Analytics without code or fuss.
               </h1>
               <p className="font-medium text-2xl mb-6">
-              Chat with your surveys without any code and get advanced analytics in seconds for free.
+              One place for analytics, recruitment, survey creation/edits, and reports.
               </p>
               
               {/* Action Buttons */}
