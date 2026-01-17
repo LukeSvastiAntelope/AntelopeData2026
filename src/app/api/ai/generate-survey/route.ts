@@ -461,12 +461,7 @@ Guidelines:
                 requestParams.temperature = 0.7;
             }
             
-            // Token budget was previously too low (700), causing truncated JSON and parse failures.
-            // Keep budgets conservative, but large enough to fit 5-12 questions + metadata.
-            const tokenBudget =
-                modelConfig.model.includes('gpt-5')
-                    ? (isProd ? 3000 : 8000)
-                    : (isProd ? (mode === 'quiz' ? 1400 : 1600) : 2200);
+            const tokenBudget = modelConfig.model.includes('gpt-5') ? 8000 : 2000;
             if (useNewTokenParam) {
                 requestParams.max_completion_tokens = tokenBudget;
             } else {
@@ -650,22 +645,57 @@ Guidelines:
 
         // Parse the AI response
         let surveyData;
-        surveyData = tryParseJsonFromText(aiResponse);
-        if (!surveyData) {
-            console.error('[gen-survey] JSON parse failed', {
-                requestId,
-                // Do not log full output; include only a small preview for production debugging.
-                preview: (aiResponse || '').slice(0, 220),
-                len: (aiResponse || '').length,
-            });
-            if (!isProd) {
-                // Development-only: include raw output to speed up debugging without impacting production privacy.
-                return NextResponse.json({
-                    status: false,
-                    errorId: requestId,
-                    message: 'Failed to parse AI response as JSON (dev only includes raw output).',
-                    raw: aiResponse,
-                }, { status: 502 });
+        try {
+            // Remove any markdown code blocks if present
+            const cleanedResponse = aiResponse.replace(/```json\n?|\n?```/g, '').trim();
+            surveyData = JSON.parse(cleanedResponse);
+        } catch (parseError) {
+            console.error('[gen-survey] JSON parse failed on first attempt:', parseError);
+            console.error('[gen-survey] Raw AI response (first 1000 chars):', aiResponse?.substring(0, 1000));
+            
+            // Try more aggressive JSON extraction for all models
+            try {
+                const text = aiResponse || '';
+                
+                // Remove markdown code fences more aggressively
+                let cleaned = text.replace(/```(?:json)?\s*\n?/g, '').replace(/```\s*$/g, '').trim();
+                
+                // Try to find JSON object boundaries
+                const start = cleaned.indexOf('{');
+                const end = cleaned.lastIndexOf('}');
+                
+                if (start !== -1 && end !== -1 && end > start) {
+                    const candidate = cleaned.slice(start, end + 1);
+                    surveyData = JSON.parse(candidate);
+                    console.warn('[gen-survey] Parsed JSON via heuristic extraction');
+                } else {
+                    throw new Error('No JSON object found in response');
+                }
+            } catch (e2) {
+                console.error('[gen-survey] Heuristic JSON extraction failed:', e2);
+                console.error('[gen-survey] Full AI response:', aiResponse);
+                
+                // Check if it's a reasoning model that might need special handling
+                const isReasoningModel = (
+                    modelConfig.model.includes('o1') ||
+                    modelConfig.model.includes('o3') ||
+                    modelConfig.model.includes('gpt-5') ||
+                    modelConfig.model.includes('gpt-4o')
+                );
+                
+                if (isReasoningModel) {
+                    return NextResponse.json({
+                        status: true,
+                        modelUsed: modelConfig.label,
+                        surveyRaw: aiResponse,
+                        note: 'Model returned non-JSON content; showing raw output.'
+                    });
+                }
+                
+                return NextResponse.json({ 
+                    error: 'Failed to parse AI response. The model did not return valid JSON. Please try again or switch models.',
+                    details: aiResponse?.substring(0, 500) // Include snippet for debugging
+                }, { status: 500 });
             }
             return NextResponse.json({
                 status: false,

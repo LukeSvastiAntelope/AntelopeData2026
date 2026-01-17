@@ -77,6 +77,7 @@ const SurveyPage = () => {
   const [error, setError] = useState<string | null>(null)
   const [agentToken, setAgentToken] = useState<string | null>(null)
   const [isExistingTwin, setIsExistingTwin] = useState(false)
+  const [shareEmail, setShareEmail] = useState(false)
   
   // Progressive disclosure step: 'demographics' | 'questions'
   const [currentStep, setCurrentStep] = useState<'demographics' | 'questions'>('demographics')
@@ -418,53 +419,96 @@ const SurveyPage = () => {
 
   if (submitted) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <Card className="w-full max-w-2xl">
-          <CardContent className="pt-6 text-center">
-            <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-6" />
-            <h2 className="text-2xl font-bold mb-4">Thank You!</h2>
-            <p className="text-muted-foreground mb-6">
-              Your survey response has been submitted successfully.
-            </p>
-            
-            <div className="bg-blue-50 dark:bg-blue-950/20 p-6 rounded-lg mb-6">
-              <div className="flex items-center gap-2 mb-3">
-                <Brain className="h-5 w-5 text-blue-600" />
-                <span className="font-medium text-blue-900 dark:text-blue-100">
-                  {isExistingTwin ? 'Digital Twin Updated' : 'Digital Twin Created'}
-                </span>
-              </div>
-              <p className="text-sm text-blue-700 dark:text-blue-300 mb-4">
-                {isExistingTwin 
-                  ? 'Your responses have been added to your existing digital twin, creating an even richer representation of your perspectives across multiple surveys.'
-                  : 'Your responses have been used to create a digital twin agent that represents your perspectives and opinions.'
-                }
+          <CardContent className="pt-6">
+            <div className="text-center mb-6">
+              <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
+              <h2 className="text-2xl font-bold mb-2">Thank You!</h2>
+              <p className="text-muted-foreground">
+                Your survey response has been submitted successfully.
               </p>
-              {agentToken && (
-                <div className="space-y-4">
-                  <div className="bg-white dark:bg-gray-800 p-3 rounded border">
-                    <Label className="text-xs font-medium text-muted-foreground">Your Digital Twin Token:</Label>
-                    <code className="block text-sm font-mono mt-1 break-all">{agentToken}</code>
-                    <p className="text-xs text-muted-foreground mt-2">
-                      Save this token for future reference.
+            </div>
+            
+            {/* Email Sharing Checkbox */}
+            {!isExistingTwin && demographics.email && (
+              <div className="mb-6 p-4 border rounded-lg bg-muted/50">
+                <div className="flex items-start gap-3">
+                  <Checkbox 
+                    id="share-email" 
+                    checked={shareEmail}
+                    onCheckedChange={(checked) => setShareEmail(checked === true)}
+                    className="mt-1"
+                  />
+                  <div className="flex-1">
+                    <label 
+                      htmlFor="share-email" 
+                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                    >
+                      Share my email with the survey creator
+                    </label>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Allow the person who created this survey to contact you at {demographics.email} for follow-up or related opportunities.
                     </p>
                   </div>
-                  <Button asChild>
-                    <a href={`/digital-twin/${agentToken}`} target="_blank" rel="noopener noreferrer">
-                      {isExistingTwin 
-                        ? 'View Your Updated Digital Twin Profile'
-                        : 'View & Complete Your Digital Twin Profile'
-                      }
+                </div>
+              </div>
+            )}
+
+            {/* Token Display */}
+            {agentToken && (
+              <div className="bg-blue-50 dark:bg-blue-950/20 p-4 rounded-lg mb-6">
+                <div className="flex items-center gap-2 mb-2">
+                  <Brain className="h-4 w-4 text-blue-600" />
+                  <span className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                    Your Response Token
+                  </span>
+                </div>
+                <code className="block text-xs font-mono p-2 bg-white dark:bg-gray-800 rounded border break-all">
+                  {agentToken}
+                </code>
+                <p className="text-xs text-blue-700 dark:text-blue-300 mt-2">
+                  Save this token to access your profile and claim rewards.
+                </p>
+              </div>
+            )}
+
+            {/* Action Buttons */}
+            <div className="space-y-3">
+              {/* View Profile Button */}
+              {agentToken && (
+                <Button asChild className="w-full" size="lg">
+                  <a href={`/digital-twin/${agentToken}`}>
+                    View My Profile
+                  </a>
+                </Button>
+              )}
+
+              {/* Create Account / Explore Surveys */}
+              {!isExistingTwin ? (
+                <div className="p-4 border rounded-lg bg-gradient-to-br from-purple-50 to-blue-50 dark:from-purple-950/20 dark:to-blue-950/20">
+                  <p className="text-sm font-medium mb-3 text-center">
+                    Liked this survey? Explore other surveys on Antelope!
+                  </p>
+                  <Button asChild className="w-full" variant="default">
+                    <a href="/register">
+                      Create Account & Explore More Surveys
                     </a>
                   </Button>
                 </div>
+              ) : (
+                <Button asChild className="w-full" variant="outline" size="lg">
+                  <a href="/surveys">
+                    Take Another Survey
+                  </a>
+                </Button>
               )}
             </div>
 
-            <p className="text-sm text-muted-foreground">
+            <p className="text-xs text-muted-foreground text-center mt-6">
               {isExistingTwin 
-                ? 'Your updated digital twin will continue to be used for research and insights while keeping your personal information private.'
-                : 'Your digital twin will be used for research and insights while keeping your personal information private.'
+                ? 'Continue taking surveys to earn more tokens and contribute to research insights.'
+                : 'Your responses help create valuable research insights while keeping your information private.'
               }
             </p>
           </CardContent>
