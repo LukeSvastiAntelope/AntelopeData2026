@@ -37,7 +37,9 @@ import {
   Calendar,
   Clock,
   Shield,
-  Info
+  Info,
+  Minimize2,
+  Maximize2
 } from "lucide-react"
 import { AnonymityLevel } from '@/app/utils/interface'
 import { 
@@ -98,6 +100,13 @@ const AISurveyBuilderPage = () => {
   const [sections, setSections] = useState<Array<{ id: string; title: string }>>([])
   const [questionSectionIdByIndex, setQuestionSectionIdByIndex] = useState<Array<string | null>>([])
 
+  // Drag and drop state
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
+  
+  // Collapsed questions state
+  const [collapsedQuestions, setCollapsedQuestions] = useState<Set<number>>(new Set())
+
   // Load saved model preference on mount
   useEffect(() => {
     const savedModel = localStorage.getItem('ai-survey-selected-model');
@@ -121,9 +130,103 @@ const AISurveyBuilderPage = () => {
     "Build a survey about social media usage habits"
   ]
 
+  const validateSurveyResponse = (data: any): { isValid: boolean; errors: string[]; survey: GeneratedSurvey | null } => {
+    const errors: string[] = []
+    
+    // Check if survey object exists
+    if (!data || !data.survey) {
+      errors.push('No survey data received from AI')
+      return { isValid: false, errors, survey: null }
+    }
+
+    const survey = data.survey
+
+    // Validate title
+    if (!survey.title || typeof survey.title !== 'string' || survey.title.trim().length === 0) {
+      errors.push('Survey title is missing or empty')
+    }
+
+    // Validate description
+    if (!survey.description || typeof survey.description !== 'string' || survey.description.trim().length === 0) {
+      errors.push('Survey description is missing or empty')
+    }
+
+    // Validate questions array
+    if (!Array.isArray(survey.questions)) {
+      errors.push('Questions array is missing')
+      return { isValid: false, errors, survey: null }
+    }
+
+    if (survey.questions.length === 0) {
+      errors.push('No questions were generated')
+      return { isValid: false, errors, survey: null }
+    }
+
+    // Validate each question
+    const invalidQuestions: number[] = []
+    survey.questions.forEach((q: any, index: number) => {
+      const questionErrors: string[] = []
+      
+      if (!q.prompt || typeof q.prompt !== 'string' || q.prompt.trim().length === 0) {
+        questionErrors.push('missing prompt')
+      }
+      
+      if (!q.type || !['text', 'single-choice', 'multiple-choice', 'rating', 'yes-no'].includes(q.type)) {
+        questionErrors.push('invalid or missing type')
+      }
+      
+      if ((q.type === 'single-choice' || q.type === 'multiple-choice') && (!Array.isArray(q.options) || q.options.length === 0)) {
+        questionErrors.push('missing options')
+      }
+      
+      if (questionErrors.length > 0) {
+        invalidQuestions.push(index + 1)
+        errors.push(`Question ${index + 1}: ${questionErrors.join(', ')}`)
+      }
+    })
+
+    // If there are errors but some questions are valid, it's a partial success
+    const hasValidQuestions = survey.questions.some((q: any) => 
+      q.prompt && q.prompt.trim().length > 0 && q.type
+    )
+
+    return {
+      isValid: errors.length === 0,
+      errors,
+      survey: hasValidQuestions ? survey : null
+    }
+  }
+
+  const sanitizeSurvey = (survey: any): GeneratedSurvey => {
+    // Provide fallback values for incomplete data
+    return {
+      title: survey.title?.trim() || 'Untitled Survey',
+      description: survey.description?.trim() || 'Please add a description for your survey.',
+      questions: (survey.questions || [])
+        .filter((q: any) => q.prompt && q.prompt.trim().length > 0) // Remove completely invalid questions
+        .map((q: any) => ({
+          type: ['text', 'single-choice', 'multiple-choice', 'rating', 'yes-no'].includes(q.type) ? q.type : 'text',
+          prompt: q.prompt?.trim() || 'Question text missing',
+          options: (q.type === 'single-choice' || q.type === 'multiple-choice') 
+            ? (Array.isArray(q.options) && q.options.length > 0 ? q.options : ['Option 1', 'Option 2', 'Option 3'])
+            : undefined,
+          isRequired: typeof q.isRequired === 'boolean' ? q.isRequired : false,
+          reasoning: q.reasoning || undefined
+        })),
+      targetAudience: survey.targetAudience,
+      purpose: survey.purpose
+    }
+  }
+
   const generateSurvey = async () => {
     if (!prompt.trim()) {
       setError('Please enter a description for your survey')
+      return
+    }
+
+    // Check if prompt is too short
+    if (prompt.trim().length < 10) {
+      setError('Please provide a more detailed description (at least 10 characters). Example: "Create a customer satisfaction survey for a restaurant with questions about food quality, service, and ambiance."')
       return
     }
 
@@ -149,37 +252,73 @@ const AISurveyBuilderPage = () => {
 
       if (response.ok) {
         const data = await response.json()
-        setGeneratedSurvey(data.survey)
-        setEditableTitle(data.survey.title)
-        setEditableDescription(data.survey.description)
-        setEditableQuestions(data.survey.questions)
-        setQuestionSectionIdByIndex((data.survey.questions || []).map(()=> null))
-        setQuestionMedia((data.survey.questions || []).map((q:any)=>({ media: undefined, optionMedia: (q.options||[]).map(()=>null) })))
-        setModelUsed(data.modelUsed)
+        
+        // Validate the response
+        const validation = validateSurveyResponse(data)
+        
+        if (!validation.isValid && !validation.survey) {
+          // Complete failure - no usable data
+          console.error('Survey validation errors:', validation.errors)
+          setError(
+            `AI generated incomplete survey data. Please try:\n` +
+            `• Making your prompt more specific and detailed\n` +
+            `• Including what topics you want to cover\n` +
+            `• Specifying the survey purpose\n\n` +
+            `Errors found:\n${validation.errors.slice(0, 3).map(e => `• ${e}`).join('\n')}`
+          )
+          return
+        }
+
+        if (!validation.isValid && validation.survey) {
+          // Partial success - some data is usable but incomplete
+          console.warn('Survey validation warnings:', validation.errors)
+          
+          // Sanitize and use the partial data
+          const sanitizedSurvey = sanitizeSurvey(validation.survey)
+          
+          setGeneratedSurvey(sanitizedSurvey)
+          setEditableTitle(sanitizedSurvey.title)
+          setEditableDescription(sanitizedSurvey.description)
+          setEditableQuestions(sanitizedSurvey.questions)
+          setQuestionSectionIdByIndex(sanitizedSurvey.questions.map(() => null))
+          setQuestionMedia(sanitizedSurvey.questions.map((q: any) => ({ 
+            media: undefined, 
+            optionMedia: (q.options || []).map(() => null) 
+          })))
+          setModelUsed(data.modelUsed)
+          
+          // Show warning about incomplete data
+          setError(
+            `⚠️ Survey generated with warnings:\n${validation.errors.slice(0, 3).map(e => `• ${e}`).join('\n')}\n\n` +
+            `The survey has been created with default values where data was missing. Please review and edit as needed.`
+          )
+        } else {
+          // Complete success
+          const sanitizedSurvey = sanitizeSurvey(data.survey)
+          
+          setGeneratedSurvey(sanitizedSurvey)
+          setEditableTitle(sanitizedSurvey.title)
+          setEditableDescription(sanitizedSurvey.description)
+          setEditableQuestions(sanitizedSurvey.questions)
+          setQuestionSectionIdByIndex(sanitizedSurvey.questions.map(() => null))
+          setQuestionMedia(sanitizedSurvey.questions.map((q: any) => ({ 
+            media: undefined, 
+            optionMedia: (q.options || []).map(() => null) 
+          })))
+          setModelUsed(data.modelUsed)
+        }
       } else {
-        let errorMessage = 'Failed to generate survey'
-        try {
-          const errorData = await response.json()
-          errorMessage = errorData?.message || errorData?.error || errorMessage
-        } catch {
-          try {
-            const t = await response.text()
-            if (t) errorMessage = t
-          } catch {}
-        }
-        if (response.status === 504 || response.status === 503) {
-          errorMessage =
-            `${errorMessage}. If this persists, try switching to a faster model (e.g. GPT-4o Mini).`
-        }
-        setError(errorMessage)
+        const errorData = await response.json()
+        setError(errorData.message || 'Failed to generate survey. Please try again with a more detailed prompt.')
       }
     } catch (error) {
       console.error('Error generating survey:', error)
-      const isAbort = (error as any)?.name === 'AbortError'
       setError(
-        isAbort
-          ? 'Survey generation timed out. Try again or switch to a faster model (e.g. GPT-4o Mini).'
-          : 'Failed to generate survey. Please try again.'
+        'Failed to generate survey. This could be due to:\n' +
+        '• Network connection issues\n' +
+        '• AI service temporarily unavailable\n' +
+        '• Prompt being too vague or complex\n\n' +
+        'Please try again with a clear, specific prompt.'
       )
     } finally {
       setIsGenerating(false)
@@ -246,6 +385,67 @@ const AISurveyBuilderPage = () => {
     newQuestions.splice(toIndex, 0, movedQuestion)
     
     setEditableQuestions(newQuestions)
+    
+    // Also move the media attachments
+    setQuestionMedia(prev => {
+      const arr = [...prev]
+      const [movedMedia] = arr.splice(fromIndex, 1)
+      arr.splice(toIndex, 0, movedMedia)
+      return arr
+    })
+    
+    // Also move section assignments
+    setQuestionSectionIdByIndex(prev => {
+      const arr = [...prev]
+      const [movedSection] = arr.splice(fromIndex, 1)
+      arr.splice(toIndex, 0, movedSection)
+      return arr
+    })
+  }
+
+  // Drag and drop handlers
+  const handleDragStart = (e: React.DragEvent, index: number) => {
+    setDraggedIndex(index)
+    e.dataTransfer.effectAllowed = 'move'
+    // Add a slight transparency to the dragged element
+    if (e.currentTarget instanceof HTMLElement) {
+      e.currentTarget.style.opacity = '0.5'
+    }
+  }
+
+  const handleDragEnd = (e: React.DragEvent) => {
+    if (e.currentTarget instanceof HTMLElement) {
+      e.currentTarget.style.opacity = '1'
+    }
+    setDraggedIndex(null)
+    setDragOverIndex(null)
+  }
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    
+    if (draggedIndex !== null && draggedIndex !== index) {
+      setDragOverIndex(index)
+    }
+  }
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    // Only clear if we're leaving the card entirely
+    if (e.currentTarget === e.target) {
+      setDragOverIndex(null)
+    }
+  }
+
+  const handleDrop = (e: React.DragEvent, dropIndex: number) => {
+    e.preventDefault()
+    
+    if (draggedIndex !== null && draggedIndex !== dropIndex) {
+      moveQuestionToPosition(draggedIndex, dropIndex)
+    }
+    
+    setDraggedIndex(null)
+    setDragOverIndex(null)
   }
 
   const addOption = (questionIndex: number) => {
@@ -492,6 +692,42 @@ const AISurveyBuilderPage = () => {
                   </div>
                 </div>
               )}
+            </CardContent>
+          </Card>
+
+          {/* Guidelines Card */}
+          <Card className="border-blue-200 bg-blue-50/50 dark:border-blue-900 dark:bg-blue-950/20">
+            <CardContent className="pt-6">
+              <div className="flex items-start gap-3">
+                <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/30">
+                  <Info className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                </div>
+                <div className="flex-1 space-y-3">
+                  <h3 className="font-semibold text-blue-900 dark:text-blue-100">Tips for Best Results</h3>
+                  <ul className="text-sm text-blue-800 dark:text-blue-200 space-y-2">
+                    <li className="flex items-start gap-2">
+                      <span className="text-blue-600 dark:text-blue-400 mt-0.5">•</span>
+                      <span><strong>Specify the number of questions</strong> you want (e.g., "Create 8 questions about...")</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-blue-600 dark:text-blue-400 mt-0.5">•</span>
+                      <span><strong>Mention question types</strong> if you have preferences (multiple choice, rating scales, text input)</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-blue-600 dark:text-blue-400 mt-0.5">•</span>
+                      <span><strong>Include your target audience</strong> (e.g., "for college students" or "for restaurant customers")</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-blue-600 dark:text-blue-400 mt-0.5">•</span>
+                      <span><strong>State the survey purpose</strong> clearly (e.g., "to measure satisfaction" or "to gather feedback")</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-blue-600 dark:text-blue-400 mt-0.5">•</span>
+                      <span><strong>Be specific about topics</strong> you want covered (e.g., "include questions about pricing, quality, and service")</span>
+                    </li>
+                  </ul>
+                </div>
+              </div>
             </CardContent>
           </Card>
 
@@ -832,11 +1068,24 @@ const AISurveyBuilderPage = () => {
                     </div>
                   ) : (
                     editableQuestions.map((question, questionIndex) => (
-                      <Card key={questionIndex} className="border-2">
+                      <Card 
+                        key={questionIndex} 
+                        className={`border-2 transition-all ${
+                          dragOverIndex === questionIndex ? 'border-primary border-dashed bg-primary/5' : ''
+                        } ${draggedIndex === questionIndex ? 'opacity-50' : ''}`}
+                        draggable
+                        onDragStart={(e) => handleDragStart(e, questionIndex)}
+                        onDragEnd={handleDragEnd}
+                        onDragOver={(e) => handleDragOver(e, questionIndex)}
+                        onDragLeave={handleDragLeave}
+                        onDrop={(e) => handleDrop(e, questionIndex)}
+                      >
                         <CardHeader className="pb-3">
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
-                              <GripVertical className="h-4 w-4 text-muted-foreground cursor-move" />
+                              <div title="Drag to reorder">
+                                <GripVertical className="h-4 w-4 text-muted-foreground cursor-move" />
+                              </div>
                               <span className="text-sm font-medium text-muted-foreground">
                                 Question {questionIndex + 1}
                               </span>
@@ -848,6 +1097,29 @@ const AISurveyBuilderPage = () => {
                               )}
                             </div>
                             <div className="flex items-center gap-1">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  setCollapsedQuestions(prev => {
+                                    const newSet = new Set(prev)
+                                    if (newSet.has(questionIndex)) {
+                                      newSet.delete(questionIndex)
+                                    } else {
+                                      newSet.add(questionIndex)
+                                    }
+                                    return newSet
+                                  })
+                                }}
+                                className="h-8 w-8 p-0"
+                                title={collapsedQuestions.has(questionIndex) ? "Expand question" : "Collapse question"}
+                              >
+                                {collapsedQuestions.has(questionIndex) ? (
+                                  <Maximize2 className="h-4 w-4" />
+                                ) : (
+                                  <Minimize2 className="h-4 w-4" />
+                                )}
+                              </Button>
                               <Button
                                 variant="ghost"
                                 size="sm"
@@ -889,6 +1161,7 @@ const AISurveyBuilderPage = () => {
                             </div>
                           </div>
                         </CardHeader>
+                        {!collapsedQuestions.has(questionIndex) && (
                         <CardContent className="space-y-4">
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
@@ -1035,6 +1308,7 @@ const AISurveyBuilderPage = () => {
                             </div>
                           </div>
                         </CardContent>
+                        )}
                       </Card>
                     ))
                   )}
