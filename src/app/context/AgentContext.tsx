@@ -16,6 +16,7 @@ export const AgentProvider = ({ children }: { children: React.ReactNode }) => {
     const [isAgentProfileLoading, setIsAgentProfileLoading] = useState(false);
     const [isInitialized, setIsInitialized] = useState(false);
     const [isUserDataLoaded, setIsUserDataLoaded] = useState(false);
+    const [profileLoadError, setProfileLoadError] = useState<string | null>(null);
     const hasFetched = useRef(false);
     const { data: session, status } = useSession();
     const pathname = usePathname();
@@ -30,12 +31,18 @@ export const AgentProvider = ({ children }: { children: React.ReactNode }) => {
         }
         
         setIsAgentProfileLoading(true);
+        setProfileLoadError(null);
         try {
+            const controller = new AbortController();
+            const timeoutMs = 15000;
+            const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
             const response = await fetch('/api/getAgentProfile', {
                 headers: {
                     'Content-Type': 'application/json',
-                }
+                },
+                signal: controller.signal
             });
+            clearTimeout(timeoutId);
             const data = await response.json();
             
             if (data.status) {
@@ -45,12 +52,19 @@ export const AgentProvider = ({ children }: { children: React.ReactNode }) => {
                 hasFetched.current = true;
                 globalAgentFetched = true;
             } else {
+                const message = data?.message || data?.error || 'Failed to load profile';
+                setProfileLoadError(message);
                 if (!isAuthPage) {
                     handleAuthError(router, false);
                 }
             }
         } catch (error) {
             console.log("Error fetching agent profile", error);
+            const message =
+                (error as any)?.name === 'AbortError'
+                    ? 'Profile request timed out. Please reload.'
+                    : 'Error fetching agent profile';
+            setProfileLoadError(message);
             if (!isPredictionPage && !isAuthPage) {
                 handleAuthError(router, false);
             }
@@ -102,7 +116,9 @@ export const AgentProvider = ({ children }: { children: React.ReactNode }) => {
             <div className="flex items-center justify-center min-h-screen">
                 <div className="flex flex-col items-center space-y-4">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                    <p className="text-sm text-muted-foreground">Loading your profile...</p>
+                    <p className="text-sm text-muted-foreground">
+                        {profileLoadError ? profileLoadError : 'Loading your profile...'}
+                    </p>
                 </div>
             </div>
         );

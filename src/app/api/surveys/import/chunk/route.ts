@@ -6,6 +6,11 @@ import path from 'path';
 import { tmpdir } from 'os';
 import { normalizeRecords } from '@/app/utils/survey/import-utils';
 
+export const dynamic = 'force-dynamic';
+// Increase body size limit for chunked uploads (10MB per chunk)
+export const maxDuration = 300; // 5 minutes for large file processing
+export const runtime = 'nodejs';
+
 interface ChunkData {
   chunkIndex: number;
   totalChunks: number;

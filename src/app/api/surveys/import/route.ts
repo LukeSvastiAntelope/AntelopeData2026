@@ -11,6 +11,10 @@ import {
   type ColumnSummary
 } from '@/app/utils/survey/import-utils';
 
+// Increase body size limit for file uploads (50MB)
+export const maxDuration = 300; // 5 minutes for large file processing
+export const runtime = 'nodejs';
+
 interface ImportPreview {
   fileName: string;
   totalRows: number;

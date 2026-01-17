@@ -65,11 +65,14 @@ interface GeneratedSurvey {
   purpose?: string
 }
 
+const DEFAULT_AI_SURVEY_MODEL =
+  process.env.NODE_ENV === 'production' ? 'gpt-4o-mini' : 'gpt-4o'
+
 const AISurveyBuilderPage = () => {
   const router = useRouter()
   
   const [prompt, setPrompt] = useState('')
-  const [selectedModel, setSelectedModel] = useState('gpt-4o')
+  const [selectedModel, setSelectedModel] = useState(DEFAULT_AI_SURVEY_MODEL)
   const [isGenerating, setIsGenerating] = useState(false)
   const [generatedSurvey, setGeneratedSurvey] = useState<GeneratedSurvey | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -231,14 +234,21 @@ const AISurveyBuilderPage = () => {
     setError(null)
 
     try {
+      const controller = new AbortController()
+      // Keep UI responsive; production serverless often times out around ~10s.
+      const timeoutMs = process.env.NODE_ENV === 'production' ? 15000 : 60000
+      const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs)
+      const token = localStorage.getItem('token')
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      // Avoid sending `Authorization: Bearer null` in production (we primarily auth via NextAuth cookies).
+      if (token) headers.Authorization = `Bearer ${token}`
       const response = await fetch('/api/ai/generate-survey', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify({ prompt, model: selectedModel })
+        headers,
+        body: JSON.stringify({ prompt, model: selectedModel }),
+        signal: controller.signal
       })
+      window.clearTimeout(timeoutId)
 
       if (response.ok) {
         const data = await response.json()
@@ -501,12 +511,13 @@ const AISurveyBuilderPage = () => {
         order: index + 1
       }));
 
+      const token = localStorage.getItem('token')
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      if (token) headers.Authorization = `Bearer ${token}`
+
       const response = await fetch('/api/surveys', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
+        headers,
         body: JSON.stringify({
           title: editableTitle,
           description: editableDescription,

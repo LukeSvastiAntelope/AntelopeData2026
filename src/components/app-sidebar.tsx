@@ -35,6 +35,9 @@ import {
   FileBarChart,
   Code,
   CircleUser,
+  BookOpen,
+  Mail,
+  DollarSign,
 } from "lucide-react"
 import LogoText from "@/components/logo-text"; // Added import
 import LogoIcon from "@/components/logo-icon"; // Added import
@@ -57,22 +60,8 @@ export function AppSidebar({ className, collapsible = "offcanvas", ...props }: S
   const pathname = usePathname()
   const { agent, user } = useAgent()
 
-  const mainNavItems = [
-    // {
-    //   title: "Overview",
-    //   href: "/overview",
-    //   icon: LayoutDashboard
-    // },
-    // {
-    //   title: "Markets",
-    //   href: "/markets",
-    //   icon: BarChart3
-    // },
-    // {
-    //   title: "Strategy",
-    //   href: "/strategy",
-    //   icon: LineChart
-    // },
+  // Platform section - only accessible when logged in
+  const platformNavItems = [
     {
       title: "Surveys",
       href: "/surveys",
@@ -100,14 +89,25 @@ export function AppSidebar({ className, collapsible = "offcanvas", ...props }: S
     }
   ]
 
-  // Conditional secondary navigation based on user role
-  const secondaryNavItems: { title: string; href: string; icon: any }[] = []
+  // Workspace section - only accessible when logged in
+  const workspaceNavItems = [
+    {
+      title: "Settings",
+      href: "/settings",
+      icon: Settings
+    }
+  ]
 
   const resourceNavItems = [
     {
       title: "About Us",
       href: "/about",
       icon: Info
+    },
+    {
+      title: "Contact Us",
+      href: "/contact",
+      icon: Mail
     },
     {
       title: "Community",
@@ -212,7 +212,8 @@ export function AppSidebar({ className, collapsible = "offcanvas", ...props }: S
       </SidebarContent>
       
       <SidebarFooter className="py-4 mt-auto">
-        <SidebarMenu className="px-4">
+        <SidebarSeparator className="mx-8" />
+        <SidebarMenu className="px-4 pt-4">
           <SidebarMenuItem>
             <div className="flex w-full items-center gap-2">
               {user ? (
@@ -234,7 +235,6 @@ export function AppSidebar({ className, collapsible = "offcanvas", ...props }: S
                             {user.email}
                           </span>
                         </div>
-                        {/* removed kebab icon next to name */}
                       </div>
                     </SidebarMenuButton>
                   </DropdownMenuTrigger>
@@ -305,7 +305,6 @@ export function AppSidebar({ className, collapsible = "offcanvas", ...props }: S
                   </div>
                 </SidebarMenuButton>
               )}
-              {/* theme toggle moved into dropdown */}
             </div>
           </SidebarMenuItem>
         </SidebarMenu>

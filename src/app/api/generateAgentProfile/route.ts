@@ -1,10 +1,11 @@
 import { NextRequest } from "next/server";
 import OpenAI from "openai";
 
-// Initialize OpenAI using the same pattern as training/route.ts
-const openaiClient = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY!,
-});
+function getOpenAIClient() {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) throw new Error("OPENAI_API_KEY is missing");
+  return new OpenAI({ apiKey });
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -32,7 +33,7 @@ export async function POST(req: NextRequest) {
     }`;
 
     // Call OpenAI with the prompt using the client instance pattern from training/route.ts
-    const completion = await openaiClient.chat.completions.create({
+    const completion = await getOpenAIClient().chat.completions.create({
       messages: [{ role: "user", content: prompt }],
       model: "gpt-4o",
       response_format: { type: "json_object" },

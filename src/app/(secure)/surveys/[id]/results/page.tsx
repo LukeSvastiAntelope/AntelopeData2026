@@ -39,6 +39,7 @@ import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { SurveyAnalyticsDashboard } from '@/components/SurveyAnalyticsDashboard'
 import { SurveyRespondentsTablePaginated } from '@/components/SurveyRespondentsTablePaginated'
+import { ViewQuestionsDialog } from '@/components/ViewQuestionsDialog'
 
 
 
@@ -247,6 +248,7 @@ const SurveyResultsPage = () => {
               </Breadcrumb>
             </div>
             <div className="flex gap-2">
+              <ViewQuestionsDialog surveyId={surveyId} />
               <Link href={`/surveys/${surveyId}/edit`}>
                 <Button size="sm" variant="outline">
                   <Edit className="h-3 w-3 mr-1.5" />

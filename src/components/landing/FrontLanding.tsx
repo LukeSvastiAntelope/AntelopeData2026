@@ -5,7 +5,7 @@ import { SidebarTrigger } from "@/components/ui/sidebar"
 import { Card, CardContent } from "@/components/ui/card"
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Lightbulb as LightbulbIcon, MessageCircle as MessageCircleIcon, Rocket, Brain as BrainIcon, Upload, FileText } from "lucide-react"
+import { Lightbulb as LightbulbIcon, MessageCircle as MessageCircleIcon, Rocket, Brain as BrainIcon, Upload, FileText, Check, X } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
 import Link from "next/link"
@@ -102,9 +102,10 @@ export default function FrontLanding() {
         <div className="border-b border-border" />
 
         {/* Main content space-y-16 */}
-        <div className="py-16 ">
+        <div className="">
           {/* Hero Section */}
-          <section className="relative w-full h-[30vh] md:h-[35vh] rounded-lg overflow-hidden flex items-start justify-center">
+          <section className="relative w-full py-16">
+          <div className="max-w-7xl mx-auto h-[30vh] md:h-[35vh] flex items-start justify-center">
             {/* Content */}
             <div className="relative z-10 flex flex-col items-center text-center max-w-3xl px-4 gap-y-6">
               <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-muted/5 border border-primary/10 text-primary font-medium text-xs">
@@ -112,10 +113,10 @@ export default function FrontLanding() {
                 Unlimited surveys &amp; responses
               </div>
               <h1 className="leading-none text-4xl sm:text-5xl lg:text-8xl font-bold tracking-tight text-card-foreground">
-              Turn Your Surveys Into Synthetic Personas.
+              Advanced Analytics without code or fuss.
               </h1>
               <p className="font-medium text-2xl mb-6">
-              Chat with your surveys and get insights in real-time.
+              One place for analytics, recruitment, survey creation/edits, and reports.
               </p>
               
               {/* Action Buttons */}
@@ -200,6 +201,15 @@ export default function FrontLanding() {
                   <span className="text-muted-foreground">or</span>
                   <Button 
                     size="lg" 
+                    variant="outline"
+                    className="px-8 py-3 text-lg font-medium"
+                    onClick={() => router.push("/login")}
+                  >
+                    Login
+                  </Button>
+                  <span className="text-muted-foreground">or</span>
+                  <Button 
+                    size="lg" 
                     className="px-8 py-3 text-lg font-medium"
                     onClick={handleSignUp}
                   >
@@ -213,6 +223,7 @@ export default function FrontLanding() {
               
 
             </div>
+          </div>
           </section>
 
            {/* Final CTA */}
@@ -232,7 +243,8 @@ export default function FrontLanding() {
           {/* </section> */}
 
           {/* Feature Grid */}
-          <section className="mt-16 max-w-6xl mx-auto">
+          <section className="py-16">
+          <div className="max-w-6xl mx-auto">
             <h3 className="text-4xl font-bold text-center mb-2">Simple, powerful and free</h3>
             <p className="text-muted-foreground text-center mb-12 text-lg">
               Ask what you want to know about your survey and Antelope will answer you. No need to read long reports to get the insights.
@@ -340,6 +352,7 @@ export default function FrontLanding() {
                 </div>
               </div>
             </div>
+          </div>
           </section>
 
         
@@ -383,6 +396,35 @@ export default function FrontLanding() {
               <li className="text-muted-foreground">Exportable charts ready for decks, reports, and stakeholders.</li>
             </ul>
           </section> */}
+
+          {/* Final CTA Section */}
+          <section className="py-16">
+          <div className="max-w-5xl mx-auto">
+            <Card className="relative overflow-hidden border-2 border-border shadow-xl">
+              {/* Black border effect */}
+              <div className="absolute top-0 left-0 right-0 h-1 bg-foreground" />
+              
+              <CardContent className="p-12 text-center space-y-6">
+                <h2 className="text-4xl font-bold text-card-foreground">
+                  See Antelope in action
+                </h2>
+                <p className="text-lg text-muted-foreground max-w-3xl mx-auto leading-relaxed">
+                  Watch how Antelope can automate your survey data workflow—from importing responses to generating insights through AI-powered chat and advanced analytics.
+                </p>
+                
+                <div className="flex items-center justify-center gap-4 pt-4">
+                  <Button 
+                    size="lg" 
+                    className="px-8 py-6 text-lg font-medium bg-primary hover:bg-primary/90"
+                    onClick={() => window.open('https://www.youtube.com/watch?v=Dgr7KQ__i1k', '_blank')}
+                  >
+                    Watch Demo
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+          </section>
 
           
 

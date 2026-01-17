@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { toast } from "@/components/ui/sonner";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { validateEmail } from "@/app/utils/validation";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,6 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2 } from "lucide-react";
 import { signIn } from "next-auth/react";
-import { useSession } from "next-auth/react";
 
 const LoginPage = () => {
     const [formData, setFormData] = useState<{ email: string; password: string }>({
@@ -19,18 +18,8 @@ const LoginPage = () => {
     });
     const [isLoading, setIsLoading] = useState(false);
     const [isResetting, setIsResetting] = useState(false);
-    const { data: session, status } = useSession();
 
     const router = useRouter();
-
-    // Redirect if already authenticated and session is loaded
-    useEffect(() => {
-        console.log('Login page useEffect - status:', status, 'session:', !!session);
-        if (status === "authenticated" && session) {
-            console.log('Redirecting to surveys from login page');
-            router.push("/surveys");
-        }
-    }, [status, session, router]);
 
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
