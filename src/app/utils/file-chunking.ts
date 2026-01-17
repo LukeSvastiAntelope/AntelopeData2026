@@ -78,8 +78,9 @@ export class FileChunker {
     const avgBytesPerLine = sampleSize / lines.length;
     const estimatedRows = Math.floor(file.size / avgBytesPerLine);
     
-    // Determine if chunking is needed (files > 2MB or > 5000 rows)
-    const needsChunking = file.size > 2 * 1024 * 1024 || estimatedRows > 5000;
+    // Determine if chunking is needed (files > 1MB or > 5000 rows)
+    // Lowered threshold to avoid 413 errors on servers with 1MB body limits
+    const needsChunking = file.size > 1 * 1024 * 1024 || estimatedRows > 5000;
     
     // Calculate optimal chunk size based on estimated rows
     let recommendedChunkSize = this.DEFAULT_CHUNK_SIZE;

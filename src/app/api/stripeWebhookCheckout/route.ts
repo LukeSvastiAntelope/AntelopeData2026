@@ -5,17 +5,26 @@ import { UserRepo } from "@/app/utils/database/user-repo";
 type METADATA = {
     userId: string;
 };
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+
+function getStripeClient() {
+    const key = process.env.STRIPE_SECRET_KEY;
+    if (!key) throw new Error('STRIPE_SECRET_KEY is missing');
+    return new Stripe(key);
+}
+
 const credit_balance = Number(process.env.CREDIT_BALANCE) || 1e6;
 
 export async function POST(request: NextRequest) {
     console.log("stripe checkout confirm");
     const body = await request.text();
-    const endpointSecret = process.env.STRIPE_SECRET_WEBHOOK_KEY!;
+    const endpointSecret = process.env.STRIPE_SECRET_WEBHOOK_KEY;
+    if (!endpointSecret) {
+        return new Response('Webhook not configured', { status: 503 });
+    }
     const sig = request.headers.get('stripe-signature') as string;
     let event: Stripe.Event;
     try {
-        event = stripe.webhooks.constructEvent(body, sig, endpointSecret);
+        event = getStripeClient().webhooks.constructEvent(body, sig, endpointSecret);
     } catch (err) {
         return new Response(`Webhook Error: ${err}`, {
             status: 400

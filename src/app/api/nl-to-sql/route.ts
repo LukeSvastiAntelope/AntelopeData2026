@@ -3,9 +3,13 @@ import OpenAI from 'openai';
 import { openSql } from '@/app/utils/database/db';
 import { RowDataPacket } from 'mysql2/promise';
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+export const dynamic = 'force-dynamic';
+
+function getOpenAIClient() {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) throw new Error('OPENAI_API_KEY is missing');
+  return new OpenAI({ apiKey });
+}
 
 // Basic safeguard to ensure no destructive SQL commands
 function isSafeQuery(sql: string): boolean {
@@ -84,7 +88,7 @@ export async function POST(req: NextRequest) {
 
     const userPrompt = `Natural Language Query:\n"${query}"\n\nSQL:`;
 
-    const completion = await openai.chat.completions.create({
+    const completion = await getOpenAIClient().chat.completions.create({
       model: "gpt-3.5-turbo",
       messages: [
         { role: 'system', content: systemPrompt },

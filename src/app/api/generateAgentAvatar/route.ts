@@ -2,10 +2,11 @@ import { NextRequest } from "next/server";
 import OpenAI from "openai";
 import { downloadAndSaveImage } from "@/app/utils/imageUtils";
 
-// Initialize OpenAI using the same pattern as other OpenAI routes
-const openaiClient = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY!,
-});
+function getOpenAIClient() {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) throw new Error("OPENAI_API_KEY is missing");
+  return new OpenAI({ apiKey });
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -24,7 +25,7 @@ export async function POST(req: NextRequest) {
     
     try {
       // Generate image using DALL-E
-      const response = await openaiClient.images.generate({
+      const response = await getOpenAIClient().images.generate({
         model: "dall-e-3", // Use DALL-E 3 for higher quality
         prompt: prompt,
         n: 1,
