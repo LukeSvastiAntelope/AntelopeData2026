@@ -13,8 +13,9 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
   SidebarGroup,
+  SidebarGroupLabel,
   SidebarGroupContent,
-  SidebarGroupLabel
+  SidebarSeparator
 } from "@/components/ui/sidebar"
 import { useAgent } from "@/app/context/AgentContext"
 import { MinimalThemeToggle } from "@/components/theme-toggle"
@@ -98,7 +99,23 @@ export function AppSidebar({ className, collapsible = "offcanvas", ...props }: S
     }
   ]
 
+  // Resources section - accessible both logged in and logged out
   const resourceNavItems = [
+    {
+      title: "Pricing",
+      href: "/pricing",
+      icon: DollarSign
+    },
+    {
+      title: "Blog",
+      href: "/blog",
+      icon: BookOpen
+    },
+    {
+      title: "Our Clients",
+      href: "/clients",
+      icon: Users
+    },
     {
       title: "About Us",
       href: "/about",
@@ -146,48 +163,59 @@ export function AppSidebar({ className, collapsible = "offcanvas", ...props }: S
             className="flex items-center gap-2 w-full px-4 py-2 text-sm font-medium rounded-md bg-foreground text-background border border-border hover:bg-foreground/90 transition-colors"
           >
             <MessageCircle className="h-4 w-4 group-data-[collapsible=offcanvas]:hidden text-background" />
-            <span className="group-data-[collapsible=offcanvas]:hidden text-background">DataChat(™)</span>
+            <span className="group-data-[collapsible=offcanvas]:hidden text-background">Chat</span>
           </Link>
         </div>
       </SidebarHeader>
       
-      <SidebarContent className="flex flex-col gap-2">
-        <SidebarMenu className="px-4">
-          {mainNavItems.map((item) => (
-            <SidebarMenuItem key={item.href}>
-              <SidebarMenuButton
-                asChild
-                isActive={pathname === item.href || pathname.startsWith(`${item.href}/`)}
-                tooltip={item.title}
-              >
-                <Link href={item.href} className="flex items-center gap-2 px-4 py-2 text-sidebar-foreground">
-                  <item.icon className="h-4 w-4 group-data-[collapsible=offcanvas]:hidden" />
-                  <span>{item.title}</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          ))}
-        </SidebarMenu>
-        
-        {secondaryNavItems.length > 0 && (
-          <SidebarMenu className="px-4">
-            {secondaryNavItems.map((item) => (
-              <SidebarMenuItem key={item.href}>
-                <SidebarMenuButton
-                  asChild
-                  isActive={pathname === item.href}
-                  tooltip={item.title}
-                >
-                  <Link href={item.href} className="flex items-center gap-2 px-4 py-2 text-sidebar-foreground">
-                    <item.icon className="h-4 w-4 group-data-[collapsible=offcanvas]:hidden" />
-                    <span>{item.title}</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            ))}
-          </SidebarMenu>
-        )}
+      <SidebarContent className="flex flex-col gap-4">
+        {/* Platform Section */}
+        <SidebarGroup className="px-4">
+          <SidebarGroupLabel>Platform</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {platformNavItems.map((item) => (
+                <SidebarMenuItem key={item.href}>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={pathname === item.href || pathname.startsWith(`${item.href}/`)}
+                    tooltip={item.title}
+                  >
+                    <Link href={item.href} className="flex items-center gap-2 px-4 py-2 text-sidebar-foreground">
+                      <item.icon className="h-4 w-4 text-sidebar-foreground group-data-[collapsible=offcanvas]:hidden" />
+                      <span className="text-sidebar-foreground">{item.title}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
 
+        {/* Workspace Section */}
+        <SidebarGroup className="px-4">
+          <SidebarGroupLabel>Workspace</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {workspaceNavItems.map((item) => (
+                <SidebarMenuItem key={item.href}>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={pathname === item.href}
+                    tooltip={item.title}
+                  >
+                    <Link href={item.href} className="flex items-center gap-2 px-4 py-2 text-sidebar-foreground">
+                      <item.icon className="h-4 w-4 text-sidebar-foreground group-data-[collapsible=offcanvas]:hidden" />
+                      <span className="text-sidebar-foreground">{item.title}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        {/* Resources Section */}
         <SidebarGroup className="px-4">
           <SidebarGroupLabel>Resources</SidebarGroupLabel>
           <SidebarGroupContent>
@@ -263,6 +291,12 @@ export function AppSidebar({ className, collapsible = "offcanvas", ...props }: S
                         <Link href="/profile" className="flex items-center gap-2">
                           <CircleUser className="size-4" />
                           Profile
+                        </Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem asChild>
+                        <Link href="/register" className="flex items-center gap-2">
+                          <CircleUser className="size-4" />
+                          Sign up
                         </Link>
                       </DropdownMenuItem>
                       <DropdownMenuItem asChild>
