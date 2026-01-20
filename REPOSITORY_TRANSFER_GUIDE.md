@@ -36,15 +36,27 @@ This method creates a complete copy in the new organization while keeping the or
 
 ### Step 2: Clone and Push (Mirror Method)
 
+**Note**: For private repositories, you'll need to authenticate. GitHub will prompt for credentials when using HTTPS, or you can use SSH URLs if you have SSH keys configured (e.g., `git@github.com:firstprinciplecode/marketmaker.git`).
+
 ```bash
 # Clone the original repository as a bare repository (includes all branches and tags)
 git clone --bare https://github.com/firstprinciplecode/marketmaker.git
 cd marketmaker.git
 
 # Push everything to the new repository (mirror push)
+# You'll be prompted for authentication if needed
 git push --mirror https://github.com/antelopehq/marketmaker.git
 
 # Clean up the temporary bare repository
+cd ..
+rm -rf marketmaker.git
+```
+
+**Alternative using SSH** (if you have SSH keys set up):
+```bash
+git clone --bare git@github.com:firstprinciplecode/marketmaker.git
+cd marketmaker.git
+git push --mirror git@github.com:antelopehq/marketmaker.git
 cd ..
 rm -rf marketmaker.git
 ```
