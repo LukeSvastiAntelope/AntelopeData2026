@@ -95,7 +95,7 @@ Update any external services that reference the repository URL:
 
 1. **Digital Ocean Deployment**: 
    - SSH into your droplet
-   - Navigate to your deployment directory (default: `/home/appuser/marketmaker`)
+   - Navigate to your deployment directory (default: `/home/appuser/marketmaker` - adapt this to your actual deployment path)
    - Update git remote: `git remote set-url origin https://github.com/antelopehq/marketmaker.git`
    - Verify: `git remote -v`
 
@@ -162,6 +162,6 @@ If you encounter any issues during the transfer:
 
 ---
 
-**Transfer completed on**: _(Fill in date when completed)_  
-**Transferred by**: _(Fill in username)_  
-**Verified by**: _(Fill in username)_
+**Transfer completed on**: _(e.g., 2026-01-20)_  
+**Transferred by**: _(e.g., @username)_  
+**Verified by**: _(e.g., @username)_
