@@ -49,7 +49,7 @@ origin  https://github.com/antelopehq/marketmaker.git (push)
 
 1. Navigate to the new repository: https://github.com/antelopehq/marketmaker
 2. Go to **Settings** → **Secrets and variables** → **Actions**
-3. Verify all required secrets are present:
+3. Verify all required secrets are present (both JWT secrets are used by the application):
    - `JWT_SECRET`
    - `JWT_SECRET_KEY`
    - `OPENAI_API_KEY`
@@ -95,8 +95,9 @@ Update any external services that reference the repository URL:
 
 1. **Digital Ocean Deployment**: 
    - SSH into your droplet
-   - Navigate to `/home/appuser/marketmaker`
+   - Navigate to your deployment directory (default: `/home/appuser/marketmaker`)
    - Update git remote: `git remote set-url origin https://github.com/antelopehq/marketmaker.git`
+   - Verify: `git remote -v`
 
 2. **Webhooks**: Check and update any webhooks that might have the old URL
 
