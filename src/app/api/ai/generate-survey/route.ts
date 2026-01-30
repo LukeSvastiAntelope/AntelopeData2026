@@ -243,6 +243,7 @@ function getOpenAiSurveyJsonSchema(mode?: string) {
 
 // POST /api/ai/generate-survey - Generate survey using AI
 export async function POST(req: NextRequest) {
+    console.log('Generating survey using AI...');
     const requestId = getRequestId();
     try {
         const userId = req.headers.get('x-user-id');
@@ -297,9 +298,9 @@ export async function POST(req: NextRequest) {
             const providerTimeoutMs = isProd ? 30000 : 240000;
             aiClient = new OpenAI({
                 apiKey: process.env.OPENAI_API_KEY,
-                // Production deployments (serverless) may have strict execution limits; fail fast and let the UI retry/switch models.
                 timeout: providerTimeoutMs,
-                maxRetries: 0,
+                // Allow 2 retries for transient network/timeout errors
+                maxRetries: 2,
             });
             console.log('[gen-survey] Using OpenAI', { requestId, model: modelConfig.model, timeoutMs: providerTimeoutMs });
         } else if (modelConfig.type === "deepseek") {
@@ -313,7 +314,7 @@ export async function POST(req: NextRequest) {
                 apiKey: process.env.DEEPSEEK_API_KEY,
                 baseURL: 'https://api.deepseek.com',
                 timeout: providerTimeoutMs,
-                maxRetries: 0,
+                maxRetries: 2,
             });
             console.log('[gen-survey] Using DeepSeek', { requestId, model: modelConfig.model, timeoutMs: providerTimeoutMs });
         } else if (modelConfig.type === "gemini") {
@@ -327,7 +328,7 @@ export async function POST(req: NextRequest) {
                 apiKey: process.env.GEMINI_API_KEY,
                 baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai/',
                 timeout: providerTimeoutMs,
-                maxRetries: 0,
+                maxRetries: 2,
             });
             console.log('[gen-survey] Using Gemini', { requestId, model: modelConfig.model, timeoutMs: providerTimeoutMs });
         } else if (modelConfig.type === "anthropic") {
@@ -479,7 +480,8 @@ Guidelines:
             });
             
             // Retry wrapper for transient errors (DNS, timeouts, rate limits)
-            const maxAttempts = 3;
+            // Increased to 5 attempts with exponential backoff for better resilience
+            const maxAttempts = 5;
             let lastError: any = null;
             for (let attempt = 1; attempt <= maxAttempts; attempt++) {
                 try {
@@ -611,7 +613,10 @@ Guidelines:
                         message: err?.message
                     });
                     if (attempt < maxAttempts && isTransient) {
-                        const delayMs = 500 * Math.pow(2, attempt - 1);
+                        // Exponential backoff: 1s, 2s, 4s, 8s for rate limits and transient errors
+                        const baseDelay = status === 429 ? 2000 : 1000;
+                        const delayMs = baseDelay * Math.pow(2, attempt - 1);
+                        console.log(`[gen-survey] Retrying after ${delayMs}ms (attempt ${attempt}/${maxAttempts})`);
                         await new Promise(res => setTimeout(res, delayMs));
                         continue;
                     }
