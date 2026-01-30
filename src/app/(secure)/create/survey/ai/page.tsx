@@ -237,7 +237,9 @@ const AISurveyBuilderPage = () => {
       const controller = new AbortController()
       // Allow enough time for backend processing (backend timeout is 30s in production)
       const timeoutMs = process.env.NODE_ENV === 'production' ? 35000 : 60000
-      const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs)
+      const timeoutId = window.setTimeout(() => {
+        controller.abort(new Error(`Request timeout after ${timeoutMs / 1000} seconds`))
+      }, timeoutMs)
       const token = localStorage.getItem('token')
       const headers: Record<string, string> = { 'Content-Type': 'application/json' }
       // Avoid sending `Authorization: Bearer null` in production (we primarily auth via NextAuth cookies).
@@ -252,6 +254,18 @@ const AISurveyBuilderPage = () => {
 
       if (response.ok) {
         const data = await response.json()
+        
+        // Handle edge case where reasoning models return empty content
+        if (data.status && !data.survey && data.surveyRaw !== undefined) {
+          setError(
+            '⚠️ AI model returned empty or unparseable content.\n\n' +
+            'This can happen with reasoning models. Please:\n' +
+            '• Try again with the same prompt\n' +
+            '• Switch to gpt-4o or gpt-4o-mini\n' +
+            '• Make your prompt more specific'
+          )
+          return
+        }
         
         // Validate the response
         const validation = validateSurveyResponse(data)
