@@ -235,8 +235,8 @@ const AISurveyBuilderPage = () => {
 
     try {
       const controller = new AbortController()
-      // Keep UI responsive; production serverless often times out around ~10s.
-      const timeoutMs = process.env.NODE_ENV === 'production' ? 15000 : 60000
+      // Allow enough time for backend processing (backend timeout is 30s in production)
+      const timeoutMs = process.env.NODE_ENV === 'production' ? 35000 : 60000
       const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs)
       const token = localStorage.getItem('token')
       const headers: Record<string, string> = { 'Content-Type': 'application/json' }
@@ -309,17 +309,36 @@ const AISurveyBuilderPage = () => {
         }
       } else {
         const errorData = await response.json()
-        setError(errorData.message || 'Failed to generate survey. Please try again with a more detailed prompt.')
+        
+        // Distinguish between provider issues and validation issues
+        if (response.status === 429) {
+          setError('⚠️ Rate limit reached. The AI service is temporarily limiting requests.\n\nPlease wait 30 seconds and try again, or switch to a different model.')
+        } else if (response.status === 503 || response.status === 504) {
+          setError('⚠️ AI service temporarily unavailable or timed out.\n\nThis usually resolves quickly. Please:\n• Wait a moment and try again\n• Or switch to gpt-4o-mini for faster responses')
+        } else if (response.status >= 500) {
+          setError('⚠️ AI service error. The provider is experiencing issues.\n\nPlease try again in a few moments.')
+        } else {
+          setError(errorData.message || 'Failed to generate survey. Please try again with a more detailed prompt.')
+        }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error generating survey:', error)
-      setError(
-        'Failed to generate survey. This could be due to:\n' +
-        '• Network connection issues\n' +
-        '• AI service temporarily unavailable\n' +
-        '• Prompt being too vague or complex\n\n' +
-        'Please try again with a clear, specific prompt.'
-      )
+      
+      // Check if it's an abort/timeout error
+      if (error.name === 'AbortError') {
+        setError(
+          '⏱️ Request timed out after 35 seconds.\n\n' +
+          'The AI is taking longer than expected. Please:\n' +
+          '• Try again (it may work on retry)\n' +
+          '• Switch to gpt-4o-mini for faster generation\n' +
+          '• Simplify your prompt slightly'
+        )
+      } else {
+        setError(
+          '❌ Network or connection error.\n\n' +
+          'Please check your internet connection and try again.'
+        )
+      }
     } finally {
       setIsGenerating(false)
     }
