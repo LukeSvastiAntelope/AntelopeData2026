@@ -116,8 +116,8 @@ export default function OnboardingEmptyState({
     },
     {
       icon: Users,
-      title: 'Digital Twins',
-      description: 'Create synthetic personas from real survey responses'
+      title: 'Voter Profiles',
+      description: 'Create synthetic voter personas from real poll responses'
     },
     {
       icon: BarChart3,
@@ -144,11 +144,11 @@ export default function OnboardingEmptyState({
           </div>
           <div className="flex items-center justify-center gap-2 mb-2">
             <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
-              Welcome to Antelope
+              Welcome to Antelope Politico
             </h1>
           </div>
           <p className="text-xl text-muted-foreground max-w-2xl">
-            Turn your surveys into conversational insights. Chat with your data, create digital twins, and discover patterns you never knew existed.
+            Turn your polls into campaign intelligence. Chat with your voter data, create synthetic voter profiles, and discover insights you never knew existed.
           </p>
         </div>
 

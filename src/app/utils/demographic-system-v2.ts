@@ -13,9 +13,20 @@ export type DemographicField =
   | 'ethnicity'
   | 'marital_status'
   | 'household_size'
-  | 'phone_number';
+  | 'phone_number'
+  // Political-specific fields
+  | 'party_affiliation'
+  | 'voter_registration_status'
+  | 'voting_frequency'
+  | 'primary_participation'
+  | 'congressional_district'
+  | 'state'
+  | 'county'
+  | 'ideology_spectrum'
+  | 'issue_priorities'
+  | 'news_sources';
 
-export type AnonymityLevel = 'full' | 'semi_anonymous' | 'anonymous';
+export type AnonymityLevel = 'full' | 'semi_anonymous' | 'anonymous' | 'political';
 
 export interface DemographicFieldConfig {
   field: DemographicField;
@@ -28,7 +39,7 @@ export interface DemographicFieldConfig {
     max?: number;
     pattern?: string;
   };
-  category: 'personal' | 'professional' | 'social' | 'contact';
+  category: 'personal' | 'professional' | 'social' | 'contact' | 'political';
   sensitivityLevel: 'low' | 'medium' | 'high'; // For privacy recommendations
 }
 
@@ -205,6 +216,123 @@ export const DEMOGRAPHIC_FIELDS: Record<DemographicField, DemographicFieldConfig
     validation: { pattern: '^[+]?[0-9\s\-\(\)]+$' },
     category: 'contact',
     sensitivityLevel: 'high'
+  },
+
+  // =========================================================================
+  // POLITICAL DEMOGRAPHIC FIELDS
+  // =========================================================================
+  party_affiliation: {
+    field: 'party_affiliation',
+    label: 'Party Affiliation',
+    type: 'select',
+    required: false,
+    options: ['Democrat', 'Republican', 'Independent', 'Libertarian', 'Green', 'Other', 'Prefer not to say'],
+    category: 'political',
+    sensitivityLevel: 'medium'
+  },
+  voter_registration_status: {
+    field: 'voter_registration_status',
+    label: 'Voter Registration Status',
+    type: 'select',
+    required: false,
+    options: ['Registered', 'Not registered', 'Unsure'],
+    category: 'political',
+    sensitivityLevel: 'medium'
+  },
+  voting_frequency: {
+    field: 'voting_frequency',
+    label: 'Voting Frequency',
+    type: 'select',
+    required: false,
+    options: ['Every election', 'Most elections', 'Occasionally', 'Rarely', 'Never voted'],
+    category: 'political',
+    sensitivityLevel: 'low'
+  },
+  primary_participation: {
+    field: 'primary_participation',
+    label: 'Primary Election Participation',
+    type: 'select',
+    required: false,
+    options: ['Always', 'Sometimes', 'Never'],
+    category: 'political',
+    sensitivityLevel: 'low'
+  },
+  congressional_district: {
+    field: 'congressional_district',
+    label: 'Congressional District',
+    type: 'text',
+    required: false,
+    category: 'political',
+    sensitivityLevel: 'low'
+  },
+  state: {
+    field: 'state',
+    label: 'State',
+    type: 'select',
+    required: false,
+    options: [
+      'Alabama', 'Alaska', 'Arizona', 'Arkansas', 'California', 'Colorado', 'Connecticut',
+      'Delaware', 'Florida', 'Georgia', 'Hawaii', 'Idaho', 'Illinois', 'Indiana', 'Iowa',
+      'Kansas', 'Kentucky', 'Louisiana', 'Maine', 'Maryland', 'Massachusetts', 'Michigan',
+      'Minnesota', 'Mississippi', 'Missouri', 'Montana', 'Nebraska', 'Nevada', 'New Hampshire',
+      'New Jersey', 'New Mexico', 'New York', 'North Carolina', 'North Dakota', 'Ohio',
+      'Oklahoma', 'Oregon', 'Pennsylvania', 'Rhode Island', 'South Carolina', 'South Dakota',
+      'Tennessee', 'Texas', 'Utah', 'Vermont', 'Virginia', 'Washington', 'West Virginia',
+      'Wisconsin', 'Wyoming', 'District of Columbia'
+    ],
+    category: 'political',
+    sensitivityLevel: 'low'
+  },
+  county: {
+    field: 'county',
+    label: 'County',
+    type: 'text',
+    required: false,
+    category: 'political',
+    sensitivityLevel: 'low'
+  },
+  ideology_spectrum: {
+    field: 'ideology_spectrum',
+    label: 'Political Ideology',
+    type: 'select',
+    required: false,
+    options: [
+      'Very Progressive', 'Progressive', 'Lean Progressive',
+      'Moderate',
+      'Lean Conservative', 'Conservative', 'Very Conservative'
+    ],
+    category: 'political',
+    sensitivityLevel: 'medium'
+  },
+  issue_priorities: {
+    field: 'issue_priorities',
+    label: 'Top Issue Priorities',
+    type: 'multi-select',
+    required: false,
+    options: [
+      'Economy & Jobs', 'Healthcare', 'Immigration', 'Education', 'Climate & Environment',
+      'National Security', 'Crime & Public Safety', 'Taxes & Government Spending',
+      'Abortion & Reproductive Rights', 'Gun Policy', 'Voting Rights & Democracy',
+      'Housing & Cost of Living', 'Social Security & Medicare', 'Foreign Policy',
+      'Civil Rights & Racial Justice', 'Technology & Privacy'
+    ],
+    category: 'political',
+    sensitivityLevel: 'low'
+  },
+  news_sources: {
+    field: 'news_sources',
+    label: 'Primary News Sources',
+    type: 'multi-select',
+    required: false,
+    options: [
+      'CNN', 'Fox News', 'MSNBC', 'NPR', 'ABC News', 'CBS News', 'NBC News',
+      'The New York Times', 'The Washington Post', 'The Wall Street Journal',
+      'AP News / Reuters', 'Local newspapers', 'Local TV news',
+      'Social media (Facebook, X, TikTok)', 'Podcasts', 'Other online sources',
+      'None / I don\'t follow news'
+    ],
+    category: 'political',
+    sensitivityLevel: 'low'
   }
 };
 
@@ -256,9 +384,35 @@ export const ANONYMITY_LEVELS: Record<AnonymityLevel, AnonymityLevelConfig> = {
     excludedFields: [
       'name', 'email', 'age', 'gender', 'location', 'occupation', 
       'education', 'income', 'political_views', 'interests', 'social_media',
-      'ethnicity', 'marital_status', 'household_size', 'phone_number'
+      'ethnicity', 'marital_status', 'household_size', 'phone_number',
+      'party_affiliation', 'voter_registration_status', 'voting_frequency',
+      'primary_participation', 'congressional_district', 'state', 'county',
+      'ideology_spectrum', 'issue_priorities', 'news_sources'
     ],
     queryCompatible: false
+  },
+
+  political: {
+    level: 'political',
+    title: 'Political Survey',
+    description: 'Political demographics without personal identification — optimized for voter research',
+    privacyNote: 'No personally identifiable information (name, email, phone) will be collected. Only political demographics, geographic, and opinion data will be stored to enable voter profile analysis.',
+    requiredFields: ['state', 'party_affiliation'],
+    availableFields: [
+      'age', 'gender', 'state', 'county', 'congressional_district',
+      'education', 'income', 'ethnicity',
+      'party_affiliation', 'voter_registration_status', 'voting_frequency',
+      'primary_participation', 'ideology_spectrum', 'issue_priorities',
+      'news_sources', 'political_views', 'marital_status', 'household_size',
+      'occupation'
+    ],
+    recommendedFields: [
+      'age', 'gender', 'state', 'party_affiliation', 'voter_registration_status',
+      'voting_frequency', 'ideology_spectrum', 'issue_priorities'
+    ],
+    excludedFields: ['name', 'email', 'phone_number', 'social_media'],
+    maxFields: 15,
+    queryCompatible: true
   }
 };
 

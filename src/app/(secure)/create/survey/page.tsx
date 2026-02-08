@@ -37,6 +37,7 @@ import {
   getPrivacyNotice,
   getRecommendedAnonymityLevel 
 } from '@/app/utils/anonymity-config'
+import { POLITICAL_SURVEY_TEMPLATES, SurveyTemplate } from '@/app/utils/political-survey-templates'
 
 interface SurveyQuestion {
   id: string
@@ -76,6 +77,29 @@ const CreateSurveyPage = () => {
   })
   const [isLoading, setIsLoading] = useState(false)
   const [showPreview, setShowPreview] = useState(false)
+  const [showTemplates, setShowTemplates] = useState(true)
+
+  const loadTemplate = (template: SurveyTemplate) => {
+    const questions: SurveyQuestion[] = template.questions.map((q, idx) => ({
+      id: `q_${Date.now()}_${idx}`,
+      type: q.type,
+      prompt: q.prompt,
+      options: q.options || [],
+      isRequired: q.isRequired,
+      order: idx + 1
+    }))
+    
+    setSurvey(prev => ({
+      ...prev,
+      title: template.title,
+      description: template.description,
+      anonymityLevel: template.recommendedAnonymityLevel as AnonymityLevel,
+      demographicsRequired: true,
+      questions
+    }))
+    setShowTemplates(false)
+    toast.success(`Loaded "${template.title}" template with ${questions.length} questions`)
+  }
   const [coverMedia, setCoverMedia] = useState<{url:string; alt:string} | null>({ url: '/assets/images/placeholder-survey.svg', alt: 'Placeholder cover' })
   const [presentationMode, setPresentationMode] = useState<'all_at_once'|'one_by_one'|'sections'>('all_at_once')
   const [sections, setSections] = useState<Array<{ id: string; title: string }>>([])
@@ -234,6 +258,45 @@ const CreateSurveyPage = () => {
         <div className="p-6">
           {!showPreview ? (
             <>
+              {/* Political Survey Templates */}
+              {showTemplates && survey.questions.length === 0 && (
+                <Card className="mb-6">
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Wand2 className="h-5 w-5 text-primary" />
+                        <CardTitle>Start from a Template</CardTitle>
+                      </div>
+                      <Button variant="ghost" size="sm" onClick={() => setShowTemplates(false)}>
+                        Skip — start blank
+                      </Button>
+                    </div>
+                    <CardDescription>
+                      Choose a pre-built political survey template to get started quickly, or create your own from scratch.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {POLITICAL_SURVEY_TEMPLATES.map((template) => (
+                        <div
+                          key={template.id}
+                          className="border rounded-lg p-4 cursor-pointer hover:border-primary hover:bg-muted/50 transition-colors"
+                          onClick={() => loadTemplate(template)}
+                        >
+                          <div className="flex items-center gap-2 mb-2">
+                            <Badge variant="outline" className="text-xs capitalize">{template.category}</Badge>
+                            <span className="text-xs text-muted-foreground">{template.estimatedTime}</span>
+                          </div>
+                          <h4 className="font-semibold text-sm mb-1">{template.title}</h4>
+                          <p className="text-xs text-muted-foreground line-clamp-2">{template.description}</p>
+                          <p className="text-xs text-muted-foreground mt-2">{template.questions.length} questions</p>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
               {/* Survey Settings */}
               <Card className="mb-6">
                 <CardHeader>
@@ -242,7 +305,7 @@ const CreateSurveyPage = () => {
                     <CardTitle>Survey Settings</CardTitle>
                   </div>
                   <CardDescription>
-                    Configure your survey details and digital twin generation
+                    Configure your poll details and voter profile generation
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">

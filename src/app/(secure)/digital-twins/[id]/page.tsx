@@ -153,7 +153,7 @@ export default function DigitalTwinDetailPage() {
               <Breadcrumb>
                 <BreadcrumbList>
                   <BreadcrumbItem>
-                    <BreadcrumbLink href="/digital-twins">Digital Twins</BreadcrumbLink>
+                    <BreadcrumbLink href="/digital-twins">Voter Profiles</BreadcrumbLink>
                   </BreadcrumbItem>
                   <BreadcrumbSeparator />
                   <BreadcrumbItem>
@@ -167,7 +167,7 @@ export default function DigitalTwinDetailPage() {
           <div className="p-4 flex items-center justify-center">
             <div className="flex items-center gap-2">
               <Loader2 className="h-4 w-4 animate-spin" />
-              <span className="text-muted-foreground">Loading digital twin...</span>
+              <span className="text-muted-foreground">Loading voter profile...</span>
             </div>
           </div>
         </div>
@@ -186,7 +186,7 @@ export default function DigitalTwinDetailPage() {
               <Breadcrumb>
                 <BreadcrumbList>
                   <BreadcrumbItem>
-                    <BreadcrumbLink href="/digital-twins">Digital Twins</BreadcrumbLink>
+                    <BreadcrumbLink href="/digital-twins">Voter Profiles</BreadcrumbLink>
                   </BreadcrumbItem>
                   <BreadcrumbSeparator />
                   <BreadcrumbItem>
@@ -205,7 +205,7 @@ export default function DigitalTwinDetailPage() {
                 </p>
                 <Button onClick={() => router.push('/digital-twins')} className="w-full">
                   <ArrowLeft className="mr-2 h-4 w-4" />
-                  Back to Digital Twins
+                  Back to Voter Profiles
                 </Button>
               </CardContent>
             </Card>
@@ -228,7 +228,7 @@ export default function DigitalTwinDetailPage() {
             <Breadcrumb>
               <BreadcrumbList>
                 <BreadcrumbItem>
-                  <BreadcrumbLink href="/digital-twins">Digital Twins</BreadcrumbLink>
+                  <BreadcrumbLink href="/digital-twins">Voter Profiles</BreadcrumbLink>
                 </BreadcrumbItem>
                 <BreadcrumbSeparator />
                 <BreadcrumbItem>
@@ -389,7 +389,7 @@ export default function DigitalTwinDetailPage() {
                 Surveys Taken
               </CardTitle>
               <p className="text-sm text-muted-foreground">
-                Surveys this digital twin has participated in
+                Polls this voter profile has participated in
               </p>
             </CardHeader>
             <CardContent>
@@ -447,7 +447,7 @@ export default function DigitalTwinDetailPage() {
           <Card className="bg-muted/20">
             <CardContent className="p-4">
               <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Digital Twin Token:</span>
+                <span className="text-muted-foreground">Voter Profile Token:</span>
                 <Badge variant="secondary" className="font-mono text-xs">
                   {twin.agentToken.slice(0, 8)}...{twin.agentToken.slice(-8)}
                 </Badge>

@@ -190,7 +190,7 @@ const DigitalTwinsPage = () => {
           <div className="flex items-center">
             <SidebarTrigger className="-ml-0.5 h-5 w-5 text-muted-foreground hover:text-foreground" />
             <div className="h-4 border-l border-border mx-4" />
-            <h1 className="text-base font-medium text-card-foreground">Digital Twins</h1>
+            <h1 className="text-base font-medium text-card-foreground">Voter Profiles</h1>
           </div>
         </div>
         
@@ -201,9 +201,9 @@ const DigitalTwinsPage = () => {
           <div className="text-left space-y-2 flex">
         
             <div className="flex-col mb-4">  
-              <h2 className="text-3xl font-bold">Digital Twin Explorer</h2>
+              <h2 className="text-3xl font-bold">Voter Profile Explorer</h2>
               <p className="text-muted-foreground text-base max-w-2xl mx-auto mt-2">
-                Search and interact with digital twins created from survey responses. Each twin represents a real person&apos;s perspectives and can answer questions based on their profile.
+                Search and interact with synthetic voter profiles created from poll responses. Each profile represents a voter&apos;s perspectives and can answer questions based on their demographics and positions.
               </p>
             </div>
            
@@ -218,7 +218,7 @@ const DigitalTwinsPage = () => {
                 <Card>
                   <CardHeader className="px-6 pt-6 pb-0">
                     <CardTitle>Age Distribution</CardTitle>
-                    <CardDescription>Total twins by age cohort</CardDescription>
+                    <CardDescription>Total profiles by age cohort</CardDescription>
                   </CardHeader>
                   <CardContent className="px-0 pt-2 pb-4 sm:px-0 sm:pt-2">
                     <ChartContainer config={{ count: { color: "hsl(var(--zinc-600))" } }} className="aspect-auto h-[220px] w-full">
@@ -357,7 +357,7 @@ const DigitalTwinsPage = () => {
             {/* Twins Table */}
             <Card>
               <CardHeader>
-                <CardTitle>Digital Twins ({allTwins.length})</CardTitle>
+                <CardTitle>Voter Profiles ({allTwins.length})</CardTitle>
               </CardHeader>
               <CardContent className="overflow-x-auto">
                 <Table>
@@ -402,7 +402,7 @@ const DigitalTwinsPage = () => {
                 Ask a Question
               </CardTitle>
               <CardDescription>
-                Ask the selected digital twin a question and get a response based on their persona
+                Ask the selected voter profile a question and get a response based on their persona
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -439,12 +439,12 @@ const DigitalTwinsPage = () => {
               <Users className="h-5 w-5 text-blue-600 mt-0.5" />
               <div>
                 <h4 className="font-medium text-blue-900 dark:text-blue-100 mb-2">
-                  How Digital Twins Work
+                  How Voter Profiles Work
                 </h4>
                 <ul className="text-sm text-blue-700 dark:text-blue-300 space-y-1">
-                  <li>• Each digital twin is created from real survey responses</li>
-                  <li>• AI analyzes demographics and answers to build a persona</li>
-                  <li>• Twins can answer new questions based on their profile</li>
+                  <li>• Each voter profile is created from real poll responses</li>
+                  <li>• AI analyzes demographics and positions to build a synthetic persona</li>
+                  <li>• Profiles can answer new questions based on their political views</li>
                   <li>• All personal information is anonymized and secure</li>
                 </ul>
               </div>
