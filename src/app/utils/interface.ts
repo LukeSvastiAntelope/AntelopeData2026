@@ -461,6 +461,9 @@ export interface SurveyDB {
     end_at?: string | null;
     archived_at?: string | null;
     status: SurveyStatus;
+    // Tracking poll / wave support
+    parent_survey_id?: number | null;
+    wave_number?: number | null;
 }
 
 export interface SurveyQuestionDB {
@@ -764,4 +767,43 @@ export interface DemographicsFormConfig {
     excludedFields: string[];
     privacyNotice: string;
     consentText?: string;
+}
+
+// =====================================================================
+// ORGANIZATION / TEAM TYPES
+// =====================================================================
+
+export type OrgRole = 'owner' | 'admin' | 'analyst' | 'viewer';
+export type OrgMemberStatus = 'pending' | 'active' | 'removed';
+
+export interface OrganizationDB {
+    id: number;
+    name: string;
+    slug: string;
+    description: string | null;
+    created_by: number;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface OrganizationMemberDB {
+    id: number;
+    organization_id: number;
+    user_id: number;
+    role: OrgRole;
+    invited_by: number | null;
+    invited_at: string;
+    accepted_at: string | null;
+    status: OrgMemberStatus;
+}
+
+export interface OrganizationActivityDB {
+    id: number;
+    organization_id: number;
+    user_id: number;
+    action: string;
+    resource_type: string | null;
+    resource_id: number | null;
+    details: any;
+    created_at: string;
 }

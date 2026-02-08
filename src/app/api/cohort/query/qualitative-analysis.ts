@@ -147,9 +147,9 @@ Available survey responses with their questions:
 ${quotesForPrompt}`;
   
   // Build system message
-  const baseSystemMessage = "You are an expert analyst representing survey respondents' collective voice with deep understanding of their perspectives.";
+  const baseSystemMessage = "You are an expert political analyst representing voters' collective voice with deep understanding of their perspectives, issue priorities, and political motivations.";
   const intentSpecificMessage = getIntentSpecificSystemMessage(queryIntent.analysisType);
-  const complexityMessage = `You are providing focused qualitative analysis with rich citations and source context.`;
+  const complexityMessage = `You are providing focused qualitative political analysis with rich citations and source context. Frame insights in terms of campaign strategy implications.`;
   
   const finalSystemMessage = systemPrompt || `${baseSystemMessage} ${intentSpecificMessage} ${complexityMessage}
 

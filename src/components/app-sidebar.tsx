@@ -16,14 +16,9 @@ import {
 import { useAgent } from "@/app/context/AgentContext"
 import { MinimalThemeToggle } from "@/components/theme-toggle"
 import {
-  LayoutDashboard,
-  BarChart3,
-  LineChart,
   Users,
   LogOut,
   Info,
-  Settings,
-  Search,
   Shield,
   FileText,
   Brain,
@@ -32,6 +27,7 @@ import {
   FileBarChart,
   Code,
   CircleUser,
+  Building2,
 } from "lucide-react"
 import LogoText from "@/components/logo-text"; // Added import
 import LogoIcon from "@/components/logo-icon"; // Added import
@@ -55,28 +51,13 @@ export function AppSidebar({ className, collapsible = "offcanvas", ...props }: S
   const { agent, user } = useAgent()
 
   const mainNavItems = [
-    // {
-    //   title: "Overview",
-    //   href: "/overview",
-    //   icon: LayoutDashboard
-    // },
-    // {
-    //   title: "Markets",
-    //   href: "/markets",
-    //   icon: BarChart3
-    // },
-    // {
-    //   title: "Strategy",
-    //   href: "/strategy",
-    //   icon: LineChart
-    // },
     {
       title: "Surveys",
       href: "/surveys",
       icon: FileText
     },
     {
-      title: "Digital Twins",
+      title: "Voter Profiles",
       href: "/digital-twins",
       icon: Brain
     },
@@ -94,6 +75,11 @@ export function AppSidebar({ className, collapsible = "offcanvas", ...props }: S
       title: "Python Analysis",
       href: "/python-analysis",
       icon: Code
+    },
+    {
+      title: "Team",
+      href: "/team",
+      icon: Building2
     }
   ]
 

@@ -1,11 +1,13 @@
 "use client";
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Label } from '@/components/ui/label';
 import { Select, SelectTrigger, SelectItem, SelectContent, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { DynamicCohortBuilder } from '@/components/DynamicCohortBuilder';
+import { VOTER_SEGMENT_PRESETS, VoterSegmentPreset } from '@/app/utils/voter-segment-presets';
 import type { Cohort, CohortFilterRule } from '../types';
 
 type SurveyOption = { id: number; title: string };
@@ -111,6 +113,33 @@ export default function CohortPanel(props: CohortPanelProps) {
           </SelectContent>
         </Select>
       </div>
+
+      {/* Voter Segment Presets */}
+      {selectedSurveyId && !showCohortCreator && (
+        <div className="space-y-2">
+          <Label className="text-xs text-muted-foreground">Quick Segments</Label>
+          <div className="flex flex-wrap gap-1.5">
+            {VOTER_SEGMENT_PRESETS.slice(0, 8).map((preset) => (
+              <button
+                key={preset.id}
+                onClick={() => {
+                  const rules: CohortFilterRule[] = preset.filters.map(f => ({
+                    field: f.field,
+                    op: f.op,
+                    value: f.value,
+                  }));
+                  setFilterRules(rules);
+                  setShowCohortCreator(true);
+                }}
+                className="inline-flex items-center px-2 py-1 text-xs rounded-md border border-border hover:border-primary hover:bg-muted/50 transition-colors cursor-pointer"
+                title={preset.description}
+              >
+                {preset.name}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Dynamic Cohort Creator */}
       {showCohortCreator && selectedSurveyId && (

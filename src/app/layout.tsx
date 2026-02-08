@@ -4,7 +4,6 @@ import "./globals.css";
 import { Noto_Sans } from 'next/font/google';
 import { Toaster } from "@/components/ui/sonner";
 import { Providers } from "./components/provider/mainProvider";
-// import { SolProvider } from "./components/provider/solProvider";
 import Script from "next/script";
 import { Analytics } from '@vercel/analytics/react';
 import { ThemeProvider } from "@/components/theme-provider";
@@ -44,12 +43,10 @@ export default function RootLayout({
                 <ThemeProvider>
                     <Toaster />
                     <Providers>
-                        {/* <SolProvider> */}
-                            <main className="min-h-screen">
-                                {children}
-                            </main>
-                            <Analytics />
-                        {/* </SolProvider> */}
+                        <main className="min-h-screen">
+                            {children}
+                        </main>
+                        <Analytics />
                     </Providers>
                 </ThemeProvider>
             </body>
