@@ -77,8 +77,8 @@ export async function POST(
       );
     } else {
       await db.execute(
-        `INSERT INTO organization_members (organization_id, user_id, role, invited_by, status)
-         VALUES (?, ?, ?, ?, 'active')`,
+        `INSERT INTO organization_members (organization_id, user_id, role, invited_by, status, accepted_at)
+         VALUES (?, ?, ?, ?, 'active', NOW())`,
         [orgId, inviteeId, role, userId]
       );
     }
@@ -97,5 +97,95 @@ export async function POST(
   } catch (error) {
     console.error('Invite member error:', error);
     return NextResponse.json({ status: false, message: 'Failed to invite member' }, { status: 500 });
+  }
+}
+
+/**
+ * PATCH /api/organizations/[id]/members
+ * Update a member's role or remove them
+ * 
+ * Body: { userId: number, role?: string, action?: 'remove' }
+ */
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id: orgId } = await params;
+    const currentUserId = request.headers.get('x-user-id');
+
+    if (!currentUserId) {
+      return NextResponse.json({ status: false, message: 'Unauthorized' }, { status: 401 });
+    }
+
+    const db = await getConnection();
+
+    // Check if current user is owner or admin
+    const [membership]: any = await db.execute(
+      `SELECT role FROM organization_members WHERE organization_id = ? AND user_id = ? AND status = 'active'`,
+      [orgId, currentUserId]
+    );
+
+    if (!membership || membership.length === 0 || !['owner', 'admin'].includes(membership[0].role)) {
+      return NextResponse.json(
+        { status: false, message: 'Only owners and admins can manage members' },
+        { status: 403 }
+      );
+    }
+
+    const { userId: targetUserId, role, action } = await request.json();
+
+    if (!targetUserId) {
+      return NextResponse.json({ status: false, message: 'userId is required' }, { status: 400 });
+    }
+
+    // Prevent removing the owner
+    const [target]: any = await db.execute(
+      `SELECT role FROM organization_members WHERE organization_id = ? AND user_id = ?`,
+      [orgId, targetUserId]
+    );
+
+    if (!target || target.length === 0) {
+      return NextResponse.json({ status: false, message: 'Member not found' }, { status: 404 });
+    }
+
+    if (target[0].role === 'owner') {
+      return NextResponse.json({ status: false, message: 'Cannot modify the organization owner' }, { status: 403 });
+    }
+
+    if (action === 'remove') {
+      await db.execute(
+        `UPDATE organization_members SET status = 'removed' WHERE organization_id = ? AND user_id = ?`,
+        [orgId, targetUserId]
+      );
+
+      await db.execute(
+        `INSERT INTO organization_activity_log (organization_id, user_id, action, resource_type, resource_id, details)
+         VALUES (?, ?, 'member_removed', 'user', ?, ?)`,
+        [orgId, currentUserId, targetUserId, JSON.stringify({ previous_role: target[0].role })]
+      );
+
+      return NextResponse.json({ status: true, message: 'Member removed' });
+    }
+
+    if (role && ['admin', 'analyst', 'viewer'].includes(role)) {
+      await db.execute(
+        `UPDATE organization_members SET role = ? WHERE organization_id = ? AND user_id = ?`,
+        [role, orgId, targetUserId]
+      );
+
+      await db.execute(
+        `INSERT INTO organization_activity_log (organization_id, user_id, action, resource_type, resource_id, details)
+         VALUES (?, ?, 'member_role_changed', 'user', ?, ?)`,
+        [orgId, currentUserId, targetUserId, JSON.stringify({ from: target[0].role, to: role })]
+      );
+
+      return NextResponse.json({ status: true, message: `Role updated to ${role}` });
+    }
+
+    return NextResponse.json({ status: false, message: 'No valid action provided' }, { status: 400 });
+  } catch (error) {
+    console.error('Update member error:', error);
+    return NextResponse.json({ status: false, message: 'Failed to update member' }, { status: 500 });
   }
 }

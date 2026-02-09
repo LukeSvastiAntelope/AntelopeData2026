@@ -18,12 +18,11 @@ export async function GET(req: NextRequest) {
     
     if (includeFeatures) {
       // Get user surveys + featured examples
-      const { userSurveys, featuredSurveys, allSurveys } = await SurveyRepo.getSurveysForUser(userId);
+      const { userSurveys, featuredSurveys, orgSurveys, allSurveys } = await SurveyRepo.getSurveysForUser(userId);
       
       console.log('Found surveys for user:', userSurveys.length);
+      console.log('Found org surveys:', orgSurveys.length);
       console.log('Found featured surveys:', featuredSurveys.length);
-      console.log('User survey titles:', userSurveys.map((s: any) => s.title));
-      console.log('Featured survey titles:', featuredSurveys.map((s: any) => s.title));
       
       // Format all surveys with proper categorization
       const surveysWithFullData = allSurveys.map((s: any) => ({
@@ -39,9 +38,11 @@ export async function GET(req: NextRequest) {
         source_metadata: s.source_metadata || null,
         start_at: s.start_at,
         end_at: s.end_at,
-        survey_type: s.survey_type, // 'own' or 'featured'
+        organization_id: s.organization_id || null,
+        organization_name: s.organization_name || null,
+        survey_type: s.survey_type, // 'own', 'org', or 'featured'
         is_featured: s.survey_type === 'featured',
-        is_editable: s.survey_type === 'own' // Only user's own surveys are editable
+        is_editable: s.survey_type === 'own' || s.survey_type === 'org'
       }));
       
       return NextResponse.json({ 
@@ -62,6 +63,25 @@ export async function GET(req: NextRequest) {
             start_at: s.start_at,
             end_at: s.end_at,
             survey_type: 'own',
+            is_featured: false,
+            is_editable: true
+          })),
+          orgSurveys: orgSurveys.map((s: any) => ({
+            id: s.id,
+            title: s.title,
+            description: s.description,
+            slug: s.slug,
+            status: s.status,
+            is_public: s.is_public,
+            created_at: s.created_at,
+            response_count: s.response_count || 0,
+            source: s.source || 'native',
+            source_metadata: s.source_metadata || null,
+            start_at: s.start_at,
+            end_at: s.end_at,
+            organization_id: s.organization_id,
+            organization_name: s.organization_name,
+            survey_type: 'org',
             is_featured: false,
             is_editable: true
           })),
@@ -141,6 +161,27 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ 
                 error: 'At least one question is required' 
             }, { status: 400 });
+        }
+
+        // If organizationId is provided, verify user is a member
+        if (body.organizationId) {
+            const { openSql } = await import('@/app/utils/database/db');
+            const db = await openSql();
+            const [membership]: any = await db.execute(
+                `SELECT role FROM organization_members WHERE organization_id = ? AND user_id = ? AND status = 'active'`,
+                [body.organizationId, parseInt(userId)]
+            );
+            if (!membership || membership.length === 0) {
+                return NextResponse.json({ 
+                    error: 'You are not a member of the selected organization' 
+                }, { status: 403 });
+            }
+            // Viewers can't create surveys for an org
+            if (membership[0].role === 'viewer') {
+                return NextResponse.json({ 
+                    error: 'Viewers cannot create surveys for an organization' 
+                }, { status: 403 });
+            }
         }
 
         // Create the survey
