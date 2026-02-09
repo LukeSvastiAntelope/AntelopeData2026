@@ -1,10 +1,8 @@
 import { CATEGORIES, SPORTS_CATEGORIES, AGENT_RISK_LEVEL } from "@/app/utils/const";
 import { IAskAgentProps } from "@/app/utils/interface";
-import { convertDaysToYMD } from "@/app/utils/lib";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
     Select,
     SelectContent,
@@ -21,20 +19,9 @@ import { X } from "lucide-react";
 const Settings = ({ agentProfile, setAgentProfile }: IAskAgentProps) => {
     const [newInterest, setNewInterest] = useState('');
     const [isSaving, setIsSaving] = useState(false);
-    const [resolutionDate, setResolutionDate] = useState<{ years: number, months: number, days: number }>(
-        convertDaysToYMD(agentProfile?.maxTimelineLimit || 5) // Default to 5 days if no value
-    );
 
     const fetch = useFetch();
     const { setAgent } = useAgent();
-
-    // Set default values when component mounts
-    useEffect(() => {
-        if (agentProfile && !agentProfile.maxTimelineLimit) {
-            setAgentProfile(prev => prev ? { ...prev, maxTimelineLimit: 5 } : null);
-            setResolutionDate({ years: 0, months: 0, days: 5 });
-        }
-    }, []);
 
     const addInterest = () => {
         if (newInterest) {
@@ -165,61 +152,10 @@ const Settings = ({ agentProfile, setAgentProfile }: IAskAgentProps) => {
                 </div>
             </div>
 
-            {/* 2. Preferred Bet Horizon */}
+            {/* 2. Analysis Settings */}
             <div className="space-y-4 border border-zinc-800 rounded-lg p-6">
                 <div className="space-y-1.5">
-                    <h2 className="text-lg font-semibold">Preferred Bet Horizon</h2>
-                </div>
-                <div className="grid grid-cols-3 gap-4">
-                    <div className="space-y-2">
-                        <div className="text-sm font-medium">Years</div>
-                        <Input
-                            type="number"
-                            value={resolutionDate?.years?.toString() || '0'}
-                            onChange={(e) => {
-                                const years = parseInt(e.target.value);
-                                const totalDays = (years * 365) + (resolutionDate?.months || 0) * 30 + (resolutionDate?.days || 0);
-                                setAgentProfile(prev => (prev ? { ...prev, maxTimelineLimit: totalDays } : null));
-                                setResolutionDate(prev => ({ ...prev, years }));
-                            }}
-                            min={0}
-                        />
-                    </div>
-                    <div className="space-y-2">
-                        <div className="text-sm font-medium">Months</div>
-                        <Input
-                            type="number"
-                            value={resolutionDate?.months?.toString() || '0'}
-                            onChange={(e) => {
-                                const months = parseInt(e.target.value);
-                                const totalDays = ((resolutionDate?.years || 0) * 365) + (months * 30) + (resolutionDate?.days || 0);
-                                setAgentProfile(prev => (prev ? { ...prev, maxTimelineLimit: totalDays } : null));
-                                setResolutionDate(prev => ({ ...prev, months }));
-                            }}
-                            min={0}
-                        />
-                    </div>
-                    <div className="space-y-2">
-                        <div className="text-sm font-medium">Days</div>
-                        <Input
-                            type="number"
-                            value={resolutionDate?.days?.toString() || '0'}
-                            onChange={(e) => {
-                                const days = parseInt(e.target.value);
-                                const totalDays = ((resolutionDate?.years || 0) * 365) + ((resolutionDate?.months || 0) * 30) + days;
-                                setAgentProfile(prev => (prev ? { ...prev, maxTimelineLimit: totalDays } : null));
-                                setResolutionDate(prev => ({ ...prev, days }));
-                            }}
-                            min={0}
-                        />
-                    </div>
-                </div>
-            </div>
-
-            {/* 3. Risk Profile */}
-            <div className="space-y-4 border border-zinc-800 rounded-lg p-6">
-                <div className="space-y-1.5">
-                    <h2 className="text-lg font-semibold">Risk Profile</h2>
+                    <h2 className="text-lg font-semibold">Analysis Settings</h2>
                 </div>
                 <div className="space-y-6">
                     <div className="flex flex-col gap-2">
@@ -239,61 +175,6 @@ const Settings = ({ agentProfile, setAgentProfile }: IAskAgentProps) => {
                                 ))}
                             </SelectContent>
                         </Select>
-                    </div>
-
-                    <div className="space-y-4">
-                        <div className="text-sm font-medium">Betting Sizes</div>
-                        <div className="grid grid-cols-3 gap-4">
-                            <div className="space-y-2">
-                                <div className="text-sm text-muted-foreground">Conservative</div>
-                                <Input
-                                    type="number"
-                                    value={agentProfile?.conservativeBetSize?.toString() || '0'}
-                                    onChange={(e) => setAgentProfile(prev => (prev ? { 
-                                        ...prev, 
-                                        conservativeBetSize: parseInt(e.target.value) 
-                                    } : null))}
-                                    min={0}
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <div className="text-sm text-muted-foreground">Moderate</div>
-                                <Input
-                                    type="number"
-                                    value={agentProfile?.moderateBetSize?.toString() || '0'}
-                                    onChange={(e) => setAgentProfile(prev => (prev ? { 
-                                        ...prev, 
-                                        moderateBetSize: parseInt(e.target.value) 
-                                    } : null))}
-                                    min={0}
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <div className="text-sm text-muted-foreground">Aggressive</div>
-                                <Input
-                                    type="number"
-                                    value={agentProfile?.aggressiveBetSize?.toString() || '0'}
-                                    onChange={(e) => setAgentProfile(prev => (prev ? { 
-                                        ...prev, 
-                                        aggressiveBetSize: parseInt(e.target.value) 
-                                    } : null))}
-                                    min={0}
-                                />
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="space-y-2">
-                        <div className="text-sm font-medium">Max Betting Size</div>
-                        <Input
-                            type="number"
-                            value={agentProfile?.maxBetSize?.toString() || '0'}
-                            onChange={(e) => setAgentProfile(prev => (prev ? { 
-                                ...prev, 
-                                maxBetSize: parseInt(e.target.value) 
-                            } : null))}
-                            min={0}
-                        />
                     </div>
                 </div>
             </div>

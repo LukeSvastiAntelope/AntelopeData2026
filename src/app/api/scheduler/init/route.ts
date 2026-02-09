@@ -6,7 +6,7 @@ export async function POST() {
         initializeScheduler();
         return NextResponse.json({ 
             success: true, 
-            message: 'Daily bet analysis scheduler initialized successfully' 
+            message: 'Daily platform tasks scheduler initialized successfully' 
         });
     } catch (error) {
         console.error('Failed to initialize scheduler:', error);

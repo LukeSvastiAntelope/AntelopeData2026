@@ -28,6 +28,7 @@ import {
   Code,
   CircleUser,
   Building2,
+  FileUp,
 } from "lucide-react"
 import LogoText from "@/components/logo-text"; // Added import
 import LogoIcon from "@/components/logo-icon"; // Added import
@@ -75,6 +76,11 @@ export function AppSidebar({ className, collapsible = "offcanvas", ...props }: S
       title: "Python Analysis",
       href: "/python-analysis",
       icon: Code
+    },
+    {
+      title: "Voter Files",
+      href: "/voter-file",
+      icon: FileUp
     },
     {
       title: "Team",

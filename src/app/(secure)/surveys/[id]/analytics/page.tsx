@@ -25,7 +25,10 @@ import {
   Loader2,
   ArrowLeft,
   Copy,
-  CheckCircle
+  CheckCircle,
+  Share2,
+  BarChart3,
+  FlaskConical,
 } from "lucide-react"
 import Link from "next/link"
 
@@ -215,8 +218,21 @@ const SurveyAnalyticsPage = () => {
                       <Label className="text-xs">Include synthetic</Label>
                       <input type="checkbox" checked={includeSynthetic} onChange={(e)=>setIncludeSynthetic(e.target.checked)} />
                     </div>
-                    <Button variant="outline" onClick={()=>router.push(`/surveys/${surveyId}/twins`)}>
-                      Manage Twin Cohort
+                    <Button variant="outline" size="sm" onClick={()=>router.push(`/surveys/${surveyId}/twins`)}>
+                      <Brain className="h-4 w-4 mr-1" />
+                      Twins
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={()=>router.push(`/surveys/${surveyId}/message-test`)}>
+                      <FlaskConical className="h-4 w-4 mr-1" />
+                      Message Test
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={()=>router.push(`/surveys/${surveyId}/predictions`)}>
+                      <BarChart3 className="h-4 w-4 mr-1" />
+                      Predictions
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={()=>router.push(`/surveys/${surveyId}/distribute`)}>
+                      <Share2 className="h-4 w-4 mr-1" />
+                      Distribute
                     </Button>
                   </div>
                 </div>

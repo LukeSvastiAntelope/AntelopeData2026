@@ -1,718 +1,591 @@
 'use client'
 
-import { useState, useEffect } from "react";
-import { Button } from "@heroui/button";
-import { Spinner } from "@heroui/spinner";
-import { Switch } from "@heroui/switch";
-import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter } from "@heroui/modal";
-import { IPrediction, IAgentProfile } from "@/app/utils/interface";
-import { useFetch } from "@/app/utils/lib";
-import toast from "react-hot-toast";
-import { Tooltip } from "@heroui/tooltip";
-import { formatDate } from "date-fns";
-import { useRouter } from "next/navigation";
-import { handleAuthError } from '../../utils/lib';
+import { useState, useEffect, useCallback } from 'react'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
+import { SidebarTrigger } from '@/components/ui/sidebar'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import {
+  Users,
+  FileText,
+  Brain,
+  Activity,
+  Loader2,
+  Trash2,
+  Search,
+  RefreshCw,
+  Shield,
+  Clock,
+  AlertTriangle,
+} from 'lucide-react'
+import { useFetch } from '@/app/utils/lib'
+import toast from 'react-hot-toast'
+import { formatDistanceToNow } from 'date-fns'
+import { useRouter } from 'next/navigation'
+import { handleAuthError } from '../../utils/lib'
 
-interface TopicUser {
-    id: number;
-    name: string | null;
-    username: string | null;
+// -----------------------------------------------------------------------
+// Types
+// -----------------------------------------------------------------------
+
+interface AdminUser {
+  id: number
+  email: string
+  display_name: string | null
+  role: 'user' | 'admin'
 }
 
-interface FormattedInterest {
-    interestName: string;
-    isDisabled: boolean;
-    userCount: number;
-    users: TopicUser[];
+interface AdminSurvey {
+  id: number
+  title: string
+  slug: string
+  status: string
+  created_by: number
+  response_count: number
+  created_at: string
 }
 
-interface FormattedCategory {
-    categoryName: string;
-    isDisabled: boolean;
-    associatedUserCountForCategory: number;
-    interests: FormattedInterest[];
+interface PlatformStats {
+  userCount: number
+  surveyCount: number
+  responseCount: number
+  twinCount: number
 }
 
-const AdminPage = () => {
-    const fetch = useFetch();
-    const router = useRouter();
+// -----------------------------------------------------------------------
+// Component
+// -----------------------------------------------------------------------
 
-    const [activeTab, setActiveTab] = useState<"overview" | "open" | "upcoming" | "resolved" | "users" | "topics">("overview");
-    const [predictions, setPredictions] = useState<IPrediction[]>([]);
-    const [displayedPredictions, setDisplayedPredictions] = useState<IPrediction[]>([]);
-    const [isLoadingPredictions, setIsLoadingPredictions] = useState<boolean>(false);
-    const [pagePredictions, setPagePredictions] = useState<number>(1);
-    const [hasMorePredictions, setHasMorePredictions] = useState<boolean>(true);
+export default function AdminPage() {
+  const fetch = useFetch()
+  const router = useRouter()
 
-    const [openPredictions, setOpenPredictions] = useState<IPrediction[]>([]);
-    const [upcomingPredictions, setUpcomingPredictions] = useState<IPrediction[]>([]);
-    const [resolvedPredictions, setResolvedPredictions] = useState<IPrediction[]>([]);
+  // Users
+  const [users, setUsers] = useState<AdminUser[]>([])
+  const [usersLoading, setUsersLoading] = useState(false)
+  const [userSearch, setUserSearch] = useState('')
+  const [deleteUser, setDeleteUser] = useState<AdminUser | null>(null)
+  const [deleteLoading, setDeleteLoading] = useState(false)
 
-    const [displayedOpenPredictions, setDisplayedOpenPredictions] = useState<IPrediction[]>([]);
-    const [displayedUpcomingPredictions, setDisplayedUpcomingPredictions] = useState<IPrediction[]>([]);
-    const [displayedResolvedPredictions, setDisplayedResolvedPredictions] = useState<IPrediction[]>([]);
+  // Surveys
+  const [surveys, setSurveys] = useState<AdminSurvey[]>([])
+  const [surveysLoading, setSurveysLoading] = useState(false)
+  const [surveySearch, setSurveySearch] = useState('')
 
-    const [isLoadingOpenPredictions, setIsLoadingOpenPredictions] = useState<boolean>(false);
-    const [isLoadingUpcomingPredictions, setIsLoadingUpcomingPredictions] = useState<boolean>(false);
-    const [isLoadingResolvedPredictions, setIsLoadingResolvedPredictions] = useState<boolean>(false);
+  // Stats
+  const [stats, setStats] = useState<PlatformStats>({
+    userCount: 0,
+    surveyCount: 0,
+    responseCount: 0,
+    twinCount: 0,
+  })
 
-    const [pageOpenPredictions, setPageOpenPredictions] = useState<number>(1);
-    const [pageUpcomingPredictions, setPageUpcomingPredictions] = useState<number>(1);
-    const [pageResolvedPredictions, setPageResolvedPredictions] = useState<number>(1);
+  // ------------------------------------------------------------------
+  // Fetch users
+  // ------------------------------------------------------------------
 
-    const [hasMoreOpenPredictions, setHasMoreOpenPredictions] = useState<boolean>(true);
-    const [hasMoreUpcomingPredictions, setHasMoreUpcomingPredictions] = useState<boolean>(true);
-    const [hasMoreResolvedPredictions, setHasMoreResolvedPredictions] = useState<boolean>(true);
-
-    const [users, setUsers] = useState<any[]>([]);
-    const [isLoadingUsers, setIsLoadingUsers] = useState<boolean>(false);
-
-    const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
-    const [selectedUserForDeletion, setSelectedUserForDeletion] = useState<IAgentProfile | null>(null);
-
-    const [structuredTopics, setStructuredTopics] = useState<FormattedCategory[]>([]);
-    const [isLoadingTopics, setIsLoadingTopics] = useState<boolean>(false);
-
-    const ITEMS_PER_PAGE_PREDICTIONS = 50;
-
-    const fetchAdminPredictions = async () => {
-        if (isLoadingPredictions) return;
-        setIsLoadingPredictions(true);
-        setIsLoadingOpenPredictions(true);
-        setIsLoadingUpcomingPredictions(true);
-        setIsLoadingResolvedPredictions(true);
-        try {
-            const response = await fetch.get('/api/admin/getPredictions');
-            if (response.status) {
-                setPredictions(response.predictions);
-                setDisplayedPredictions(response.predictions.slice(0, ITEMS_PER_PAGE_PREDICTIONS));
-                setHasMorePredictions(response.predictions.length > ITEMS_PER_PAGE_PREDICTIONS);
-                const openPredictionsData = response.predictions.filter((prediction: IPrediction) => prediction.status === "open");
-                const upcomingPredictionsData = response.predictions.filter((prediction: IPrediction) => prediction.status === "awaiting_confirmation");
-                const resolvedPredictionsData = response.predictions.filter((prediction: IPrediction) => prediction.status === "resolved");
-                setOpenPredictions(openPredictionsData);
-                setUpcomingPredictions(upcomingPredictionsData);
-                setResolvedPredictions(resolvedPredictionsData);
-                setDisplayedOpenPredictions(openPredictionsData.slice(0, ITEMS_PER_PAGE_PREDICTIONS));
-                setDisplayedUpcomingPredictions(upcomingPredictionsData.slice(0, ITEMS_PER_PAGE_PREDICTIONS));
-                setDisplayedResolvedPredictions(resolvedPredictionsData.slice(0, ITEMS_PER_PAGE_PREDICTIONS));
-                setHasMoreOpenPredictions(openPredictionsData.length > ITEMS_PER_PAGE_PREDICTIONS);
-                setHasMoreUpcomingPredictions(upcomingPredictionsData.length > ITEMS_PER_PAGE_PREDICTIONS);
-                setHasMoreResolvedPredictions(resolvedPredictionsData.length > ITEMS_PER_PAGE_PREDICTIONS);
-            } else {
-                toast.error(response.message);
-            }
-        } catch (error) {
-            console.error("Error in fetchAdminPredictions: ", error);
-            toast.error('Failed to fetch predictions');
-        } finally {
-            setIsLoadingPredictions(false);
-            setIsLoadingOpenPredictions(false);
-            setIsLoadingUpcomingPredictions(false);
-            setIsLoadingResolvedPredictions(false);
-        }
+  const fetchUsers = useCallback(async () => {
+    setUsersLoading(true)
+    try {
+      const response = await fetch.get('/api/admin/users')
+      if (response.status) {
+        setUsers(response.users || [])
+      } else {
+        toast.error(response.message || 'Failed to fetch users')
+      }
+    } catch (error) {
+      console.error('Error fetching users:', error)
+      toast.error('Failed to fetch users')
+    } finally {
+      setUsersLoading(false)
     }
+  }, [])
 
-    useEffect(() => {
-        fetchAdminPredictions();
-    }, [])
+  // ------------------------------------------------------------------
+  // Fetch surveys (uses the regular surveys endpoint with admin context)
+  // ------------------------------------------------------------------
 
-    const fetchUsers = async () => {
-        if (isLoadingUsers) return;
-        setIsLoadingUsers(true);
-        try {
-            const response = await fetch.get('/api/admin/users');
-            if (response.status) {
-                setUsers(response.users);
-            } else {
-                toast.error(response.message);
-            }
-        } catch (error) {
-            console.error("Error fetching users:", error);
-            toast.error("Failed to fetch users");
-        } finally {
-            setIsLoadingUsers(false);
-        }
-    };
-
-    const fetchStructuredTopics = async () => {
-        if (isLoadingTopics) return;
-        setIsLoadingTopics(true);
-        try {
-            const response = await fetch.get('/api/admin/prediction-topics');
-            if (response.status) {
-                setStructuredTopics(response.topics);
-            } else {
-                toast.error(response.message || "Failed to fetch topics");
-            }
-        } catch (error) {
-            console.error("Error fetching prediction topics:", error);
-            toast.error("Failed to fetch prediction topics");
-        } finally {
-            setIsLoadingTopics(false);
-        }
-    };
-
-    useEffect(() => {
-        if (activeTab === 'users') {
-            fetchUsers();
-        } else if (activeTab === 'topics') {
-            fetchStructuredTopics();
-        }
-    }, [activeTab]);
-
-    const handleToggleTopic = async (type: 'category' | 'interest', value: string, currentIsDisabled: boolean) => {
-        const newIsDisabled = !currentIsDisabled;
-        try {
-            const response = await fetch.post('/api/admin/prediction-topics', {
-                topic_type: type,
-                topic_value: value,
-                is_disabled: newIsDisabled,
-            });
-            if (response.status) {
-                toast.success(`${type === 'category' ? 'Category' : 'Interest'} '${value}' ${newIsDisabled ? 'disabled' : 'enabled'}.`);
-                setStructuredTopics(prevCategories => 
-                    prevCategories.map(cat => {
-                        if (type === 'category' && cat.categoryName === value) {
-                            return { ...cat, isDisabled: newIsDisabled };
-                        }
-                        if (type === 'interest') {
-                            return {
-                                ...cat,
-                                interests: cat.interests.map(interest => 
-                                    interest.interestName === value ? { ...interest, isDisabled: newIsDisabled } : interest
-                                )
-                            };
-                        }
-                        return cat;
-                    })
-                );
-            } else {
-                toast.error(response.message || "Failed to update status.");
-            }
-        } catch (error) {
-            toast.error("Error updating status.");
-            console.error("Error toggling topic:", error);
-        }
-    };
-
-    const handleConfirmDelete = async () => {
-        if (!selectedUserForDeletion) return;
-
-        // Get JWT token (assuming it's stored in localStorage)
-        const token = typeof window !== 'undefined' ? localStorage.getItem("token") ?? "" : "";
-        if (!token && process.env.NODE_ENV !== 'development') { // Allow no token in dev for easier testing if middleware is off
-            handleAuthError(undefined, false); // Use centralized handler without toast
-            setIsDeleteConfirmOpen(false);
-            setSelectedUserForDeletion(null);
-            return;
-        }
-
-        try {
-            // Note: useFetch might not support DELETE method directly or might need specific config.
-            // Using standard fetch for DELETE here for clarity.
-            const response = await window.fetch(`/api/admin/deleteUser/${selectedUserForDeletion.user_id}`, {
-                method: 'DELETE',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                }
-            });
-
-            const result = await response.json();
-
-            if (response.ok && result.status) {
-                toast.success(`User ${selectedUserForDeletion.name || selectedUserForDeletion.username} deleted successfully.`);
-                setUsers(prevUsers => prevUsers.filter(u => u.user_id !== selectedUserForDeletion.user_id));
-            } else {
-                toast.error(result.message || "Failed to delete user.");
-            }
-        } catch (error) {
-            console.error("Error deleting user:", error);
-            toast.error("An error occurred while trying to delete the user.");
-        } finally {
-            setIsDeleteConfirmOpen(false);
-            setSelectedUserForDeletion(null);
-        }
-    };
-
-    const handleDeleteUserClick = (user: IAgentProfile) => {
-        setSelectedUserForDeletion(user);
-        setIsDeleteConfirmOpen(true);
-    };
-
-    const loadMorePredictions = () => {
-        if (!isLoadingPredictions && hasMorePredictions) {
-            const newPage = pagePredictions + 1;
-            const nextItems = predictions.slice(0, newPage * ITEMS_PER_PAGE_PREDICTIONS);
-            setDisplayedPredictions(nextItems);
-            setHasMorePredictions(nextItems.length < predictions.length);
-            setPagePredictions(newPage);
-        }
+  const fetchSurveys = useCallback(async () => {
+    setSurveysLoading(true)
+    try {
+      const response = await fetch.get('/api/admin/surveys')
+      if (response.status !== false) {
+        const surveyList = response.surveys || []
+        setSurveys(surveyList)
+      }
+    } catch (error) {
+      console.error('Error fetching surveys:', error)
+      // Don't toast on this — it might not exist as an admin endpoint yet
+    } finally {
+      setSurveysLoading(false)
     }
+  }, [])
 
-    const loadMoreOpenPredictions = () => {
-        if (!isLoadingOpenPredictions && hasMoreOpenPredictions) {
-            const newPage = pageOpenPredictions + 1;
-            const nextItems = openPredictions.slice(0, newPage * ITEMS_PER_PAGE_PREDICTIONS);
-            setDisplayedOpenPredictions(nextItems);
-            setHasMoreOpenPredictions(nextItems.length < openPredictions.length);
-            setPageOpenPredictions(newPage);
+  // ------------------------------------------------------------------
+  // Initial load
+  // ------------------------------------------------------------------
+
+  useEffect(() => {
+    fetchUsers()
+    fetchSurveys()
+  }, [])
+
+  // Derive stats from loaded data
+  useEffect(() => {
+    setStats((prev) => ({
+      ...prev,
+      userCount: users.length,
+      surveyCount: surveys.length,
+      responseCount: surveys.reduce((sum, s) => sum + (s.response_count || 0), 0),
+    }))
+  }, [users, surveys])
+
+  // ------------------------------------------------------------------
+  // Delete user
+  // ------------------------------------------------------------------
+
+  const handleConfirmDelete = async () => {
+    if (!deleteUser) return
+    setDeleteLoading(true)
+
+    try {
+      const token =
+        typeof window !== 'undefined'
+          ? localStorage.getItem('token') ?? ''
+          : ''
+      if (!token && process.env.NODE_ENV !== 'development') {
+        handleAuthError(undefined, false)
+        setDeleteUser(null)
+        return
+      }
+
+      const response = await window.fetch(
+        `/api/admin/deleteUser/${deleteUser.id}`,
+        {
+          method: 'DELETE',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
         }
-    }
+      )
 
-    const loadMoreUpcomingPredictions = () => {
-        if (!isLoadingUpcomingPredictions && hasMoreUpcomingPredictions) {
-            const newPage = pageUpcomingPredictions + 1;
-            const nextItems = upcomingPredictions.slice(0, newPage * ITEMS_PER_PAGE_PREDICTIONS);
-            setDisplayedUpcomingPredictions(nextItems);
-            setHasMoreUpcomingPredictions(nextItems.length < upcomingPredictions.length);
-            setPageUpcomingPredictions(newPage);
-        }
-    }
+      const result = await response.json()
 
-    const loadMoreResolvedPredictions = () => {
-        if (!isLoadingResolvedPredictions && hasMoreResolvedPredictions) {
-            const newPage = pageResolvedPredictions + 1;
-            const nextItems = resolvedPredictions.slice(0, newPage * ITEMS_PER_PAGE_PREDICTIONS);
-            setDisplayedResolvedPredictions(nextItems);
-            setHasMoreResolvedPredictions(nextItems.length < resolvedPredictions.length);
-            setPageResolvedPredictions(newPage);
-        }
+      if (response.ok && result.status) {
+        toast.success(
+          `User ${deleteUser.display_name || deleteUser.email} deleted`
+        )
+        setUsers((prev) => prev.filter((u) => u.id !== deleteUser.id))
+      } else {
+        toast.error(result.message || 'Failed to delete user')
+      }
+    } catch (error) {
+      console.error('Error deleting user:', error)
+      toast.error('An error occurred while deleting the user')
+    } finally {
+      setDeleteLoading(false)
+      setDeleteUser(null)
     }
+  }
 
+  // ------------------------------------------------------------------
+  // Filtered lists
+  // ------------------------------------------------------------------
+
+  const filteredUsers = users.filter((u) => {
+    if (!userSearch) return true
+    const q = userSearch.toLowerCase()
     return (
-        <>
-            <div className="flex flex-row justify-between h-fit">
-                <div className="pr-8 pt-2">
-                    <h1 className="font-bold mb-2 font-kodemono ">
-                        Admin
-                    </h1>
-                </div>
-            </div>
-            <div className="flex gap-2 font-kodemono mb-2 text-small">
-                <Tooltip
-                    content="View overall predictions."
-                    showArrow
-                >
-                    <button
-                        onClick={() => setActiveTab("overview")}
-                        className={`px-1 py-2 hover:text-white ${activeTab === "overview" ? "text-white" : "text-gray-500"
-                            }`}
-                    >
-                        Overview
-                    </button>
-                </Tooltip>
-                <Tooltip
-                    content="View open predictions."
-                    showArrow
-                >
-                    <button
-                        onClick={() => setActiveTab("open")}
-                        className={`px-1 py-2 hover:text-white ${activeTab === "open" ? "text-white" : "text-gray-500"
-                            }`}
-                    >
-                        Open
-                    </button>
-                </Tooltip>
-                <Tooltip
-                    content="View upcoming predictions."
-                    showArrow
-                >
-                    <button
-                        onClick={() => setActiveTab("upcoming")}
-                        className={`px-1 py-2 hover:text-white ${activeTab === "upcoming" ? "text-white" : "text-gray-500"
-                            }`}
-                    >
-                        Upcoming
-                    </button>
-                </Tooltip>
-                <Tooltip
-                    content="View resolved predictions."
-                    showArrow
-                >
-                    <button
-                        onClick={() => setActiveTab("resolved")}
-                        className={`px-1 py-2 hover:text-white ${activeTab === "resolved" ? "text-white" : "text-gray-500"
-                            }`}
-                    >
-                        Resolved
-                    </button>
-                </Tooltip>
-                <Tooltip
-                    content="View platform users."
-                    showArrow
-                >
-                    <button
-                        onClick={() => setActiveTab("users")}
-                        className={`px-1 py-2 hover:text-white ${activeTab === "users" ? "text-white" : "text-gray-500"
-                            }`}
-                    >
-                        Users
-                    </button>
-                </Tooltip>
-                <Tooltip
-                    content="Manage prediction topics."
-                    showArrow
-                >
-                    <button
-                        onClick={() => setActiveTab("topics")}
-                        className={`px-1 py-2 hover:text-white ${activeTab === "topics" ? "text-white" : "text-gray-500"
-                            }`}
-                    >
-                        Topic Control
-                    </button>
-                </Tooltip>
-                <Tooltip
-                    content="Manage daily bet analysis scheduler."
-                    showArrow
-                >
-                    <button
-                        onClick={() => router.push("/admin/scheduler")}
-                        className="px-1 py-2 hover:text-white text-gray-500 ml-4 border-l border-gray-600 pl-4"
-                    >
-                        Scheduler
-                    </button>
-                </Tooltip>
-            </div>
-            {
-                activeTab === "overview" && (
-                    <div className="flex flex-col gap-2">
-                        <div className="flex flex-row justify-between">
-                            <div>Predictions</div>
-                            <div>Resolve By</div>
-                        </div>
-                        {isLoadingPredictions && predictions.length === 0 && (
-                            <div className="flex justify-center items-center py-8">
-                                <Spinner size="lg" />
-                            </div>
-                        )}
-                        {!isLoadingPredictions && predictions.length === 0 && (
-                            <div className="text-center text-gray-500 py-8 container">
-                                No predictions found
-                            </div>
-                        )}
-                        {
-                            displayedPredictions.map((prediction: IPrediction) => (
-                                <div key={prediction.id} className="flex flex-row justify-between cursor-pointer gap-4" onClick={() => router.push(`/admin/${prediction.id}`)}>
-                                    <div>{prediction.description}</div>
-                                    <div>{formatDate(new Date(prediction.resolution_date), "MM/dd/yyyy")}</div>
-                                </div>
-                            ))
-                        }
-                        {
-                            hasMorePredictions && !isLoadingPredictions && displayedPredictions.length > 0 && (
-                                <div className="flex justify-center mt-4">
-                                    <Button
-                                        color="primary"
-                                        variant="flat"
-                                        onPress={loadMorePredictions}
-                                        className="min-w-[200px]"
-                                    >
-                                        Show More
-                                    </Button>
-                                </div>
-                            )
-                        }
-                    </div>
-                )
-            }
-            {
-                activeTab === "open" && (
-                    <div className="flex flex-col gap-2">
-                        <div className="flex flex-row justify-between">
-                            <div>Predictions</div>
-                            <div>Resolve By</div>
-                        </div>
-                        {isLoadingOpenPredictions && openPredictions.length === 0 && (
-                            <div className="flex justify-center items-center py-8">
-                                <Spinner size="lg" />
-                            </div>
-                        )}
-                        {!isLoadingOpenPredictions && openPredictions.length === 0 && (
-                            <div className="text-center text-gray-500 py-8 container">
-                                No predictions found
-                            </div>
-                        )}
-                        {
-                            displayedOpenPredictions.map((prediction: IPrediction) => (
-                                <div key={prediction.id} className="flex flex-row justify-between cursor-pointer gap-4" onClick={() => router.push(`/admin/${prediction.id}`)}>
-                                    <div>{prediction.description}</div>
-                                    <div>{formatDate(new Date(prediction.resolution_date), "MM/dd/yyyy")}</div>
-                                </div>
-                            ))
-                        }
-                        {
-                            hasMoreOpenPredictions && !isLoadingOpenPredictions && displayedOpenPredictions.length > 0 && (
-                                <div className="flex justify-center mt-4">
-                                    <Button
-                                        color="primary"
-                                        variant="flat"
-                                        onPress={loadMoreOpenPredictions}
-                                        className="min-w-[200px]"
-                                    >
-                                        Show More
-                                    </Button>
-                                </div>
-                            )
-                        }
-                    </div>
-                )
-            }
-            {
-                activeTab === "upcoming" && (
-                    <div className="flex flex-col gap-2">
-                        <div className="flex flex-row justify-between">
-                            <div>Predictions</div>
-                            <div>Resolve By</div>
-                        </div>
-                        {isLoadingUpcomingPredictions && upcomingPredictions.length === 0 && (
-                            <div className="flex justify-center items-center py-8">
-                                <Spinner size="lg" />
-                            </div>
-                        )}
-                        {!isLoadingUpcomingPredictions && upcomingPredictions.length === 0 && (
-                            <div className="text-center text-gray-500 py-8 container">
-                                No predictions found
-                            </div>
-                        )}
-                        {
-                            displayedUpcomingPredictions.map((prediction: IPrediction) => (
-                                <div key={prediction.id} className="flex flex-row justify-between cursor-pointer gap-4" onClick={() => router.push(`/admin/${prediction.id}`)}>
-                                    <div>{prediction.description}</div>
-                                    <div>{formatDate(new Date(prediction.resolution_date), "MM/dd/yyyy")}</div>
-                                </div>
-                            ))
-                        }
-                        {
-                            hasMoreUpcomingPredictions && !isLoadingUpcomingPredictions && displayedUpcomingPredictions.length > 0 && (
-                                <div className="flex justify-center mt-4">
-                                    <Button
-                                        color="primary"
-                                        variant="flat"
-                                        onPress={loadMoreUpcomingPredictions}
-                                        className="min-w-[200px]"
-                                    >
-                                        Show More
-                                    </Button>
-                                </div>
-                            )
-                        }
-                    </div>
-                )
-            }
-            {
-                activeTab === "resolved" && (
-                    <div className="flex flex-col gap-2">
-                        <div className="flex flex-row justify-between">
-                            <div>Predictions</div>
-                            <div>Resolve By</div>
-                        </div>
-                        {isLoadingResolvedPredictions && resolvedPredictions.length === 0 && (
-                            <div className="flex justify-center items-center py-8">
-                                <Spinner size="lg" />
-                            </div>
-                        )}
-                        {!isLoadingResolvedPredictions && resolvedPredictions.length === 0 && (
-                            <div className="text-center text-gray-500 py-8 container">
-                                No predictions found
-                            </div>
-                        )}
-                        {
-                            displayedResolvedPredictions.map((prediction: IPrediction) => (
-                                <div key={prediction.id} className="flex flex-row justify-between cursor-pointer gap-4" onClick={() => router.push(`/admin/${prediction.id}`)}>
-                                    <div>{prediction.description}</div>
-                                    <div>{formatDate(new Date(prediction.resolution_date), "MM/dd/yyyy")}</div>
-                                </div>
-                            ))
-                        }
-                        {
-                            hasMoreResolvedPredictions && !isLoadingResolvedPredictions && displayedResolvedPredictions.length > 0 && (
-                                <div className="flex justify-center mt-4">
-                                    <Button
-                                        color="primary"
-                                        variant="flat"
-                                        onPress={loadMoreResolvedPredictions}
-                                        className="min-w-[200px]"
-                                    >
-                                        Show More
-                                    </Button>
-                                </div>
-                            )
-                        }
-                    </div>
-                )
-            }
-            {
-                activeTab === "users" && (
-                    <div className="flex flex-col gap-2 py-4">
-                        <div className="grid grid-cols-5 font-semibold px-2 pb-2 border-b border-gray-700">
-                            <div>User ID</div>
-                            <div>Email</div>
-                            <div>Display Name</div>
-                            <div>Role</div>
-                            <div>Actions</div>
-                        </div>
-                        {isLoadingUsers && users.length === 0 && (
-                            <div className="flex justify-center items-center py-8">
-                                <Spinner size="lg" />
-                            </div>
-                        )}
-                        {!isLoadingUsers && users.length === 0 && (
-                            <div className="text-center text-gray-500 py-8 container">
-                                No users found
-                            </div>
-                        )}
-                        {users.map((u: any) => (
-                            <div key={u.id} className="grid grid-cols-5 gap-4 hover:bg-gray-800 p-2 rounded-md items-center">
-                                <div>{u.id}</div>
-                                <div>{u.email || "N/A"}</div>
-                                <div>{u.display_name || "N/A"}</div>
-                                <div className="uppercase text-xs">{u.role || "user"}</div>
-                                <div>
-                                    <Button 
-                                        size="sm" 
-                                        color="danger" 
-                                        variant="light"
-                                        onPress={() => handleDeleteUserClick({ user_id: u.id, name: u.display_name } as any)}
-                                    >
-                                        Delete
-                                    </Button>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                )
-            }
-            {
-                activeTab === "topics" && (
-                    <div className="flex flex-col gap-6 py-4">
-                        {isLoadingTopics && structuredTopics.length === 0 && (
-                            <div className="flex justify-center items-center py-8">
-                                <Spinner size="lg" />
-                            </div>
-                        )}
-                        {!isLoadingTopics && structuredTopics.length === 0 && (
-                            <div className="text-center text-gray-500 py-8 container">
-                                No categories or interests found for agents, or no configurations exist.
-                            </div>
-                        )}
-                        {structuredTopics.map((category) => (
-                            <div key={category.categoryName} className="border border-gray-700 rounded-lg overflow-hidden">
-                                <div className="bg-gray-800 p-4 flex justify-between items-center">
-                                    <h2 className="text-xl font-semibold capitalize flex items-center">
-                                        {category.categoryName}
-                                        <span className="text-sm font-normal text-gray-400 ml-2">
-                                            ({category.associatedUserCountForCategory} user(s))
-                                        </span>
-                                    </h2>
-                                    <div className="flex items-center">
-                                        <Switch
-                                            isSelected={!category.isDisabled}
-                                            onValueChange={() => handleToggleTopic('category', category.categoryName, category.isDisabled)}
-                                            aria-label={`Toggle Category ${category.categoryName}`}
-                                        />
-                                        <span className="ml-2 text-sm">{category.isDisabled ? 'Disabled' : 'Enabled'}</span>
-                                    </div>
-                                </div>
-                                
-                                {category.interests.length > 0 ? (
-                                    <div className="bg-gray-900">
-                                        {category.interests.map(interest => (
-                                            <div key={interest.interestName} className="border-t border-gray-700">
-                                                <div className="p-3 bg-gray-800/30 flex justify-between items-center">
-                                                    <div className="flex items-center">
-                                                        <div className="font-medium capitalize">{interest.interestName}</div>
-                                                        <div className="ml-2 px-2 py-0.5 bg-gray-700 rounded-full text-xs">
-                                                            {interest.userCount} user(s)
-                                                        </div>
-                                                    </div>
-                                                    <div className="flex items-center">
-                                                        <Switch
-                                                            size="sm"
-                                                            isSelected={!interest.isDisabled}
-                                                            onValueChange={() => handleToggleTopic('interest', interest.interestName, interest.isDisabled)}
-                                                            aria-label={`Toggle Interest ${interest.interestName}`}
-                                                        />
-                                                        <span className="ml-2 text-xs">{interest.isDisabled ? 'Disabled' : 'Enabled'}</span>
-                                                    </div>
-                                                </div>
-                                                
-                                                {interest.users.length > 0 ? (
-                                                    <div className="px-4 py-2 bg-gray-900/50">
-                                                        <div className="text-xs text-gray-400 mb-2">Users betting on this interest:</div>
-                                                        <div className="flex flex-wrap gap-2">
-                                                            {interest.users.map(user => (
-                                                                <div key={user.id} className="px-2 py-1 bg-gray-800 rounded text-xs flex items-center">
-                                                                    <div className="font-medium">{user.name || 'Unnamed'}</div>
-                                                                    {user.username && (
-                                                                        <div className="ml-1 text-gray-400">
-                                                                            ({user.username})
-                                                                        </div>
-                                                                    )}
-                                                                </div>
-                                                            ))}
-                                                        </div>
-                                                    </div>
-                                                ) : (
-                                                    <div className="px-4 py-2 bg-gray-900/50 text-xs text-gray-500">
-                                                        No users betting on this interest
-                                                    </div>
-                                                )}
-                                            </div>
-                                        ))}
-                                    </div>
-                                ) : (
-                                    <div className="p-4 text-sm text-gray-500">No specific interests found under this category.</div>
-                                )}
-                            </div>
-                        ))}
-                    </div>
-                )
-            }
-            {selectedUserForDeletion && (
-                <Modal
-                    isOpen={isDeleteConfirmOpen}
-                    onClose={() => {
-                        setIsDeleteConfirmOpen(false);
-                        setSelectedUserForDeletion(null);
-                    }}
-                    size="md"
-                    classNames={{
-                        base: "bg-[#1c1c1c] dark", 
-                    }}
-                >
-                    <ModalContent>
-                        <ModalHeader className="text-white">Confirm Deletion</ModalHeader>
-                        <ModalBody>
-                            <p className="text-gray-300">
-                                Are you sure you want to delete the user: <span className="font-semibold text-white">{selectedUserForDeletion.name || selectedUserForDeletion.username || `ID: ${selectedUserForDeletion.user_id}`}</span>?
-                            </p>
-                            <p className="text-sm text-red-500 mt-2">This action cannot be undone.</p>
-                        </ModalBody>
-                        <ModalFooter>
-                            <Button 
-                                variant="light" 
-                                onPress={() => {
-                                    setIsDeleteConfirmOpen(false);
-                                    setSelectedUserForDeletion(null);
-                                }}
-                                className="text-gray-400 hover:text-white"
-                            >
-                                Cancel
-                            </Button>
-                            <Button 
-                                color="danger" 
-                                onPress={handleConfirmDelete}
-                            >
-                                Confirm Delete
-                            </Button>
-                        </ModalFooter>
-                    </ModalContent>
-                </Modal>
-            )}
-        </>
+      (u.email || '').toLowerCase().includes(q) ||
+      (u.display_name || '').toLowerCase().includes(q) ||
+      String(u.id).includes(q)
     )
+  })
+
+  const filteredSurveys = surveys.filter((s) => {
+    if (!surveySearch) return true
+    const q = surveySearch.toLowerCase()
+    return (
+      (s.title || '').toLowerCase().includes(q) ||
+      (s.slug || '').toLowerCase().includes(q) ||
+      String(s.id).includes(q)
+    )
+  })
+
+  // ------------------------------------------------------------------
+  // Render
+  // ------------------------------------------------------------------
+
+  return (
+    <div className="flex flex-col min-h-screen">
+      {/* Header */}
+      <div className="flex items-center gap-2 p-4 border-b">
+        <SidebarTrigger />
+        <div className="flex-1">
+          <h1 className="text-2xl font-bold flex items-center gap-2">
+            <Shield className="h-5 w-5" />
+            Admin Dashboard
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Platform management and user administration
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => router.push('/admin/scheduler')}
+        >
+          <Clock className="h-4 w-4 mr-1" />
+          Scheduler
+        </Button>
+      </div>
+
+      <div className="flex-1 p-6 max-w-6xl mx-auto w-full space-y-6">
+        {/* Stats cards */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <StatsCard
+            icon={<Users className="h-5 w-5" />}
+            label="Total Users"
+            value={stats.userCount}
+            loading={usersLoading}
+          />
+          <StatsCard
+            icon={<FileText className="h-5 w-5" />}
+            label="Surveys"
+            value={stats.surveyCount}
+            loading={surveysLoading}
+          />
+          <StatsCard
+            icon={<Activity className="h-5 w-5" />}
+            label="Responses"
+            value={stats.responseCount}
+            loading={surveysLoading}
+          />
+          <StatsCard
+            icon={<Brain className="h-5 w-5" />}
+            label="Voter Profiles"
+            value={stats.twinCount}
+            loading={false}
+            note="—"
+          />
+        </div>
+
+        {/* Main tabs */}
+        <Tabs defaultValue="users">
+          <TabsList>
+            <TabsTrigger value="users" className="flex items-center gap-1">
+              <Users className="h-4 w-4" />
+              Users
+            </TabsTrigger>
+            <TabsTrigger value="surveys" className="flex items-center gap-1">
+              <FileText className="h-4 w-4" />
+              Surveys
+            </TabsTrigger>
+          </TabsList>
+
+          {/* ---- USERS TAB ---- */}
+          <TabsContent value="users" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>User Management</CardTitle>
+                    <CardDescription>
+                      {users.length} registered users
+                    </CardDescription>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={fetchUsers}
+                    disabled={usersLoading}
+                  >
+                    <RefreshCw
+                      className={`h-4 w-4 mr-1 ${usersLoading ? 'animate-spin' : ''}`}
+                    />
+                    Refresh
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {/* Search */}
+                <div className="relative mb-4">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search by name, email, or ID..."
+                    value={userSearch}
+                    onChange={(e) => setUserSearch(e.target.value)}
+                    className="pl-9"
+                  />
+                </div>
+
+                {/* Table */}
+                {usersLoading && users.length === 0 ? (
+                  <div className="flex justify-center py-12">
+                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                  </div>
+                ) : filteredUsers.length === 0 ? (
+                  <div className="text-center py-12 text-muted-foreground">
+                    {userSearch ? 'No users match your search' : 'No users found'}
+                  </div>
+                ) : (
+                  <div className="rounded-md border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-[80px]">ID</TableHead>
+                          <TableHead>Email</TableHead>
+                          <TableHead>Display Name</TableHead>
+                          <TableHead className="w-[100px]">Role</TableHead>
+                          <TableHead className="w-[80px] text-right">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredUsers.map((u) => (
+                          <TableRow key={u.id}>
+                            <TableCell className="font-mono text-sm">
+                              {u.id}
+                            </TableCell>
+                            <TableCell className="text-sm">
+                              {u.email || '—'}
+                            </TableCell>
+                            <TableCell className="text-sm">
+                              {u.display_name || '—'}
+                            </TableCell>
+                            <TableCell>
+                              <Badge
+                                variant={u.role === 'admin' ? 'default' : 'secondary'}
+                              >
+                                {u.role || 'user'}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                onClick={() => setDeleteUser(u)}
+                                disabled={u.role === 'admin'}
+                                title={
+                                  u.role === 'admin'
+                                    ? 'Cannot delete admin users'
+                                    : 'Delete user'
+                                }
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* ---- SURVEYS TAB ---- */}
+          <TabsContent value="surveys" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Survey Management</CardTitle>
+                    <CardDescription>
+                      {surveys.length} surveys across all users
+                    </CardDescription>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={fetchSurveys}
+                    disabled={surveysLoading}
+                  >
+                    <RefreshCw
+                      className={`h-4 w-4 mr-1 ${surveysLoading ? 'animate-spin' : ''}`}
+                    />
+                    Refresh
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {/* Search */}
+                <div className="relative mb-4">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search by title, slug, or ID..."
+                    value={surveySearch}
+                    onChange={(e) => setSurveySearch(e.target.value)}
+                    className="pl-9"
+                  />
+                </div>
+
+                {/* Table */}
+                {surveysLoading && surveys.length === 0 ? (
+                  <div className="flex justify-center py-12">
+                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                  </div>
+                ) : filteredSurveys.length === 0 ? (
+                  <div className="text-center py-12 text-muted-foreground">
+                    {surveySearch ? 'No surveys match your search' : 'No surveys found'}
+                  </div>
+                ) : (
+                  <div className="rounded-md border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-[80px]">ID</TableHead>
+                          <TableHead>Title</TableHead>
+                          <TableHead className="w-[100px]">Status</TableHead>
+                          <TableHead className="w-[100px] text-right">Responses</TableHead>
+                          <TableHead className="w-[120px]">Created</TableHead>
+                          <TableHead className="w-[80px]">Owner</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredSurveys.map((s) => (
+                          <TableRow
+                            key={s.id}
+                            className="cursor-pointer"
+                            onClick={() => router.push(`/surveys/${s.id}/analytics`)}
+                          >
+                            <TableCell className="font-mono text-sm">
+                              {s.id}
+                            </TableCell>
+                            <TableCell className="text-sm font-medium">
+                              {s.title || '—'}
+                            </TableCell>
+                            <TableCell>
+                              <SurveyStatusBadge status={s.status} />
+                            </TableCell>
+                            <TableCell className="text-right font-mono text-sm">
+                              {s.response_count || 0}
+                            </TableCell>
+                            <TableCell className="text-sm text-muted-foreground">
+                              {s.created_at
+                                ? formatDistanceToNow(new Date(s.created_at), {
+                                    addSuffix: true,
+                                  })
+                                : '—'}
+                            </TableCell>
+                            <TableCell className="font-mono text-sm">
+                              {s.created_by}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+      </div>
+
+      {/* Delete confirmation dialog */}
+      <Dialog open={!!deleteUser} onOpenChange={(open) => !open && setDeleteUser(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-destructive" />
+              Confirm User Deletion
+            </DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete{' '}
+              <span className="font-semibold text-foreground">
+                {deleteUser?.display_name || deleteUser?.email || `User #${deleteUser?.id}`}
+              </span>
+              ? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteUser(null)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleConfirmDelete}
+              disabled={deleteLoading}
+            >
+              {deleteLoading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                  Deleting...
+                </>
+              ) : (
+                'Delete User'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
 }
 
-export default AdminPage;
+// -----------------------------------------------------------------------
+// Sub-components
+// -----------------------------------------------------------------------
+
+function StatsCard({
+  icon,
+  label,
+  value,
+  loading,
+  note,
+}: {
+  icon: React.ReactNode
+  label: string
+  value: number
+  loading: boolean
+  note?: string
+}) {
+  return (
+    <Card>
+      <CardContent className="pt-6">
+        <div className="flex items-center gap-3">
+          <div className="text-muted-foreground">{icon}</div>
+          <div>
+            <p className="text-sm text-muted-foreground">{label}</p>
+            {loading ? (
+              <Loader2 className="h-5 w-5 animate-spin mt-1" />
+            ) : note ? (
+              <p className="text-2xl font-bold text-muted-foreground">{note}</p>
+            ) : (
+              <p className="text-2xl font-bold">{value.toLocaleString()}</p>
+            )}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+function SurveyStatusBadge({ status }: { status: string }) {
+  switch (status) {
+    case 'active':
+      return <Badge className="bg-green-500/15 text-green-700 dark:text-green-400 border-0">Active</Badge>
+    case 'draft':
+      return <Badge variant="secondary">Draft</Badge>
+    case 'stopped':
+      return <Badge variant="outline" className="text-muted-foreground">Stopped</Badge>
+    case 'scheduled':
+      return <Badge className="bg-blue-500/15 text-blue-700 dark:text-blue-400 border-0">Scheduled</Badge>
+    default:
+      return <Badge variant="secondary">{status}</Badge>
+  }
+}

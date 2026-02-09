@@ -24,20 +24,12 @@ const publicRoutes = [
     '/api/auth/csrf',
     '/api/generateAgentProfile',
     '/api/generateAgentAvatar',
-    '/api/getRecentActivity',
-    '/api/public/bet/:id*',
-    '/api/public/prediction/:id*',
     '/api/public/surveys/:slug*',
-    '/api/getPublicMarketStats',
     '/api/image-proxy',
-    '/api/testDailyAnalysis', // Temporary for testing
-    '/api/testPositionAdjustment', // Temporary for testing
-    '/api/testOddsHistory', // Temporary for testing
     '/api/scheduler/init', // Scheduler initialization
     '/api/admin/scheduler/stats', // Admin scheduler stats
     '/api/admin/scheduler/config', // Admin scheduler config
     '/api/admin/scheduler/trigger', // Admin manual trigger
-    '/api/predictions/:id*/odds-history', // Historical odds data
     '/api/agents/query', // Public agent querying
     '/api/digital-twin/:id*/responses', // Twin responses list
     '/api/digital-twin/:id*/update', // Update twin
@@ -128,7 +120,7 @@ export default auth((req) => {
     }
 
     // Protect pages that require authentication
-    const protectedPages = ['/cohort-chat', '/cohort-chat/chat', '/surveys', '/admin', '/digital-twins', '/profile', '/setup-profile', '/team', '/reports', '/python-analysis', '/channels'];
+    const protectedPages = ['/cohort-chat', '/cohort-chat/chat', '/surveys', '/admin', '/digital-twins', '/profile', '/setup-profile', '/team', '/reports', '/python-analysis', '/channels', '/voter-file'];
     if (protectedPages.some(page => path.startsWith(page))) {
         if (!session) {
             return NextResponse.redirect(new URL('/login', req.url));
@@ -148,6 +140,7 @@ export const config = {
         '/digital-twins/:path*',
         '/profile/:path*',
         '/setup-profile/:path*',
+        '/voter-file/:path*',
         '/login',
         '/register',
         '/logout'

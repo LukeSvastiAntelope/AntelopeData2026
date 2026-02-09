@@ -31,9 +31,6 @@ interface ContentPreferencesDialogProps {
     onSave: (preferences: {
         category: string;
         riskLevel: string;
-        conservativeBetSize: number;
-        moderateBetSize: number;
-        aggressiveBetSize: number;
         sportPreference?: string;
         interests?: string[];
     }) => void;
@@ -52,9 +49,6 @@ const ContentPreferencesDialog = ({
 }: ContentPreferencesDialogProps) => {
     const [category, setCategory] = useState("General");
     const [riskLevel, setRiskLevel] = useState("Medium");
-    const [conservativeBetSize, setConservativeBetSize] = useState(10);
-    const [moderateBetSize, setModerateBetSize] = useState(30);
-    const [aggressiveBetSize, setAggressiveBetSize] = useState(90);
     const [sportPreference, setSportPreference] = useState("");
     const [interests, setInterests] = useState<string[]>([]);
     const [newInterest, setNewInterest] = useState("");
@@ -66,9 +60,6 @@ const ContentPreferencesDialog = ({
             const currentCategory = agent.category || "General";
             setCategory(currentCategory);
             setRiskLevel(agent.riskLevel || "Medium");
-            setConservativeBetSize(agent.conservativeBetSize || 10);
-            setModerateBetSize(agent.moderateBetSize || 30);
-            setAggressiveBetSize(agent.aggressiveBetSize || 90);
             setInterests(agent.interests || []);
             if (currentCategory === "Sports") {
                 setSportPreference(agent.sport_preference || "");
@@ -78,9 +69,6 @@ const ContentPreferencesDialog = ({
         } else if (isOpen) {
             setCategory("General");
             setRiskLevel("Medium");
-            setConservativeBetSize(10);
-            setModerateBetSize(30);
-            setAggressiveBetSize(90);
             setSportPreference("");
             setInterests([]);
         }
@@ -109,9 +97,6 @@ const ContentPreferencesDialog = ({
             const prefsToSave = {
                 category,
                 riskLevel,
-                conservativeBetSize,
-                moderateBetSize,
-                aggressiveBetSize,
                 interests: category !== "Sports" ? interests : [],
                 ...(category === "Sports" && sportPreference ? { sportPreference } : {}),
             };
@@ -135,7 +120,7 @@ const ContentPreferencesDialog = ({
                     <DialogHeader>
                         <DialogTitle>Strategy Settings</DialogTitle>
                         <DialogDescription>
-                            Step 2 of 3: Configure your agent&apos;s prediction strategy
+                            Step 2 of 3: Configure your agent&apos;s analysis strategy
                         </DialogDescription>
                         <Progress value={66} className="h-2" />
                     </DialogHeader>
@@ -143,8 +128,7 @@ const ContentPreferencesDialog = ({
                     <div className="space-y-6 py-4">
                         <div className="text-sm text-muted-foreground">
                             Help us tailor your experience by setting your preferred content category, 
-                            interests, risk appetite, and default betting sizes. You can change these 
-                            later in your profile.
+                            interests, and risk appetite. You can change these later in your profile.
                         </div>
 
                         <div className="space-y-4">
@@ -225,41 +209,6 @@ const ContentPreferencesDialog = ({
                                 </SelectContent>
                             </Select>
 
-                            <div className="space-y-3">
-                                <label className="text-sm font-medium">Default Betting Sizes</label>
-                                <div className="grid grid-cols-3 gap-4">
-                                    <div className="space-y-2">
-                                        <label className="text-xs text-muted-foreground">Small Bet</label>
-                                        <Input
-                                            type="number"
-                                            value={conservativeBetSize}
-                                            onChange={(e) => setConservativeBetSize(Number(e.target.value))}
-                                            min={1}
-                                            className="bg-muted"
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="text-xs text-muted-foreground">Medium Bet</label>
-                                        <Input
-                                            type="number"
-                                            value={moderateBetSize}
-                                            onChange={(e) => setModerateBetSize(Number(e.target.value))}
-                                            min={1}
-                                            className="bg-muted"
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="text-xs text-muted-foreground">Large Bet</label>
-                                        <Input
-                                            type="number"
-                                            value={aggressiveBetSize}
-                                            onChange={(e) => setAggressiveBetSize(Number(e.target.value))}
-                                            min={1}
-                                            className="bg-muted"
-                                        />
-                                    </div>
-                                </div>
-                            </div>
                         </div>
                     </div>
 

@@ -21,7 +21,6 @@ export const AgentProvider = ({ children }: { children: React.ReactNode }) => {
     const { data: session, status } = useSession();
     const pathname = usePathname();
     const router = useRouter();
-    const isPredictionPage = pathname.split('/')[1] === "predictions";
     const isAuthPage = pathname === '/login' || pathname === '/register';
     const isLoginPage = pathname === '/login';
 
@@ -36,7 +35,7 @@ export const AgentProvider = ({ children }: { children: React.ReactNode }) => {
             const controller = new AbortController();
             const timeoutMs = 15000;
             const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-            const response = await fetch('/api/getAgentProfile', {
+            const response = await fetch('/api/me', {
                 headers: {
                     'Content-Type': 'application/json',
                 },
@@ -46,7 +45,7 @@ export const AgentProvider = ({ children }: { children: React.ReactNode }) => {
             const data = await response.json();
             
             if (data.status) {
-                setAgent({...data.agent, successRate: data.successRate});
+                setAgent(data.agent);
                 setUser(data.user);
                 setIsUserDataLoaded(true);
                 hasFetched.current = true;
@@ -59,13 +58,13 @@ export const AgentProvider = ({ children }: { children: React.ReactNode }) => {
                 }
             }
         } catch (error) {
-            console.log("Error fetching agent profile", error);
+            console.log("Error fetching profile", error);
             const message =
                 (error as any)?.name === 'AbortError'
                     ? 'Profile request timed out. Please reload.'
-                    : 'Error fetching agent profile';
+                    : 'Error fetching profile';
             setProfileLoadError(message);
-            if (!isPredictionPage && !isAuthPage) {
+            if (!isAuthPage) {
                 handleAuthError(router, false);
             }
         } finally {

@@ -24,7 +24,7 @@ const nextConfig = {
         '*.ngrok-free.app'
     ],
     experimental: {
-        optimizePackageImports: ['@heroui/react', '@nextui-org/react'],
+        optimizePackageImports: [],
     },
     images: {
         remotePatterns: [

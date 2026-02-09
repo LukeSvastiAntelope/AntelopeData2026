@@ -27,7 +27,7 @@ import {
   LogIn as LogInIcon,
   UserPlus as UserPlusIcon,
   FileBarChart as FileBarChartIcon,
-  Settings as SettingsIcon,
+  FileUp as FileUpIcon,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
@@ -46,25 +46,22 @@ export function PublicAppSidebar({ className, collapsible = "offcanvas", ...prop
       key: "surveys"
     },
     {
-      title: "Digital Twins",
+      title: "Voter Profiles",
       href: "/login",
       icon: BrainIcon,
-      key: "digital-twins"
+      key: "voter-profiles"
     },
     {
       title: "Reports",
       href: "/login",
       icon: FileBarChartIcon,
       key: "reports"
-    }
-  ]
-
-  const secondaryNavItems = [
+    },
     {
-      title: "Settings",
+      title: "Voter Files",
       href: "/login",
-      icon: SettingsIcon,
-      key: "settings"
+      icon: FileUpIcon,
+      key: "voter-files"
     }
   ]
 
@@ -138,30 +135,6 @@ export function PublicAppSidebar({ className, collapsible = "offcanvas", ...prop
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
-
-        {secondaryNavItems.length > 0 && (
-          <SidebarGroup className="px-4">
-            <SidebarGroupLabel>Workspace</SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                {secondaryNavItems.map((item) => (
-                  <SidebarMenuItem key={item.key || item.href}>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={pathname === item.href}
-                      tooltip={item.title}
-                    >
-                      <Link href={item.href} className="flex items-center gap-2 px-4 py-2 text-sidebar-foreground">
-                        <item.icon className="h-4 w-4 text-sidebar-foreground group-data-[collapsible=offcanvas]:hidden" />
-                        <span className="text-sidebar-foreground">{item.title}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        )}
 
         <SidebarGroup className="px-4">
           <SidebarGroupLabel>Resources</SidebarGroupLabel>

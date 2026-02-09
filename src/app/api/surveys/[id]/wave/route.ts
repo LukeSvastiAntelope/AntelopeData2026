@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getConnection } from '../../../utils/database/db';
+import { getConnection } from '../../../../utils/database/db';
 
 /**
  * POST /api/surveys/[id]/wave
