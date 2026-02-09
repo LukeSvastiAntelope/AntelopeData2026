@@ -14,11 +14,11 @@ export async function POST(req: NextRequest) {
     const { name, category, avatarPrompt, userId } = await req.json();
     
     // Create a prompt for DALL-E that generates a suitable avatar based on the inputs
-    let prompt = `Create a professional, unique avatar for a prediction agent named "${name}" with focus on ${category || 'general topics'}.`;
+    let prompt = `Create a professional, unique avatar for a survey analyst named "${name}" with focus on ${category || 'general topics'}.`;
     
     // If we have a specific avatar prompt provided by the LLM, use it
     if (avatarPrompt && avatarPrompt.length > 0) {
-      prompt = `Create a professional avatar: ${avatarPrompt}. Suitable for a prediction agent in ${category || 'general topics'}.`;
+      prompt = `Create a professional avatar: ${avatarPrompt}. Suitable for a survey analyst in ${category || 'general topics'}.`;
     }
     
     console.log("Image generation prompt:", prompt);

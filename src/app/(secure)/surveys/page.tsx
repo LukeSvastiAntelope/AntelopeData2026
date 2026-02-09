@@ -24,8 +24,10 @@ import {
   Brain,
   TrendingUp,
   Share,
+  Share2,
   MessageCircle,
-  MoreVertical
+  MoreVertical,
+  FlaskConical,
 } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
@@ -718,6 +720,24 @@ const SurveysPage = () => {
                                       <Link href={`/surveys/${survey.id}/twins`} className="flex items-center cursor-pointer">
                                         <Users className="h-4 w-4 mr-2" />
                                         Deploy Twins
+                                      </Link>
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem asChild>
+                                      <Link href={`/surveys/${survey.id}/distribute`} className="flex items-center cursor-pointer">
+                                        <Share2 className="h-4 w-4 mr-2" />
+                                        Distribute
+                                      </Link>
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem asChild>
+                                      <Link href={`/surveys/${survey.id}/predictions`} className="flex items-center cursor-pointer">
+                                        <TrendingUp className="h-4 w-4 mr-2" />
+                                        Predictions
+                                      </Link>
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem asChild>
+                                      <Link href={`/surveys/${survey.id}/message-test`} className="flex items-center cursor-pointer">
+                                        <FlaskConical className="h-4 w-4 mr-2" />
+                                        Message Test
                                       </Link>
                                     </DropdownMenuItem>
                                     <DropdownMenuItem 

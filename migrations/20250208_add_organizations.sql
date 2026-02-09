@@ -5,7 +5,7 @@ CREATE TABLE IF NOT EXISTS organizations (
   name VARCHAR(255) NOT NULL,
   slug VARCHAR(255) NOT NULL UNIQUE,
   description TEXT NULL,
-  created_by INT NOT NULL,
+  created_by BIGINT NOT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE
@@ -14,9 +14,9 @@ CREATE TABLE IF NOT EXISTS organizations (
 CREATE TABLE IF NOT EXISTS organization_members (
   id INT AUTO_INCREMENT PRIMARY KEY,
   organization_id INT NOT NULL,
-  user_id INT NOT NULL,
+  user_id BIGINT NOT NULL,
   role ENUM('owner', 'admin', 'analyst', 'viewer') NOT NULL DEFAULT 'viewer',
-  invited_by INT NULL,
+  invited_by BIGINT NULL,
   invited_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   accepted_at TIMESTAMP NULL,
   status ENUM('pending', 'active', 'removed') NOT NULL DEFAULT 'pending',
@@ -37,7 +37,7 @@ CREATE INDEX idx_surveys_org ON surveys (organization_id);
 CREATE TABLE IF NOT EXISTS organization_activity_log (
   id INT AUTO_INCREMENT PRIMARY KEY,
   organization_id INT NOT NULL,
-  user_id INT NOT NULL,
+  user_id BIGINT NOT NULL,
   action VARCHAR(100) NOT NULL,
   resource_type VARCHAR(50) NULL,
   resource_id INT NULL,

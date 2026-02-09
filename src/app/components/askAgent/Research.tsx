@@ -121,7 +121,7 @@ const Research = ({ agentProfile }: IAskAgentProps) => {
             {messages.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full py-8 text-center text-muted-foreground">
                 <p className="text-sm">
-                  Ask your agent anything about previous bets, strategy, or other topics you want more info on.
+                  Ask your agent anything about survey analysis, voter insights, strategy, or other topics you want more info on.
                 </p>
               </div>
             ) : (

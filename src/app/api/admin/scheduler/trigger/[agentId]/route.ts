@@ -1,6 +1,11 @@
 import { NextResponse } from 'next/server';
-import { runDailyAnalysisWithAdjustments } from '@/app/utils/api/dailyBetMonitor';
 
+/**
+ * POST /api/admin/scheduler/trigger/[agentId]
+ * 
+ * Manual trigger for per-agent tasks (placeholder).
+ * The previous bet analysis logic has been removed.
+ */
 export async function POST(
     request: Request,
     { params }: { params: Promise<{ agentId: string }> }
@@ -16,30 +21,18 @@ export async function POST(
             }, { status: 400 });
         }
 
-        console.log(`🚀 Manual trigger: Starting daily analysis for agent ${agentId}...`);
-        
-        const result = await runDailyAnalysisWithAdjustments(agentId);
-        
-        console.log(`✅ Manual trigger completed for agent ${agentId}`);
-
         return NextResponse.json({
             success: true,
-            message: `Manual analysis completed for agent ${agentId}`,
+            message: `No scheduled tasks configured for agent ${agentId}.`,
             agentId,
-            analysisCount: result.analysis.length,
-            adjustmentCount: result.adjustments.totalAdjustments,
-            details: {
-                analysis: result.analysis,
-                adjustments: result.adjustments
-            }
         });
     } catch (error) {
         const resolvedParams = await params;
-        console.error(`Failed to trigger manual analysis for agent ${resolvedParams.agentId}:`, error);
+        console.error(`Failed to trigger tasks for agent ${resolvedParams.agentId}:`, error);
         return NextResponse.json({
             success: false,
-            message: `Failed to trigger manual analysis for agent ${resolvedParams.agentId}`,
+            message: `Failed to trigger tasks for agent ${resolvedParams.agentId}`,
             error: error instanceof Error ? error.message : 'Unknown error'
         }, { status: 500 });
     }
-} 
+}

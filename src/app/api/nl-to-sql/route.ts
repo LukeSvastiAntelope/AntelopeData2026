@@ -13,37 +13,13 @@ function getOpenAIClient() {
 
 // Basic safeguard to ensure no destructive SQL commands
 function isSafeQuery(sql: string): boolean {
-  const forbiddenPatterns = ["DROP ", "DELETE ", "TRUNCATE ", "ALTER "];
+  const forbiddenPatterns = ["DROP ", "DELETE ", "TRUNCATE ", "ALTER ", "INSERT ", "UPDATE "];
   const upperSql = sql.toUpperCase();
   return !forbiddenPatterns.some((fp) => upperSql.includes(fp));
 }
 
-/**
- * A naive approach to enforce that only the requesting user's bets are shown.
- * If "FROM bets" is present in the query, we inject a "WHERE" or "AND" clause for user_id.
- * 
- * Note: This is a basic string manipulation. For a complex query (e.g., with JOINs, aliases, etc.),
- * you might need a real SQL parser or a safer approach.
- */
-function enforceUserBetsOnly(rawSql: string, userId: number): string {
-  let sql = rawSql;
-  // Check if user references the bets table
-  const upperSql = sql.toUpperCase();
-  if (upperSql.includes("FROM BETS")) {
-    const whereIndex = upperSql.indexOf(" WHERE ");
-    if (whereIndex >= 0) {
-      // There's already a WHERE -> add an AND
-      sql = sql.replace(/where/i, `WHERE bets.user_id=${userId} AND`);
-    } else {
-      // No WHERE clause -> add one
-      sql = sql.replace(/(from\\s+bets)/i, `$1 WHERE bets.user_id=${userId}`);
-    }
-  }
-  return sql;
-}
-
 interface FilteredRow {
-  [key: string]: string | number | boolean | null; // Adjust types as necessary
+  [key: string]: string | number | boolean | null;
 }
 
 /**
@@ -55,10 +31,8 @@ function removeSensitiveColumns(rows: RowDataPacket[]): { columns: string[]; res
     return { columns: [], results: [] };
   }
   
-  // Determine columns, excluding any that look like "password"
   const columns = Object.keys(rows[0]).filter((col) => !col.toLowerCase().includes("password"));
 
-  // Filter the rows so the password columns are removed from each row
   const results = rows.map((row) => {
     const copy: FilteredRow = { ...row };
     for (const col of Object.keys(copy)) {
@@ -74,15 +48,14 @@ function removeSensitiveColumns(rows: RowDataPacket[]): { columns: string[]; res
 
 export async function POST(req: NextRequest) {
   try {
-    // Example user ID from auth or session
-    const userId = 123; // Replace with real user identification
-
     const { query } = await req.json();
 
     // 1) Use OpenAI to convert natural language to SQL
     const systemPrompt = `
       You are a helpful assistant that converts natural language to EXACT and VALID SQL queries.
-      The schema is known to you. ONLY produce SELECT statements or safe read-only queries.
+      The database contains tables for surveys, survey_responses, survey_questions, survey_answers,
+      responder_agents, users, agents, cohorts, organizations, and reports.
+      ONLY produce SELECT statements or safe read-only queries.
       Return only the SQL, no extra text or explanation.
     `;
 
@@ -107,14 +80,11 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // 2) Enforce user can only see their own bets
-    generatedSql = enforceUserBetsOnly(generatedSql, userId);
-
-    // 3) Run query against your MySQL
+    // 2) Run query against MySQL
     const db = await openSql();
     const [rows] = await db.query<RowDataPacket[]>(generatedSql);
 
-    // 4) Remove password columns
+    // 3) Remove password columns
     const { columns, results } = removeSensitiveColumns(rows);
 
     return NextResponse.json({
@@ -131,4 +101,4 @@ export async function POST(req: NextRequest) {
       error: error instanceof Error ? error.message : 'Internal server error'
     });
   }
-} 
+}
