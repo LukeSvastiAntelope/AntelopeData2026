@@ -24,6 +24,25 @@ import {
     categorizeImportedTwin
 } from "../anonymity-config";
 
+/**
+ * Reusable SQL fragment for org-aware survey access.
+ * Checks: user owns the survey OR user is an active member of the survey's org.
+ * Pass `editOnly = true` to restrict to roles that can edit (owner/admin/analyst).
+ */
+function orgAccessWhere(alias: string = 's', editOnly: boolean = false): string {
+    const roleClause = editOnly ? `AND om.role IN ('owner', 'admin', 'analyst')` : '';
+    return `(
+        ${alias}.created_by = ?
+        OR EXISTS (
+            SELECT 1 FROM organization_members om
+            WHERE om.organization_id = ${alias}.organization_id
+              AND om.user_id = ?
+              AND om.status = 'active'
+              ${roleClause}
+        )
+    )`;
+}
+
 export const SurveyRepo = {
     /**
      * Update responder agent persona/capability profile and increment version
@@ -89,20 +108,22 @@ export const SurveyRepo = {
             const anonymityLevel = data.anonymityLevel || 'full';
             const demographicsRequired = data.demographicsRequired !== false; // Default to true
             
+            const organizationId = data.organizationId || null;
+
             if (hasSourceTracking) {
                 const source = data.source || 'native';
                 const sourceMetadata = data.sourceMetadata ? JSON.stringify(data.sourceMetadata) : null;
                 
                 [surveyResult] = await connection.execute<ResultSetHeader>(
-                    `INSERT INTO surveys (title, description, slug, created_by, is_public, anonymity_level, demographics_required, status, start_at, end_at, source, source_metadata) 
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                    [data.title, data.description, slug, createdBy, data.isPublic, anonymityLevel, demographicsRequired, status, startAt, endAt, source, sourceMetadata]
+                    `INSERT INTO surveys (title, description, slug, created_by, is_public, anonymity_level, demographics_required, status, start_at, end_at, source, source_metadata, organization_id) 
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                    [data.title, data.description, slug, createdBy, data.isPublic, anonymityLevel, demographicsRequired, status, startAt, endAt, source, sourceMetadata, organizationId]
                 );
             } else {
                 [surveyResult] = await connection.execute<ResultSetHeader>(
-                    `INSERT INTO surveys (title, description, slug, created_by, is_public, anonymity_level, demographics_required, status, start_at, end_at) 
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                    [data.title, data.description, slug, createdBy, data.isPublic, anonymityLevel, demographicsRequired, status, startAt, endAt]
+                    `INSERT INTO surveys (title, description, slug, created_by, is_public, anonymity_level, demographics_required, status, start_at, end_at, organization_id) 
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                    [data.title, data.description, slug, createdBy, data.isPublic, anonymityLevel, demographicsRequired, status, startAt, endAt, organizationId]
                 );
             }
             
@@ -479,6 +500,25 @@ export const SurveyRepo = {
         
         let userSurveys, featuredSurveys;
         
+        // Get surveys shared via organizations the user belongs to
+        let orgSurveys: RowDataPacket[] = [];
+        try {
+            const [orgRows] = await db.execute<RowDataPacket[]>(
+                `SELECT s.*, COUNT(sr.id) as response_count, 'org' as survey_type, o.name as organization_name
+                 FROM surveys s 
+                 LEFT JOIN survey_responses sr ON s.id = sr.survey_id 
+                 JOIN organizations o ON s.organization_id = o.id
+                 JOIN organization_members om ON o.id = om.organization_id
+                 WHERE om.user_id = ? AND om.status = 'active' AND s.created_by != ?
+                 GROUP BY s.id 
+                 ORDER BY s.created_at DESC`,
+                [createdBy, createdBy]
+            );
+            orgSurveys = orgRows as RowDataPacket[];
+        } catch {
+            // organization tables may not exist in all environments
+        }
+
         if (hasSourceTracking) {
             // Get user's own surveys
             const [userRows] = await db.execute<RowDataPacket[]>(
@@ -542,7 +582,8 @@ export const SurveyRepo = {
         return {
             userSurveys,
             featuredSurveys,
-            allSurveys: [...userSurveys, ...featuredSurveys]
+            orgSurveys,
+            allSurveys: [...userSurveys, ...orgSurveys, ...featuredSurveys]
         };
     },
 
@@ -763,13 +804,19 @@ export const SurveyRepo = {
         const db = await getMySQLConnection();
         
         const [rows] = await db.execute<RowDataPacket[]>(
-            `SELECT * FROM surveys 
-             WHERE id = ? 
+            `SELECT s.* FROM surveys s
+             WHERE s.id = ? 
              AND (
-               created_by = ? 
-               OR (is_public = 1 AND status = 'published')
+               s.created_by = ? 
+               OR (s.is_public = 1 AND s.status = 'published')
+               OR EXISTS (
+                 SELECT 1 FROM organization_members om 
+                 WHERE om.organization_id = s.organization_id 
+                   AND om.user_id = ? 
+                   AND om.status = 'active'
+               )
              )`,
-            [surveyId, createdBy]
+            [surveyId, createdBy, createdBy]
         );
         
         if (!rows[0]) return null;
@@ -798,10 +845,20 @@ export const SurveyRepo = {
         try {
             await connection.beginTransaction();
             
-            // Check if survey exists and belongs to user
+            // Check if survey exists and user has access (owner or org member with edit rights)
             const [existingRows] = await connection.execute<RowDataPacket[]>(
-                "SELECT id FROM surveys WHERE id = ? AND created_by = ?",
-                [surveyId, createdBy]
+                `SELECT s.id FROM surveys s
+                 WHERE s.id = ? AND (
+                   s.created_by = ?
+                   OR EXISTS (
+                     SELECT 1 FROM organization_members om
+                     WHERE om.organization_id = s.organization_id
+                       AND om.user_id = ?
+                       AND om.status = 'active'
+                       AND om.role IN ('owner', 'admin', 'analyst')
+                   )
+                 )`,
+                [surveyId, createdBy, createdBy]
             );
             
             if (!existingRows[0]) {
@@ -881,10 +938,20 @@ export const SurveyRepo = {
         try {
             await connection.beginTransaction();
             
-            // Check if survey exists and belongs to user
+            // Check if survey exists and user has access (owner or org member with edit rights)
             const [existingRows] = await connection.execute<RowDataPacket[]>(
-                "SELECT id FROM surveys WHERE id = ? AND created_by = ?",
-                [surveyId, createdBy]
+                `SELECT s.id FROM surveys s
+                 WHERE s.id = ? AND (
+                   s.created_by = ?
+                   OR EXISTS (
+                     SELECT 1 FROM organization_members om
+                     WHERE om.organization_id = s.organization_id
+                       AND om.user_id = ?
+                       AND om.status = 'active'
+                       AND om.role IN ('owner', 'admin', 'analyst')
+                   )
+                 )`,
+                [surveyId, createdBy, createdBy]
             );
             
             if (!existingRows[0]) {
@@ -996,10 +1063,10 @@ export const SurveyRepo = {
         const db = await getMySQLConnection();
         
         try {
-            // Get survey details
+            // Get survey details (org members can also view analytics)
             const [surveyRows] = await db.execute<RowDataPacket[]>(
-                "SELECT * FROM surveys WHERE id = ? AND created_by = ?",
-                [surveyId, createdBy]
+                `SELECT s.* FROM surveys s WHERE s.id = ? AND ${orgAccessWhere('s')}`,
+                [surveyId, createdBy, createdBy]
             );
             
             if (!surveyRows[0]) return null;
@@ -1201,15 +1268,15 @@ export const SurveyRepo = {
     ) => {
         const db = await getMySQLConnection();
 
-        // Verify ownership first
+        // Verify access (owner, org member, or public published)
         const [surveyRows] = await db.execute<RowDataPacket[]>(
-            `SELECT id FROM surveys 
-             WHERE id = ? 
+            `SELECT s.id FROM surveys s
+             WHERE s.id = ? 
                AND (
-                 created_by = ? 
-                 OR (is_public = 1 AND status = 'published')
+                 ${orgAccessWhere('s')}
+                 OR (s.is_public = 1 AND s.status = 'published')
                )`,
-            [surveyId, createdBy]
+            [surveyId, createdBy, createdBy]
         );
         if (!surveyRows[0]) return null;
 
@@ -1252,16 +1319,16 @@ export const SurveyRepo = {
     getSurveySummary: async (surveyId: number, createdBy: number) => {
         const db = await getMySQLConnection();
 
-        // Verify ownership
+        // Verify access (owner, org member, or public published)
         const [surveyRows] = await db.execute<RowDataPacket[]>(
-            `SELECT id, title, description, created_at, status, is_public 
-             FROM surveys 
-             WHERE id = ? 
+            `SELECT s.id, s.title, s.description, s.created_at, s.status, s.is_public 
+             FROM surveys s
+             WHERE s.id = ? 
                AND (
-                 created_by = ? 
-                 OR (is_public = 1 AND status = 'published')
+                 ${orgAccessWhere('s')}
+                 OR (s.is_public = 1 AND s.status = 'published')
                )`,
-            [surveyId, createdBy]
+            [surveyId, createdBy, createdBy]
         );
         if (!surveyRows[0]) return null;
         const survey = surveyRows[0];
@@ -1329,8 +1396,8 @@ export const SurveyRepo = {
     closeSurvey: async (surveyId: number, createdBy: number) => {
         const db = await getMySQLConnection();
         const [result] = await db.execute<ResultSetHeader>(
-            `UPDATE surveys SET status = 'closed' WHERE id = ? AND created_by = ?`,
-            [surveyId, createdBy]
+            `UPDATE surveys s SET s.status = 'closed' WHERE s.id = ? AND ${orgAccessWhere('s', true)}`,
+            [surveyId, createdBy, createdBy]
         );
         return (result as ResultSetHeader).affectedRows > 0;
     },
@@ -1341,8 +1408,8 @@ export const SurveyRepo = {
 
         // Fetch timing info first
         const [rows] = await db.execute<RowDataPacket[]>(
-            `SELECT start_at, end_at FROM surveys WHERE id = ? AND created_by = ? LIMIT 1`,
-            [surveyId, createdBy]
+            `SELECT s.start_at, s.end_at FROM surveys s WHERE s.id = ? AND ${orgAccessWhere('s', true)} LIMIT 1`,
+            [surveyId, createdBy, createdBy]
         );
         if (!rows[0]) return false;
 
@@ -1354,8 +1421,8 @@ export const SurveyRepo = {
         }
 
         const [result] = await db.execute<ResultSetHeader>(
-            `UPDATE surveys SET status = ? WHERE id = ? AND created_by = ?`,
-            [newStatus, surveyId, createdBy]
+            `UPDATE surveys s SET s.status = ? WHERE s.id = ? AND ${orgAccessWhere('s', true)}`,
+            [newStatus, surveyId, createdBy, createdBy]
         );
         return (result as ResultSetHeader).affectedRows > 0;
     },
@@ -1375,10 +1442,10 @@ export const SurveyRepo = {
         const db = await getMySQLConnection();
         
         try {
-            // Verify survey exists and belongs to user
+            // Verify survey exists and user has access (owner or org admin)
             const [surveyRows] = await db.execute<RowDataPacket[]>(
-                "SELECT id, title FROM surveys WHERE id = ? AND created_by = ?",
-                [surveyId, createdBy]
+                `SELECT s.id, s.title FROM surveys s WHERE s.id = ? AND ${orgAccessWhere('s', true)}`,
+                [surveyId, createdBy, createdBy]
             );
             
             if (!surveyRows[0]) {
@@ -1613,8 +1680,8 @@ export const SurveyRepo = {
             // Step 5: Finally delete the survey itself
             console.log('Deleting survey...');
             const [result] = await db.execute<ResultSetHeader>(
-                'DELETE FROM surveys WHERE id = ? AND created_by = ?',
-                [surveyId, createdBy]
+                `DELETE s FROM surveys s WHERE s.id = ? AND ${orgAccessWhere('s', true)}`,
+                [surveyId, createdBy, createdBy]
             );
             
             if ((result as ResultSetHeader).affectedRows === 0) {
@@ -1813,10 +1880,10 @@ export const SurveyRepo = {
         const db = await getMySQLConnection();
         
         const [result] = await db.execute<ResultSetHeader>(
-            `UPDATE surveys 
-             SET status = 'active', campaign_start_at = NOW()
-             WHERE id = ? AND created_by = ? AND status IN ('draft', 'scheduled', 'stopped')`,
-            [surveyId, userId]
+            `UPDATE surveys s
+             SET s.status = 'active', s.campaign_start_at = NOW()
+             WHERE s.id = ? AND ${orgAccessWhere('s', true)} AND s.status IN ('draft', 'scheduled', 'stopped')`,
+            [surveyId, userId, userId]
         );
         
         return (result as ResultSetHeader).affectedRows > 0;
@@ -1827,13 +1894,13 @@ export const SurveyRepo = {
         const db = await getMySQLConnection();
         
         const [result] = await db.execute<ResultSetHeader>(
-            `UPDATE surveys 
-             SET status = 'stopped', 
-                 stopped_at = NOW(), 
-                 stopped_by = ?,
-                 stop_reason = ?
-             WHERE id = ? AND created_by = ? AND status = 'active'`,
-            [userId, reason || null, surveyId, userId]
+            `UPDATE surveys s
+             SET s.status = 'stopped', 
+                 s.stopped_at = NOW(), 
+                 s.stopped_by = ?,
+                 s.stop_reason = ?
+             WHERE s.id = ? AND ${orgAccessWhere('s', true)} AND s.status = 'active'`,
+            [userId, reason || null, surveyId, userId, userId]
         );
         
         return (result as ResultSetHeader).affectedRows > 0;
@@ -1849,12 +1916,12 @@ export const SurveyRepo = {
         const status = startDate > now ? 'scheduled' : 'active';
         
         const [result] = await db.execute<ResultSetHeader>(
-            `UPDATE surveys 
-             SET status = ?, 
-                 campaign_start_at = ?,
-                 campaign_end_at = ?
-             WHERE id = ? AND created_by = ?`,
-            [status, startAt, endAt || null, surveyId, userId]
+            `UPDATE surveys s
+             SET s.status = ?, 
+                 s.campaign_start_at = ?,
+                 s.campaign_end_at = ?
+             WHERE s.id = ? AND ${orgAccessWhere('s', true)}`,
+            [status, startAt, endAt || null, surveyId, userId, userId]
         );
         
         return (result as ResultSetHeader).affectedRows > 0;
@@ -1866,13 +1933,13 @@ export const SurveyRepo = {
         
         const [rows] = await db.execute<RowDataPacket[]>(
             `SELECT 
-                id, title, status, is_public,
-                campaign_start_at, campaign_end_at,
-                stopped_at, stopped_by, stop_reason,
-                created_at, updated_at
-             FROM surveys 
-             WHERE id = ? AND created_by = ?`,
-            [surveyId, userId]
+                s.id, s.title, s.status, s.is_public,
+                s.campaign_start_at, s.campaign_end_at,
+                s.stopped_at, s.stopped_by, s.stop_reason,
+                s.created_at, s.updated_at
+             FROM surveys s
+             WHERE s.id = ? AND ${orgAccessWhere('s')}`,
+            [surveyId, userId, userId]
         );
         
         if (!rows[0]) return null;

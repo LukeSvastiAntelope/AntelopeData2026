@@ -27,6 +27,9 @@ export const openSql = async () => {
     return pool;
 }
 
+// Alias for routes that use getConnection naming convention
+export const getConnection = openSql;
+
 // Add a method to explicitly close the pool if needed
 export const closePool = async () => {
     if (pool) {
