@@ -3,27 +3,15 @@
 import { useRef, useEffect, useState, useCallback } from 'react'
 import { useTheme } from 'next-themes'
 import { Button } from '@/components/ui/button'
-import { 
-  MapPin, 
-  Users, 
-  FileText, 
+import {
+  MapPin,
+  Users,
+  FileText,
   Vote,
   Loader2,
   Globe,
+  Landmark,
 } from 'lucide-react'
-
-// State FIPS codes for Mapbox boundaries tileset
-const STATE_FIPS: Record<string, string> = {
-  'AL': '01', 'AK': '02', 'AZ': '04', 'AR': '05', 'CA': '06', 'CO': '08',
-  'CT': '09', 'DE': '10', 'DC': '11', 'FL': '12', 'GA': '13', 'HI': '15',
-  'ID': '16', 'IL': '17', 'IN': '18', 'IA': '19', 'KS': '20', 'KY': '21',
-  'LA': '22', 'ME': '23', 'MD': '24', 'MA': '25', 'MI': '26', 'MN': '27',
-  'MS': '28', 'MO': '29', 'MT': '30', 'NE': '31', 'NV': '32', 'NH': '33',
-  'NJ': '34', 'NM': '35', 'NY': '36', 'NC': '37', 'ND': '38', 'OH': '39',
-  'OK': '40', 'OR': '41', 'PA': '42', 'RI': '44', 'SC': '45', 'SD': '46',
-  'TN': '47', 'TX': '48', 'UT': '49', 'VT': '50', 'VA': '51', 'WA': '53',
-  'WV': '54', 'WI': '55', 'WY': '56',
-}
 
 // Full state name to abbreviation
 const STATE_NAME_TO_ABBREV: Record<string, string> = {
@@ -51,8 +39,43 @@ interface GeoData {
   orgCenter?: { latitude: number; longitude: number; zoom: number; name: string } | null
 }
 
+interface PoliticalFeature {
+  id: string
+  name?: string
+  state?: string
+  pvi?: string
+  pviNumeric?: number
+  electoralVotes?: number
+  margin2024?: number
+  governorParty?: string
+  senateSeats?: string
+  incumbentName?: string
+  incumbentParty?: string
+  donations?: { dem: number; rep: number; other?: number }
+  swing?: number
+}
+
+interface PoliticalData {
+  level: 'state' | 'district' | 'county'
+  features: PoliticalFeature[]
+}
+
 interface DashboardMapProps {
   className?: string
+}
+
+/** Convert a PVI numeric value (-25 to +25) to a red-blue color */
+function pviToColor(pvi: number, alpha: number = 0.6): string {
+  // Clamp to -30..+30
+  const clamped = Math.max(-30, Math.min(30, pvi))
+  const t = (clamped + 30) / 60 // 0 = deep red, 0.5 = neutral, 1 = deep blue
+  // Red channel: high when R, low when D
+  const r = Math.round(220 - t * 180)
+  // Blue channel: low when R, high when D
+  const b = Math.round(40 + t * 180)
+  // Green: peaks at center (purple-ish neutral)
+  const g = Math.round(60 + (1 - Math.abs(t - 0.5) * 2) * 40)
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`
 }
 
 export default function DashboardMap({ className }: DashboardMapProps) {
@@ -60,21 +83,22 @@ export default function DashboardMap({ className }: DashboardMapProps) {
   const mapRef = useRef<any>(null)
   const [loading, setLoading] = useState(true)
   const [geoData, setGeoData] = useState<GeoData | null>(null)
+  const [politicalData, setPoliticalData] = useState<PoliticalData | null>(null)
   const [showSurveyLayer, setShowSurveyLayer] = useState(true)
   const [showVoterLayer, setShowVoterLayer] = useState(true)
+  const [showPoliticalLayer, setShowPoliticalLayer] = useState(true)
   const [hoveredState, setHoveredState] = useState<string | null>(null)
   const [mapReady, setMapReady] = useState(false)
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const { resolvedTheme } = useTheme()
 
-  // Fetch geo data
+  // Fetch geo data (survey responses)
   useEffect(() => {
     const fetchData = async () => {
       try {
         const res = await fetch('/api/dashboard/geo')
         const data = await res.json()
-        if (data.status) {
-          setGeoData(data)
-        }
+        if (data.status) setGeoData(data)
       } catch (err) {
         console.error('Failed to fetch geo data:', err)
       }
@@ -82,10 +106,25 @@ export default function DashboardMap({ className }: DashboardMapProps) {
     fetchData()
   }, [])
 
+  // Fetch political data based on viewport
+  const fetchPoliticalData = useCallback(async (zoom: number) => {
+    try {
+      const res = await fetch(`/api/dashboard/political?zoom=${zoom}`)
+      const data = await res.json()
+      if (data.status) setPoliticalData(data)
+    } catch (err) {
+      console.error('Failed to fetch political data:', err)
+    }
+  }, [])
+
+  // Initial political data fetch
+  useEffect(() => {
+    fetchPoliticalData(4)
+  }, [fetchPoliticalData])
+
   // Initialize Mapbox
   useEffect(() => {
     if (!mapContainer.current || mapRef.current) return
-
     let cancelled = false
 
     const initMap = async () => {
@@ -102,13 +141,12 @@ export default function DashboardMap({ className }: DashboardMapProps) {
       }
 
       mapboxgl.accessToken = token
-
       const isDark = resolvedTheme === 'dark'
 
       const map = new mapboxgl.Map({
         container: mapContainer.current,
         style: isDark ? 'mapbox://styles/mapbox/dark-v11' : 'mapbox://styles/mapbox/light-v11',
-        center: [-98.5, 39.8], // Center of US
+        center: [-98.5, 39.8],
         zoom: 3.5,
         pitch: 0,
         bearing: 0,
@@ -118,7 +156,6 @@ export default function DashboardMap({ className }: DashboardMapProps) {
       })
 
       mapRef.current = map
-
       map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'bottom-right')
 
       map.on('load', () => {
@@ -126,26 +163,33 @@ export default function DashboardMap({ className }: DashboardMapProps) {
         setMapReady(true)
         setLoading(false)
 
-        // Add US states source (GeoJSON from Mapbox)
+        // --- State boundaries (Mapbox built-in) ---
         map.addSource('us-states', {
           type: 'vector',
           url: 'mapbox://mapbox.boundaries-adm1-v4',
         })
 
-        // State fill layer (choropleth)
+        // State fill - survey data choropleth
         map.addLayer({
           id: 'state-fills',
           type: 'fill',
           source: 'us-states',
           'source-layer': 'boundaries_admin_1',
           filter: ['==', ['get', 'iso_3166_1'], 'US'],
-          paint: {
-            'fill-color': 'rgba(59, 130, 246, 0.05)',
-            'fill-opacity': 0.8,
-          },
+          paint: { 'fill-color': 'rgba(59, 130, 246, 0.05)', 'fill-opacity': 0.8 },
         })
 
-        // State border layer
+        // State fill - political PVI choropleth (on top, toggled separately)
+        map.addLayer({
+          id: 'state-political-fills',
+          type: 'fill',
+          source: 'us-states',
+          'source-layer': 'boundaries_admin_1',
+          filter: ['==', ['get', 'iso_3166_1'], 'US'],
+          paint: { 'fill-color': 'rgba(128, 128, 128, 0.1)', 'fill-opacity': 0.7 },
+        })
+
+        // State borders
         map.addLayer({
           id: 'state-borders',
           type: 'line',
@@ -153,31 +197,27 @@ export default function DashboardMap({ className }: DashboardMapProps) {
           'source-layer': 'boundaries_admin_1',
           filter: ['==', ['get', 'iso_3166_1'], 'US'],
           paint: {
-            'line-color': isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.1)',
-            'line-width': 0.8,
+            'line-color': isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.15)',
+            'line-width': 1,
           },
         })
 
-        // State hover highlight layer
+        // State hover highlight
         map.addLayer({
           id: 'state-hover',
           type: 'line',
           source: 'us-states',
           'source-layer': 'boundaries_admin_1',
           filter: ['==', ['get', 'iso_3166_1_alpha2'], ''],
-          paint: {
-            'line-color': '#3b82f6',
-            'line-width': 2,
-          },
+          paint: { 'line-color': '#3b82f6', 'line-width': 2.5 },
         })
 
-        // Points source for canvass GPS data
+        // --- Response points (canvass GPS) ---
         map.addSource('response-points', {
           type: 'geojson',
           data: { type: 'FeatureCollection', features: [] },
         })
 
-        // Heatmap layer for response density
         map.addLayer({
           id: 'response-heatmap',
           type: 'heatmap',
@@ -199,7 +239,6 @@ export default function DashboardMap({ className }: DashboardMapProps) {
           },
         })
 
-        // Point circles (visible at higher zoom)
         map.addLayer({
           id: 'response-points-circles',
           type: 'circle',
@@ -214,7 +253,7 @@ export default function DashboardMap({ className }: DashboardMapProps) {
           },
         })
 
-        // Fly to org center after a brief pause
+        // Fly to org center
         setTimeout(() => {
           if (cancelled) return
           const center = geoData?.orgCenter
@@ -228,13 +267,24 @@ export default function DashboardMap({ className }: DashboardMapProps) {
         }, 600)
       })
 
-      // Hover interactions
+      // --- Viewport listener: refetch political data on zoom change ---
+      let lastZoomBucket = 0
+      map.on('moveend', () => {
+        const z = map.getZoom()
+        const bucket = z < 5 ? 0 : z < 9 ? 1 : 2
+        if (bucket !== lastZoomBucket) {
+          lastZoomBucket = bucket
+          if (debounceRef.current) clearTimeout(debounceRef.current)
+          debounceRef.current = setTimeout(() => fetchPoliticalData(z), 300)
+        }
+      })
+
+      // --- Hover interactions ---
       let hoveredId: string | null = null
 
-      map.on('mousemove', 'state-fills', (e: any) => {
+      map.on('mousemove', 'state-political-fills', (e: any) => {
         if (e.features && e.features.length > 0) {
-          const feature = e.features[0]
-          const stateCode = feature.properties?.iso_3166_1_alpha2 || ''
+          const stateCode = e.features[0].properties?.iso_3166_1_alpha2 || ''
           if (stateCode !== hoveredId) {
             hoveredId = stateCode
             map.setFilter('state-hover', ['==', ['get', 'iso_3166_1_alpha2'], stateCode])
@@ -244,15 +294,15 @@ export default function DashboardMap({ className }: DashboardMapProps) {
         }
       })
 
-      map.on('mouseleave', 'state-fills', () => {
+      map.on('mouseleave', 'state-political-fills', () => {
         hoveredId = null
         map.setFilter('state-hover', ['==', ['get', 'iso_3166_1_alpha2'], ''])
         map.getCanvas().style.cursor = ''
         setHoveredState(null)
       })
 
-      // Click to zoom
-      map.on('click', 'state-fills', (e: any) => {
+      // Click to zoom into state
+      map.on('click', 'state-political-fills', (e: any) => {
         if (e.features && e.features.length > 0) {
           const feature = e.features[0]
           if (feature.geometry?.type === 'MultiPolygon' || feature.geometry?.type === 'Polygon') {
@@ -277,67 +327,49 @@ export default function DashboardMap({ className }: DashboardMapProps) {
 
     return () => {
       cancelled = true
-      if (mapRef.current) {
-        mapRef.current.remove()
-        mapRef.current = null
-      }
+      if (debounceRef.current) clearTimeout(debounceRef.current)
+      if (mapRef.current) { mapRef.current.remove(); mapRef.current = null }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Update map data when geoData changes
+  // --- Update survey data layers ---
   useEffect(() => {
     if (!mapReady || !mapRef.current || !geoData) return
-
     const map = mapRef.current
 
-    // Build state color expression based on response data
+    // State survey choropleth
     const stateEntries = Object.entries(geoData.states)
     const defaultColor = 'rgba(59, 130, 246, 0.03)'
-
     let fillColor: any = defaultColor
 
     if (stateEntries.length > 0) {
-      const maxResponses = Math.max(1, ...stateEntries.map(([, s]) => s.responses))
-      const stateColorExpr: any[] = ['match', ['get', 'iso_3166_1_alpha2']]
-
-      for (const [stateName, data] of stateEntries) {
-        const abbrev = STATE_NAME_TO_ABBREV[stateName] || stateName
+      const maxR = Math.max(1, ...stateEntries.map(([, s]) => s.responses))
+      const expr: any[] = ['match', ['get', 'iso_3166_1_alpha2']]
+      for (const [name, data] of stateEntries) {
+        const abbrev = STATE_NAME_TO_ABBREV[name] || name
         if (abbrev.length === 2) {
-          const intensity = Math.min(1, data.responses / maxResponses)
-          const alpha = 0.1 + intensity * 0.6
-          stateColorExpr.push(`US-${abbrev}`, `rgba(59, 130, 246, ${alpha})`)
+          const alpha = 0.1 + Math.min(1, data.responses / maxR) * 0.6
+          expr.push(`US-${abbrev}`, `rgba(59, 130, 246, ${alpha})`)
         }
       }
-
-      // Only use match expression if we added at least one state pair
-      if (stateColorExpr.length > 2) {
-        stateColorExpr.push(defaultColor) // fallback
-        fillColor = stateColorExpr
-      }
+      if (expr.length > 2) { expr.push(defaultColor); fillColor = expr }
     }
 
-    try {
-      map.setPaintProperty('state-fills', 'fill-color', fillColor)
-    } catch {
-      // Layer might not be ready yet
-    }
+    try { map.setPaintProperty('state-fills', 'fill-color', fillColor) } catch {}
 
-    // Update response points
+    // Response points
     if (geoData.points.length > 0) {
       const features = geoData.points.map(p => ({
         type: 'Feature' as const,
         geometry: { type: 'Point' as const, coordinates: [p.lng, p.lat] },
         properties: { surveyId: p.surveyId },
       }))
-
-      const source = map.getSource('response-points')
-      if (source) {
-        source.setData({ type: 'FeatureCollection', features })
-      }
+      const src = map.getSource('response-points')
+      if (src) src.setData({ type: 'FeatureCollection', features })
     }
 
-    // If no fly-to happened yet (data loaded after map), fly now
+    // Fly to org center if loaded after map init
     if (geoData.orgCenter) {
       map.flyTo({
         center: [geoData.orgCenter.longitude, geoData.orgCenter.latitude],
@@ -349,14 +381,32 @@ export default function DashboardMap({ className }: DashboardMapProps) {
     }
   }, [geoData, mapReady])
 
-  // Toggle layer visibility
+  // --- Update political PVI choropleth ---
+  useEffect(() => {
+    if (!mapReady || !mapRef.current || !politicalData) return
+    const map = mapRef.current
+
+    if (politicalData.level === 'state' && politicalData.features.length > 0) {
+      const expr: any[] = ['match', ['get', 'iso_3166_1_alpha2']]
+      for (const f of politicalData.features) {
+        if (f.id && f.id.length === 2) {
+          expr.push(`US-${f.id}`, pviToColor(f.pviNumeric || 0, 0.5))
+        }
+      }
+      if (expr.length > 2) {
+        expr.push('rgba(128, 128, 128, 0.05)')
+        try { map.setPaintProperty('state-political-fills', 'fill-color', expr) } catch {}
+      }
+    }
+  }, [politicalData, mapReady])
+
+  // --- Layer visibility toggles ---
   useEffect(() => {
     if (!mapReady || !mapRef.current) return
     const map = mapRef.current
     try {
       map.setLayoutProperty('state-fills', 'visibility', showSurveyLayer ? 'visible' : 'none')
-      map.setLayoutProperty('state-borders', 'visibility', showSurveyLayer ? 'visible' : 'none')
-    } catch { /* layers may not exist yet */ }
+    } catch {}
   }, [showSurveyLayer, mapReady])
 
   useEffect(() => {
@@ -365,8 +415,16 @@ export default function DashboardMap({ className }: DashboardMapProps) {
     try {
       map.setLayoutProperty('response-heatmap', 'visibility', showVoterLayer ? 'visible' : 'none')
       map.setLayoutProperty('response-points-circles', 'visibility', showVoterLayer ? 'visible' : 'none')
-    } catch { /* layers may not exist yet */ }
+    } catch {}
   }, [showVoterLayer, mapReady])
+
+  useEffect(() => {
+    if (!mapReady || !mapRef.current) return
+    const map = mapRef.current
+    try {
+      map.setLayoutProperty('state-political-fills', 'visibility', showPoliticalLayer ? 'visible' : 'none')
+    } catch {}
+  }, [showPoliticalLayer, mapReady])
 
   const resetView = useCallback(() => {
     if (!mapRef.current) return
@@ -378,23 +436,33 @@ export default function DashboardMap({ className }: DashboardMapProps) {
     })
   }, [geoData])
 
-  // Get hovered state info
-  const hoveredStateData = hoveredState
+  // --- Enriched hover tooltip data ---
+  const tooltipData = hoveredState
     ? (() => {
-        // Try full state code (e.g. US-NJ)
         const abbrev = hoveredState.replace('US-', '')
-        // Find by abbreviation or full name
+
+        // Find survey data
+        let surveyInfo: { name: string; responses: number; surveys: number } | null = null
         for (const [name, data] of Object.entries(geoData?.states || {})) {
-          const stateAbbrev = STATE_NAME_TO_ABBREV[name] || name
-          if (stateAbbrev === abbrev) return { name, ...data }
+          if ((STATE_NAME_TO_ABBREV[name] || name) === abbrev) {
+            surveyInfo = { name, ...data }
+            break
+          }
         }
-        return null
+
+        // Find political data
+        let politicalInfo: PoliticalFeature | null = null
+        if (politicalData?.level === 'state') {
+          politicalInfo = politicalData.features.find(f => f.id === abbrev) || null
+        }
+
+        if (!surveyInfo && !politicalInfo) return null
+        return { surveyInfo, politicalInfo }
       })()
     : null
 
   return (
     <div className={`relative rounded-lg overflow-hidden border border-border ${className || ''}`}>
-      {/* Map container */}
       <div ref={mapContainer} className="w-full h-full min-h-[400px]" />
 
       {/* Loading overlay */}
@@ -411,6 +479,17 @@ export default function DashboardMap({ className }: DashboardMapProps) {
       <div className="absolute top-3 right-3 z-10 flex flex-col gap-2">
         <div className="bg-background/80 backdrop-blur-md rounded-lg border border-border/50 p-2 shadow-lg">
           <div className="flex flex-col gap-1.5">
+            <button
+              onClick={() => setShowPoliticalLayer(!showPoliticalLayer)}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                showPoliticalLayer
+                  ? 'bg-red-500/10 text-red-400 border border-red-500/20'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+              }`}
+            >
+              <Landmark className="h-3.5 w-3.5" />
+              Political
+            </button>
             <button
               onClick={() => setShowSurveyLayer(!showSurveyLayer)}
               className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
@@ -445,30 +524,106 @@ export default function DashboardMap({ className }: DashboardMapProps) {
         </Button>
       </div>
 
-      {/* Hover tooltip */}
-      {hoveredStateData && (
-        <div className="absolute top-3 left-3 z-10 bg-background/90 backdrop-blur-md rounded-lg border border-border/50 p-3 shadow-lg min-w-[160px]">
-          <p className="font-semibold text-sm">{hoveredStateData.name}</p>
-          <div className="flex items-center gap-3 mt-1.5 text-xs text-muted-foreground">
-            <span className="flex items-center gap-1">
-              <Users className="h-3 w-3" />
-              {hoveredStateData.responses} responses
-            </span>
-            <span className="flex items-center gap-1">
-              <FileText className="h-3 w-3" />
-              {hoveredStateData.surveys} surveys
-            </span>
-          </div>
+      {/* Enriched hover tooltip */}
+      {tooltipData && (
+        <div className="absolute top-3 left-3 z-10 bg-background/90 backdrop-blur-md rounded-lg border border-border/50 p-3 shadow-lg min-w-[200px] max-w-[280px]">
+          <p className="font-semibold text-sm">
+            {tooltipData.politicalInfo?.name || tooltipData.surveyInfo?.name || hoveredState?.replace('US-', '')}
+          </p>
+
+          {/* Political info */}
+          {tooltipData.politicalInfo && showPoliticalLayer && (
+            <div className="mt-2 space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-muted-foreground">PVI</span>
+                <span className={`text-xs font-bold ${
+                  (tooltipData.politicalInfo.pviNumeric || 0) > 0 ? 'text-blue-400' :
+                  (tooltipData.politicalInfo.pviNumeric || 0) < 0 ? 'text-red-400' : 'text-muted-foreground'
+                }`}>
+                  {tooltipData.politicalInfo.pvi}
+                </span>
+              </div>
+              {tooltipData.politicalInfo.margin2024 !== undefined && (
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-muted-foreground">2024 Margin</span>
+                  <span className={`text-xs font-medium ${
+                    tooltipData.politicalInfo.margin2024 > 0 ? 'text-blue-400' :
+                    tooltipData.politicalInfo.margin2024 < 0 ? 'text-red-400' : 'text-muted-foreground'
+                  }`}>
+                    {tooltipData.politicalInfo.margin2024 > 0 ? 'D' : 'R'}+{Math.abs(tooltipData.politicalInfo.margin2024).toFixed(1)}
+                  </span>
+                </div>
+              )}
+              {tooltipData.politicalInfo.electoralVotes && (
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-muted-foreground">Electoral Votes</span>
+                  <span className="text-xs font-medium">{tooltipData.politicalInfo.electoralVotes}</span>
+                </div>
+              )}
+              {tooltipData.politicalInfo.governorParty && (
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-muted-foreground">Governor</span>
+                  <span className={`text-xs font-medium ${
+                    tooltipData.politicalInfo.governorParty === 'D' ? 'text-blue-400' : 'text-red-400'
+                  }`}>
+                    {tooltipData.politicalInfo.governorParty === 'D' ? 'Democrat' : 'Republican'}
+                  </span>
+                </div>
+              )}
+              {tooltipData.politicalInfo.senateSeats && tooltipData.politicalInfo.senateSeats !== '-' && (
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-muted-foreground">Senate</span>
+                  <span className="text-xs font-medium">{tooltipData.politicalInfo.senateSeats}</span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Survey info */}
+          {tooltipData.surveyInfo && showSurveyLayer && (
+            <div className="flex items-center gap-3 mt-2 pt-2 border-t border-border/50 text-xs text-muted-foreground">
+              <span className="flex items-center gap-1">
+                <Users className="h-3 w-3" />
+                {tooltipData.surveyInfo.responses} responses
+              </span>
+              <span className="flex items-center gap-1">
+                <FileText className="h-3 w-3" />
+                {tooltipData.surveyInfo.surveys} surveys
+              </span>
+            </div>
+          )}
         </div>
       )}
 
-      {/* Minimal org label - bottom left */}
+      {/* Org label - bottom left */}
       {geoData?.orgCenter && (
         <div className="absolute bottom-3 left-3 z-10">
           <div className="bg-background/80 backdrop-blur-md rounded-lg border border-border/50 px-3 py-2 shadow-lg">
             <div className="flex items-center gap-1.5">
               <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
               <span className="text-xs font-medium">{geoData.orgCenter.name}</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* PVI Legend - bottom right (above nav controls) */}
+      {showPoliticalLayer && (
+        <div className="absolute bottom-14 right-3 z-10">
+          <div className="bg-background/80 backdrop-blur-md rounded-lg border border-border/50 px-3 py-2 shadow-lg">
+            <p className="text-[10px] font-medium text-muted-foreground mb-1">Partisan Lean</p>
+            <div className="flex items-center gap-0.5">
+              {[-25, -15, -5, 0, 5, 15, 25].map(v => (
+                <div
+                  key={v}
+                  className="w-4 h-3 rounded-sm"
+                  style={{ backgroundColor: pviToColor(v, 0.8) }}
+                />
+              ))}
+            </div>
+            <div className="flex justify-between mt-0.5">
+              <span className="text-[9px] text-red-400">R+25</span>
+              <span className="text-[9px] text-blue-400">D+25</span>
             </div>
           </div>
         </div>
