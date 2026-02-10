@@ -112,3 +112,6 @@ dist
 # Temporary folders
 tmp/
 temp/
+data/*.csv
+data/*.tsv
+data/*.xlsx
