@@ -35,6 +35,13 @@ export async function GET(
 
     const db = await getMySQLConnection();
 
+    // Parse optional cohort filter from query string
+    let cohortFilter: Array<{ field: string; op: string; value: string | string[] }> = [];
+    const filterParam = request.nextUrl.searchParams.get('filter');
+    if (filterParam) {
+      try { cohortFilter = JSON.parse(filterParam); } catch { /* ignore malformed */ }
+    }
+
     // Dynamically discover the schema
     const schema = await discoverTableSchema(db);
     console.log('Discovered schema for survey', surveyIdNum, ':', schema);
@@ -45,8 +52,8 @@ export async function GET(
       [surveyIdNum]
     );
 
-    // Build dynamic query based on discovered schema
-    const responseQuery = buildResponseQuery(schema, surveyIdNum);
+    // Build dynamic query based on discovered schema (with optional filter)
+    const responseQuery = buildResponseQuery(schema, surveyIdNum, cohortFilter);
     const [responseRows] = await db.execute<RowDataPacket[]>(responseQuery.sql, responseQuery.params);
 
     if (responseRows.length === 0) {
@@ -182,18 +189,72 @@ async function discoverTableSchema(db: any): Promise<TableSchema> {
   }
 }
 
-function buildResponseQuery(schema: TableSchema, surveyId: number) {
+function buildResponseQuery(
+  schema: TableSchema,
+  surveyId: number,
+  filters: Array<{ field: string; op: string; value: string | string[] }> = []
+) {
+  const params: any[] = [surveyId];
+  const extraWhere: string[] = [];
+
+  for (const rule of filters) {
+    if (!rule.field || rule.value === '' || (Array.isArray(rule.value) && rule.value.length === 0)) continue;
+
+    if (!rule.field.startsWith('question_')) {
+      // Demographic field stored in survey_responses.demographics JSON
+      switch (rule.op) {
+        case '=':
+          extraWhere.push(`JSON_UNQUOTE(JSON_EXTRACT(sr.demographics, CONCAT('$.', ?))) = ?`);
+          params.push(rule.field, rule.value);
+          break;
+        case 'IN': {
+          const vals = Array.isArray(rule.value) ? rule.value : String(rule.value).split(',');
+          if (vals.length > 0) {
+            extraWhere.push(`JSON_UNQUOTE(JSON_EXTRACT(sr.demographics, CONCAT('$.', ?))) IN (${vals.map(() => '?').join(',')})`);
+            params.push(rule.field, ...vals);
+          }
+          break;
+        }
+        case 'CONTAINS':
+          extraWhere.push(`JSON_UNQUOTE(JSON_EXTRACT(sr.demographics, CONCAT('$.', ?))) LIKE ?`);
+          params.push(rule.field, `%${rule.value}%`);
+          break;
+      }
+    } else {
+      // Question-based filter
+      const qId = parseInt(rule.field.replace('question_', ''));
+      if (isNaN(qId)) continue;
+      switch (rule.op) {
+        case '=':
+          extraWhere.push(`sr.id IN (SELECT response_id FROM survey_answers WHERE question_id = ? AND answer_value = ?)`);
+          params.push(qId, rule.value);
+          break;
+        case 'IN': {
+          const vals = Array.isArray(rule.value) ? rule.value : String(rule.value).split(',');
+          if (vals.length > 0) {
+            extraWhere.push(`sr.id IN (SELECT response_id FROM survey_answers WHERE question_id = ? AND answer_value IN (${vals.map(() => '?').join(',')}))`);
+            params.push(qId, ...vals);
+          }
+          break;
+        }
+        case 'CONTAINS':
+          extraWhere.push(`sr.id IN (SELECT response_id FROM survey_answers WHERE question_id = ? AND answer_value LIKE ?)`);
+          params.push(qId, `%${rule.value}%`);
+          break;
+      }
+    }
+  }
+
+  const filterClause = extraWhere.length > 0 ? ` AND ${extraWhere.join(' AND ')}` : '';
+
   const sql = `
     SELECT sr.id, sr.submitted_at, sa.question_id, sa.${schema.answerValueColumn}, sq.${schema.questionOrderColumn} 
     FROM survey_responses sr
     LEFT JOIN survey_answers sa ON sr.id = sa.${schema.responseIdColumn}  
     LEFT JOIN survey_questions sq ON sa.question_id = sq.id
-    WHERE sr.survey_id = ?
+    WHERE sr.survey_id = ?${filterClause}
     ORDER BY sr.id, sq.${schema.questionOrderColumn}
   `;
 
-  return {
-    sql: sql.trim(),
-    params: [surveyId]
-  };
+  return { sql: sql.trim(), params };
 } 
