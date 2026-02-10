@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { useState, useEffect } from 'react'
+import dynamic from 'next/dynamic'
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { SidebarTrigger } from "@/components/ui/sidebar"
@@ -9,10 +10,8 @@ import {
   FileText, 
   Users,
   BarChart3,
-  Calendar,
   Eye,
   Edit,
-  ExternalLink,
   Plus,
   Clock,
   X,
@@ -21,13 +20,14 @@ import {
   Database,
   Trash2,
   Copy,
-  Brain,
   TrendingUp,
   Share,
   Share2,
   MessageCircle,
   MoreVertical,
   FlaskConical,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
@@ -38,10 +38,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-
-// Charts & table utilities
-import { AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, CartesianGrid, XAxis, YAxis, LabelList } from "recharts"
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@/components/ui/table"
 import { formatDistanceToNow } from "date-fns"
 import {
@@ -51,6 +47,19 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog"
+
+// Dynamic import for the map (requires browser APIs)
+const DashboardMap = dynamic(() => import('@/components/dashboard-map'), {
+  ssr: false,
+  loading: () => (
+    <div className="w-full h-[60vh] rounded-lg border border-border bg-muted/30 flex items-center justify-center">
+      <div className="flex flex-col items-center gap-2 text-muted-foreground">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-current border-t-transparent" />
+        <p className="text-sm">Loading map...</p>
+      </div>
+    </div>
+  ),
+})
 
 
 interface Survey {
@@ -84,75 +93,11 @@ const SurveysPage = () => {
   const [surveys, setSurveys] = useState<Survey[]>([])
   const [stats, setStats] = useState<DashboardStats | null>(null)
   const [loading, setLoading] = useState(true)
+  const [showTable, setShowTable] = useState(false)
   const router = useRouter()
   const [shareOpen, setShareOpen] = useState(false)
   const [shareFor, setShareFor] = useState<Survey | null>(null)
   const [telegramUsername, setTelegramUsername] = useState<string | null>(null)
-
-  const grayscalePalette = [
-    'hsl(0, 0%, 9%)',   // Very dark gray (almost black)
-    'hsl(0, 0%, 26%)',  // Dark gray
-    'hsl(0, 0%, 40%)',  // Medium gray
-    'hsl(0, 0%, 54%)',  // Light gray
-    'hsl(0, 0%, 71%)',  // Very light gray
-  ]
-
-  /* --------------------------------------------------
-   * Aggregated data for dashboard visualizations
-   * -------------------------------------------------- */
-  const aggregation = useMemo(() => {
-    const statusCounts: Record<string, number> = {
-      draft: 0,
-      scheduled: 0,
-      active: 0,
-      published: 0,
-      closed: 0,
-      archived: 0
-    }
-
-    const monthlyData: Record<string, number> = {}
-    const responseData: { range: string; count: number }[] = []
-
-    surveys.forEach((survey) => {
-      // Status distribution
-      statusCounts[survey.status] += 1
-
-      // Monthly creation data
-      const month = new Date(survey.created_at).toLocaleDateString('en-US', { 
-        year: 'numeric', 
-        month: 'short' 
-      })
-      monthlyData[month] = (monthlyData[month] || 0) + 1
-    })
-
-    // Response count distribution
-    const responseBuckets = { '0': 0, '1-10': 0, '11-50': 0, '51-100': 0, '100+': 0 }
-    surveys.forEach(survey => {
-      const count = survey.response_count
-      if (count === 0) responseBuckets['0']++
-      else if (count <= 10) responseBuckets['1-10']++
-      else if (count <= 50) responseBuckets['11-50']++
-      else if (count <= 100) responseBuckets['51-100']++
-      else responseBuckets['100+']++
-    })
-
-    const statusData = Object.entries(statusCounts).map(([status, count]) => ({ 
-      status: status.charAt(0).toUpperCase() + status.slice(1), 
-      count 
-    }))
-
-    const monthlyCreationData = Object.entries(monthlyData)
-      .sort((a, b) => new Date(a[0]).getTime() - new Date(b[0]).getTime())
-      .slice(-6) // Last 6 months
-      .map(([month, count]) => ({ month, count }))
-
-    const responseDistribution = Object.entries(responseBuckets).map(([range, count]) => ({ 
-      range, 
-      count 
-    }))
-
-    return { statusData, monthlyCreationData, responseDistribution }
-  }, [surveys])
 
   // Load all surveys on component mount
   useEffect(() => {
@@ -436,57 +381,54 @@ const SurveysPage = () => {
         
         <div className="border-b border-border" />
 
-        <div className="p-6 space-y-4">
-          <Dialog open={shareOpen} onOpenChange={setShareOpen}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Share survey</DialogTitle>
-                <DialogDescription>Use these links to distribute your survey.</DialogDescription>
-              </DialogHeader>
-              {shareFor && (
-                <div className="space-y-3">
-                  <div className="rounded border p-3">
-                    <div className="text-sm font-medium mb-1">Web</div>
-                    <div className="flex items-center gap-2">
-                      <input readOnly className="w-full px-2 py-1 border rounded bg-muted/50" value={`${window.location.origin}/survey/${shareFor.slug}`} />
-                      <Button size="sm" variant="outline" onClick={() => copyShareLink(shareFor.slug, shareFor.title)}>Copy</Button>
-                    </div>
-                  </div>
-                  <div className="rounded border p-3">
-                    <div className="text-sm font-medium mb-1">Telegram</div>
-                    {telegramUsername ? (
-                      <div className="flex items-center gap-2">
-                        <input readOnly className="w-full px-2 py-1 border rounded bg-muted/50" value={`https://t.me/${telegramUsername}?start=survey_${shareFor.slug}`} />
-                        <Button size="sm" variant="outline" onClick={async()=>{
-                          await navigator.clipboard.writeText(`https://t.me/${telegramUsername}?start=survey_${shareFor.slug}`)
-                          toast.success('Telegram deep link copied')
-                        }}>Copy</Button>
-                        <a href={`https://t.me/${telegramUsername}?start=survey_${shareFor.slug}`} target="_blank" rel="noreferrer">
-                          <Button size="sm">Open</Button>
-                        </a>
-                      </div>
-                    ) : (
-                      <div className="text-xs text-muted-foreground">
-                        Telegram not connected. Configure under Channels to enable deep links.
-                      </div>
-                    )}
+        <Dialog open={shareOpen} onOpenChange={setShareOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Share survey</DialogTitle>
+              <DialogDescription>Use these links to distribute your survey.</DialogDescription>
+            </DialogHeader>
+            {shareFor && (
+              <div className="space-y-3">
+                <div className="rounded border p-3">
+                  <div className="text-sm font-medium mb-1">Web</div>
+                  <div className="flex items-center gap-2">
+                    <input readOnly className="w-full px-2 py-1 border rounded bg-muted/50" value={`${window.location.origin}/survey/${shareFor.slug}`} />
+                    <Button size="sm" variant="outline" onClick={() => copyShareLink(shareFor.slug, shareFor.title)}>Copy</Button>
                   </div>
                 </div>
-              )}
-            </DialogContent>
-          </Dialog>
-          {/* Introduction (restored) */}
-          <div className="text-left">
-            <h2 className="text-3xl font-bold">Survey Management</h2>
-            <p className="text-muted-foreground text-base max-w-2xl mt-2">
-              Create, manage, and analyze your surveys in one place. Build engaging surveys with AI assistance, import from popular platforms, and get real-time insights from the responses.
-            </p>
-          </div>
+                <div className="rounded border p-3">
+                  <div className="text-sm font-medium mb-1">Telegram</div>
+                  {telegramUsername ? (
+                    <div className="flex items-center gap-2">
+                      <input readOnly className="w-full px-2 py-1 border rounded bg-muted/50" value={`https://t.me/${telegramUsername}?start=survey_${shareFor.slug}`} />
+                      <Button size="sm" variant="outline" onClick={async()=>{
+                        await navigator.clipboard.writeText(`https://t.me/${telegramUsername}?start=survey_${shareFor.slug}`)
+                        toast.success('Telegram deep link copied')
+                      }}>Copy</Button>
+                      <a href={`https://t.me/${telegramUsername}?start=survey_${shareFor.slug}`} target="_blank" rel="noreferrer">
+                        <Button size="sm">Open</Button>
+                      </a>
+                    </div>
+                  ) : (
+                    <div className="text-xs text-muted-foreground">
+                      Telegram not connected. Configure under Channels to enable deep links.
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
 
+        {/* Map hero section - always visible */}
+        <div className="px-2 pt-2">
+          <DashboardMap className="h-[60vh]" />
+        </div>
 
+        <div className="p-4 space-y-4">
           {surveys.length === 0 ? (
             /* Empty State */
-            <div className="text-center space-y-4 py-12">
+            <div className="text-center space-y-4 py-8">
               <div className="flex items-center justify-center mb-4">
                 <div className="p-3 rounded-full bg-primary/10">
                   <FileText className="h-8 w-8 text-primary" />
@@ -504,84 +446,33 @@ const SurveysPage = () => {
               </Link>
             </div>
           ) : (
-                        <>
-              {/* Dashboard Overview */}
-              <section className="space-y-4">
-                                 {/* Overview Stats Cards */}
-                 {stats && (
-                   <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                     <Card>
-                       <CardContent className="p-4">
-                         <div className="flex items-center">
-                           <FileText className="h-6 w-6 text-blue-600" />
-                           <div className="ml-3">
-                             <p className="text-sm font-medium text-muted-foreground">Total Surveys</p>
-                             <p className="text-xl font-bold">{stats.total_surveys}</p>
-                           </div>
-                         </div>
-                       </CardContent>
-                     </Card>
+            <>
+              {/* Collapsible survey table */}
+              <button
+                onClick={() => setShowTable(!showTable)}
+                className="w-full flex items-center justify-between px-4 py-3 rounded-lg border border-border bg-card hover:bg-muted/50 transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <FileText className="h-4 w-4 text-muted-foreground" />
+                  <span className="font-medium text-sm">All Surveys ({surveys.length})</span>
+                  {stats && (
+                    <div className="flex items-center gap-3 ml-2">
+                      <Badge variant="secondary" className="text-xs">
+                        {stats.total_responses} responses
+                      </Badge>
+                      <Badge variant="secondary" className="text-xs">
+                        {stats.published_surveys} published
+                      </Badge>
+                    </div>
+                  )}
+                </div>
+                {showTable ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+              </button>
 
-                     <Card>
-                       <CardContent className="p-4">
-                         <div className="flex items-center">
-                           <TrendingUp className="h-6 w-6 text-green-600" />
-                           <div className="ml-3">
-                             <p className="text-sm font-medium text-muted-foreground">Published</p>
-                             <p className="text-xl font-bold">{stats.published_surveys}</p>
-                           </div>
-                         </div>
-                       </CardContent>
-                     </Card>
-
-                     <Card>
-                       <CardContent className="p-4">
-                         <div className="flex items-center">
-                           <Users className="h-6 w-6 text-purple-600" />
-                           <div className="ml-3">
-                             <p className="text-sm font-medium text-muted-foreground">Total Responses</p>
-                             <p className="text-xl font-bold">{stats.total_responses}</p>
-                           </div>
-                         </div>
-                       </CardContent>
-                     </Card>
-
-                     <Card>
-                       <CardContent className="p-4">
-                         <div className="flex items-center">
-                           <Brain className="h-6 w-6 text-pink-600" />
-                           <div className="ml-3">
-                             <p className="text-sm font-medium text-muted-foreground">Digital Twins</p>
-                             <p className="text-xl font-bold">{stats.total_digital_twins}</p>
-                           </div>
-                         </div>
-                       </CardContent>
-                     </Card>
-
-                     <Card>
-                       <CardContent className="p-4">
-                         <div className="flex items-center">
-                           <BarChart3 className="h-6 w-6 text-orange-600" />
-                           <div className="ml-3">
-                             <p className="text-sm font-medium text-muted-foreground">Avg per Survey</p>
-                             <p className="text-xl font-bold">
-                               {stats.total_surveys > 0 
-                                 ? Math.round(stats.total_responses / stats.total_surveys)
-                                 : 0
-                               }
-                             </p>
-                           </div>
-                         </div>
-                       </CardContent>
-                     </Card>
-                   </div>
-                 )}
+              {showTable && (
+                <section className="space-y-4">
 
 
-
-
-
-                {/* Surveys Table */}
                 <Card>
                   <CardHeader>
                     <CardTitle>All Surveys ({surveys.length})</CardTitle>
@@ -783,10 +674,9 @@ const SurveysPage = () => {
                   </CardContent>
                 </Card>
               </section>
+              )}
             </>
           )}
-
-
         </div>
       </div>
     </div>
