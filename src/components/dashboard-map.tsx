@@ -13,7 +13,10 @@ import {
   Landmark,
 } from 'lucide-react'
 
-// Full state name to abbreviation
+// ---------------------------------------------------------------------------
+// State name <-> abbreviation lookups
+// ---------------------------------------------------------------------------
+
 const STATE_NAME_TO_ABBREV: Record<string, string> = {
   'Alabama': 'AL', 'Alaska': 'AK', 'Arizona': 'AZ', 'Arkansas': 'AR',
   'California': 'CA', 'Colorado': 'CO', 'Connecticut': 'CT', 'Delaware': 'DE',
@@ -29,6 +32,18 @@ const STATE_NAME_TO_ABBREV: Record<string, string> = {
   'Vermont': 'VT', 'Virginia': 'VA', 'Washington': 'WA', 'West Virginia': 'WV',
   'Wisconsin': 'WI', 'Wyoming': 'WY',
 }
+
+const ABBREV_TO_STATE_NAME: Record<string, string> = Object.fromEntries(
+  Object.entries(STATE_NAME_TO_ABBREV).map(([name, abbrev]) => [abbrev, name])
+)
+
+// Public GeoJSON of US state boundaries (free, no API key required)
+const US_STATES_GEOJSON_URL =
+  'https://raw.githubusercontent.com/PublicaMundi/MappingAPI/master/data/geojson/us-states.json'
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
 
 interface GeoData {
   states: Record<string, { responses: number; surveys: number }>
@@ -55,44 +70,46 @@ interface PoliticalFeature {
   swing?: number
 }
 
-interface PoliticalData {
-  level: 'state' | 'district' | 'county'
-  features: PoliticalFeature[]
-}
-
 interface DashboardMapProps {
   className?: string
 }
 
-/** Convert a PVI numeric value (-25 to +25) to a red-blue color */
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/** Convert a PVI numeric value (-25 to +25) to a red-blue colour */
 function pviToColor(pvi: number, alpha: number = 0.6): string {
-  // Clamp to -30..+30
   const clamped = Math.max(-30, Math.min(30, pvi))
-  const t = (clamped + 30) / 60 // 0 = deep red, 0.5 = neutral, 1 = deep blue
-  // Red channel: high when R, low when D
+  const t = (clamped + 30) / 60
   const r = Math.round(220 - t * 180)
-  // Blue channel: low when R, high when D
   const b = Math.round(40 + t * 180)
-  // Green: peaks at center (purple-ish neutral)
   const g = Math.round(60 + (1 - Math.abs(t - 0.5) * 2) * 40)
   return `rgba(${r}, ${g}, ${b}, ${alpha})`
 }
+
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
 
 export default function DashboardMap({ className }: DashboardMapProps) {
   const mapContainer = useRef<HTMLDivElement>(null)
   const mapRef = useRef<any>(null)
   const [loading, setLoading] = useState(true)
   const [geoData, setGeoData] = useState<GeoData | null>(null)
-  const [politicalData, setPoliticalData] = useState<PoliticalData | null>(null)
+  const [statePoliticalData, setStatePoliticalData] = useState<PoliticalFeature[]>([])
   const [showSurveyLayer, setShowSurveyLayer] = useState(true)
   const [showVoterLayer, setShowVoterLayer] = useState(true)
   const [showPoliticalLayer, setShowPoliticalLayer] = useState(true)
-  const [hoveredState, setHoveredState] = useState<string | null>(null)
+  const [hoveredStateName, setHoveredStateName] = useState<string | null>(null)
   const [mapReady, setMapReady] = useState(false)
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const { resolvedTheme } = useTheme()
 
-  // Fetch geo data (survey responses)
+  // -----------------------------------------------------------------------
+  // Data fetching
+  // -----------------------------------------------------------------------
+
+  // Survey geo data
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -106,23 +123,25 @@ export default function DashboardMap({ className }: DashboardMapProps) {
     fetchData()
   }, [])
 
-  // Fetch political data based on viewport
-  const fetchPoliticalData = useCallback(async (zoom: number) => {
-    try {
-      const res = await fetch(`/api/dashboard/political?zoom=${zoom}`)
-      const data = await res.json()
-      if (data.status) setPoliticalData(data)
-    } catch (err) {
-      console.error('Failed to fetch political data:', err)
+  // State-level political data (fetched once)
+  useEffect(() => {
+    const fetchStates = async () => {
+      try {
+        const res = await fetch('/api/dashboard/political?zoom=4')
+        const data = await res.json()
+        if (data.status && data.features?.length > 0) {
+          setStatePoliticalData(data.features)
+        }
+      } catch (err) {
+        console.error('Failed to fetch state political data:', err)
+      }
     }
+    fetchStates()
   }, [])
 
-  // Initial political data fetch
-  useEffect(() => {
-    fetchPoliticalData(4)
-  }, [fetchPoliticalData])
-
-  // Initialize Mapbox
+  // -----------------------------------------------------------------------
+  // Map initialisation
+  // -----------------------------------------------------------------------
   useEffect(() => {
     if (!mapContainer.current || mapRef.current) return
     let cancelled = false
@@ -163,56 +182,55 @@ export default function DashboardMap({ className }: DashboardMapProps) {
         setMapReady(true)
         setLoading(false)
 
-        // --- State boundaries (Mapbox built-in) ---
+        // ---- US state boundaries from public GeoJSON -----------------------
         map.addSource('us-states', {
-          type: 'vector',
-          url: 'mapbox://mapbox.boundaries-adm1-v4',
+          type: 'geojson',
+          data: US_STATES_GEOJSON_URL,
         })
 
-        // State fill - survey data choropleth
+        // Survey data choropleth (blue intensity by response count)
         map.addLayer({
           id: 'state-fills',
           type: 'fill',
           source: 'us-states',
-          'source-layer': 'boundaries_admin_1',
-          filter: ['==', ['get', 'iso_3166_1'], 'US'],
-          paint: { 'fill-color': 'rgba(59, 130, 246, 0.05)', 'fill-opacity': 0.8 },
+          paint: {
+            'fill-color': 'rgba(59, 130, 246, 0.03)',
+            'fill-opacity': 0.8,
+          },
         })
 
-        // State fill - political PVI choropleth (on top, toggled separately)
+        // Political PVI choropleth (red-blue)
         map.addLayer({
           id: 'state-political-fills',
           type: 'fill',
           source: 'us-states',
-          'source-layer': 'boundaries_admin_1',
-          filter: ['==', ['get', 'iso_3166_1'], 'US'],
-          paint: { 'fill-color': 'rgba(128, 128, 128, 0.1)', 'fill-opacity': 0.7 },
+          paint: {
+            'fill-color': 'rgba(128, 128, 128, 0.1)',
+            'fill-opacity': 0.7,
+          },
         })
 
-        // State borders
+        // State border lines
         map.addLayer({
           id: 'state-borders',
           type: 'line',
           source: 'us-states',
-          'source-layer': 'boundaries_admin_1',
-          filter: ['==', ['get', 'iso_3166_1'], 'US'],
           paint: {
-            'line-color': isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.15)',
+            'line-color': isDark ? 'rgba(255, 255, 255, 0.25)' : 'rgba(0, 0, 0, 0.15)',
             'line-width': 1,
           },
         })
 
-        // State hover highlight
+        // Hover highlight ring
         map.addLayer({
           id: 'state-hover',
           type: 'line',
           source: 'us-states',
-          'source-layer': 'boundaries_admin_1',
-          filter: ['==', ['get', 'iso_3166_1_alpha2'], ''],
+          filter: ['==', ['get', 'name'], ''],
           paint: { 'line-color': '#3b82f6', 'line-width': 2.5 },
         })
 
-        // --- Response points (canvass GPS) ---
+        // ---- Response points (canvass GPS) ---------------------------------
         map.addSource('response-points', {
           type: 'geojson',
           data: { type: 'FeatureCollection', features: [] },
@@ -253,7 +271,7 @@ export default function DashboardMap({ className }: DashboardMapProps) {
           },
         })
 
-        // Fly to org center
+        // Fly to org centre
         setTimeout(() => {
           if (cancelled) return
           const center = geoData?.orgCenter
@@ -267,38 +285,26 @@ export default function DashboardMap({ className }: DashboardMapProps) {
         }, 600)
       })
 
-      // --- Viewport listener: refetch political data on zoom change ---
-      let lastZoomBucket = 0
-      map.on('moveend', () => {
-        const z = map.getZoom()
-        const bucket = z < 5 ? 0 : z < 9 ? 1 : 2
-        if (bucket !== lastZoomBucket) {
-          lastZoomBucket = bucket
-          if (debounceRef.current) clearTimeout(debounceRef.current)
-          debounceRef.current = setTimeout(() => fetchPoliticalData(z), 300)
-        }
-      })
-
-      // --- Hover interactions ---
-      let hoveredId: string | null = null
+      // ---- Hover interactions -----------------------------------------------
+      let hoveredName: string | null = null
 
       map.on('mousemove', 'state-political-fills', (e: any) => {
         if (e.features && e.features.length > 0) {
-          const stateCode = e.features[0].properties?.iso_3166_1_alpha2 || ''
-          if (stateCode !== hoveredId) {
-            hoveredId = stateCode
-            map.setFilter('state-hover', ['==', ['get', 'iso_3166_1_alpha2'], stateCode])
+          const name = e.features[0].properties?.name || ''
+          if (name !== hoveredName) {
+            hoveredName = name
+            map.setFilter('state-hover', ['==', ['get', 'name'], name])
             map.getCanvas().style.cursor = 'pointer'
-            setHoveredState(stateCode)
+            setHoveredStateName(name)
           }
         }
       })
 
       map.on('mouseleave', 'state-political-fills', () => {
-        hoveredId = null
-        map.setFilter('state-hover', ['==', ['get', 'iso_3166_1_alpha2'], ''])
+        hoveredName = null
+        map.setFilter('state-hover', ['==', ['get', 'name'], ''])
         map.getCanvas().style.cursor = ''
-        setHoveredState(null)
+        setHoveredStateName(null)
       })
 
       // Click to zoom into state
@@ -327,30 +333,31 @@ export default function DashboardMap({ className }: DashboardMapProps) {
 
     return () => {
       cancelled = true
-      if (debounceRef.current) clearTimeout(debounceRef.current)
       if (mapRef.current) { mapRef.current.remove(); mapRef.current = null }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // --- Update survey data layers ---
+  // -----------------------------------------------------------------------
+  // Update survey data layers
+  // -----------------------------------------------------------------------
   useEffect(() => {
     if (!mapReady || !mapRef.current || !geoData) return
     const map = mapRef.current
 
-    // State survey choropleth
+    // State survey choropleth — match on full state name
     const stateEntries = Object.entries(geoData.states)
     const defaultColor = 'rgba(59, 130, 246, 0.03)'
     let fillColor: any = defaultColor
 
     if (stateEntries.length > 0) {
       const maxR = Math.max(1, ...stateEntries.map(([, s]) => s.responses))
-      const expr: any[] = ['match', ['get', 'iso_3166_1_alpha2']]
+      const expr: any[] = ['match', ['get', 'name']]
       for (const [name, data] of stateEntries) {
-        const abbrev = STATE_NAME_TO_ABBREV[name] || name
-        if (abbrev.length === 2) {
+        // name is already the full state name from the API
+        if (name) {
           const alpha = 0.1 + Math.min(1, data.responses / maxR) * 0.6
-          expr.push(`US-${abbrev}`, `rgba(59, 130, 246, ${alpha})`)
+          expr.push(name, `rgba(59, 130, 246, ${alpha})`)
         }
       }
       if (expr.length > 2) { expr.push(defaultColor); fillColor = expr }
@@ -369,7 +376,7 @@ export default function DashboardMap({ className }: DashboardMapProps) {
       if (src) src.setData({ type: 'FeatureCollection', features })
     }
 
-    // Fly to org center if loaded after map init
+    // Fly to org centre if loaded after map init
     if (geoData.orgCenter) {
       map.flyTo({
         center: [geoData.orgCenter.longitude, geoData.orgCenter.latitude],
@@ -381,32 +388,38 @@ export default function DashboardMap({ className }: DashboardMapProps) {
     }
   }, [geoData, mapReady])
 
-  // --- Update political PVI choropleth ---
+  // -----------------------------------------------------------------------
+  // Update political PVI choropleth (from stable state data)
+  //  — match on full state name from the GeoJSON properties.name
+  // -----------------------------------------------------------------------
   useEffect(() => {
-    if (!mapReady || !mapRef.current || !politicalData) return
+    if (!mapReady || !mapRef.current || statePoliticalData.length === 0) return
     const map = mapRef.current
 
-    if (politicalData.level === 'state' && politicalData.features.length > 0) {
-      const expr: any[] = ['match', ['get', 'iso_3166_1_alpha2']]
-      for (const f of politicalData.features) {
-        if (f.id && f.id.length === 2) {
-          expr.push(`US-${f.id}`, pviToColor(f.pviNumeric || 0, 0.5))
-        }
-      }
-      if (expr.length > 2) {
-        expr.push('rgba(128, 128, 128, 0.05)')
-        try { map.setPaintProperty('state-political-fills', 'fill-color', expr) } catch {}
+    const expr: any[] = ['match', ['get', 'name']]
+    for (const f of statePoliticalData) {
+      const fullName = ABBREV_TO_STATE_NAME[f.id]
+      if (fullName) {
+        expr.push(fullName, pviToColor(f.pviNumeric || 0, 0.5))
       }
     }
-  }, [politicalData, mapReady])
+    if (expr.length > 2) {
+      expr.push('rgba(128, 128, 128, 0.05)')
+      try {
+        map.setPaintProperty('state-political-fills', 'fill-color', expr)
+      } catch (e) {
+        console.warn('Failed to set political fill color:', e)
+      }
+    }
+  }, [statePoliticalData, mapReady])
 
-  // --- Layer visibility toggles ---
+  // -----------------------------------------------------------------------
+  // Layer visibility toggles
+  // -----------------------------------------------------------------------
   useEffect(() => {
     if (!mapReady || !mapRef.current) return
     const map = mapRef.current
-    try {
-      map.setLayoutProperty('state-fills', 'visibility', showSurveyLayer ? 'visible' : 'none')
-    } catch {}
+    try { map.setLayoutProperty('state-fills', 'visibility', showSurveyLayer ? 'visible' : 'none') } catch {}
   }, [showSurveyLayer, mapReady])
 
   useEffect(() => {
@@ -421,9 +434,7 @@ export default function DashboardMap({ className }: DashboardMapProps) {
   useEffect(() => {
     if (!mapReady || !mapRef.current) return
     const map = mapRef.current
-    try {
-      map.setLayoutProperty('state-political-fills', 'visibility', showPoliticalLayer ? 'visible' : 'none')
-    } catch {}
+    try { map.setLayoutProperty('state-political-fills', 'visibility', showPoliticalLayer ? 'visible' : 'none') } catch {}
   }, [showPoliticalLayer, mapReady])
 
   const resetView = useCallback(() => {
@@ -436,31 +447,30 @@ export default function DashboardMap({ className }: DashboardMapProps) {
     })
   }, [geoData])
 
-  // --- Enriched hover tooltip data ---
-  const tooltipData = hoveredState
+  // -----------------------------------------------------------------------
+  // Tooltip data for hovered state
+  // -----------------------------------------------------------------------
+  const tooltipData = hoveredStateName
     ? (() => {
-        const abbrev = hoveredState.replace('US-', '')
+        const abbrev = STATE_NAME_TO_ABBREV[hoveredStateName] || ''
 
-        // Find survey data
-        let surveyInfo: { name: string; responses: number; surveys: number } | null = null
-        for (const [name, data] of Object.entries(geoData?.states || {})) {
-          if ((STATE_NAME_TO_ABBREV[name] || name) === abbrev) {
-            surveyInfo = { name, ...data }
-            break
-          }
-        }
+        // Survey data (keyed by full state name)
+        const surveyState = geoData?.states?.[hoveredStateName]
+        const surveyInfo = surveyState
+          ? { name: hoveredStateName, ...surveyState }
+          : null
 
-        // Find political data
-        let politicalInfo: PoliticalFeature | null = null
-        if (politicalData?.level === 'state') {
-          politicalInfo = politicalData.features.find(f => f.id === abbrev) || null
-        }
+        // Political data (keyed by 2-letter abbreviation)
+        const politicalInfo = statePoliticalData.find(f => f.id === abbrev) || null
 
         if (!surveyInfo && !politicalInfo) return null
         return { surveyInfo, politicalInfo }
       })()
     : null
 
+  // -----------------------------------------------------------------------
+  // Render
+  // -----------------------------------------------------------------------
   return (
     <div className={`relative rounded-lg overflow-hidden border border-border ${className || ''}`}>
       <div ref={mapContainer} className="w-full h-full min-h-[400px]" />
@@ -475,7 +485,7 @@ export default function DashboardMap({ className }: DashboardMapProps) {
         </div>
       )}
 
-      {/* Layer controls - top right */}
+      {/* Layer controls — top right */}
       <div className="absolute top-3 right-3 z-10 flex flex-col gap-2">
         <div className="bg-background/80 backdrop-blur-md rounded-lg border border-border/50 p-2 shadow-lg">
           <div className="flex flex-col gap-1.5">
@@ -528,7 +538,7 @@ export default function DashboardMap({ className }: DashboardMapProps) {
       {tooltipData && (
         <div className="absolute top-3 left-3 z-10 bg-background/90 backdrop-blur-md rounded-lg border border-border/50 p-3 shadow-lg min-w-[200px] max-w-[280px]">
           <p className="font-semibold text-sm">
-            {tooltipData.politicalInfo?.name || tooltipData.surveyInfo?.name || hoveredState?.replace('US-', '')}
+            {tooltipData.politicalInfo?.name || tooltipData.surveyInfo?.name || hoveredStateName}
           </p>
 
           {/* Political info */}
@@ -595,7 +605,7 @@ export default function DashboardMap({ className }: DashboardMapProps) {
         </div>
       )}
 
-      {/* Org label - bottom left */}
+      {/* Org label — bottom left */}
       {geoData?.orgCenter && (
         <div className="absolute bottom-3 left-3 z-10">
           <div className="bg-background/80 backdrop-blur-md rounded-lg border border-border/50 px-3 py-2 shadow-lg">
@@ -607,7 +617,7 @@ export default function DashboardMap({ className }: DashboardMapProps) {
         </div>
       )}
 
-      {/* PVI Legend - bottom right (above nav controls) */}
+      {/* PVI Legend — bottom right (above nav controls) */}
       {showPoliticalLayer && (
         <div className="absolute bottom-14 right-3 z-10">
           <div className="bg-background/80 backdrop-blur-md rounded-lg border border-border/50 px-3 py-2 shadow-lg">
