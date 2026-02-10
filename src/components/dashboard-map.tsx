@@ -4,13 +4,10 @@ import { useRef, useEffect, useState, useCallback } from 'react'
 import { useTheme } from 'next-themes'
 import { Button } from '@/components/ui/button'
 import {
-  MapPin,
   Users,
   FileText,
-  Vote,
   Loader2,
   Globe,
-  Landmark,
 } from 'lucide-react'
 
 // ---------------------------------------------------------------------------
@@ -72,6 +69,8 @@ interface PoliticalFeature {
 
 interface DashboardMapProps {
   className?: string
+  /** Layer visibility controlled from parent (right panel) */
+  layers?: { political: boolean; responses: boolean; voters: boolean }
 }
 
 // ---------------------------------------------------------------------------
@@ -92,18 +91,20 @@ function pviToColor(pvi: number, alpha: number = 0.6): string {
 // Component
 // ---------------------------------------------------------------------------
 
-export default function DashboardMap({ className }: DashboardMapProps) {
+export default function DashboardMap({ className, layers }: DashboardMapProps) {
   const mapContainer = useRef<HTMLDivElement>(null)
   const mapRef = useRef<any>(null)
   const [loading, setLoading] = useState(true)
   const [geoData, setGeoData] = useState<GeoData | null>(null)
   const [statePoliticalData, setStatePoliticalData] = useState<PoliticalFeature[]>([])
-  const [showSurveyLayer, setShowSurveyLayer] = useState(true)
-  const [showVoterLayer, setShowVoterLayer] = useState(true)
-  const [showPoliticalLayer, setShowPoliticalLayer] = useState(true)
   const [hoveredStateName, setHoveredStateName] = useState<string | null>(null)
   const [mapReady, setMapReady] = useState(false)
   const { resolvedTheme } = useTheme()
+
+  // Derive layer visibility from props (default all on)
+  const showPoliticalLayer = layers?.political ?? true
+  const showSurveyLayer = layers?.responses ?? true
+  const showVoterLayer = layers?.voters ?? true
 
   // -----------------------------------------------------------------------
   // Data fetching
@@ -485,52 +486,15 @@ export default function DashboardMap({ className }: DashboardMapProps) {
         </div>
       )}
 
-      {/* Layer controls — top right */}
-      <div className="absolute top-3 right-3 z-10 flex flex-col gap-2">
-        <div className="bg-background/80 backdrop-blur-md rounded-lg border border-border/50 p-2 shadow-lg">
-          <div className="flex flex-col gap-1.5">
-            <button
-              onClick={() => setShowPoliticalLayer(!showPoliticalLayer)}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                showPoliticalLayer
-                  ? 'bg-red-500/10 text-red-400 border border-red-500/20'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
-              }`}
-            >
-              <Landmark className="h-3.5 w-3.5" />
-              Political
-            </button>
-            <button
-              onClick={() => setShowSurveyLayer(!showSurveyLayer)}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                showSurveyLayer
-                  ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
-              }`}
-            >
-              <MapPin className="h-3.5 w-3.5" />
-              Responses
-            </button>
-            <button
-              onClick={() => setShowVoterLayer(!showVoterLayer)}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                showVoterLayer
-                  ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
-              }`}
-            >
-              <Vote className="h-3.5 w-3.5" />
-              Voters
-            </button>
-          </div>
-        </div>
+      {/* Reset view button — top right (toggle buttons moved to right panel) */}
+      <div className="absolute top-3 right-3 z-10">
         <Button
           size="sm"
           variant="outline"
-          className="bg-background/80 backdrop-blur-md border-border/50 shadow-lg h-8"
+          className="bg-background/80 backdrop-blur-md border-border/50 shadow-lg h-7 w-7 p-0"
           onClick={resetView}
         >
-          <Globe className="h-3.5 w-3.5" />
+          <Globe className="h-3 w-3" />
         </Button>
       </div>
 
@@ -617,27 +581,7 @@ export default function DashboardMap({ className }: DashboardMapProps) {
         </div>
       )}
 
-      {/* PVI Legend — bottom right (above nav controls) */}
-      {showPoliticalLayer && (
-        <div className="absolute bottom-14 right-3 z-10">
-          <div className="bg-background/80 backdrop-blur-md rounded-lg border border-border/50 px-3 py-2 shadow-lg">
-            <p className="text-[10px] font-medium text-muted-foreground mb-1">Partisan Lean</p>
-            <div className="flex items-center gap-0.5">
-              {[-25, -15, -5, 0, 5, 15, 25].map(v => (
-                <div
-                  key={v}
-                  className="w-4 h-3 rounded-sm"
-                  style={{ backgroundColor: pviToColor(v, 0.8) }}
-                />
-              ))}
-            </div>
-            <div className="flex justify-between mt-0.5">
-              <span className="text-[9px] text-red-400">R+25</span>
-              <span className="text-[9px] text-blue-400">D+25</span>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* PVI legend moved to right panel */}
     </div>
   )
 }
