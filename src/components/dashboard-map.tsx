@@ -2,15 +2,12 @@
 
 import { useRef, useEffect, useState, useCallback } from 'react'
 import { useTheme } from 'next-themes'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { 
-  Layers, 
   MapPin, 
   Users, 
   FileText, 
   Vote,
-  ChevronUp,
   Loader2,
   Globe,
 } from 'lucide-react'
@@ -295,26 +292,33 @@ export default function DashboardMap({ className }: DashboardMapProps) {
     const map = mapRef.current
 
     // Build state color expression based on response data
-    const stateColorExpr: any[] = ['match', ['get', 'iso_3166_1_alpha2']]
+    const stateEntries = Object.entries(geoData.states)
+    const defaultColor = 'rgba(59, 130, 246, 0.03)'
 
-    const maxResponses = Math.max(1, ...Object.values(geoData.states).map(s => s.responses))
+    let fillColor: any = defaultColor
 
-    // Map state names to abbreviations and build color scale
-    for (const [stateName, data] of Object.entries(geoData.states)) {
-      const abbrev = STATE_NAME_TO_ABBREV[stateName] || stateName
-      // Only add if it's a valid 2-letter code
-      if (abbrev.length === 2) {
-        const intensity = Math.min(1, data.responses / maxResponses)
-        const alpha = 0.1 + intensity * 0.6
-        stateColorExpr.push(`US-${abbrev}`, `rgba(59, 130, 246, ${alpha})`)
+    if (stateEntries.length > 0) {
+      const maxResponses = Math.max(1, ...stateEntries.map(([, s]) => s.responses))
+      const stateColorExpr: any[] = ['match', ['get', 'iso_3166_1_alpha2']]
+
+      for (const [stateName, data] of stateEntries) {
+        const abbrev = STATE_NAME_TO_ABBREV[stateName] || stateName
+        if (abbrev.length === 2) {
+          const intensity = Math.min(1, data.responses / maxResponses)
+          const alpha = 0.1 + intensity * 0.6
+          stateColorExpr.push(`US-${abbrev}`, `rgba(59, 130, 246, ${alpha})`)
+        }
+      }
+
+      // Only use match expression if we added at least one state pair
+      if (stateColorExpr.length > 2) {
+        stateColorExpr.push(defaultColor) // fallback
+        fillColor = stateColorExpr
       }
     }
 
-    // Default color for states with no data
-    stateColorExpr.push('rgba(59, 130, 246, 0.03)')
-
     try {
-      map.setPaintProperty('state-fills', 'fill-color', stateColorExpr)
+      map.setPaintProperty('state-fills', 'fill-color', fillColor)
     } catch {
       // Layer might not be ready yet
     }
@@ -458,29 +462,13 @@ export default function DashboardMap({ className }: DashboardMapProps) {
         </div>
       )}
 
-      {/* Stats bar - bottom */}
-      {geoData && (
-        <div className="absolute bottom-3 left-3 right-3 z-10">
-          <div className="bg-background/80 backdrop-blur-md rounded-lg border border-border/50 px-4 py-2.5 shadow-lg flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              {geoData.orgCenter && (
-                <div className="flex items-center gap-1.5">
-                  <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
-                  <span className="text-xs font-medium">{geoData.orgCenter.name}</span>
-                </div>
-              )}
-              <Badge variant="secondary" className="text-xs gap-1">
-                <FileText className="h-3 w-3" />
-                {geoData.totalSurveys} surveys
-              </Badge>
-              <Badge variant="secondary" className="text-xs gap-1">
-                <Users className="h-3 w-3" />
-                {geoData.totalResponses.toLocaleString()} responses
-              </Badge>
-              <Badge variant="secondary" className="text-xs gap-1">
-                <Layers className="h-3 w-3" />
-                {Object.keys(geoData.states).length} states
-              </Badge>
+      {/* Minimal org label - bottom left */}
+      {geoData?.orgCenter && (
+        <div className="absolute bottom-3 left-3 z-10">
+          <div className="bg-background/80 backdrop-blur-md rounded-lg border border-border/50 px-3 py-2 shadow-lg">
+            <div className="flex items-center gap-1.5">
+              <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+              <span className="text-xs font-medium">{geoData.orgCenter.name}</span>
             </div>
           </div>
         </div>
