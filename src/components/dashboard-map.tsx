@@ -44,7 +44,11 @@ interface GeoData {
   points: { lat: number; lng: number; surveyId: number }[]
   totalResponses: number
   totalSurveys: number
-  orgCenter?: { latitude: number; longitude: number; zoom: number; name: string } | null
+  orgCenter?: {
+    latitude: number; longitude: number; zoom: number; name: string
+    officeType?: string | null; state?: string | null; districtCode?: string | null
+    candidateName?: string | null; party?: string | null
+  } | null
 }
 
 interface PoliticalFeature {
@@ -239,6 +243,21 @@ export default function DashboardMap({ layers }: DashboardMapProps) {
           paint: { 'line-color': '#f97316', 'line-width': 2.5 },
         })
 
+        // ---- "My district" / "My state" highlight layers ----
+        // These are always-on when a district/state matches the org's race
+        map.addLayer({
+          id: 'my-district-border', type: 'line', source: 'us-districts',
+          layout: { visibility: 'none' },
+          filter: ['==', ['get', 'district_code'], ''],
+          paint: { 'line-color': '#f59e0b', 'line-width': 3, 'line-dasharray': [3, 2] },
+        })
+        map.addLayer({
+          id: 'my-state-border', type: 'line', source: 'us-states',
+          layout: { visibility: 'none' },
+          filter: ['==', ['get', 'name'], ''],
+          paint: { 'line-color': '#f59e0b', 'line-width': 3, 'line-dasharray': [3, 2] },
+        })
+
         // ---- Response points ----
         map.addSource('response-points', {
           type: 'geojson',
@@ -320,15 +339,15 @@ export default function DashboardMap({ layers }: DashboardMapProps) {
       let hoveredDistrictCode: string | null = null
       map.on('mousemove', 'district-fills', (e: any) => {
         if (e.features?.length) {
-          const code = e.features[0].properties?.district_code || ''
+          const props = e.features[0].properties
+          const code = props?.district_code || ''
           if (code !== hoveredDistrictCode) {
             hoveredDistrictCode = code
             map.setFilter('district-hover', ['==', ['get', 'district_code'], code])
             map.getCanvas().style.cursor = 'pointer'
-            setHoveredDistrict(prev => {
-              // Dispatch the district code; the tooltip will look up full data from state
-              return { id: code, state: e.features[0].properties?.state || '', districtNumber: e.features[0].properties?.district_number || 0 }
-            })
+            const stateAbbrev = props?.state || ''
+            const distNum = props?.district_number || 0
+            setHoveredDistrict({ id: code, state: stateAbbrev, districtNumber: distNum })
           }
         }
       })
@@ -493,6 +512,34 @@ export default function DashboardMap({ layers }: DashboardMapProps) {
       mapRef.current.setLayoutProperty('district-hover', 'visibility', vis)
     } catch {}
   }, [showDistrictsLayer, status])
+
+  // -----------------------------------------------------------------------
+  // "My district" / "My state" highlight based on org campaign context
+  // -----------------------------------------------------------------------
+  useEffect(() => {
+    if (status !== 'ready' || !mapRef.current || !geoData?.orgCenter) return
+    const map = mapRef.current
+    const { officeType, districtCode, state: orgState } = geoData.orgCenter
+
+    // Highlight the org's district if it's a district-level race
+    if (districtCode && ['federal_house', 'state_senate', 'state_house', 'city_council', 'county'].includes(officeType || '')) {
+      try {
+        map.setFilter('my-district-border', ['==', ['get', 'district_code'], districtCode])
+        map.setLayoutProperty('my-district-border', 'visibility', showDistrictsLayer ? 'visible' : 'none')
+      } catch {}
+    }
+
+    // Highlight the org's state for statewide races
+    if (orgState && ['federal_senate', 'governor'].includes(officeType || '')) {
+      const stateName = ABBREV_TO_STATE_NAME[orgState]
+      if (stateName) {
+        try {
+          map.setFilter('my-state-border', ['==', ['get', 'name'], stateName])
+          map.setLayoutProperty('my-state-border', 'visibility', 'visible')
+        } catch {}
+      }
+    }
+  }, [geoData, status, showDistrictsLayer])
 
   const resetView = useCallback(() => {
     if (!mapRef.current) return
@@ -661,9 +708,14 @@ export default function DashboardMap({ layers }: DashboardMapProps) {
         <div className="absolute bottom-3 left-3 z-10">
           <div className="bg-background/80 backdrop-blur-md rounded-lg border border-border/50 px-3 py-2 shadow-lg">
             <div className="flex items-center gap-1.5">
-              <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
-              <span className="text-xs font-medium">{geoData.orgCenter.name}</span>
+              <div className={`h-2 w-2 rounded-full ${geoData.orgCenter.party === 'D' ? 'bg-blue-500' : geoData.orgCenter.party === 'R' ? 'bg-red-500' : 'bg-green-500'} animate-pulse`} />
+              <span className="text-xs font-medium">{geoData.orgCenter.candidateName || geoData.orgCenter.name}</span>
             </div>
+            {(geoData.orgCenter.districtCode || geoData.orgCenter.state) && (
+              <p className="text-[10px] text-muted-foreground mt-0.5 pl-3.5">
+                {[geoData.orgCenter.districtCode || geoData.orgCenter.state, geoData.orgCenter.party].filter(Boolean).join(' · ')}
+              </p>
+            )}
           </div>
         </div>
       )}
