@@ -10,7 +10,7 @@ const SecureLayout = ({ children }: { children: React.ReactNode }) => {
             <div className="flex min-h-screen w-full bg-background">
                 <AppSidebar />
                 
-                <div className="flex flex-col flex-1">
+                <div className="flex flex-col flex-1 min-w-0">
                     <SidebarInset className="bg-background">
                         {children}
                     </SidebarInset>
