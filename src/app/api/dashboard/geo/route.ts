@@ -107,11 +107,12 @@ export async function GET(request: NextRequest) {
       statesOut[key] = { responses: val.responses, surveys: val.surveys.size };
     }
 
-    // Get user's primary org location for map center
+    // Get user's primary org location + campaign context for map center
     let orgCenter = null;
     try {
       const [orgRows]: any = await db.execute(
-        `SELECT o.latitude, o.longitude, o.default_zoom, o.name
+        `SELECT o.latitude, o.longitude, o.default_zoom, o.name,
+                o.office_type, o.state, o.district_code, o.candidate_name, o.party
          FROM organizations o
          JOIN organization_members om ON o.id = om.organization_id
          WHERE om.user_id = ? AND om.status = 'active'
@@ -120,15 +121,21 @@ export async function GET(request: NextRequest) {
         [userId]
       );
       if (orgRows.length > 0) {
+        const row = orgRows[0];
         orgCenter = {
-          latitude: parseFloat(orgRows[0].latitude),
-          longitude: parseFloat(orgRows[0].longitude),
-          zoom: orgRows[0].default_zoom || 10,
-          name: orgRows[0].name,
+          latitude: parseFloat(row.latitude),
+          longitude: parseFloat(row.longitude),
+          zoom: row.default_zoom || 10,
+          name: row.name,
+          officeType: row.office_type || null,
+          state: row.state || null,
+          districtCode: row.district_code || null,
+          candidateName: row.candidate_name || null,
+          party: row.party || null,
         };
       }
     } catch {
-      // Org tables may not exist
+      // Org tables may not exist yet
     }
 
     return NextResponse.json({

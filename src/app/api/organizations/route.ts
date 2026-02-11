@@ -43,7 +43,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ status: false, message: 'Unauthorized' }, { status: 401 });
     }
 
-    const { name, description, latitude, longitude, default_zoom } = await request.json();
+    const {
+      name, description, latitude, longitude, default_zoom,
+      office_type, state, district_code, candidate_name, party, election_year,
+    } = await request.json();
 
     if (!name?.trim()) {
       return NextResponse.json({ status: false, message: 'Organization name is required' }, { status: 400 });
@@ -52,10 +55,27 @@ export async function POST(request: NextRequest) {
     const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
     const db = await getConnection();
 
-    // Create the organization with optional location (defaults to Washington DC)
+    // Create the organization with optional location and campaign fields
     const [result]: any = await db.execute(
-      'INSERT INTO organizations (name, slug, description, created_by, latitude, longitude, default_zoom) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [name.trim(), `${slug}-${Date.now().toString(36)}`, description || null, userId, latitude || 38.9072, longitude || -77.0369, default_zoom || 10]
+      `INSERT INTO organizations
+        (name, slug, description, created_by, latitude, longitude, default_zoom,
+         office_type, state, district_code, candidate_name, party, election_year)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        name.trim(),
+        `${slug}-${Date.now().toString(36)}`,
+        description || null,
+        userId,
+        latitude || 38.9072,
+        longitude || -77.0369,
+        default_zoom || 10,
+        office_type || null,
+        state || null,
+        district_code || null,
+        candidate_name || null,
+        party || null,
+        election_year || null,
+      ]
     );
 
     const orgId = result.insertId;
