@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import dynamic from 'next/dynamic'
 import { useSidebar } from "@/components/ui/sidebar"
-import { PanelLeft, Landmark, MapPin, Vote, ChevronDown, ChevronRight } from 'lucide-react'
+import { PanelLeft, Landmark, MapPin, Vote, Grid3x3, ChevronDown, ChevronRight } from 'lucide-react'
 
 const DashboardMap = dynamic(() => import('@/components/dashboard-map'), {
   ssr: false,
@@ -53,6 +53,7 @@ export default function SurveysPage() {
   const [rightPanelOpen, setRightPanelOpen] = useState(true)
   const [layers, setLayers] = useState({
     political: true,
+    districts: false,
     responses: true,
     voters: true,
   })
@@ -106,15 +107,18 @@ export default function SurveysPage() {
             <Section title="Layers">
               <div className="space-y-1">
                 <LayerToggle icon={<Landmark className="h-3 w-3" />} label="Political" active={layers.political} colorClass="text-red-400" activeBg="bg-red-500/10 border-red-500/20" onClick={() => toggleLayer('political')} />
+                <LayerToggle icon={<Grid3x3 className="h-3 w-3" />} label="Districts" active={layers.districts} colorClass="text-orange-400" activeBg="bg-orange-500/10 border-orange-500/20" onClick={() => toggleLayer('districts')} />
                 <LayerToggle icon={<MapPin className="h-3 w-3" />} label="Responses" active={layers.responses} colorClass="text-blue-400" activeBg="bg-blue-500/10 border-blue-500/20" onClick={() => toggleLayer('responses')} />
                 <LayerToggle icon={<Vote className="h-3 w-3" />} label="Voters" active={layers.voters} colorClass="text-purple-400" activeBg="bg-purple-500/10 border-purple-500/20" onClick={() => toggleLayer('voters')} />
               </div>
             </Section>
 
-            {layers.political && (
+            {(layers.political || layers.districts) && (
               <Section title="Legend">
                 <div className="space-y-1.5">
-                  <p className="text-[10px] text-muted-foreground">Cook PVI</p>
+                  <p className="text-[10px] text-muted-foreground">
+                    Cook PVI {layers.districts ? '(Districts)' : '(States)'}
+                  </p>
                   <div className="flex items-center gap-0.5">
                     {[-25, -15, -5, 0, 5, 15, 25].map(v => (
                       <div key={v} className="flex-1 h-2.5 rounded-sm" style={{ backgroundColor: pviToColor(v, 0.8) }} />
@@ -131,7 +135,9 @@ export default function SurveysPage() {
 
             <Section title="About" defaultOpen={false}>
               <p className="text-[11px] text-muted-foreground leading-relaxed">
-                Cook PVI scores, 2024 margins, electoral votes, governor &amp; senate data. Hover any state for details.
+                Cook PVI scores, 2024 margins, electoral votes, governor &amp; senate data.
+                Toggle Districts to see 119th Congress boundaries with incumbent and PVI data.
+                Hover any state or district for details.
               </p>
             </Section>
           </div>
