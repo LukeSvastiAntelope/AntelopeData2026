@@ -63,8 +63,20 @@ interface PoliticalFeature {
   swing?: number
 }
 
+interface DistrictFeature {
+  id: string
+  state: string
+  districtNumber: number
+  pvi?: string
+  pviNumeric?: number
+  incumbentName?: string
+  incumbentParty?: string
+  margin2024?: number
+  donations?: { dem: number; rep: number; other?: number }
+}
+
 interface DashboardMapProps {
-  layers?: { political: boolean; responses: boolean; voters: boolean }
+  layers?: { political: boolean; districts: boolean; responses: boolean; voters: boolean }
 }
 
 // ---------------------------------------------------------------------------
@@ -91,10 +103,14 @@ export default function DashboardMap({ layers }: DashboardMapProps) {
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [geoData, setGeoData] = useState<GeoData | null>(null)
   const [statePoliticalData, setStatePoliticalData] = useState<PoliticalFeature[]>([])
+  const [districtPoliticalData, setDistrictPoliticalData] = useState<DistrictFeature[]>([])
+  const districtDataFetched = useRef(false)
   const [hoveredStateName, setHoveredStateName] = useState<string | null>(null)
+  const [hoveredDistrict, setHoveredDistrict] = useState<DistrictFeature | null>(null)
   const { resolvedTheme } = useTheme()
 
   const showPoliticalLayer = layers?.political ?? true
+  const showDistrictsLayer = layers?.districts ?? false
   const showSurveyLayer = layers?.responses ?? true
   const showVoterLayer = layers?.voters ?? true
 
@@ -198,6 +214,31 @@ export default function DashboardMap({ layers }: DashboardMapProps) {
           paint: { 'line-color': '#3b82f6', 'line-width': 2.5 },
         })
 
+        // ---- Congressional district boundaries (119th Congress) ----
+        map.addSource('us-districts', {
+          type: 'geojson',
+          data: '/data/cd-119.geojson',
+        })
+        map.addLayer({
+          id: 'district-fills', type: 'fill', source: 'us-districts',
+          layout: { visibility: 'none' },
+          paint: { 'fill-color': 'rgba(128, 128, 128, 0.1)', 'fill-opacity': 0.65 },
+        })
+        map.addLayer({
+          id: 'district-borders', type: 'line', source: 'us-districts',
+          layout: { visibility: 'none' },
+          paint: {
+            'line-color': isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.12)',
+            'line-width': 0.8,
+          },
+        })
+        map.addLayer({
+          id: 'district-hover', type: 'line', source: 'us-districts',
+          layout: { visibility: 'none' },
+          filter: ['==', ['get', 'district_code'], ''],
+          paint: { 'line-color': '#f97316', 'line-width': 2.5 },
+        })
+
         // ---- Response points ----
         map.addSource('response-points', {
           type: 'geojson',
@@ -260,6 +301,44 @@ export default function DashboardMap({ layers }: DashboardMapProps) {
         setHoveredStateName(null)
       })
       map.on('click', 'state-political-fills', (e: any) => {
+        if (e.features?.length) {
+          const feature = e.features[0]
+          if (feature.geometry?.type === 'MultiPolygon' || feature.geometry?.type === 'Polygon') {
+            const bounds = new maplibregl.LngLatBounds()
+            const coords = feature.geometry.type === 'Polygon'
+              ? [feature.geometry.coordinates] : feature.geometry.coordinates
+            for (const polygon of coords)
+              for (const ring of polygon)
+                for (const coord of ring)
+                  bounds.extend(coord as [number, number])
+            map.fitBounds(bounds, { padding: 60, duration: 1200 })
+          }
+        }
+      })
+
+      // ---- District hover interactions ----
+      let hoveredDistrictCode: string | null = null
+      map.on('mousemove', 'district-fills', (e: any) => {
+        if (e.features?.length) {
+          const code = e.features[0].properties?.district_code || ''
+          if (code !== hoveredDistrictCode) {
+            hoveredDistrictCode = code
+            map.setFilter('district-hover', ['==', ['get', 'district_code'], code])
+            map.getCanvas().style.cursor = 'pointer'
+            setHoveredDistrict(prev => {
+              // Dispatch the district code; the tooltip will look up full data from state
+              return { id: code, state: e.features[0].properties?.state || '', districtNumber: e.features[0].properties?.district_number || 0 }
+            })
+          }
+        }
+      })
+      map.on('mouseleave', 'district-fills', () => {
+        hoveredDistrictCode = null
+        map.setFilter('district-hover', ['==', ['get', 'district_code'], ''])
+        map.getCanvas().style.cursor = ''
+        setHoveredDistrict(null)
+      })
+      map.on('click', 'district-fills', (e: any) => {
         if (e.features?.length) {
           const feature = e.features[0]
           if (feature.geometry?.type === 'MultiPolygon' || feature.geometry?.type === 'Polygon') {
@@ -356,7 +435,37 @@ export default function DashboardMap({ layers }: DashboardMapProps) {
     }
   }, [statePoliticalData, status])
 
+  // -----------------------------------------------------------------------
+  // Fetch district political data (once, when layer is first enabled)
+  // -----------------------------------------------------------------------
+  useEffect(() => {
+    if (!showDistrictsLayer || districtDataFetched.current) return
+    districtDataFetched.current = true
+    fetch('/api/dashboard/political?zoom=6')
+      .then(r => r.json())
+      .then(d => {
+        if (d.status && d.features?.length) setDistrictPoliticalData(d.features)
+      })
+      .catch(e => console.error('Failed to fetch district political data:', e))
+  }, [showDistrictsLayer])
+
+  // Color district fills by PVI
+  useEffect(() => {
+    if (status !== 'ready' || !mapRef.current || !districtPoliticalData.length) return
+    const map = mapRef.current
+    const expr: any[] = ['match', ['get', 'district_code']]
+    for (const d of districtPoliticalData) {
+      expr.push(d.id, pviToColor(d.pviNumeric || 0, 0.55))
+    }
+    if (expr.length > 2) {
+      expr.push('rgba(128, 128, 128, 0.08)')
+      try { map.setPaintProperty('district-fills', 'fill-color', expr) } catch {}
+    }
+  }, [districtPoliticalData, status])
+
+  // -----------------------------------------------------------------------
   // Layer visibility
+  // -----------------------------------------------------------------------
   useEffect(() => {
     if (status !== 'ready' || !mapRef.current) return
     try { mapRef.current.setLayoutProperty('state-fills', 'visibility', showSurveyLayer ? 'visible' : 'none') } catch {}
@@ -375,6 +484,16 @@ export default function DashboardMap({ layers }: DashboardMapProps) {
     try { mapRef.current.setLayoutProperty('state-political-fills', 'visibility', showPoliticalLayer ? 'visible' : 'none') } catch {}
   }, [showPoliticalLayer, status])
 
+  useEffect(() => {
+    if (status !== 'ready' || !mapRef.current) return
+    const vis = showDistrictsLayer ? 'visible' : 'none'
+    try {
+      mapRef.current.setLayoutProperty('district-fills', 'visibility', vis)
+      mapRef.current.setLayoutProperty('district-borders', 'visibility', vis)
+      mapRef.current.setLayoutProperty('district-hover', 'visibility', vis)
+    } catch {}
+  }, [showDistrictsLayer, status])
+
   const resetView = useCallback(() => {
     if (!mapRef.current) return
     const center = geoData?.orgCenter
@@ -385,8 +504,12 @@ export default function DashboardMap({ layers }: DashboardMapProps) {
   }, [geoData])
 
   // -----------------------------------------------------------------------
-  // Tooltip
+  // Tooltip — supports both state and district hover
   // -----------------------------------------------------------------------
+  const districtTooltipData = hoveredDistrict && showDistrictsLayer
+    ? districtPoliticalData.find(d => d.id === hoveredDistrict.id) || hoveredDistrict
+    : null
+
   const tooltipData = hoveredStateName
     ? (() => {
         const abbrev = STATE_NAME_TO_ABBREV[hoveredStateName] || ''
@@ -433,6 +556,52 @@ export default function DashboardMap({ layers }: DashboardMapProps) {
         </Button>
       </div>
 
+      {/* District tooltip (takes priority when hovering a district) */}
+      {districtTooltipData && !tooltipData && (() => {
+        const d = districtTooltipData as DistrictFeature
+        return (
+          <div
+            style={{ position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)', zIndex: 10 }}
+            className="pointer-events-none select-none bg-background/90 backdrop-blur-md rounded-lg border border-border/50 p-3 shadow-lg min-w-[200px] max-w-[280px]"
+          >
+            <p className="font-semibold text-sm">
+              {d.id}{d.districtNumber === 0 && ' (At-Large)'}
+            </p>
+            {d.incumbentName && (
+              <div className="mt-1.5 flex items-center justify-between">
+                <span className="text-xs text-muted-foreground">Incumbent</span>
+                <span className={`text-xs font-medium ${d.incumbentParty === 'D' ? 'text-blue-400' : d.incumbentParty === 'R' ? 'text-red-400' : 'text-muted-foreground'}`}>
+                  {d.incumbentName} ({d.incumbentParty})
+                </span>
+              </div>
+            )}
+            {d.pvi && (
+              <div className="mt-1 flex items-center justify-between">
+                <span className="text-xs text-muted-foreground">PVI</span>
+                <span className={`text-xs font-bold ${(d.pviNumeric || 0) > 0 ? 'text-blue-400' : (d.pviNumeric || 0) < 0 ? 'text-red-400' : 'text-muted-foreground'}`}>
+                  {d.pvi}
+                </span>
+              </div>
+            )}
+            {d.margin2024 !== undefined && d.margin2024 !== 0 && (
+              <div className="flex items-center justify-between mt-1">
+                <span className="text-xs text-muted-foreground">2024 Margin</span>
+                <span className={`text-xs font-medium ${(d.margin2024 || 0) > 0 ? 'text-blue-400' : 'text-red-400'}`}>
+                  {(d.margin2024 || 0) > 0 ? 'D' : 'R'}+{Math.abs(d.margin2024 || 0).toFixed(1)}
+                </span>
+              </div>
+            )}
+            {d.donations && (
+              <div className="flex items-center gap-3 mt-2 pt-2 border-t border-border/50 text-[10px] text-muted-foreground">
+                <span className="text-blue-400">${(d.donations.dem / 1000).toFixed(0)}k Dem</span>
+                <span className="text-red-400">${(d.donations.rep / 1000).toFixed(0)}k Rep</span>
+              </div>
+            )}
+          </div>
+        )
+      })()}
+
+      {/* State tooltip */}
       {tooltipData && (
         <div
           style={{ position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)', zIndex: 10 }}
