@@ -4,11 +4,21 @@ import { useCallback } from 'react';
 import type { ChatMessage, Conversation } from '../types';
 
 type SaveArgs = {
-  currentConversationType: 'chat' | 'code';
+  currentConversationType: 'chat' | 'news' | 'code';
   selectedSurveyId: number | null;
   selectedCohortId: number | null;
   setConversations: React.Dispatch<React.SetStateAction<Conversation[]>>;
 };
+
+type ConversationContextSnapshot = {
+  type: 'chat' | 'news' | 'code';
+  surveyId: number | null;
+  cohortId: number | null;
+};
+
+function createSaveTraceId() {
+  return `convsave_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+}
 
 export function useSaveConversation({
   currentConversationType,
@@ -16,7 +26,22 @@ export function useSaveConversation({
   selectedCohortId,
   setConversations,
 }: SaveArgs) {
-  const saveConversation = useCallback(async (conversationId: string, messages: ChatMessage[], title?: string) => {
+  const saveConversation = useCallback(async (
+    conversationId: string,
+    messages: ChatMessage[],
+    title?: string,
+    contextOverride?: ConversationContextSnapshot
+  ) => {
+    const requestedContext: ConversationContextSnapshot = contextOverride || {
+      type: currentConversationType,
+      surveyId: selectedSurveyId,
+      cohortId: selectedCohortId,
+    };
+    const effectiveContext: ConversationContextSnapshot =
+      requestedContext.type === 'news'
+        ? { type: 'news', surveyId: null, cohortId: null }
+        : requestedContext;
+
     const processedMessages = messages.map((m) => {
       const meta = (m as any).metadata || {};
       const content = m.content;
@@ -49,16 +74,20 @@ export function useSaveConversation({
     const finalTitle = title || (firstUser ? firstUser.content.slice(0, 40) + (firstUser.content.length > 40 ? '...' : '') : 'New Conversation');
 
     try {
+      const traceId = createSaveTraceId();
       const response = await fetch('/api/conversations', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-chat-trace-id': traceId,
+        },
         body: JSON.stringify({
           id: conversationId,
           title: finalTitle,
           messages: processedMessages,
-          surveyId: selectedSurveyId,
-          cohortId: selectedCohortId,
-          type: currentConversationType,
+          surveyId: effectiveContext.surveyId,
+          cohortId: effectiveContext.cohortId,
+          type: effectiveContext.type,
         }),
       });
 
@@ -75,9 +104,9 @@ export function useSaveConversation({
           messages: processedMessages as any,
           createdAt: existing?.createdAt || new Date().toISOString(),
           updatedAt: new Date().toISOString(),
-          surveyId: selectedSurveyId,
-          cohortId: selectedCohortId,
-          type: currentConversationType,
+          surveyId: effectiveContext.surveyId,
+          cohortId: effectiveContext.cohortId,
+          type: effectiveContext.type,
         };
         if (existing) {
           return prev.map((c) => (c.id === conversationId ? updated : c));

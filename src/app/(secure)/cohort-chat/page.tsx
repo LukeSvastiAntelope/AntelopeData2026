@@ -22,7 +22,7 @@ import { Separator } from '@/components/ui/separator';
 import { Select, SelectTrigger, SelectItem, SelectContent, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
-import { ChevronLeft, ChevronRight, Send, PanelLeft, PanelRight, Upload, FileText, X, Plus, MessageCircle, Trash2, ChevronDown, ChevronRight as ChevronRightIcon, FolderOpen, Folder, ChevronUp, BarChart3, RefreshCw, Code2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Send, PanelLeft, PanelRight, Upload, FileText, X, Plus, MessageCircle, Trash2, ChevronDown, ChevronRight as ChevronRightIcon, FolderOpen, Folder, ChevronUp, BarChart3, RefreshCw, Code2, Newspaper } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from '@/components/ui/sonner';
@@ -59,6 +59,21 @@ const CodeConversation = dynamic(() =>
   { ssr: false }
 );
 
+type ConversationKind = 'chat' | 'news' | 'code';
+type SelectableConversationKind = 'chat' | 'news';
+
+function createTraceId() {
+  return `chat_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function toMessageSignature(messages: unknown[]) {
+  try {
+    return JSON.stringify(messages);
+  } catch {
+    return `fallback:${messages.length}`;
+  }
+}
+
 
 
 
@@ -89,10 +104,11 @@ export default function CohortChatPage() {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [selectedModel, setSelectedModel] = useState('gpt-4o');
   const [temperature, setTemperature] = useState(0.0);
-  const [sources, setSources] = useState<{survey: boolean; twins: boolean; web: boolean}>({survey: true, twins: true, web: false});
+  const [sources, setSources] = useState<{survey: boolean; twins: boolean; web: boolean}>({survey: true, twins: true, web: true});
   const [activeTab, setActiveTab] = useState<'chat' | 'stats'>('chat');
+  const [copilotMode, setCopilotMode] = useState<'survey' | 'news'>('survey');
   const [showConversationTypeDialog, setShowConversationTypeDialog] = useState(false);
-  const [currentConversationType, setCurrentConversationType] = useState<'chat' | 'code'>('chat');
+  const [currentConversationType, setCurrentConversationType] = useState<ConversationKind>('chat');
   const [pythonEnvironmentInitialized, setPythonEnvironmentInitialized] = useState(false);
   const [systemPrompt, setSystemPrompt] = useState(DEFAULT_SYSTEM_PROMPT);
   const [streamingMode, setStreamingMode] = useState<'off' | 'smart' | 'buffered' | 'instant'>('off');
@@ -104,14 +120,32 @@ export default function CohortChatPage() {
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploadLoading, setUploadLoading] = useState(false);
   const [uploadPreview, setUploadPreview] = useState<any>(null);
+  const [campaignNews, setCampaignNews] = useState<{
+    unreadCount: number;
+    items: Array<{ title: string; source: string; url: string; publishedAt: string | null }>;
+  } | null>(null);
+  const [showCampaignNewsOverlay, setShowCampaignNewsOverlay] = useState(false);
+  const [showCampaignNewsDialog, setShowCampaignNewsDialog] = useState(false);
   
   // Ref for auto-scrolling to bottom of chat
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const streamAbortRef = useRef<AbortController | null>(null);
+  const switchingConversationRef = useRef(false);
+  const lastSavedSignatureRef = useRef<Map<string, string>>(new Map());
+
+  // Derived view state boundaries
+  const isCodeConversation = currentConversationType === 'code';
+  const isNewsConversation = currentConversationType === 'news';
+  const activeMessages = isCodeConversation ? codeMessages : messages;
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, isLoading]);
+  }, [activeMessages, isLoading]);
+
+  useEffect(() => {
+    setShowConversationTypeDialog(true);
+  }, []);
   
   // Poll for report status updates
   useEffect(() => {
@@ -279,53 +313,61 @@ export default function CohortChatPage() {
     }
   }, [currentConversationId, conversations]);
 
-  // Save conversation whenever messages change (chat or code)
+  const { saveConversation } = useSaveConversation({
+    currentConversationType,
+    selectedSurveyId,
+    selectedCohortId,
+    setConversations,
+  });
+
+  // Save conversation whenever active messages change.
+  // Guard against save races during conversation switches and stream transitions.
   useEffect(() => {
-    console.log('🔄 SAVE EFFECT TRIGGERED:', {
-      currentConversationId,
-      messageCount: messages.length,
-      codeMessageCount: codeMessages.length,
-      isLoading,
-      currentConversationType,
-      trigger: 'useEffect dependency change'
-    });
-    
-    // Don't save if we're loading conversations or if we have an empty state that looks like initialization
-    const hasActualMessages = currentConversationType === 'code' ? codeMessages.length > 1 : messages.length > 1;
-    const shouldSave = currentConversationId && hasActualMessages && !isLoading;
-    
-    if (shouldSave) {
-      console.log('⏰ SCHEDULING SAVE in 1 second...');
-      // Debounce saving to avoid interfering with streaming
-      const timeoutId = setTimeout(() => {
-        // Double-check we still have messages before saving
-        if (currentConversationType === 'code' && codeMessages.length > 1) {
-          console.log('💾 SAVING CODE CONVERSATION with', codeMessages.length, 'messages');
-          saveConversation(currentConversationId, codeMessages);
-        } else if (currentConversationType === 'chat' && messages.length > 1) {
-          console.log('💾 SAVING CHAT CONVERSATION with', messages.length, 'messages');
-          saveConversation(currentConversationId, messages);
-        } else {
-          console.log('🚫 SKIPPING SAVE - insufficient messages at save time');
-        }
-      }, 1000); // Wait 1 second after messages stop changing
-      
-      return () => {
-        console.log('🚫 CANCELLING PREVIOUS SAVE TIMEOUT');
-        clearTimeout(timeoutId);
-      };
-    } else {
-      console.log('❌ NOT SAVING:', {
-        hasConversationId: !!currentConversationId,
-        hasActualMessages,
-        isNotLoading: !isLoading,
-        currentMessageCount: currentConversationType === 'code' ? codeMessages.length : messages.length,
-        reason: !currentConversationId ? 'no conversation ID' : 
-                !hasActualMessages ? 'insufficient messages (need >1)' :
-                isLoading ? 'still loading' : 'unknown'
-      });
+    const hasConversationId = Boolean(currentConversationId);
+    const hasActualMessages = activeMessages.length > 1;
+    const isSwitchingConversation = switchingConversationRef.current;
+    const shouldSave =
+      hasConversationId &&
+      hasActualMessages &&
+      !isLoading &&
+      !isSwitchingConversation;
+
+    if (!shouldSave) return;
+
+    const conversationId = currentConversationId as string;
+    const contextSnapshot = {
+      type: currentConversationType,
+      surveyId: selectedSurveyId,
+      cohortId: selectedCohortId,
+    };
+    const signature = toMessageSignature(activeMessages);
+
+    // Skip duplicate writes for identical content.
+    if (lastSavedSignatureRef.current.get(conversationId) === signature) {
+      return;
     }
-  }, [messages, codeMessages, currentConversationId, isLoading, currentConversationType]);
+
+    const timeoutId = setTimeout(() => {
+      if (switchingConversationRef.current) return;
+      saveConversation(
+        conversationId,
+        activeMessages as any,
+        undefined,
+        contextSnapshot
+      );
+      lastSavedSignatureRef.current.set(conversationId, signature);
+    }, 900);
+
+    return () => clearTimeout(timeoutId);
+  }, [
+    activeMessages,
+    currentConversationId,
+    currentConversationType,
+    isLoading,
+    saveConversation,
+    selectedCohortId,
+    selectedSurveyId,
+  ]);
   
   // Save model preference when it changes
   const handleModelChange = (model: string) => {
@@ -386,17 +428,9 @@ export default function CohortChatPage() {
     }
   };
 
-  const streamAbortRef = useRef<AbortController | null>(null);
   const { appendChunk, finalize } = useChatStreaming({
     streamingMode,
     processPartialResponse,
-  });
-
-  const { saveConversation } = useSaveConversation({
-    currentConversationType,
-    selectedSurveyId,
-    selectedCohortId,
-    setConversations,
   });
 
   const handleSend = async () => {
@@ -405,6 +439,7 @@ export default function CohortChatPage() {
       return;
     }
     const question = input.trim();
+    const traceId = createTraceId();
     setInput('');
     // Create stable IDs first
     const userId = `user-${Date.now()}`;
@@ -432,20 +467,23 @@ FORMATTING REQUIREMENTS:
     console.log('🚨 FRONTEND DEBUG: selectedSurveyId value:', selectedSurveyId);
     console.log('🚨 FRONTEND DEBUG: Will send surveyId:', selectedSurveyId || 'NOT_SENT');
 
+    const newsOnlyMode = copilotMode === 'news';
     const payload: any = {
-      cohort: selectedCohortId ? { id: selectedCohortId } : undefined,
+      cohort: !newsOnlyMode && selectedCohortId ? { id: selectedCohortId } : undefined,
       question,
       model: selectedModel,
       temperature,
-      sources,
+      sources: newsOnlyMode
+        ? { survey: false, twins: false, web: true }
+        : sources,
       systemPrompt: enhancedSystemPrompt,
     };
 
-    // Only include surveyId if it has a valid value
-    if (selectedSurveyId) {
+    // Only include surveyId in Survey Copilot mode
+    if (!newsOnlyMode && selectedSurveyId) {
       payload.surveyId = selectedSurveyId;
       console.log('✅ FRONTEND DEBUG: Including surveyId in payload:', selectedSurveyId);
-    } else {
+    } else if (!newsOnlyMode) {
       console.log('❌ FRONTEND DEBUG: No surveyId selected - will use old code path');
       // Replace the placeholder agent message with a helpful prompt instead of adding another bubble
       const noSurveyMessage = `Please select a survey from the dropdown above to analyze your question. Without a survey selection, I can only provide general demographic information.`;
@@ -462,6 +500,8 @@ FORMATTING REQUIREMENTS:
       });
       setIsLoading(false);
       return; // Exit early
+    } else {
+      console.log('📰 FRONTEND DEBUG: News mode active - sending without surveyId');
     }
 
     if (streamingMode === 'off') {
@@ -476,10 +516,28 @@ FORMATTING REQUIREMENTS:
 
     const res = await fetch('/api/cohort/query', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'x-chat-trace-id': traceId,
+      },
       body: JSON.stringify(payload),
       signal: streamAbortRef.current.signal,
     });
+
+    if (!res.ok) {
+      const errorText = await res.text().catch(() => '');
+      setMessages(prev => {
+        const updated = [...prev];
+        const last = updated[updated.length - 1];
+        if (last && last.role === 'agent' && (last as any).id === agentId) {
+          (last as any).content = `Request failed (${res.status}). ${errorText || 'Please try again.'}`;
+          updated[updated.length - 1] = last;
+        }
+        return updated;
+      });
+      setIsLoading(false);
+      return;
+    }
 
     const isEventStream = res.headers.get('content-type')?.includes('text/event-stream');
 
@@ -597,11 +655,9 @@ FORMATTING REQUIREMENTS:
             console.log('🔍 Attempting to parse JSON:', JSON.stringify(cleanJsonStr));
             const data = JSON.parse(cleanJsonStr);
             console.log('🔧 Parsed JSON data:', data);
-            
-            // Check if this is a report generation message
-            if (data.reportId) {
-              console.log('📋 Report generation detected');
-              // Replace the placeholder message with report generation status
+
+            const eventType = data.type || (data.reportId ? 'report' : 'chunk');
+            if (eventType === 'report') {
               const immediateResponse = data.immediateResponse || 'I\'m generating a comprehensive analysis for you. This will take a moment...';
               setMessages(prev => {
                 const updated = [...prev];
@@ -615,32 +671,20 @@ FORMATTING REQUIREMENTS:
                 return updated;
               });
               setIsLoading(false);
-              return; // Exit the streaming loop for report generation
+              return;
             }
-            
-            if (data.content) {
-                appendChunk(data.content, setMessages, streamingMode);
+
+            if (eventType === 'chunk' && typeof data.content === 'string') {
+              appendChunk(data.content, setMessages, streamingMode);
             }
           } catch (error) {
-            console.error('❌ JSON parse failed for dataStr:', JSON.stringify(dataStr), 'Error:', error);
-            console.error('❌ Original line was:', JSON.stringify(line));
-            // If not JSON, treat as plain text (fallback for non-streaming responses)
-            if (dataStr.trim()) {
-              appendChunk(dataStr, setMessages, streamingMode);
-            }
+            console.warn('Ignoring malformed SSE payload:', error);
           }
-        } else if (line.trim() && !line.startsWith('data: ')) {
-          console.log('📄 Non-SSE line found:', line);
-          // Handle non-SSE content (fallback for plain text responses)
-          appendChunk(line + '\n', setMessages, streamingMode);
         }
       }
     }
     
-    // Append any remaining buffered data that wasn't followed by a newline (e.g. single-chunk plain text)
-    if (buffer.trim()) {
-      appendChunk(buffer, setMessages, streamingMode);
-    }
+    // Ignore incomplete trailing SSE buffer fragments to keep the transport contract strict.
     
     console.log('🏁 Stream processing complete, final accumulated content:', accumulatedContent.length, 'chars');
     
@@ -879,16 +923,18 @@ FORMATTING REQUIREMENTS:
         
         setConversations(data.conversations || []);
         
-        // If no current conversation, create a new one
+        // If no current conversation, ask user which mode to start with.
         if (!currentConversationId && data.conversations.length === 0) {
-          console.log('🆕 No conversations found, creating new one');
-          createNewConversation();
+          console.log('🆕 No conversations found, opening conversation type chooser');
+          setShowConversationTypeDialog(true);
         } else if (!currentConversationId && data.conversations.length > 0) {
           // Load the most recent conversation
           const mostRecent = data.conversations[0];
           console.log('🔄 Loading most recent conversation:', mostRecent.id, 'type:', mostRecent.type);
           setCurrentConversationId(mostRecent.id);
-          setCurrentConversationType(mostRecent.type || 'chat');
+          const mostRecentType = (mostRecent.type || 'chat') as 'chat' | 'news' | 'code';
+          setCurrentConversationType(mostRecentType);
+          setCopilotMode(mostRecentType === 'news' ? 'news' : 'survey');
           
           // Load messages into the appropriate state based on conversation type
           if (mostRecent.type === 'code') {
@@ -902,8 +948,11 @@ FORMATTING REQUIREMENTS:
             setCodeMessages([]); // Clear code messages
           }
           
-          // Set survey context from the loaded conversation if not already set
-          if (!selectedSurveyId && mostRecent.surveyId) {
+          // Set survey context from the loaded conversation.
+          if (mostRecentType === 'news') {
+            setSelectedSurveyId(null);
+            setSelectedCohortId(null);
+          } else if (!selectedSurveyId && mostRecent.surveyId) {
             setSelectedSurveyId(mostRecent.surveyId);
             localStorage.setItem('cohort-chat-selected-survey', String(mostRecent.surveyId));
           }
@@ -925,16 +974,22 @@ FORMATTING REQUIREMENTS:
 
   // moved: saveConversation logic into useSaveConversation hook
 
-  const createNewConversation = (type: 'chat' | 'code' = 'chat') => {
+  const createNewConversation = (type: ConversationKind = 'chat') => {
     console.log('🆕 CREATE NEW CONVERSATION DEBUG:');
     console.log('   - selectedSurveyId:', selectedSurveyId);
     console.log('   - selectedCohortId:', selectedCohortId);
     console.log('   - conversationType:', type);
     console.log('   - Will create conversation with surveyId:', selectedSurveyId || 'NULL');
     
+    switchingConversationRef.current = true;
+    if (streamAbortRef.current) {
+      try { streamAbortRef.current.abort(); } catch {}
+      streamAbortRef.current = null;
+    }
     const newId = `conv_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     setCurrentConversationId(newId);
     setCurrentConversationType(type);
+    setCopilotMode(type === 'news' ? 'news' : 'survey');
     
     // Clear messages based on conversation type
     if (type === 'code') {
@@ -952,8 +1007,8 @@ FORMATTING REQUIREMENTS:
       messages: [],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-      surveyId: selectedSurveyId,
-      cohortId: selectedCohortId,
+      surveyId: type === 'news' ? null : selectedSurveyId,
+      cohortId: type === 'news' ? null : selectedCohortId,
       type: type
     };
     
@@ -967,28 +1022,27 @@ FORMATTING REQUIREMENTS:
     setConversations(prev => [newConversation, ...prev]);
     
     // Auto-expand the survey if one is selected
-    if (selectedSurveyId) {
+    if (type !== 'news' && selectedSurveyId) {
       setExpandedSurveys(prev => new Set([...prev, selectedSurveyId]));
       console.log('📂 Auto-expanded survey:', selectedSurveyId);
     } else {
       console.log('⚠️ WARNING: No selectedSurveyId - conversation will not have survey context!');
     }
+
+    // New conversation starts clean; allow autosave once initial message flow begins.
+    setTimeout(() => {
+      switchingConversationRef.current = false;
+    }, 0);
   };
 
   const handleNewConversation = () => {
-    if (selectedSurveyId) {
-      // If survey is selected, show type dialog
-      setShowConversationTypeDialog(true);
-    } else {
-      // If no survey, create regular chat
-      createNewConversation('chat');
-    }
+    setShowConversationTypeDialog(true);
   };
 
-  const handleConversationTypeSelect = (type: 'chat' | 'code') => {
-    if (type === 'code' && !pythonEnvironmentInitialized) {
-      // Show loading state immediately for code conversations
-      setPythonEnvironmentInitialized(true);
+  const handleConversationTypeSelect = (type: SelectableConversationKind) => {
+    if (type === 'news') {
+      setSelectedSurveyId(null);
+      setSelectedCohortId(null);
     }
     createNewConversation(type);
   };
@@ -1005,12 +1059,19 @@ FORMATTING REQUIREMENTS:
     });
     
     if (conversation) {
+      switchingConversationRef.current = true;
+      if (streamAbortRef.current) {
+        try { streamAbortRef.current.abort(); } catch {}
+        streamAbortRef.current = null;
+      }
       // Set loading state to prevent saves during switching
       console.log('🔒 SETTING LOADING STATE during conversation switch');
       setIsLoading(true);
       
       setCurrentConversationId(conversationId);
-      setCurrentConversationType(conversation.type || 'chat');
+      const conversationType = (conversation.type || 'chat') as 'chat' | 'news' | 'code';
+      setCurrentConversationType(conversationType);
+      setCopilotMode(conversationType === 'news' ? 'news' : 'survey');
       
       // Lazy-load messages from API to avoid heavy initial payloads
       try {
@@ -1053,9 +1114,11 @@ FORMATTING REQUIREMENTS:
         setPythonEnvironmentInitialized(true);
       }
       
-      // 🚨 FIX: Only update survey if conversation has a VALID surveyId AND it's different
-      // NEVER reset selectedSurveyId to null when switching conversations
-      if (conversation.surveyId && conversation.surveyId !== selectedSurveyId) {
+      // Keep survey/cohort context aligned with the active conversation mode.
+      if (conversationType === 'news') {
+        setSelectedSurveyId(null);
+        setSelectedCohortId(null);
+      } else if (conversation.surveyId && conversation.surveyId !== selectedSurveyId) {
         console.log('🔄 Survey context change:', selectedSurveyId, '→', conversation.surveyId);
         setSelectedSurveyId(conversation.surveyId);
         localStorage.setItem('cohort-chat-selected-survey', String(conversation.surveyId));
@@ -1069,15 +1132,21 @@ FORMATTING REQUIREMENTS:
       // Clear loading state after state has settled - use longer timeout for better reliability
       setTimeout(() => {
         console.log('🔓 CLEARING LOADING STATE after conversation switch');
+        switchingConversationRef.current = false;
         setIsLoading(false);
       }, 250);
     } else {
       console.log('❌ CONVERSATION NOT FOUND:', conversationId);
+      switchingConversationRef.current = false;
     }
   };
 
   const deleteConversation = async (conversationId: string) => {
     try {
+      if (streamAbortRef.current && currentConversationId === conversationId) {
+        try { streamAbortRef.current.abort(); } catch {}
+        streamAbortRef.current = null;
+      }
       await fetch(`/api/conversations/${conversationId}`, {
         method: 'DELETE',
         headers: {
@@ -1149,6 +1218,16 @@ FORMATTING REQUIREMENTS:
 
   // Add new state for inline survey selector
   const [showSurveyDropdown, setShowSurveyDropdown] = useState(false);
+  const activateNewsCopilot = () => {
+    setCopilotMode('news');
+    setSelectedSurveyId(null);
+    setSelectedCohortId(null);
+    setActiveTab('chat');
+    setShowSurveyDropdown(false);
+  };
+  const activateSurveyCopilot = () => {
+    setCopilotMode('survey');
+  };
   
   // Click outside handler for survey dropdown
   useEffect(() => {
@@ -1165,8 +1244,60 @@ FORMATTING REQUIREMENTS:
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showSurveyDropdown]);
 
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/campaign/news/summary')
+      .then((r) => r.json())
+      .then((data) => {
+        if (cancelled || !data?.status) return;
+        const payload = {
+          unreadCount: data.unreadCount || 0,
+          items: (data.items || []).map((item: any) => ({
+            title: item.title,
+            source: item.source || 'Unknown source',
+            url: item.url,
+            publishedAt: item.publishedAt || null,
+          })),
+        };
+        setCampaignNews(payload);
+        if (payload.unreadCount > 0) {
+          setShowCampaignNewsOverlay(true);
+        }
+      })
+      .catch((error) => {
+        console.error('Failed to load campaign news summary:', error);
+      });
+    return () => { cancelled = true; };
+  }, []);
+
+  const markCampaignNewsSeen = async () => {
+    try {
+      await fetch('/api/campaign/news/mark-seen', { method: 'POST' });
+    } catch (error) {
+      console.error('Failed to mark campaign news as seen:', error);
+    } finally {
+      setShowCampaignNewsOverlay(false);
+    }
+  };
+
+  const getFreshnessLabel = () => {
+    if (!campaignNews?.items?.length) return 'updated recently';
+    const timestamps = campaignNews.items
+      .map((i) => (i.publishedAt ? new Date(i.publishedAt).getTime() : 0))
+      .filter((t) => t > 0);
+    if (!timestamps.length) return 'updated recently';
+    const newest = Math.max(...timestamps);
+    const diffMinutes = Math.max(1, Math.floor((Date.now() - newest) / 60000));
+    if (diffMinutes < 60) return `updated ${diffMinutes}m ago`;
+    const diffHours = Math.floor(diffMinutes / 60);
+    if (diffHours < 24) return `updated ${diffHours}h ago`;
+    const diffDays = Math.floor(diffHours / 24);
+    return `updated ${diffDays}d ago`;
+  };
+
   // Handler for inline survey selection
   const handleInlineSurveySelect = (surveyId: number) => {
+    activateSurveyCopilot();
     handleSurveyChange(surveyId);
     setShowSurveyDropdown(false);
     
@@ -1224,10 +1355,10 @@ FORMATTING REQUIREMENTS:
   };
 
   return (
-    <div className="flex h-full w-full bg-background">
+    <div className="flex h-screen w-full bg-background overflow-hidden">
       {/* Main Content Area */}
-      <div className="flex-1 p-1 min-w-0">
-        <div className="relative min-h-screen rounded-lg bg-card text-card-foreground shadow-lg min-w-0">
+      <div className="flex-1 min-w-0 flex flex-col p-1 overflow-hidden">
+        <div className="relative flex flex-col flex-1 min-h-0 rounded-lg bg-card text-card-foreground shadow-lg min-w-0">
           {/* Header */}
           <HeaderBar
                         surveys={surveys}
@@ -1245,10 +1376,93 @@ FORMATTING REQUIREMENTS:
 
           <div className="border-b border-border" />
 
-          <div className="p-2 min-w-0">
-            {/* Chat Area - Only show if survey is selected */}
-            <div className="flex flex-col h-full min-w-0">
-              {!selectedSurveyId ? (
+          {showCampaignNewsOverlay && campaignNews && copilotMode !== 'news' && (
+            <div className="mx-4 mt-3 rounded-md border border-amber-300/40 bg-amber-500/10 p-2.5">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold text-amber-300 flex items-center gap-2">
+                    <span>
+                      Campaign Brief: {campaignNews.unreadCount} new district/state headline{campaignNews.unreadCount === 1 ? '' : 's'}
+                    </span>
+                    <span className="text-[10px] text-amber-200/90 font-normal">({getFreshnessLabel()})</span>
+                  </p>
+                  <ul className="mt-1 space-y-1">
+                    {campaignNews.items.slice(0, 3).map((item, idx) => (
+                      <li key={`${item.url}-${idx}`} className="text-[11px] text-muted-foreground leading-snug">
+                        <a href={item.url} target="_blank" rel="noreferrer" className="hover:underline">
+                          <span className="font-medium text-foreground/90">{item.title}</span>
+                        </a>
+                        <span className="text-muted-foreground"> · {item.source}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                <div className="flex items-center gap-1">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-6 px-2 text-[11px]"
+                    onClick={() => setShowCampaignNewsDialog(true)}
+                  >
+                    View all
+                  </Button>
+                  <Button size="sm" variant="ghost" className="h-6 px-2 text-[11px]" onClick={markCampaignNewsSeen}>
+                    Mark read
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <Dialog open={showCampaignNewsDialog} onOpenChange={setShowCampaignNewsDialog}>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>Campaign News Brief</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-1">
+                {(campaignNews?.items || []).length === 0 && (
+                  <p className="text-sm text-muted-foreground">No recent district/state headlines.</p>
+                )}
+                {(campaignNews?.items || []).map((item, idx) => (
+                  <div key={`${item.url}-${idx}`} className="rounded-md border border-border/60 p-2">
+                    <a href={item.url} target="_blank" rel="noreferrer" className="text-sm font-medium hover:underline">
+                      {item.title}
+                    </a>
+                    <p className="text-[11px] text-muted-foreground mt-1">
+                      {item.source}
+                      {item.publishedAt ? ` · ${new Date(item.publishedAt).toLocaleString()}` : ''}
+                    </p>
+                  </div>
+                ))}
+              </div>
+              <div className="flex justify-end">
+                <Button size="sm" onClick={markCampaignNewsSeen}>Mark all read</Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          <div className="flex-1 min-h-0 p-2 min-w-0 flex flex-col">
+            <div className="flex flex-col flex-1 min-h-0 min-w-0">
+              {copilotMode === 'news' ? (
+                /* News Copilot — clean chat-only view, no survey chrome */
+                <ChatView
+                  messages={messages}
+                  isLoading={isLoading}
+                  messagesEndRef={messagesEndRef}
+                  input={input}
+                  setInput={setInput}
+                  onSend={handleSend}
+                  onKeyDown={handleKeyDown}
+                  showSurveyDropdown={showSurveyDropdown}
+                  setShowSurveyDropdown={setShowSurveyDropdown}
+                  surveys={surveys}
+                  selectedSurveyId={selectedSurveyId}
+                  onInlineSurveySelect={handleInlineSurveySelect}
+                  onSelectNewsCopilot={activateNewsCopilot}
+                  onUploadClick={handleUploadClick}
+                  isNewsMode
+                />
+              ) : !selectedSurveyId ? (
                 <OnboardingEmptyState
                   onTryDemo={handleTryDemo}
                   onCreateSurvey={handleCreateSurvey}
@@ -1272,19 +1486,24 @@ FORMATTING REQUIREMENTS:
                 />
               ) : (
                 // 🚨 FIX: Always show active chat when survey is selected, regardless of message count
-                <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'chat' | 'stats')} className="flex flex-col flex-1 min-w-0">
+                <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'chat' | 'stats')} className="flex flex-col flex-1 min-h-0 min-w-0">
                   <div className="px-4 pt-4">
                     <TabsList className="inline-flex w-fit items-center gap-2">
                       <TabsTrigger value="chat" className="gap-2">
                         {currentConversationType === 'code' ? (
                           <>
                             <Code2 className="h-4 w-4" />
-                            Code
+                            Legacy Code
+                          </>
+                        ) : currentConversationType === 'news' ? (
+                          <>
+                            <Newspaper className="h-4 w-4" />
+                            News Chat
                           </>
                         ) : (
                           <>
                             <MessageCircle className="h-4 w-4" />
-                            Chat
+                            Cohort Chat
                           </>
                         )}
                       </TabsTrigger>
@@ -1295,7 +1514,7 @@ FORMATTING REQUIREMENTS:
                     </TabsList>
                   </div>
                   
-                  <TabsContent value="chat" className="flex flex-col flex-1 mt-0 min-w-0">
+                  <TabsContent value="chat" className="flex flex-col flex-1 mt-0 min-h-0 min-w-0">
                     {currentConversationType === 'code' ? (
                       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
                         <CodeConversation 
@@ -1328,6 +1547,7 @@ FORMATTING REQUIREMENTS:
                           surveys={surveys}
                           selectedSurveyId={selectedSurveyId}
                           onInlineSurveySelect={handleInlineSurveySelect}
+                          onSelectNewsCopilot={activateNewsCopilot}
                           onUploadClick={handleUploadClick}
                         />
                     )}

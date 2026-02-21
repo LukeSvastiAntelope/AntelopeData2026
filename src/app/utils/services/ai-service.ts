@@ -78,7 +78,12 @@ function getAnthropicClient() {
 
 // Determine provider from model ID
 function getProvider(modelId: string): 'openai' | 'deepseek' | 'gemini' | 'anthropic' {
-  if (modelId.startsWith('gpt-') || modelId.startsWith('o1') || modelId.startsWith('o3')) return 'openai';
+  if (
+    modelId.startsWith('gpt-') ||
+    modelId.startsWith('o1') ||
+    modelId.startsWith('o3') ||
+    modelId.startsWith('o4')
+  ) return 'openai';
   if (modelId.startsWith('deepseek-')) return 'deepseek';
   if (modelId.startsWith('gemini-')) return 'gemini';
   if (modelId.startsWith('claude-')) return 'anthropic';
@@ -126,10 +131,13 @@ async function createOpenAICompletion(options: AICompletionOptions): Promise<AIC
   const client = getOpenAIClient();
   
   // Determine if this is a newer model that uses max_completion_tokens
+  // All o-series, gpt-4.1+, gpt-4o, and gpt-5+ models use this parameter
   const usesCompletionTokens =
     options.model.startsWith('o1') ||
     options.model.startsWith('o3') ||
+    options.model.startsWith('o4') ||
     options.model.startsWith('gpt-5') ||
+    options.model.startsWith('gpt-4.1') ||
     options.model.includes('gpt-4o');
   
   const requestParams: any = {
@@ -291,7 +299,9 @@ async function createOpenAIStreamingCompletion(options: AICompletionOptions): Pr
   const usesCompletionTokens =
     options.model.startsWith('o1') ||
     options.model.startsWith('o3') ||
+    options.model.startsWith('o4') ||
     options.model.startsWith('gpt-5') ||
+    options.model.startsWith('gpt-4.1') ||
     options.model.includes('gpt-4o');
   
   const requestParams: any = {
@@ -331,7 +341,7 @@ async function createOpenAIStreamingCompletion(options: AICompletionOptions): Pr
           if (content) {
             contentChunks++;
             console.log('🔍 STREAMING DEBUG: Content found in chunk', chunkCount, ':', content.length, 'chars');
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content })}\n\n`));
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'chunk', content })}\n\n`));
           } else {
             console.log('🔍 STREAMING DEBUG: No content in chunk', chunkCount, '- delta:', JSON.stringify(chunk.choices[0]?.delta));
           }
@@ -372,7 +382,7 @@ async function createDeepSeekStreamingCompletion(options: AICompletionOptions): 
         for await (const chunk of stream as any) {
           const content = chunk.choices[0]?.delta?.content;
           if (content) {
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content })}\n\n`));
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'chunk', content })}\n\n`));
           }
         }
         controller.enqueue(encoder.encode('data: [DONE]\n\n'));
@@ -408,7 +418,7 @@ async function createGeminiStreamingCompletion(options: AICompletionOptions): Pr
         for await (const chunk of stream as any) {
           const content = chunk.choices[0]?.delta?.content;
           if (content) {
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content })}\n\n`));
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'chunk', content })}\n\n`));
           }
         }
         controller.enqueue(encoder.encode('data: [DONE]\n\n'));
@@ -461,7 +471,7 @@ async function createAnthropicStreamingCompletion(options: AICompletionOptions):
           if (chunk.type === 'content_block_delta' && chunk.delta.type === 'text_delta') {
             const content = chunk.delta.text;
             if (content) {
-              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content })}\n\n`));
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'chunk', content })}\n\n`));
             }
           }
         }
