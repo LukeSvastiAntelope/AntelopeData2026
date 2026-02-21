@@ -1,7 +1,7 @@
 "use client";
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { ChevronDown, ChevronRight, Folder, MessageCircle, Plus, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, Folder, MessageCircle, Newspaper, Plus, Trash2 } from 'lucide-react';
 import { Conversation } from '../types';
 
 interface Props {
@@ -75,7 +75,11 @@ export default function ConversationManager({
                       )}
                       onClick={() => onSwitchConversation(conversation.id)}
                     >
-                      <MessageCircle className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                      {conversation.type === 'news' ? (
+                        <Newspaper className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                      ) : (
+                        <MessageCircle className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                      )}
                       <span className="text-xs truncate flex-1">{conversation.title || 'New Conversation'}</span>
                       <Button
                         variant="ghost"
@@ -117,7 +121,11 @@ export default function ConversationManager({
                   )}
                   onClick={() => onSwitchConversation(conversation.id)}
                 >
-                  <MessageCircle className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                  {conversation.type === 'news' ? (
+                    <Newspaper className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                  ) : (
+                    <MessageCircle className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                  )}
                   <span className="text-xs truncate flex-1">{conversation.title || 'New Conversation'}</span>
                   <Button
                     variant="ghost"

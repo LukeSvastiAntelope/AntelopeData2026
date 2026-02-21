@@ -3,7 +3,7 @@
 import React from 'react';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
-import { PanelLeft, PanelRight, Plus } from 'lucide-react';
+import { PanelLeft, PanelRight, Plus, Newspaper } from 'lucide-react';
 import { BreadcrumbNavigation } from './breadcrumb-navigation';
 import type { Conversation } from '../types';
 
@@ -18,7 +18,7 @@ type Props = {
   onConversationSwitch: (id: string) => void;
   onNewConversation: () => void;
   conversationsLoading: boolean;
-  currentConversationType: 'chat' | 'code';
+  currentConversationType: 'chat' | 'news' | 'code';
   isCollapsed: boolean;
   onToggleRightPanel: () => void;
 };
@@ -43,17 +43,25 @@ export default function HeaderBar(props: Props) {
       <SidebarTrigger className="-ml-0.5 h-5 w-5 text-muted-foreground hover:text-foreground flex-shrink-0" />
       <div className="h-4 border-l border-border mx-4 flex-shrink-0" />
       <div className="flex-1 min-w-0 mr-4">
-        <BreadcrumbNavigation
-          surveys={surveys}
-          selectedSurveyId={selectedSurveyId}
-          onSurveyChange={onSurveyChange}
-          conversations={conversations}
-          currentConversationId={currentConversationId}
-          onConversationSwitch={onConversationSwitch}
-          onNewConversation={onNewConversation}
-          conversationsLoading={conversationsLoading}
-          currentConversationType={currentConversationType}
-        />
+        {currentConversationType === 'news' ? (
+          <div className="flex items-center gap-2">
+            <Newspaper className="h-4 w-4 text-amber-500 flex-shrink-0" />
+            <span className="text-sm font-medium">News Chat</span>
+            <span className="text-xs text-muted-foreground">District/state campaign news</span>
+          </div>
+        ) : (
+          <BreadcrumbNavigation
+            surveys={surveys}
+            selectedSurveyId={selectedSurveyId}
+            onSurveyChange={onSurveyChange}
+            conversations={conversations}
+            currentConversationId={currentConversationId}
+            onConversationSwitch={onConversationSwitch}
+            onNewConversation={onNewConversation}
+            conversationsLoading={conversationsLoading}
+            currentConversationType={currentConversationType}
+          />
+        )}
       </div>
       <div className="flex items-center gap-2 flex-shrink-0">
         <Button

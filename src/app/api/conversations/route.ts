@@ -11,8 +11,12 @@ interface Conversation {
   updatedAt: string;
   surveyId?: number | null;
   cohortId?: number | null;
-  type?: 'chat' | 'code';
+  type?: 'chat' | 'news' | 'code';
   userId: string;
+}
+
+function logConversation(trace: string, stage: string, details: Record<string, unknown>) {
+  console.log(JSON.stringify({ scope: 'conversations', trace, stage, ...details }));
 }
 
 // GET - Load conversations for user
@@ -71,6 +75,7 @@ export async function GET(request: NextRequest) {
 
 // POST - Save conversation
 export async function POST(request: NextRequest) {
+  const trace = request.headers.get('x-chat-trace-id') || `conv_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   try {
     const session = await auth();
     
@@ -81,14 +86,17 @@ export async function POST(request: NextRequest) {
     const userId = session.user.id; // Keep as string, MySQL driver handles conversion
     const body = await request.json();
     const { id, title, messages, surveyId, cohortId, type } = body;
+    const requestedType: 'chat' | 'news' | 'code' = (type || 'chat');
+    const normalizedSurveyId = requestedType === 'news' ? null : (surveyId || null);
+    const normalizedCohortId = requestedType === 'news' ? null : (cohortId || null);
 
-    console.log('📝 API SAVING CONVERSATION:', {
+    logConversation(trace, 'save_requested', {
       id,
       title,
       messageCount: messages?.length || 0,
-      type,
-      surveyId,
-      firstMessage: messages?.[0]?.content?.substring(0, 50)
+      type: requestedType,
+      surveyId: normalizedSurveyId,
+      cohortId: normalizedCohortId,
     });
 
     if (!id || !title) {
@@ -104,22 +112,38 @@ export async function POST(request: NextRequest) {
       'SELECT id FROM chat_conversations WHERE id = ? AND user_id = ?',
       [id, userId]
     );
-    
-    if (existingRows.length > 0) {
-      // Update existing conversation
-      await db.execute(
-        `UPDATE chat_conversations 
-         SET title = ?, messages = ?, survey_id = ?, cohort_id = ?, type = ?, updated_at = CURRENT_TIMESTAMP 
-         WHERE id = ? AND user_id = ?`,
-        [title, messagesJson, surveyId || null, cohortId || null, type || 'chat', id, userId]
-      );
-    } else {
-      // Insert new conversation
-      await db.execute(
-        `INSERT INTO chat_conversations (id, user_id, title, messages, survey_id, cohort_id, type) 
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [id, userId, title, messagesJson, surveyId || null, cohortId || null, type || 'chat']
-      );
+
+    const persistConversation = async (persistType: 'chat' | 'news' | 'code') => {
+      if (existingRows.length > 0) {
+        // Update existing conversation
+        await db.execute(
+          `UPDATE chat_conversations
+           SET title = ?, messages = ?, survey_id = ?, cohort_id = ?, type = ?, updated_at = CURRENT_TIMESTAMP
+           WHERE id = ? AND user_id = ?`,
+          [title, messagesJson, normalizedSurveyId, normalizedCohortId, persistType, id, userId]
+        );
+      } else {
+        // Insert new conversation
+        await db.execute(
+          `INSERT INTO chat_conversations (id, user_id, title, messages, survey_id, cohort_id, type)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          [id, userId, title, messagesJson, normalizedSurveyId, normalizedCohortId, persistType]
+        );
+      }
+    };
+
+    let persistedType: 'chat' | 'news' | 'code' = requestedType;
+    try {
+      await persistConversation(requestedType);
+    } catch (error: any) {
+      // Backward-compatible fallback when DB enum has not yet been migrated to include 'news'.
+      const errMsg = String(error?.message || '');
+      if (requestedType === 'news' && /(Data truncated|Incorrect|enum|type)/i.test(errMsg)) {
+        persistedType = 'chat';
+        await persistConversation('chat');
+      } else {
+        throw error;
+      }
     }
 
     const conversation: Conversation = {
@@ -128,11 +152,17 @@ export async function POST(request: NextRequest) {
       messages: messages || [],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-      surveyId,
-      cohortId,
-      type: type || 'chat',
+      surveyId: normalizedSurveyId,
+      cohortId: normalizedCohortId,
+      type: persistedType,
       userId: userId
     };
+    logConversation(trace, 'save_completed', {
+      id,
+      persistedType,
+      surveyId: normalizedSurveyId,
+      cohortId: normalizedCohortId,
+    });
     
     return NextResponse.json({ 
       status: true, 

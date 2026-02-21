@@ -27,7 +27,7 @@ interface BreadcrumbNavigationProps {
   conversationsLoading: boolean;
   
   // UI state
-  currentConversationType?: 'chat' | 'code';
+  currentConversationType?: 'chat' | 'news' | 'code';
 }
 
 export function BreadcrumbNavigation({
@@ -55,14 +55,20 @@ export function BreadcrumbNavigation({
   // Generate conversation title with type indicator (no truncation for main breadcrumb)
   const getConversationDisplayTitle = (conversation: Conversation) => {
     const baseTitle = conversation.title || 'New Conversation';
-    const typeIcon = conversation.type === 'code' ? '🐍 ' : '💬 ';
+    const typeIcon =
+      conversation.type === 'code' ? '🧪 ' :
+      conversation.type === 'news' ? '📰 ' :
+      '💬 ';
     return typeIcon + baseTitle;
   };
   
   // Generate conversation title with truncation for dropdown items
   const getConversationDropdownTitle = (conversation: Conversation) => {
     const title = conversation.title || 'New Conversation';
-    const typeIcon = conversation.type === 'code' ? '🐍 ' : '💬 ';
+    const typeIcon =
+      conversation.type === 'code' ? '🧪 ' :
+      conversation.type === 'news' ? '📰 ' :
+      '💬 ';
     const fullTitle = typeIcon + title;
     return fullTitle.length > 30 ? `${fullTitle.substring(0, 30)}...` : fullTitle;
   };
@@ -122,8 +128,12 @@ export function BreadcrumbNavigation({
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
                                   <button className="text-sm font-medium text-foreground hover:text-primary transition-colors whitespace-nowrap">
-                      {currentConversation ? getConversationDisplayTitle(currentConversation) : 
-                       (currentConversationType === 'code' ? '🐍 New Conversation' : '💬 New Conversation')}
+                      {currentConversation ? getConversationDisplayTitle(currentConversation) :
+                       (currentConversationType === 'code'
+                         ? '🧪 Legacy Code Conversation'
+                         : currentConversationType === 'news'
+                           ? '📰 New News Chat'
+                           : '💬 New Cohort Chat')}
                     </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-[280px]">

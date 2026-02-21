@@ -2,14 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { openSql as getMySQLConnection } from "@/app/utils/database/db";
 import { CohortRepo } from "@/app/utils/database/cohort-repo";
 import { CohortFilterRule } from "@/app/utils/interface";
-import { TextEncoder } from "util";
 import { auth } from '@/auth';
 
-import { createCompletion, createStreamingCompletion } from "@/app/utils/services/ai-service";
+import { createCompletion } from "@/app/utils/services/ai-service";
 import { verifyConfirmationToken } from "@/app/utils/api/token";
 import { SmartSurveyQueryBuilder } from "@/app/utils/survey/smart-query-builder";
 import { EnhancedSurveyQueryBuilder } from "@/app/utils/survey/enhanced-query-builder";
 import { QueryIntentClassifier } from "@/app/utils/survey/query-intent-classifier";
+import { getCampaignNewsContextForUser } from "@/app/utils/campaign-news";
+import { respondFromCampaignNewsOnly } from "./news-copilot";
 import type { FactSheetQueryResult } from "../../../utils/survey/fact-sheet-query-resolver";
 // Note: QuestionIntelligence is dynamically imported in the route handler
 
@@ -25,6 +26,108 @@ interface CohortQueryPayload {
   sources?: { survey: boolean; twins: boolean; web: boolean };
   systemPrompt?: string;
   stream?: boolean;
+}
+
+interface CampaignIdentity {
+  candidateName: string | null;
+  organizationName: string | null;
+  party: string | null;
+  officeType: string | null;
+  state: string | null;
+  districtCode: string | null;
+}
+
+async function getCampaignIdentityForUser(userId: string): Promise<CampaignIdentity | null> {
+  const db = await getMySQLConnection();
+  const [rows]: any = await db.execute(
+    `SELECT o.candidate_name AS candidateName,
+            o.name AS organizationName,
+            o.party AS party,
+            o.office_type AS officeType,
+            UPPER(TRIM(o.state)) AS state,
+            o.district_code AS districtCode
+     FROM organizations o
+     JOIN organization_members om ON o.id = om.organization_id
+     WHERE om.user_id = ? AND om.status = 'active'
+     ORDER BY om.role = 'owner' DESC, o.created_at ASC
+     LIMIT 1`,
+    [userId]
+  );
+  if (!rows?.length) return null;
+  return {
+    candidateName: rows[0].candidateName || null,
+    organizationName: rows[0].organizationName || null,
+    party: rows[0].party || null,
+    officeType: rows[0].officeType || null,
+    state: rows[0].state || null,
+    districtCode: rows[0].districtCode || null,
+  };
+}
+
+function isNewsIntent(question: string): boolean {
+  return /(news|headline|headlines|what changed|this week|today|yesterday|press|media|story|stories|update|updates|events?|talking points?|newsletter|subject line|comms|messaging|rapid response|advice|recommendations?)/i.test(
+    question || ''
+  );
+}
+
+type RouteDecision =
+  | 'news_only_with_context'
+  | 'news_only_no_context'
+  | 'survey_or_analysis';
+
+function decidePrimaryRoute(args: {
+  surveyId?: number;
+  webSourceEnabled: boolean;
+  newsItemCount: number;
+}): RouteDecision {
+  if (!args.surveyId && args.webSourceEnabled && args.newsItemCount > 0) {
+    return 'news_only_with_context';
+  }
+  if (!args.surveyId && args.webSourceEnabled && args.newsItemCount === 0) {
+    return 'news_only_no_context';
+  }
+  return 'survey_or_analysis';
+}
+
+function logRoute(traceId: string, stage: string, details: Record<string, unknown>) {
+  console.log(
+    JSON.stringify({
+      scope: 'cohort-query',
+      traceId,
+      stage,
+      ...details,
+    })
+  );
+}
+
+
+function buildCampaignCopilotSystemPrompt(basePrompt: string | undefined, newsContext: Awaited<ReturnType<typeof getCampaignNewsContextForUser>> | null): string {
+  const contract = `Campaign Copilot Output Contract:
+- Use these exact sections in order:
+  1) Situation Brief
+  2) Strategic Read (opportunity + risk)
+  3) Action Drafts
+     - 3 newsletter headline options
+     - 5 talking points
+     - 2 rapid-response lines
+  4) Next 48 Hours
+  5) Confidence
+  6) Evidence
+- Keep outputs campaign-operational, concise, and candidate-specific.
+- Tie recommendations to district/cohort realities; avoid generic consulting language.
+- If evidence is thin, explicitly lower confidence and say why.
+- When the question is about news/events, explicitly reference relevant headlines in Evidence and separate observed facts from recommendations.`;
+
+  const newsPacket = newsContext && newsContext.items.length > 0
+    ? `Latest district/state campaign news context:
+${newsContext.items.slice(0, 5).map((item, idx) =>
+  `${idx + 1}. [${item.source}] ${item.title}${item.summary ? ` — ${item.summary}` : ''} (${item.publishedAt || 'time unknown'})`
+).join('\n')}
+`
+    : 'Latest district/state campaign news context: none available.';
+
+  const existing = (basePrompt || '').trim();
+  return [existing, contract, newsPacket].filter(Boolean).join('\n\n');
 }
 
 function buildWhereClause(rules: CohortFilterRule[], params: any[]): string {
@@ -386,12 +489,14 @@ async function processMultiCohortResults(
 }
 
 export async function POST(req: NextRequest) {
+  const traceId = req.headers.get('x-chat-trace-id') || `srv_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   try {
-    console.log('🚀🚀🚀 COHORT QUERY ROUTE STARTED - INTELLIGENT ROUTER VERSION 🚀🚀🚀');
+    logRoute(traceId, 'start', { method: 'POST' });
     
     // Authenticate request via NextAuth session (safer than trusting header)
     const session = await auth();
     if (!session?.user?.id) {
+      logRoute(traceId, 'auth_failed', {});
       return NextResponse.json({ status: false, message: "Unauthorized" }, { status: 401 });
     }
     const userId = session.user.id;
@@ -399,6 +504,21 @@ export async function POST(req: NextRequest) {
     const body = (await req.json()) as CohortQueryPayload;
     const { cohort, question, topK = 1000, surveyId: initialSurveyId, model = 'gpt-4o', temperature = 0.0, sources, systemPrompt, stream = true } = body;
     let surveyId = initialSurveyId; // Allow reassignment for auto-selection
+    // Default web/news context to ON for campaign copilot unless explicitly disabled.
+    const webSourceEnabled = sources?.web !== false;
+    const newsContext = webSourceEnabled ? await getCampaignNewsContextForUser(userId, 5) : null;
+    const campaignIdentity = webSourceEnabled ? await getCampaignIdentityForUser(userId) : null;
+    const effectiveSystemPrompt = webSourceEnabled
+      ? buildCampaignCopilotSystemPrompt(systemPrompt, newsContext)
+      : systemPrompt;
+    logRoute(traceId, 'request_parsed', {
+      userId,
+      surveyId: surveyId || null,
+      stream,
+      model,
+      webSourceEnabled,
+      newsItems: newsContext?.items?.length || 0,
+    });
     
     console.log('🔍 DEBUGGING: Request body stream value:', body.stream);
     console.log('🎯 DEBUGGING: surveyId received from frontend:', surveyId);
@@ -410,7 +530,33 @@ export async function POST(req: NextRequest) {
     console.log(`📊 Survey ID: ${surveyId}`);
 
     if (!question || question.trim() === "") {
+      logRoute(traceId, 'validation_failed', { reason: 'empty_question' });
       return NextResponse.json({ status: false, message: "Question is required" }, { status: 400 });
+    }
+
+    const primaryRoute = decidePrimaryRoute({
+      surveyId,
+      webSourceEnabled,
+      newsItemCount: newsContext?.items?.length || 0,
+    });
+    logRoute(traceId, 'route_decision', { primaryRoute });
+
+    if (primaryRoute === 'news_only_with_context') {
+      logRoute(traceId, 'route_news_only', { reason: 'no_survey_with_news_context' });
+      return respondFromCampaignNewsOnly({
+        question,
+        stream,
+        newsContext,
+        campaignIdentity,
+      });
+    }
+    if (primaryRoute === 'news_only_no_context') {
+      logRoute(traceId, 'route_news_no_context', {});
+      return NextResponse.json({
+        status: true,
+        content:
+          "No district/state news items are available yet for your campaign scope. Try running the news digest refresh, then ask again.",
+      });
     }
 
     // Resolve cohort filter
@@ -883,8 +1029,25 @@ Only suggest auto-selection if there's a clear, unambiguous match with high conf
            
            console.log(`🔄 Converted ${executedResults.length} results to ${rows.length} text responses for analysis`);
            
-           // 🎯 SUCCESS! Use LightweightQuestionMatcher results - route to analysis engines
+          // 🎯 SUCCESS! Use LightweightQuestionMatcher results - route to analysis engines
            console.log('🚀 Using LightweightQuestionMatcher results - routing to analysis engines');
+
+          // If this is a news-style question and survey rows are empty, answer from campaign news context.
+          if (
+            rows.length === 0 &&
+            webSourceEnabled &&
+            newsContext &&
+            newsContext.items.length > 0 &&
+            isNewsIntent(question)
+          ) {
+            console.log('📰 Using campaign-news-only fallback (lightweight path)');
+            return respondFromCampaignNewsOnly({
+              question,
+              stream,
+              newsContext,
+              campaignIdentity,
+            });
+          }
            
            // Use the clean analysis router
            const { routeToAnalysisEngine } = await import('./analysis-router');
@@ -897,7 +1060,7 @@ Only suggest auto-selection if there's a clear, unambiguous match with high conf
              stream,
              model,
              temperature,
-             systemPrompt
+              systemPrompt: effectiveSystemPrompt
            });
         } else {
           console.warn(`❌ Survey ${surveyId} not found`);
@@ -995,6 +1158,22 @@ Only suggest auto-selection if there's a clear, unambiguous match with high conf
       }
     }
     
+    if (
+      (!rows || rows.length === 0) &&
+      webSourceEnabled &&
+      newsContext &&
+      newsContext.items.length > 0 &&
+      isNewsIntent(question)
+    ) {
+      console.log('📰 Using campaign-news-only fallback (fallback path)');
+      return respondFromCampaignNewsOnly({
+        question,
+        stream,
+        newsContext,
+        campaignIdentity,
+      });
+    }
+
     const { routeToAnalysisEngine } = await import('./analysis-router');
     return routeToAnalysisEngine({
       factSheet,
@@ -1005,9 +1184,12 @@ Only suggest auto-selection if there's a clear, unambiguous match with high conf
       stream,
       model,
       temperature,
-      systemPrompt
+      systemPrompt: effectiveSystemPrompt
     });
   } catch (error) {
+    logRoute(traceId, 'unhandled_error', {
+      message: error instanceof Error ? error.message : 'Unknown error',
+    });
     console.error("Error in cohort query:", error);
     return NextResponse.json({ status: false, message: "Internal error" }, { status: 500 });
   }
