@@ -33,6 +33,38 @@ export async function GET(request: NextRequest) {
 
     const surveyIds: number[] = surveyRows.map((r: any) => r.id);
 
+    // Get user's primary org location + campaign context for map center
+    // (must run before the early return so new accounts still get their org center)
+    let orgCenter = null;
+    try {
+      const [orgRows]: any = await db.execute(
+        `SELECT o.latitude, o.longitude, o.default_zoom, o.name,
+                o.office_type, o.state, o.district_code, o.candidate_name, o.party
+         FROM organizations o
+         JOIN organization_members om ON o.id = om.organization_id
+         WHERE om.user_id = ? AND om.status = 'active'
+         ORDER BY om.role = 'owner' DESC, o.created_at ASC
+         LIMIT 1`,
+        [userId]
+      );
+      if (orgRows.length > 0) {
+        const row = orgRows[0];
+        orgCenter = {
+          latitude: parseFloat(row.latitude),
+          longitude: parseFloat(row.longitude),
+          zoom: row.default_zoom || 10,
+          name: row.name,
+          officeType: row.office_type || null,
+          state: row.state || null,
+          districtCode: row.district_code || null,
+          candidateName: row.candidate_name || null,
+          party: row.party || null,
+        };
+      }
+    } catch {
+      // Org tables may not exist yet
+    }
+
     if (surveyIds.length === 0) {
       return NextResponse.json({
         status: true,
@@ -41,6 +73,7 @@ export async function GET(request: NextRequest) {
         points: [],
         totalResponses: 0,
         totalSurveys: 0,
+        orgCenter,
       });
     }
 
@@ -105,37 +138,6 @@ export async function GET(request: NextRequest) {
     const statesOut: Record<string, { responses: number; surveys: number }> = {};
     for (const [key, val] of Object.entries(states)) {
       statesOut[key] = { responses: val.responses, surveys: val.surveys.size };
-    }
-
-    // Get user's primary org location + campaign context for map center
-    let orgCenter = null;
-    try {
-      const [orgRows]: any = await db.execute(
-        `SELECT o.latitude, o.longitude, o.default_zoom, o.name,
-                o.office_type, o.state, o.district_code, o.candidate_name, o.party
-         FROM organizations o
-         JOIN organization_members om ON o.id = om.organization_id
-         WHERE om.user_id = ? AND om.status = 'active'
-         ORDER BY om.role = 'owner' DESC, o.created_at ASC
-         LIMIT 1`,
-        [userId]
-      );
-      if (orgRows.length > 0) {
-        const row = orgRows[0];
-        orgCenter = {
-          latitude: parseFloat(row.latitude),
-          longitude: parseFloat(row.longitude),
-          zoom: row.default_zoom || 10,
-          name: row.name,
-          officeType: row.office_type || null,
-          state: row.state || null,
-          districtCode: row.district_code || null,
-          candidateName: row.candidate_name || null,
-          party: row.party || null,
-        };
-      }
-    } catch {
-      // Org tables may not exist yet
     }
 
     return NextResponse.json({

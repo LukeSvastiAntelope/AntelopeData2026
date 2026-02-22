@@ -82,14 +82,14 @@ interface SurveyAnalyticsApiResponse {
   responses: SurveyResponse[]
 }
 
-// ShadCN zinc theme color palette
+// Neutral theme color palette
 const COLORS = [
-  'hsl(var(--zinc-600))',
-  'hsl(var(--zinc-500))', 
-  'hsl(var(--zinc-400))',
-  'hsl(var(--zinc-700))',
-  'hsl(var(--zinc-300))',
-  'hsl(var(--zinc-800))'
+  'var(--neutral-600)',
+  'var(--neutral-500)',
+  'var(--neutral-400)',
+  'var(--neutral-700)',
+  'var(--neutral-300)',
+  'var(--neutral-800)'
 ]
 
 const SurveyResultsPage = () => {
@@ -432,15 +432,15 @@ const SurveyResultsPage = () => {
                       </CardHeader>
                       <CardContent className="pb-4">
                         <ChartContainer 
-                          config={{ count: { label: "Responses", color: "hsl(var(--zinc-600))" } }} 
+                          config={{ count: { label: "Responses", color: "var(--neutral-600)" } }} 
                           className="aspect-auto h-[160px] w-full"
                         >
                           <BarChart data={analytics.ageData} margin={{ left: -20, right: 20, top: 12, bottom: 12 }}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted))" />
-                            <XAxis dataKey="range" tickLine={false} axisLine={false} stroke="hsl(var(--muted-foreground))" fontSize={10} />
-                            <YAxis tickLine={false} axisLine={false} stroke="hsl(var(--muted-foreground))" fontSize={10} />
+                            <CartesianGrid strokeDasharray="3 3" stroke="var(--muted)" />
+                            <XAxis dataKey="range" tickLine={false} axisLine={false} stroke="var(--muted-foreground)" fontSize={10} />
+                            <YAxis tickLine={false} axisLine={false} stroke="var(--muted-foreground)" fontSize={10} />
                             <ChartTooltip content={<ChartTooltipContent />} />
-                            <Bar dataKey="count" fill="hsl(var(--zinc-600))" radius={2} />
+                            <Bar dataKey="count" fill="var(--neutral-600)" radius={2} />
                           </BarChart>
                         </ChartContainer>
                       </CardContent>
@@ -454,7 +454,7 @@ const SurveyResultsPage = () => {
                       <CardContent className="pb-4 flex items-center gap-4">
                         <div className="flex-shrink-0">
                           <ChartContainer 
-                            config={{ count: { label: "Responses", color: "hsl(var(--zinc-600))" } }} 
+                            config={{ count: { label: "Responses", color: "var(--neutral-600)" } }} 
                             className="aspect-square h-[140px] w-[140px]"
                           >
                             <RechartsPieChart>
@@ -499,8 +499,8 @@ const SurveyResultsPage = () => {
                       <CardContent className="pb-4">
                         <ChartContainer 
                           config={{ 
-                            count: { label: "Responses", color: "hsl(var(--zinc-600))" },
-                            label: { color: "hsl(var(--background))" }
+                            count: { label: "Responses", color: "var(--neutral-600)" },
+                            label: { color: "var(--background)" }
                           }} 
                           className="aspect-auto h-[160px] w-full"
                         >
@@ -528,7 +528,7 @@ const SurveyResultsPage = () => {
                             <Bar
                               dataKey="count"
                               layout="vertical"
-                              fill="hsl(var(--zinc-600))"
+                              fill="var(--neutral-600)"
                               radius={4}
                             >
                               <LabelList

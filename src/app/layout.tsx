@@ -1,7 +1,7 @@
 'use client';
 
 import "./globals.css";
-import { Noto_Sans } from 'next/font/google';
+import { Inter } from 'next/font/google';
 import { Toaster } from "@/components/ui/sonner";
 import { Providers } from "./components/provider/mainProvider";
 import Script from "next/script";
@@ -9,12 +9,11 @@ import { Analytics } from '@vercel/analytics/react';
 import { ThemeProvider } from "@/components/theme-provider";
 import Head from 'next/head';
 
-const notoSans = Noto_Sans({
+const inter = Inter({
     subsets: ['latin'],
-    variable: '--font-noto-sans',
+    variable: '--font-inter',
     display: 'swap',
-    fallback: ['system-ui', 'arial'],
-    preload: false, // Skip preloading to avoid build-time fetch
+    fallback: ['system-ui', 'sans-serif'],
 });
 
 export default function RootLayout({
@@ -39,7 +38,7 @@ export default function RootLayout({
                     `}
                 </Script>
             </head>
-            <body className={`${notoSans.className} antialiased bg-background text-foreground transition-colors duration-300`}>
+            <body className={`${inter.className} antialiased bg-background text-foreground transition-colors duration-300`}>
                 <ThemeProvider>
                     <Toaster />
                     <Providers>

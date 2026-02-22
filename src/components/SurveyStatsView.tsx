@@ -65,24 +65,24 @@ interface SurveyStatsViewProps {
   className?: string;
 }
 
-// Chart color scheme (ShadCN neutral zinc theme)
+// Chart color scheme (ShadCN radix-nova neutral theme)
 const CHART_COLORS = {
-  primary: 'hsl(var(--primary))',
-  secondary: 'hsl(var(--secondary))',
-  muted: 'hsl(var(--muted))',
-  accent: 'hsl(var(--accent))',
+  primary: 'var(--primary)',
+  secondary: 'var(--secondary)',
+  muted: 'var(--muted)',
+  accent: 'var(--accent)',
   zinc: ['#71717a', '#a1a1aa', '#d4d4d8', '#e4e4e7', '#f4f4f5', '#fafafa'],
   gradient: ['#18181b', '#27272a', '#3f3f46', '#52525b', '#71717a', '#a1a1aa']
 }
 
-// ShadCN zinc theme color palette (matching Advanced Analytics)
+// Neutral theme color palette
 const COLORS = [
-  'hsl(var(--zinc-600))',
-  'hsl(var(--zinc-500))', 
-  'hsl(var(--zinc-400))',
-  'hsl(var(--zinc-700))',
-  'hsl(var(--zinc-300))',
-  'hsl(var(--zinc-800))'
+  'var(--neutral-600)',
+  'var(--neutral-500)',
+  'var(--neutral-400)',
+  'var(--neutral-700)',
+  'var(--neutral-300)',
+  'var(--neutral-800)'
 ]
 
 export default function SurveyStatsView({ surveyId, className }: SurveyStatsViewProps) {
@@ -332,15 +332,15 @@ export default function SurveyStatsView({ surveyId, className }: SurveyStatsView
             </CardHeader>
             <CardContent className="pb-4">
               <ChartContainer 
-                config={{ count: { label: "Responses", color: "hsl(var(--zinc-600))" } }} 
+                config={{ count: { label: "Responses", color: "var(--neutral-600)" } }} 
                 className="aspect-auto h-[160px] w-full"
               >
                 <BarChart data={demographics.age || []} margin={{ left: -20, right: 20, top: 12, bottom: 12 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted))" />
-                  <XAxis dataKey="range" tickLine={false} axisLine={false} stroke="hsl(var(--muted-foreground))" fontSize={10} />
-                  <YAxis tickLine={false} axisLine={false} stroke="hsl(var(--muted-foreground))" fontSize={10} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--muted)" />
+                  <XAxis dataKey="range" tickLine={false} axisLine={false} stroke="var(--muted-foreground)" fontSize={10} />
+                  <YAxis tickLine={false} axisLine={false} stroke="var(--muted-foreground)" fontSize={10} />
                   <ChartTooltip content={<ChartTooltipContent />} />
-                  <Bar dataKey="count" fill="hsl(var(--zinc-600))" radius={2} />
+                  <Bar dataKey="count" fill="var(--neutral-600)" radius={2} />
                 </BarChart>
               </ChartContainer>
             </CardContent>
@@ -354,7 +354,7 @@ export default function SurveyStatsView({ surveyId, className }: SurveyStatsView
             <CardContent className="pb-4 flex items-center gap-4">
               <div className="flex-shrink-0">
                 <ChartContainer 
-                  config={{ count: { label: "Responses", color: "hsl(var(--zinc-600))" } }} 
+                  config={{ count: { label: "Responses", color: "var(--neutral-600)" } }} 
                   className="aspect-square h-[140px] w-[140px]"
                 >
                   <RechartsPieChart>
@@ -399,8 +399,8 @@ export default function SurveyStatsView({ surveyId, className }: SurveyStatsView
             <CardContent className="pb-4">
               <ChartContainer 
                 config={{ 
-                  count: { label: "Responses", color: "hsl(var(--zinc-600))" },
-                  label: { color: "hsl(var(--background))" }
+                  count: { label: "Responses", color: "var(--neutral-600)" },
+                  label: { color: "var(--background)" }
                 }} 
                 className="aspect-auto h-[160px] w-full"
               >
@@ -428,7 +428,7 @@ export default function SurveyStatsView({ surveyId, className }: SurveyStatsView
                   <Bar
                     dataKey="count"
                     layout="vertical"
-                    fill="hsl(var(--zinc-600))"
+                    fill="var(--neutral-600)"
                     radius={4}
                   >
                     <LabelList
@@ -538,7 +538,7 @@ export default function SurveyStatsView({ surveyId, className }: SurveyStatsView
                                         <div className="flex items-center gap-4">
                                           <div className="flex-shrink-0">
                                             <ChartContainer 
-                                              config={{ count: { label: "Responses", color: "hsl(var(--zinc-600))" } }} 
+                                              config={{ count: { label: "Responses", color: "var(--neutral-600)" } }} 
                                               className="aspect-square h-[120px] w-[120px]"
                                             >
                                               <RechartsPieChart>

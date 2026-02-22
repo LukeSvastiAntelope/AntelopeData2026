@@ -4,6 +4,7 @@ import { useRef, useEffect, useState, useCallback } from 'react'
 import { useTheme } from 'next-themes'
 import { Button } from '@/components/ui/button'
 import { Users, FileText, Loader2, Globe } from 'lucide-react'
+import { PartyIcon, partyColor } from '@/components/party-icons'
 
 // ---------------------------------------------------------------------------
 // State name <-> abbreviation lookups
@@ -77,6 +78,13 @@ interface DistrictFeature {
   incumbentParty?: string
   margin2024?: number
   donations?: { dem: number; rep: number; other?: number }
+  demographics?: {
+    totalPopulation?: number | null
+    medianHouseholdIncome?: number | null
+    bachelorsOrHigherPct?: number | null
+    medianAge?: number | null
+    sourceYear?: number | null
+  } | null
 }
 
 interface DashboardMapProps {
@@ -108,7 +116,13 @@ export default function DashboardMap({ layers }: DashboardMapProps) {
   const [geoData, setGeoData] = useState<GeoData | null>(null)
   const [statePoliticalData, setStatePoliticalData] = useState<PoliticalFeature[]>([])
   const [districtPoliticalData, setDistrictPoliticalData] = useState<DistrictFeature[]>([])
-  const districtDataFetched = useRef(false)
+  const districtDataFetchedForKey = useRef<string | null>(null)
+  const [campaignNewsScopes, setCampaignNewsScopes] = useState<{ states: string[]; districts: string[] }>({ states: [], districts: [] })
+  const [campaignNewsSummary, setCampaignNewsSummary] = useState<{
+    unreadCount: number
+    items: Array<{ title: string; source: string; url: string; publishedAt: string | null }>
+  } | null>(null)
+  const [showCampaignNewsNotice, setShowCampaignNewsNotice] = useState(true)
   const [hoveredStateName, setHoveredStateName] = useState<string | null>(null)
   const [hoveredDistrict, setHoveredDistrict] = useState<DistrictFeature | null>(null)
   const { resolvedTheme } = useTheme()
@@ -133,6 +147,23 @@ export default function DashboardMap({ layers }: DashboardMapProps) {
       .then(r => r.json())
       .then(d => { if (d.status && d.features?.length) setStatePoliticalData(d.features) })
       .catch(e => console.error('Failed to fetch political data:', e))
+  }, [])
+
+  useEffect(() => {
+    fetch('/api/campaign/news/summary')
+      .then(r => r.json())
+      .then(d => {
+        if (!d?.status) return
+        setCampaignNewsScopes({
+          states: d?.scopes?.states || [],
+          districts: d?.scopes?.districts || [],
+        })
+        setCampaignNewsSummary({
+          unreadCount: d?.unreadCount || 0,
+          items: Array.isArray(d?.items) ? d.items : [],
+        })
+      })
+      .catch((e) => console.error('Failed to fetch campaign news scopes:', e))
   }, [])
 
   // -----------------------------------------------------------------------
@@ -217,6 +248,12 @@ export default function DashboardMap({ layers }: DashboardMapProps) {
           filter: ['==', ['get', 'name'], ''],
           paint: { 'line-color': '#3b82f6', 'line-width': 2.5 },
         })
+        map.addLayer({
+          id: 'news-state-highlight', type: 'line', source: 'us-states',
+          layout: { visibility: 'none' },
+          filter: ['in', ['get', 'name'], ['literal', []]],
+          paint: { 'line-color': '#f59e0b', 'line-width': 2.5, 'line-dasharray': [2, 2] },
+        })
 
         // ---- Congressional district boundaries (119th Congress) ----
         map.addSource('us-districts', {
@@ -241,6 +278,12 @@ export default function DashboardMap({ layers }: DashboardMapProps) {
           layout: { visibility: 'none' },
           filter: ['==', ['get', 'district_code'], ''],
           paint: { 'line-color': '#f97316', 'line-width': 2.5 },
+        })
+        map.addLayer({
+          id: 'news-district-highlight', type: 'line', source: 'us-districts',
+          layout: { visibility: 'none' },
+          filter: ['in', ['get', 'district_code'], ['literal', []]],
+          paint: { 'line-color': '#f59e0b', 'line-width': 2.5, 'line-dasharray': [2, 2] },
         })
 
         // ---- "My district" / "My state" highlight layers ----
@@ -289,15 +332,7 @@ export default function DashboardMap({ layers }: DashboardMapProps) {
           },
         })
 
-        // Fly to centre
-        setTimeout(() => {
-          if (cancelled) return
-          map.flyTo({
-            center: [-77.0369, 38.9072],
-            zoom: 10, duration: 2800, curve: 1.42,
-            easing: (t: number) => t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t + 2, 3) / 2,
-          })
-        }, 600)
+        // Initial fly handled by the geoData effect (uses orgCenter when available)
       })
 
       // ---- Hover interactions ----
@@ -430,13 +465,14 @@ export default function DashboardMap({ layers }: DashboardMapProps) {
       if (src) src.setData({ type: 'FeatureCollection', features })
     }
 
-    if (geoData.orgCenter) {
-      map.flyTo({
-        center: [geoData.orgCenter.longitude, geoData.orgCenter.latitude],
-        zoom: geoData.orgCenter.zoom || 10, duration: 2800, curve: 1.42,
-        easing: (t: number) => t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t + 2, 3) / 2,
-      })
-    }
+    // Fly to org center (campaign HQ) or default to DC area
+    const target = geoData.orgCenter
+      ? { center: [geoData.orgCenter.longitude, geoData.orgCenter.latitude] as [number, number], zoom: geoData.orgCenter.zoom || 10 }
+      : { center: [-77.0369, 38.9072] as [number, number], zoom: 10 }
+    map.flyTo({
+      ...target, duration: 2800, curve: 1.42,
+      easing: (t: number) => t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t + 2, 3) / 2,
+    })
   }, [geoData, status])
 
   // Update PVI choropleth
@@ -455,18 +491,27 @@ export default function DashboardMap({ layers }: DashboardMapProps) {
   }, [statePoliticalData, status])
 
   // -----------------------------------------------------------------------
-  // Fetch district political data (once, when layer is first enabled)
+  // Fetch district political data when districts layer is enabled.
+  // Uses org state if available to keep payload bounded for campaign workflows.
   // -----------------------------------------------------------------------
   useEffect(() => {
-    if (!showDistrictsLayer || districtDataFetched.current) return
-    districtDataFetched.current = true
-    fetch('/api/dashboard/political?zoom=6')
+    if (!showDistrictsLayer) return
+
+    const stateFilter = geoData?.orgCenter?.state?.trim().toUpperCase() || ''
+    const fetchKey = stateFilter || 'ALL'
+    if (districtDataFetchedForKey.current === fetchKey) return
+
+    districtDataFetchedForKey.current = fetchKey
+    const params = new URLSearchParams({ zoom: '6' })
+    if (stateFilter) params.set('state', stateFilter)
+
+    fetch(`/api/dashboard/political?${params.toString()}`)
       .then(r => r.json())
       .then(d => {
-        if (d.status && d.features?.length) setDistrictPoliticalData(d.features)
+        if (d.status) setDistrictPoliticalData(d.features || [])
       })
       .catch(e => console.error('Failed to fetch district political data:', e))
-  }, [showDistrictsLayer])
+  }, [showDistrictsLayer, geoData?.orgCenter?.state])
 
   // Color district fills by PVI
   useEffect(() => {
@@ -485,6 +530,23 @@ export default function DashboardMap({ layers }: DashboardMapProps) {
   // -----------------------------------------------------------------------
   // Layer visibility
   // -----------------------------------------------------------------------
+  useEffect(() => {
+    if (status !== 'ready' || !mapRef.current) return
+    const map = mapRef.current
+    const stateNames = campaignNewsScopes.states
+      .map((abbrev) => ABBREV_TO_STATE_NAME[abbrev])
+      .filter(Boolean)
+    const districts = campaignNewsScopes.districts || []
+    try {
+      map.setFilter('news-state-highlight', ['in', ['get', 'name'], ['literal', stateNames]])
+      map.setLayoutProperty('news-state-highlight', 'visibility', stateNames.length ? 'visible' : 'none')
+    } catch {}
+    try {
+      map.setFilter('news-district-highlight', ['in', ['get', 'district_code'], ['literal', districts]])
+      map.setLayoutProperty('news-district-highlight', 'visibility', districts.length ? 'visible' : 'none')
+    } catch {}
+  }, [status, campaignNewsScopes])
+
   useEffect(() => {
     if (status !== 'ready' || !mapRef.current) return
     try { mapRef.current.setLayoutProperty('state-fills', 'visibility', showSurveyLayer ? 'visible' : 'none') } catch {}
@@ -550,6 +612,31 @@ export default function DashboardMap({ layers }: DashboardMapProps) {
     })
   }, [geoData])
 
+  const markCampaignNewsSeen = useCallback(async () => {
+    try {
+      await fetch('/api/campaign/news/mark-seen', { method: 'POST' })
+      setCampaignNewsSummary((prev) => (prev ? { ...prev, unreadCount: 0 } : prev))
+      setShowCampaignNewsNotice(false)
+    } catch (e) {
+      console.error('Failed to mark campaign news as seen:', e)
+    }
+  }, [])
+
+  const getNewsFreshnessLabel = useCallback(() => {
+    if (!campaignNewsSummary?.items?.length) return 'updated recently'
+    const timestamps = campaignNewsSummary.items
+      .map((i) => (i.publishedAt ? new Date(i.publishedAt).getTime() : 0))
+      .filter((t) => t > 0)
+    if (!timestamps.length) return 'updated recently'
+    const newest = Math.max(...timestamps)
+    const diffMinutes = Math.max(1, Math.floor((Date.now() - newest) / 60000))
+    if (diffMinutes < 60) return `${diffMinutes}m ago`
+    const diffHours = Math.floor(diffMinutes / 60)
+    if (diffHours < 24) return `${diffHours}h ago`
+    const diffDays = Math.floor(diffHours / 24)
+    return `${diffDays}d ago`
+  }, [campaignNewsSummary])
+
   // -----------------------------------------------------------------------
   // Tooltip — supports both state and district hover
   // -----------------------------------------------------------------------
@@ -603,21 +690,75 @@ export default function DashboardMap({ layers }: DashboardMapProps) {
         </Button>
       </div>
 
+      {showCampaignNewsNotice && (campaignNewsSummary?.unreadCount || 0) > 0 && (
+        <div
+          style={{ position: 'absolute', top: 12, left: 12, zIndex: 10 }}
+          className="max-w-[280px] rounded-md border border-amber-300/40 bg-amber-500/10 px-2 py-1.5 backdrop-blur-sm"
+        >
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="text-[10px] font-semibold text-amber-300 leading-tight">
+                {campaignNewsSummary?.unreadCount} campaign update{campaignNewsSummary?.unreadCount === 1 ? '' : 's'} ({getNewsFreshnessLabel()})
+              </p>
+              {campaignNewsSummary?.items?.[0] && (
+                <a
+                  href={campaignNewsSummary.items[0].url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="block mt-0.5 text-[10px] text-foreground/90 truncate hover:underline"
+                  title={campaignNewsSummary.items[0].title}
+                >
+                  {campaignNewsSummary.items[0].title}
+                </a>
+              )}
+            </div>
+            <div className="flex items-center gap-1">
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-5 px-1.5 text-[10px]"
+                onClick={markCampaignNewsSeen}
+              >
+                Read
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-5 w-5 p-0 text-[10px]"
+                onClick={() => setShowCampaignNewsNotice(false)}
+              >
+                x
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* District tooltip (takes priority when hovering a district) */}
       {districtTooltipData && !tooltipData && (() => {
         const d = districtTooltipData as DistrictFeature
+        const districtLean = (d.pviNumeric || 0) < 0 ? 'R'
+          : (d.pviNumeric || 0) > 0 ? 'D'
+          : (d.margin2024 || 0) < 0 ? 'R'
+          : (d.margin2024 || 0) > 0 ? 'D'
+          : d.incumbentParty === 'R' || d.incumbentParty === 'D' ? d.incumbentParty
+          : null
         return (
           <div
             style={{ position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)', zIndex: 10 }}
             className="pointer-events-none select-none bg-background/90 backdrop-blur-md rounded-lg border border-border/50 p-3 shadow-lg min-w-[200px] max-w-[280px]"
           >
-            <p className="font-semibold text-sm">
-              {d.id}{d.districtNumber === 0 && ' (At-Large)'}
-            </p>
+            <div className="flex items-center gap-2">
+              {districtLean && <PartyIcon party={districtLean} size={14} className={partyColor(districtLean)} />}
+              <p className="font-semibold text-sm">
+                {d.id}{d.districtNumber === 0 && ' (At-Large)'}
+              </p>
+            </div>
             {d.incumbentName && (
               <div className="mt-1.5 flex items-center justify-between">
                 <span className="text-xs text-muted-foreground">Incumbent</span>
-                <span className={`text-xs font-medium ${d.incumbentParty === 'D' ? 'text-blue-400' : d.incumbentParty === 'R' ? 'text-red-400' : 'text-muted-foreground'}`}>
+                <span className={`text-xs font-medium flex items-center gap-1 ${d.incumbentParty === 'D' ? 'text-blue-400' : d.incumbentParty === 'R' ? 'text-red-400' : 'text-muted-foreground'}`}>
+                  <PartyIcon party={d.incumbentParty || null} size={10} className={partyColor(d.incumbentParty)} />
                   {d.incumbentName} ({d.incumbentParty})
                 </span>
               </div>
@@ -640,8 +781,36 @@ export default function DashboardMap({ layers }: DashboardMapProps) {
             )}
             {d.donations && (
               <div className="flex items-center gap-3 mt-2 pt-2 border-t border-border/50 text-[10px] text-muted-foreground">
-                <span className="text-blue-400">${(d.donations.dem / 1000).toFixed(0)}k Dem</span>
-                <span className="text-red-400">${(d.donations.rep / 1000).toFixed(0)}k Rep</span>
+                <span className="flex items-center gap-1 text-blue-400"><PartyIcon party="D" size={9} className="text-blue-400" />${(d.donations.dem / 1000).toFixed(0)}k</span>
+                <span className="flex items-center gap-1 text-red-400"><PartyIcon party="R" size={9} className="text-red-400" />${(d.donations.rep / 1000).toFixed(0)}k</span>
+              </div>
+            )}
+            {d.demographics && (
+              <div className="mt-2 pt-2 border-t border-border/50 space-y-1">
+                {d.demographics.totalPopulation !== null && d.demographics.totalPopulation !== undefined && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-muted-foreground">Population</span>
+                    <span className="text-xs font-medium">{d.demographics.totalPopulation.toLocaleString()}</span>
+                  </div>
+                )}
+                {d.demographics.medianHouseholdIncome !== null && d.demographics.medianHouseholdIncome !== undefined && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-muted-foreground">Median Income</span>
+                    <span className="text-xs font-medium">${Math.round(d.demographics.medianHouseholdIncome).toLocaleString()}</span>
+                  </div>
+                )}
+                {d.demographics.medianAge !== null && d.demographics.medianAge !== undefined && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-muted-foreground">Median Age</span>
+                    <span className="text-xs font-medium">{d.demographics.medianAge.toFixed(1)}</span>
+                  </div>
+                )}
+                {d.demographics.bachelorsOrHigherPct !== null && d.demographics.bachelorsOrHigherPct !== undefined && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-muted-foreground">Bachelor's+</span>
+                    <span className="text-xs font-medium">{d.demographics.bachelorsOrHigherPct.toFixed(1)}%</span>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -649,71 +818,90 @@ export default function DashboardMap({ layers }: DashboardMapProps) {
       })()}
 
       {/* State tooltip */}
-      {tooltipData && (
-        <div
-          style={{ position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)', zIndex: 10 }}
-          className="pointer-events-none select-none bg-background/90 backdrop-blur-md rounded-lg border border-border/50 p-3 shadow-lg min-w-[200px] max-w-[280px]"
-        >
-          <p className="font-semibold text-sm">
-            {tooltipData.politicalInfo?.name || tooltipData.surveyInfo?.name || hoveredStateName}
-          </p>
-          {tooltipData.politicalInfo && showPoliticalLayer && (
-            <div className="mt-2 space-y-1">
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-muted-foreground">PVI</span>
-                <span className={`text-xs font-bold ${(tooltipData.politicalInfo.pviNumeric || 0) > 0 ? 'text-blue-400' : (tooltipData.politicalInfo.pviNumeric || 0) < 0 ? 'text-red-400' : 'text-muted-foreground'}`}>
-                  {tooltipData.politicalInfo.pvi}
-                </span>
+      {tooltipData && (() => {
+        const pi = tooltipData.politicalInfo
+        const stateLean = pi
+          ? (pi.pviNumeric || 0) < 0 ? 'R'
+            : (pi.pviNumeric || 0) > 0 ? 'D'
+            : (pi.margin2024 || 0) < 0 ? 'R'
+            : (pi.margin2024 || 0) > 0 ? 'D'
+            : pi.governorParty === 'R' || pi.governorParty === 'D' ? pi.governorParty
+            : null
+          : null
+        return (
+          <div
+            style={{ position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)', zIndex: 10 }}
+            className="pointer-events-none select-none bg-background/90 backdrop-blur-md rounded-lg border border-border/50 p-3 shadow-lg min-w-[200px] max-w-[280px]"
+          >
+            <div className="flex items-center gap-2">
+              {stateLean && <PartyIcon party={stateLean} size={14} className={partyColor(stateLean)} />}
+              <p className="font-semibold text-sm">
+                {tooltipData.politicalInfo?.name || tooltipData.surveyInfo?.name || hoveredStateName}
+              </p>
+            </div>
+            {tooltipData.politicalInfo && showPoliticalLayer && (
+              <div className="mt-2 space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-muted-foreground">PVI</span>
+                  <span className={`text-xs font-bold ${(tooltipData.politicalInfo.pviNumeric || 0) > 0 ? 'text-blue-400' : (tooltipData.politicalInfo.pviNumeric || 0) < 0 ? 'text-red-400' : 'text-muted-foreground'}`}>
+                    {tooltipData.politicalInfo.pvi}
+                  </span>
+                </div>
+                {tooltipData.politicalInfo.margin2024 !== undefined && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-muted-foreground">2024 Margin</span>
+                    <span className={`text-xs font-medium ${tooltipData.politicalInfo.margin2024 > 0 ? 'text-blue-400' : tooltipData.politicalInfo.margin2024 < 0 ? 'text-red-400' : 'text-muted-foreground'}`}>
+                      {tooltipData.politicalInfo.margin2024 > 0 ? 'D' : 'R'}+{Math.abs(tooltipData.politicalInfo.margin2024).toFixed(1)}
+                    </span>
+                  </div>
+                )}
+                {tooltipData.politicalInfo.electoralVotes && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-muted-foreground">Electoral Votes</span>
+                    <span className="text-xs font-medium">{tooltipData.politicalInfo.electoralVotes}</span>
+                  </div>
+                )}
+                {tooltipData.politicalInfo.governorParty && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-muted-foreground">Governor</span>
+                    <span className={`text-xs font-medium flex items-center gap-1 ${tooltipData.politicalInfo.governorParty === 'D' ? 'text-blue-400' : 'text-red-400'}`}>
+                      <PartyIcon party={tooltipData.politicalInfo.governorParty} size={10} className={partyColor(tooltipData.politicalInfo.governorParty)} />
+                      {tooltipData.politicalInfo.governorParty === 'D' ? 'Democrat' : 'Republican'}
+                    </span>
+                  </div>
+                )}
+                {tooltipData.politicalInfo.senateSeats && tooltipData.politicalInfo.senateSeats !== '-' && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-muted-foreground">Senate</span>
+                    <span className="text-xs font-medium">{tooltipData.politicalInfo.senateSeats}</span>
+                  </div>
+                )}
               </div>
-              {tooltipData.politicalInfo.margin2024 !== undefined && (
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-muted-foreground">2024 Margin</span>
-                  <span className={`text-xs font-medium ${tooltipData.politicalInfo.margin2024 > 0 ? 'text-blue-400' : tooltipData.politicalInfo.margin2024 < 0 ? 'text-red-400' : 'text-muted-foreground'}`}>
-                    {tooltipData.politicalInfo.margin2024 > 0 ? 'D' : 'R'}+{Math.abs(tooltipData.politicalInfo.margin2024).toFixed(1)}
-                  </span>
-                </div>
-              )}
-              {tooltipData.politicalInfo.electoralVotes && (
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-muted-foreground">Electoral Votes</span>
-                  <span className="text-xs font-medium">{tooltipData.politicalInfo.electoralVotes}</span>
-                </div>
-              )}
-              {tooltipData.politicalInfo.governorParty && (
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-muted-foreground">Governor</span>
-                  <span className={`text-xs font-medium ${tooltipData.politicalInfo.governorParty === 'D' ? 'text-blue-400' : 'text-red-400'}`}>
-                    {tooltipData.politicalInfo.governorParty === 'D' ? 'Democrat' : 'Republican'}
-                  </span>
-                </div>
-              )}
-              {tooltipData.politicalInfo.senateSeats && tooltipData.politicalInfo.senateSeats !== '-' && (
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-muted-foreground">Senate</span>
-                  <span className="text-xs font-medium">{tooltipData.politicalInfo.senateSeats}</span>
-                </div>
-              )}
-            </div>
-          )}
-          {tooltipData.surveyInfo && showSurveyLayer && (
-            <div className="flex items-center gap-3 mt-2 pt-2 border-t border-border/50 text-xs text-muted-foreground">
-              <span className="flex items-center gap-1"><Users className="h-3 w-3" />{tooltipData.surveyInfo.responses} responses</span>
-              <span className="flex items-center gap-1"><FileText className="h-3 w-3" />{tooltipData.surveyInfo.surveys} surveys</span>
-            </div>
-          )}
-        </div>
-      )}
+            )}
+            {tooltipData.surveyInfo && showSurveyLayer && (
+              <div className="flex items-center gap-3 mt-2 pt-2 border-t border-border/50 text-xs text-muted-foreground">
+                <span className="flex items-center gap-1"><Users className="h-3 w-3" />{tooltipData.surveyInfo.responses} responses</span>
+                <span className="flex items-center gap-1"><FileText className="h-3 w-3" />{tooltipData.surveyInfo.surveys} surveys</span>
+              </div>
+            )}
+          </div>
+        )
+      })()}
 
       {geoData?.orgCenter && (
         <div className="absolute bottom-3 left-3 z-10">
           <div className="bg-background/80 backdrop-blur-md rounded-lg border border-border/50 px-3 py-2 shadow-lg">
-            <div className="flex items-center gap-1.5">
-              <div className={`h-2 w-2 rounded-full ${geoData.orgCenter.party === 'D' ? 'bg-blue-500' : geoData.orgCenter.party === 'R' ? 'bg-red-500' : 'bg-green-500'} animate-pulse`} />
+            <div className="flex items-center gap-2">
+              {(geoData.orgCenter.party === 'R' || geoData.orgCenter.party === 'D') ? (
+                <PartyIcon party={geoData.orgCenter.party} size={16} className={partyColor(geoData.orgCenter.party)} />
+              ) : (
+                <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+              )}
               <span className="text-xs font-medium">{geoData.orgCenter.candidateName || geoData.orgCenter.name}</span>
             </div>
             {(geoData.orgCenter.districtCode || geoData.orgCenter.state) && (
-              <p className="text-[10px] text-muted-foreground mt-0.5 pl-3.5">
-                {[geoData.orgCenter.districtCode || geoData.orgCenter.state, geoData.orgCenter.party].filter(Boolean).join(' · ')}
+              <p className="text-[10px] text-muted-foreground mt-0.5 pl-5">
+                {[geoData.orgCenter.districtCode || geoData.orgCenter.state, geoData.orgCenter.party === 'R' ? 'Republican' : geoData.orgCenter.party === 'D' ? 'Democrat' : geoData.orgCenter.party].filter(Boolean).join(' · ')}
               </p>
             )}
           </div>

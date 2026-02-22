@@ -1,7 +1,7 @@
 'use client'
 
 import { createContext, useContext, useState, useEffect, useRef } from 'react';
-import { IAgentProfile, IAgentContext, UserDB } from '../utils/interface';
+import { IAgentProfile, IAgentContext, UserDB, UserOrganization } from '../utils/interface';
 import { usePathname, useRouter } from 'next/navigation';
 import { handleAuthError } from '../utils/lib';
 import { useSession } from 'next-auth/react';
@@ -13,6 +13,7 @@ let globalAgentFetched = false;
 export const AgentProvider = ({ children }: { children: React.ReactNode }) => {
     const [agent, setAgent] = useState<IAgentProfile | null>(null);
     const [user, setUser] = useState<UserDB | null>(null);
+    const [organization, setOrganization] = useState<UserOrganization | null>(null);
     const [isAgentProfileLoading, setIsAgentProfileLoading] = useState(false);
     const [isInitialized, setIsInitialized] = useState(false);
     const [isUserDataLoaded, setIsUserDataLoaded] = useState(false);
@@ -47,6 +48,7 @@ export const AgentProvider = ({ children }: { children: React.ReactNode }) => {
             if (data.status) {
                 setAgent(data.agent);
                 setUser(data.user);
+                setOrganization(data.organization || null);
                 setIsUserDataLoaded(true);
                 hasFetched.current = true;
                 globalAgentFetched = true;
@@ -129,6 +131,7 @@ export const AgentProvider = ({ children }: { children: React.ReactNode }) => {
             setAgent, 
             user, 
             setUser, 
+            organization,
             isAgentProfileLoading, 
             setIsAgentProfileLoading 
         }}>

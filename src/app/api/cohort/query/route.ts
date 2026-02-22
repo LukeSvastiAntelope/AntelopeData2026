@@ -9,8 +9,29 @@ import { verifyConfirmationToken } from "@/app/utils/api/token";
 import { SmartSurveyQueryBuilder } from "@/app/utils/survey/smart-query-builder";
 import { EnhancedSurveyQueryBuilder } from "@/app/utils/survey/enhanced-query-builder";
 import { QueryIntentClassifier } from "@/app/utils/survey/query-intent-classifier";
-import { getCampaignNewsContextForUser } from "@/app/utils/campaign-news";
+import {
+  getCampaignNewsContextForUser,
+  refreshCampaignNewsForUserScope,
+  type NewsTimeWindowConfig,
+} from "@/app/utils/campaign-news";
 import { respondFromCampaignNewsOnly } from "./news-copilot";
+import { detectSurveyToolIntent, executeSurveyTool } from "./survey-tools";
+import { orchestrateWithPlanner } from "./agent-orchestrator";
+import {
+  buildCampaignMemoryNamespace,
+  CampaignMemoryService,
+} from "@/app/utils/services/campaign-memory-service";
+import {
+  computeContinuityScore,
+  computeFreshnessScore,
+  computeRepetitionScore,
+} from "@/app/utils/evaluations/chat-evals";
+import {
+  getAgentRolloutStage,
+  getRolloutStage,
+  shouldTriggerAgentRollback,
+  shouldTriggerRollback,
+} from "@/app/utils/evaluations/rollout-guardrails";
 import type { FactSheetQueryResult } from "../../../utils/survey/fact-sheet-query-resolver";
 // Note: QuestionIntelligence is dynamically imported in the route handler
 
@@ -19,6 +40,7 @@ import type { FactSheetQueryResult } from "../../../utils/survey/fact-sheet-quer
 interface CohortQueryPayload {
   cohort?: { id?: number; filter?: CohortFilterRule[] };
   question: string;
+  recentMessages?: Array<{ role: 'user' | 'agent'; content: string }>;
   topK?: number;
   surveyId?: number;
   model?: string;
@@ -26,9 +48,11 @@ interface CohortQueryPayload {
   sources?: { survey: boolean; twins: boolean; web: boolean };
   systemPrompt?: string;
   stream?: boolean;
+  responseMode?: 'quick_update' | 'decision_support' | 'full_brief';
 }
 
 interface CampaignIdentity {
+  orgId: number | null;
   candidateName: string | null;
   organizationName: string | null;
   party: string | null;
@@ -37,10 +61,14 @@ interface CampaignIdentity {
   districtCode: string | null;
 }
 
+type ResponseMode = 'quick_update' | 'decision_support' | 'full_brief';
+type ComplexityLevel = 'low' | 'medium' | 'high';
+
 async function getCampaignIdentityForUser(userId: string): Promise<CampaignIdentity | null> {
   const db = await getMySQLConnection();
   const [rows]: any = await db.execute(
-    `SELECT o.candidate_name AS candidateName,
+    `SELECT o.id AS orgId,
+            o.candidate_name AS candidateName,
             o.name AS organizationName,
             o.party AS party,
             o.office_type AS officeType,
@@ -55,6 +83,7 @@ async function getCampaignIdentityForUser(userId: string): Promise<CampaignIdent
   );
   if (!rows?.length) return null;
   return {
+    orgId: rows[0].orgId ? Number(rows[0].orgId) : null,
     candidateName: rows[0].candidateName || null,
     organizationName: rows[0].organizationName || null,
     party: rows[0].party || null,
@@ -64,10 +93,58 @@ async function getCampaignIdentityForUser(userId: string): Promise<CampaignIdent
   };
 }
 
+function envFlag(name: string, fallback = false): boolean {
+  const raw = process.env[name];
+  if (raw === undefined) return fallback;
+  return ['1', 'true', 'yes', 'on'].includes(String(raw).toLowerCase());
+}
+
 function isNewsIntent(question: string): boolean {
   return /(news|headline|headlines|what changed|this week|today|yesterday|press|media|story|stories|update|updates|events?|talking points?|newsletter|subject line|comms|messaging|rapid response|advice|recommendations?)/i.test(
     question || ''
   );
+}
+
+function inferResponseMode(question: string, requested?: CohortQueryPayload['responseMode']): ResponseMode {
+  if (requested) return requested;
+  const q = (question || '').toLowerCase();
+  if (/\b(full brief|full report|comprehensive|deep dive|long-form|strategy memo)\b/.test(q)) {
+    return 'full_brief';
+  }
+  if (/\b(what should we do|next steps|recommend|plan|tomorrow|48 hours|action)\b/.test(q)) {
+    return 'decision_support';
+  }
+  return 'quick_update';
+}
+
+function inferComplexity(mode: ResponseMode, question: string): ComplexityLevel {
+  if (mode === 'full_brief') return 'high';
+  const q = (question || '').toLowerCase();
+  if (/\b(compare|scenario|tradeoff|risk|opportunity|multi-step|prioritize)\b/.test(q)) {
+    return 'medium';
+  }
+  return mode === 'decision_support' ? 'medium' : 'low';
+}
+
+function parseNewsTimeWindow(question: string): NewsTimeWindowConfig | null {
+  const q = (question || '').toLowerCase();
+  const customDaysMatch = q.match(/\b(last|past)\s+(\d{1,2})\s+days?\b/);
+  if (customDaysMatch) {
+    const days = Math.max(1, Math.min(30, Number(customDaysMatch[2])));
+    return { preset: 'custom_days', days, label: `last ${days} days` };
+  }
+  if (/\btoday\b/.test(q)) return { preset: 'today', days: 1, label: 'today' };
+  if (/\byesterday\b/.test(q)) return { preset: 'yesterday', days: 2, label: 'yesterday' };
+  if (/\b(this week|this wk|past week|last week)\b/.test(q)) {
+    return { preset: 'this_week', days: 7, label: 'this week' };
+  }
+  if (/\b(last 7 days|past 7 days)\b/.test(q)) {
+    return { preset: 'last_7_days', days: 7, label: 'last 7 days' };
+  }
+  if (/\b(this month|last month|past month|last 30 days|past 30 days)\b/.test(q)) {
+    return { preset: 'last_30_days', days: 30, label: 'last 30 days' };
+  }
+  return null;
 }
 
 type RouteDecision =
@@ -100,23 +177,26 @@ function logRoute(traceId: string, stage: string, details: Record<string, unknow
   );
 }
 
+function buildNewsContextSummary(
+  newsContext: Awaited<ReturnType<typeof getCampaignNewsContextForUser>> | null
+): string {
+  if (!newsContext?.items?.length) return '';
+  return newsContext.items
+    .slice(0, 8)
+    .map((item, idx) => {
+      const summary = item.summary ? ` - ${item.summary}` : '';
+      return `${idx + 1}. [${item.source}] ${item.title}${summary}${item.url ? ` (${item.url})` : ''}`;
+    })
+    .join('\n');
+}
+
 
 function buildCampaignCopilotSystemPrompt(basePrompt: string | undefined, newsContext: Awaited<ReturnType<typeof getCampaignNewsContextForUser>> | null): string {
-  const contract = `Campaign Copilot Output Contract:
-- Use these exact sections in order:
-  1) Situation Brief
-  2) Strategic Read (opportunity + risk)
-  3) Action Drafts
-     - 3 newsletter headline options
-     - 5 talking points
-     - 2 rapid-response lines
-  4) Next 48 Hours
-  5) Confidence
-  6) Evidence
-- Keep outputs campaign-operational, concise, and candidate-specific.
-- Tie recommendations to district/cohort realities; avoid generic consulting language.
-- If evidence is thin, explicitly lower confidence and say why.
-- When the question is about news/events, explicitly reference relevant headlines in Evidence and separate observed facts from recommendations.`;
+  const contract = `Campaign Copilot behavior:
+- Adapt response length and structure to the user request; default concise.
+- For follow-ups, focus on deltas/new implications and avoid repeating unchanged context.
+- Keep outputs campaign-operational, candidate-specific, and grounded in evidence.
+- If evidence is thin, lower confidence and explain why.`;
 
   const newsPacket = newsContext && newsContext.items.length > 0
     ? `Latest district/state campaign news context:
@@ -490,6 +570,7 @@ async function processMultiCohortResults(
 
 export async function POST(req: NextRequest) {
   const traceId = req.headers.get('x-chat-trace-id') || `srv_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  const startedAt = Date.now();
   try {
     logRoute(traceId, 'start', { method: 'POST' });
     
@@ -500,25 +581,23 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ status: false, message: "Unauthorized" }, { status: 401 });
     }
     const userId = session.user.id;
+    const numericUserId = Number.isFinite(Number(userId)) ? Number(userId) : null;
 
     const body = (await req.json()) as CohortQueryPayload;
-    const { cohort, question, topK = 1000, surveyId: initialSurveyId, model = 'gpt-4o', temperature = 0.0, sources, systemPrompt, stream = true } = body;
+    const { cohort, question, recentMessages, topK = 1000, surveyId: initialSurveyId, model = 'gpt-4o', temperature = 0.0, sources, systemPrompt, stream = true, responseMode: requestedResponseMode } = body;
     let surveyId = initialSurveyId; // Allow reassignment for auto-selection
-    // Default web/news context to ON for campaign copilot unless explicitly disabled.
-    const webSourceEnabled = sources?.web !== false;
-    const newsContext = webSourceEnabled ? await getCampaignNewsContextForUser(userId, 5) : null;
-    const campaignIdentity = webSourceEnabled ? await getCampaignIdentityForUser(userId) : null;
-    const effectiveSystemPrompt = webSourceEnabled
-      ? buildCampaignCopilotSystemPrompt(systemPrompt, newsContext)
-      : systemPrompt;
-    logRoute(traceId, 'request_parsed', {
-      userId,
-      surveyId: surveyId || null,
-      stream,
-      model,
-      webSourceEnabled,
-      newsItems: newsContext?.items?.length || 0,
-    });
+    const featureFlags = {
+      adaptiveModes: envFlag('NEWS_ADAPTIVE_MODES', true),
+      memoryRetrieval: envFlag('NEWS_MEMORY_RETRIEVAL', true),
+      criticPass: envFlag('NEWS_CRITIC_PASS', true),
+      surveyTools: envFlag('CHAT_SURVEY_TOOLS_ENABLED', false),
+      surveyCreate: envFlag('CHAT_SURVEY_CREATE_ENABLED', false),
+      agentsPlanner: envFlag('AGENTS_PLANNER_ENABLED', false),
+      agentsNews: envFlag('AGENTS_NEWS_ENABLED', false),
+      agentsCampaignManager: envFlag('AGENTS_CAMPAIGN_MANAGER_ENABLED', false),
+      agentsSituationDocs: envFlag('AGENTS_SITUATION_DOCS_ENABLED', false),
+      agentsDebugMetadata: envFlag('AGENTS_DEBUG_METADATA', false),
+    };
     
     console.log('🔍 DEBUGGING: Request body stream value:', body.stream);
     console.log('🎯 DEBUGGING: surveyId received from frontend:', surveyId);
@@ -534,12 +613,237 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ status: false, message: "Question is required" }, { status: 400 });
     }
 
+    // Survey tool action branch (read/list/get + create draft).
+    if (featureFlags.surveyTools && numericUserId) {
+      const toolIntent = detectSurveyToolIntent(question);
+      if (toolIntent.kind === 'ambiguous') {
+        logRoute(traceId, 'tool_intent_ambiguous', {});
+        return NextResponse.json({
+          status: true,
+          content: toolIntent.clarification,
+          tool: null,
+        });
+      }
+      if (toolIntent.kind === 'tool') {
+        logRoute(traceId, 'tool_intent_detected', {
+          tool: toolIntent.tool,
+          confidence: toolIntent.confidence,
+        });
+        const toolResult = await executeSurveyTool({
+          tool: toolIntent.tool,
+          rawArgs: toolIntent.rawArgs,
+          userId: numericUserId,
+          allowCreate: featureFlags.surveyCreate,
+        });
+        if (!toolResult.ok) {
+          logRoute(traceId, 'tool_failed', {
+            tool: toolResult.tool,
+            errorCode: toolResult.errorCode,
+            missingFields: toolResult.missingFields || [],
+          });
+        } else {
+          logRoute(traceId, 'tool_executed', {
+            tool: toolResult.tool,
+            keys: Object.keys(toolResult.data || {}),
+          });
+        }
+        logRoute(traceId, 'tool_result_returned', {
+          tool: toolResult.tool,
+          ok: toolResult.ok,
+        });
+        return NextResponse.json({
+          status: true,
+          content: toolResult.summaryMarkdown,
+          tool: toolResult.tool,
+          toolResult,
+        });
+      }
+    }
+
+    // Default web/news context to ON for campaign copilot unless explicitly disabled.
+    const webSourceEnabled = sources?.web !== false;
+    const responseMode = featureFlags.adaptiveModes
+      ? inferResponseMode(question, requestedResponseMode)
+      : 'full_brief';
+    const complexity = inferComplexity(responseMode, question);
+    const requestedNewsTimeWindow = isNewsIntent(question) ? parseNewsTimeWindow(question) : null;
+    let liveRefreshSummary: {
+      fetched: number;
+      inserted: number;
+      deduped: number;
+      query: string;
+    } | null = null;
+    if (webSourceEnabled && isNewsIntent(question)) {
+      try {
+        liveRefreshSummary = await refreshCampaignNewsForUserScope(userId, question, { maxResults: 12 });
+        logRoute(traceId, 'news_live_refresh', liveRefreshSummary);
+      } catch (error) {
+        logRoute(traceId, 'news_live_refresh_failed', {
+          message: error instanceof Error ? error.message : 'Unknown live refresh error',
+        });
+      }
+    }
+    const newsContext = webSourceEnabled
+      ? await getCampaignNewsContextForUser(userId, {
+          limit: 8,
+          minItems: 3,
+          timeWindow: requestedNewsTimeWindow,
+        })
+      : null;
+    const campaignIdentity = webSourceEnabled ? await getCampaignIdentityForUser(userId) : null;
+    let memoryContext = '';
+    if (featureFlags.memoryRetrieval && campaignIdentity) {
+      try {
+        const namespace = buildCampaignMemoryNamespace(campaignIdentity.orgId, numericUserId);
+        const recalled = await CampaignMemoryService.retrieveRelevantMemories({
+          traceId,
+          query: question,
+          namespace,
+          topK: 6,
+          orgId: campaignIdentity.orgId,
+          userId: numericUserId,
+        });
+        if (recalled.length > 0) {
+          memoryContext = recalled
+            .slice(0, 5)
+            .map((m, idx) => `${idx + 1}. (${m.memoryType}) ${m.content}`)
+            .join('\n');
+        }
+      } catch (error) {
+        logRoute(traceId, 'memory_retrieval_failed', {
+          message: error instanceof Error ? error.message : 'Unknown memory retrieval error',
+        });
+      }
+    }
+    const effectiveSystemPrompt = webSourceEnabled
+      ? [
+          buildCampaignCopilotSystemPrompt(systemPrompt, newsContext),
+          memoryContext ? `Relevant campaign memory:\n${memoryContext}` : '',
+        ]
+          .filter(Boolean)
+          .join('\n\n')
+      : systemPrompt;
+    const evalMetrics = {
+      repetitionScore: computeRepetitionScore(question, recentMessages || []),
+      continuityScore: computeContinuityScore(question, recentMessages || []),
+      freshnessScore: computeFreshnessScore(newsContext?.items || []),
+    };
+    logRoute(traceId, 'request_parsed', {
+      userId,
+      surveyId: surveyId || null,
+      stream,
+      model,
+      responseMode,
+      complexity,
+      webSourceEnabled,
+      requestedNewsWindow: requestedNewsTimeWindow?.label || null,
+      appliedNewsWindow: newsContext?.retrieval?.appliedWindowLabel || null,
+      newsWindowWidened: newsContext?.retrieval?.widened || false,
+      newsItems: newsContext?.items?.length || 0,
+      liveRefresh: liveRefreshSummary,
+      evalMetrics,
+      featureFlags,
+      rolloutStage: getRolloutStage(),
+      agentRolloutStage: getAgentRolloutStage(),
+    });
+    const guardrail = shouldTriggerRollback({
+      repetitionScore: evalMetrics.repetitionScore,
+      freshnessScore: evalMetrics.freshnessScore,
+      latencyMs: Date.now() - startedAt,
+    });
+    if (evalMetrics.repetitionScore > 0.85 || evalMetrics.freshnessScore < 0.25) {
+      logRoute(traceId, 'eval_alert', evalMetrics);
+    }
+    if (guardrail.rollback) {
+      logRoute(traceId, 'rollout_guardrail_triggered', { reasons: guardrail.reasons });
+    }
+
     const primaryRoute = decidePrimaryRoute({
       surveyId,
       webSourceEnabled,
       newsItemCount: newsContext?.items?.length || 0,
     });
     logRoute(traceId, 'route_decision', { primaryRoute });
+
+    const multiAgentEligible =
+      featureFlags.agentsPlanner &&
+      featureFlags.agentsSituationDocs &&
+      featureFlags.agentsNews &&
+      featureFlags.agentsCampaignManager &&
+      Boolean(campaignIdentity?.orgId);
+
+    if (multiAgentEligible && campaignIdentity?.orgId) {
+      try {
+        logRoute(traceId, 'planner_started', {
+          orgId: campaignIdentity.orgId,
+        });
+        const orchestration = await orchestrateWithPlanner({
+          traceId,
+          orgId: campaignIdentity.orgId,
+          userId,
+          question,
+          model,
+          recentMessages: recentMessages || [],
+          memoryContext,
+          newsContextSummary: buildNewsContextSummary(newsContext),
+        });
+        if (orchestration) {
+          logRoute(traceId, 'planner_route_decision', {
+            reason: orchestration.decision.reason,
+            selectedAgents: orchestration.decision.selectedAgents,
+          });
+          for (const agentId of orchestration.decision.selectedAgents) {
+            logRoute(traceId, 'agent_task_started', { agentId });
+          }
+          for (const result of orchestration.results) {
+            logRoute(traceId, 'agent_task_completed', {
+              agentId: result.agentId,
+              confidence: result.confidence,
+              evidenceCount: result.evidenceRefs.length,
+            });
+          }
+          for (const version of orchestration.situationVersions) {
+            logRoute(traceId, 'situation_doc_committed', version);
+          }
+          logRoute(traceId, 'planner_finalized', {
+            usedAgents: orchestration.usedAgents,
+          });
+          const agentGuardrail = shouldTriggerAgentRollback({
+            plannerErrorRate: 0,
+            docWriteFailureRate: 0,
+            p95LatencyMs: Date.now() - startedAt,
+          });
+          if (agentGuardrail.rollback) {
+            logRoute(traceId, 'agent_rollout_guardrail_triggered', { reasons: agentGuardrail.reasons });
+          }
+          return NextResponse.json({
+            status: true,
+            content: orchestration.finalAnswer,
+            metadata: featureFlags.agentsDebugMetadata
+              ? {
+                  activeAgents: orchestration.usedAgents,
+                  situationVersions: orchestration.situationVersions,
+                }
+              : undefined,
+          });
+        }
+        logRoute(traceId, 'planner_route_decision', {
+          reason: 'fallback_to_existing_paths',
+        });
+      } catch (error) {
+        const agentGuardrail = shouldTriggerAgentRollback({
+          plannerErrorRate: 1,
+          docWriteFailureRate: 0,
+          p95LatencyMs: Date.now() - startedAt,
+        });
+        if (agentGuardrail.rollback) {
+          logRoute(traceId, 'agent_rollout_guardrail_triggered', { reasons: agentGuardrail.reasons });
+        }
+        logRoute(traceId, 'planner_failed_fallback', {
+          message: error instanceof Error ? error.message : 'Unknown planner error',
+        });
+      }
+    }
 
     if (primaryRoute === 'news_only_with_context') {
       logRoute(traceId, 'route_news_only', { reason: 'no_survey_with_news_context' });
@@ -548,6 +852,13 @@ export async function POST(req: NextRequest) {
         stream,
         newsContext,
         campaignIdentity,
+        model,
+        recentMessages,
+        responseMode,
+        complexity,
+        memoryContext,
+        userId: numericUserId || undefined,
+        featureFlags,
       });
     }
     if (primaryRoute === 'news_only_no_context') {
@@ -555,7 +866,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({
         status: true,
         content:
-          "No district/state news items are available yet for your campaign scope. Try running the news digest refresh, then ask again.",
+          requestedNewsTimeWindow
+            ? `No district/state campaign news matched the requested window (${requestedNewsTimeWindow.label}). Try broadening the window (for example, last 14 days) or refresh the digest.`
+            : "No district/state news items are available yet for your campaign scope. Try running the news digest refresh, then ask again.",
       });
     }
 
@@ -1046,6 +1359,13 @@ Only suggest auto-selection if there's a clear, unambiguous match with high conf
               stream,
               newsContext,
               campaignIdentity,
+              model,
+              recentMessages,
+              responseMode,
+              complexity,
+              memoryContext,
+              userId: numericUserId || undefined,
+              featureFlags,
             });
           }
            
@@ -1171,6 +1491,13 @@ Only suggest auto-selection if there's a clear, unambiguous match with high conf
         stream,
         newsContext,
         campaignIdentity,
+        model,
+        recentMessages,
+        responseMode,
+        complexity,
+        memoryContext,
+        userId: numericUserId || undefined,
+        featureFlags,
       });
     }
 

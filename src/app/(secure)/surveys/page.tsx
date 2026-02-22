@@ -1,169 +1,227 @@
 'use client'
 
-import { useState } from 'react'
-import dynamic from 'next/dynamic'
-import { useSidebar } from "@/components/ui/sidebar"
-import { PanelLeft, Landmark, MapPin, Vote, Grid3x3, ChevronDown, ChevronRight } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import Link from 'next/link'
+import { SidebarTrigger } from '@/components/ui/sidebar'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Plus, Upload, Search, ArrowUpDown } from 'lucide-react'
 
-const DashboardMap = dynamic(() => import('@/components/dashboard-map'), {
-  ssr: false,
-  loading: () => (
-    <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-      className="bg-muted/30"
-    >
-      <div className="flex flex-col items-center gap-2 text-muted-foreground">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-current border-t-transparent" />
-        <p className="text-sm">Loading map...</p>
-      </div>
-    </div>
-  ),
-})
-
-function pviToColor(pvi: number, alpha = 0.6): string {
-  const clamped = Math.max(-30, Math.min(30, pvi))
-  const t = (clamped + 30) / 60
-  const r = Math.round(220 - t * 180)
-  const b = Math.round(40 + t * 180)
-  const g = Math.round(60 + (1 - Math.abs(t - 0.5) * 2) * 40)
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`
+type SurveyRow = {
+  id: number
+  title: string
+  description?: string | null
+  status?: string | null
+  created_at?: string | null
+  response_count?: number
+  survey_type?: 'own' | 'org' | 'featured' | string
 }
-
-function Section({ title, defaultOpen = true, children }: { title: string; defaultOpen?: boolean; children: React.ReactNode }) {
-  const [open, setOpen] = useState(defaultOpen)
-  return (
-    <div>
-      <button
-        onClick={() => setOpen(!open)}
-        className="flex items-center gap-1.5 w-full text-left py-1.5 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider hover:text-foreground transition-colors"
-      >
-        {open ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
-        {title}
-      </button>
-      {open && <div className="pt-1">{children}</div>}
-    </div>
-  )
-}
-
-/** Shared style for both sidebar/panel toggle buttons */
-const toggleBtnClass =
-  'flex items-center justify-center h-7 w-7 rounded-md bg-background/80 backdrop-blur-md border border-border/50 shadow-sm text-muted-foreground hover:text-foreground hover:bg-background transition-colors cursor-pointer'
 
 export default function SurveysPage() {
-  const { toggleSidebar } = useSidebar()
-  const [rightPanelOpen, setRightPanelOpen] = useState(true)
-  const [layers, setLayers] = useState({
-    political: true,
-    districts: false,
-    responses: true,
-    voters: true,
-  })
+  const [surveys, setSurveys] = useState<SurveyRow[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [search, setSearch] = useState('')
+  const [tab, setTab] = useState<'all' | 'own' | 'org' | 'featured'>('all')
+  const [sortKey, setSortKey] = useState<'created_at' | 'title' | 'response_count'>('created_at')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
 
-  const toggleLayer = (key: keyof typeof layers) => {
-    setLayers(prev => ({ ...prev, [key]: !prev[key] }))
+  useEffect(() => {
+    let mounted = true
+    const load = async () => {
+      try {
+        const res = await fetch('/api/surveys')
+        const data = await res.json()
+        if (!mounted) return
+        if (!res.ok || !data?.status) {
+          setError(data?.message || data?.error || 'Failed to load surveys')
+          return
+        }
+        setSurveys(Array.isArray(data.surveys) ? data.surveys : [])
+      } catch {
+        if (mounted) setError('Failed to load surveys')
+      } finally {
+        if (mounted) setLoading(false)
+      }
+    }
+    load()
+    return () => {
+      mounted = false
+    }
+  }, [])
+
+  const filteredSurveys = useMemo(() => {
+    const base = surveys.filter((s) => {
+      const type = (s.survey_type || 'own') as string
+      if (tab !== 'all' && type !== tab) return false
+      if (!search.trim()) return true
+      const q = search.toLowerCase()
+      return (
+        (s.title || '').toLowerCase().includes(q) ||
+        (s.description || '').toLowerCase().includes(q) ||
+        String(s.id).includes(q) ||
+        (s.status || '').toLowerCase().includes(q)
+      )
+    })
+
+    const sorted = [...base].sort((a, b) => {
+      let lhs: string | number = ''
+      let rhs: string | number = ''
+      if (sortKey === 'created_at') {
+        lhs = a.created_at ? new Date(a.created_at).getTime() : 0
+        rhs = b.created_at ? new Date(b.created_at).getTime() : 0
+      } else if (sortKey === 'response_count') {
+        lhs = a.response_count || 0
+        rhs = b.response_count || 0
+      } else {
+        lhs = (a.title || '').toLowerCase()
+        rhs = (b.title || '').toLowerCase()
+      }
+      if (lhs < rhs) return sortDir === 'asc' ? -1 : 1
+      if (lhs > rhs) return sortDir === 'asc' ? 1 : -1
+      return 0
+    })
+
+    return sorted
+  }, [surveys])
+
+  const counts = useMemo(() => {
+    const own = surveys.filter((s) => (s.survey_type || 'own') === 'own').length
+    const org = surveys.filter((s) => s.survey_type === 'org').length
+    const featured = surveys.filter((s) => s.survey_type === 'featured').length
+    return { all: surveys.length, own, org, featured }
+  }, [surveys])
+
+  const toggleSort = (key: 'created_at' | 'title' | 'response_count') => {
+    if (sortKey === key) {
+      setSortDir((prev) => (prev === 'asc' ? 'desc' : 'asc'))
+      return
+    }
+    setSortKey(key)
+    setSortDir(key === 'title' ? 'asc' : 'desc')
   }
 
   return (
-    <div style={{ display: 'flex', width: '100%', height: '100vh', overflow: 'hidden' }}>
-      {/* Map — takes all remaining space */}
-      <div style={{ flex: 1, minWidth: 0, position: 'relative' }}>
-        <DashboardMap layers={layers} />
-
-        {/* Left sidebar toggle — inside map, top-left */}
-        <div style={{ position: 'absolute', top: 12, left: 12, zIndex: 20 }}>
-          <button onClick={toggleSidebar} className={toggleBtnClass} title="Toggle sidebar">
-            <PanelLeft className="h-3.5 w-3.5" />
-          </button>
-        </div>
-
-        {/* Right panel toggle — inside map, top-right */}
-        <div style={{ position: 'absolute', top: 12, right: 12, zIndex: 20 }}>
-          <button
-            onClick={() => setRightPanelOpen(prev => !prev)}
-            className={toggleBtnClass}
-            title={rightPanelOpen ? 'Collapse layers panel' : 'Expand layers panel'}
-          >
-            <PanelLeft className="h-3.5 w-3.5" style={{ transform: 'scaleX(-1)' }} />
-          </button>
-        </div>
-      </div>
-
-      {/* Right panel — layers/legend */}
-      <div
-        style={{
-          width: rightPanelOpen ? '13rem' : 0,
-          flexShrink: 0,
-          height: '100%',
-          overflow: 'hidden',
-          transition: 'width 200ms ease-in-out',
-        }}
-        className="bg-background border-l border-border/40"
-      >
-        <div style={{ width: '13rem', height: '100%', overflowY: 'auto' }} className="px-2 py-3">
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground px-1 pb-2">
-            Map Layers
-          </p>
-
-          <div className="space-y-4 px-1">
-            <Section title="Layers">
-              <div className="space-y-1">
-                <LayerToggle icon={<Landmark className="h-3 w-3" />} label="Political" active={layers.political} colorClass="text-red-400" activeBg="bg-red-500/10 border-red-500/20" onClick={() => toggleLayer('political')} />
-                <LayerToggle icon={<Grid3x3 className="h-3 w-3" />} label="Districts" active={layers.districts} colorClass="text-orange-400" activeBg="bg-orange-500/10 border-orange-500/20" onClick={() => toggleLayer('districts')} />
-                <LayerToggle icon={<MapPin className="h-3 w-3" />} label="Responses" active={layers.responses} colorClass="text-blue-400" activeBg="bg-blue-500/10 border-blue-500/20" onClick={() => toggleLayer('responses')} />
-                <LayerToggle icon={<Vote className="h-3 w-3" />} label="Voters" active={layers.voters} colorClass="text-purple-400" activeBg="bg-purple-500/10 border-purple-500/20" onClick={() => toggleLayer('voters')} />
-              </div>
-            </Section>
-
-            {(layers.political || layers.districts) && (
-              <Section title="Legend">
-                <div className="space-y-1.5">
-                  <p className="text-[10px] text-muted-foreground">
-                    Cook PVI {layers.districts ? '(Districts)' : '(States)'}
-                  </p>
-                  <div className="flex items-center gap-0.5">
-                    {[-25, -15, -5, 0, 5, 15, 25].map(v => (
-                      <div key={v} className="flex-1 h-2.5 rounded-sm" style={{ backgroundColor: pviToColor(v, 0.8) }} />
-                    ))}
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-[9px] text-red-400 font-medium">R+25</span>
-                    <span className="text-[9px] text-muted-foreground">Even</span>
-                    <span className="text-[9px] text-blue-400 font-medium">D+25</span>
-                  </div>
-                </div>
-              </Section>
-            )}
-
-            <Section title="About" defaultOpen={false}>
-              <p className="text-[11px] text-muted-foreground leading-relaxed">
-                Cook PVI scores, 2024 margins, electoral votes, governor &amp; senate data.
-                Toggle Districts to see 119th Congress boundaries with incumbent and PVI data.
-                Hover any state or district for details.
-              </p>
-            </Section>
+    <div className="flex-1 p-2 w-full bg-background">
+      <div className="mx-auto rounded-lg bg-card text-card-foreground shadow-lg">
+        <div className="px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center">
+            <SidebarTrigger className="-ml-0.5 h-5 w-5 text-muted-foreground hover:text-foreground" />
+            <div className="h-4 border-l border-border mx-4" />
+            <h1 className="text-base font-medium">Surveys</h1>
           </div>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" asChild>
+              <Link href="/surveys/import"><Upload className="h-4 w-4 mr-1" />Import</Link>
+            </Button>
+            <Button size="sm" asChild>
+              <Link href="/create/survey"><Plus className="h-4 w-4 mr-1" />Create Survey</Link>
+            </Button>
+          </div>
+        </div>
+        <div className="border-b border-border" />
+        <div className="p-6 space-y-6">
+          <div className="flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
+            <Tabs value={tab} onValueChange={(v) => setTab(v as 'all' | 'own' | 'org' | 'featured')}>
+              <TabsList>
+                <TabsTrigger value="all">All ({counts.all})</TabsTrigger>
+                <TabsTrigger value="own">Mine ({counts.own})</TabsTrigger>
+                <TabsTrigger value="org">Org ({counts.org})</TabsTrigger>
+                <TabsTrigger value="featured">Featured ({counts.featured})</TabsTrigger>
+              </TabsList>
+            </Tabs>
+            <div className="relative w-full md:w-80">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search surveys, status, id..."
+                className="pl-9"
+              />
+            </div>
+          </div>
+
+          {loading ? <p className="text-muted-foreground text-sm">Loading surveys...</p> : null}
+          {error ? <p className="text-sm text-destructive">{error}</p> : null}
+          {!loading && !error ? (
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">Survey Table View</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-[80px]">ID</TableHead>
+                      <TableHead>
+                        <button className="inline-flex items-center gap-1 hover:text-foreground" onClick={() => toggleSort('title')}>
+                          Title <ArrowUpDown className="h-3 w-3" />
+                        </button>
+                      </TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead>
+                        <button className="inline-flex items-center gap-1 hover:text-foreground" onClick={() => toggleSort('response_count')}>
+                          Responses <ArrowUpDown className="h-3 w-3" />
+                        </button>
+                      </TableHead>
+                      <TableHead>
+                        <button className="inline-flex items-center gap-1 hover:text-foreground" onClick={() => toggleSort('created_at')}>
+                          Created <ArrowUpDown className="h-3 w-3" />
+                        </button>
+                      </TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredSurveys.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
+                          No surveys found for this filter.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      filteredSurveys.map((survey) => (
+                        <TableRow key={survey.id}>
+                          <TableCell className="font-mono text-xs">{survey.id}</TableCell>
+                          <TableCell>
+                            <div className="font-medium">{survey.title}</div>
+                            <div className="text-xs text-muted-foreground line-clamp-1">
+                              {survey.description || 'No description'}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="secondary">{survey.status || 'draft'}</Badge>
+                          </TableCell>
+                          <TableCell className="capitalize">{survey.survey_type || 'own'}</TableCell>
+                          <TableCell>{survey.response_count || 0}</TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {survey.created_at ? new Date(survey.created_at).toLocaleDateString() : 'Unknown'}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="inline-flex gap-2">
+                              <Button size="sm" variant="outline" asChild>
+                                <Link href={`/surveys/${survey.id}/results`}>Results</Link>
+                              </Button>
+                              <Button size="sm" asChild>
+                                <Link href={`/surveys/${survey.id}/edit`}>Open</Link>
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          ) : null}
         </div>
       </div>
     </div>
-  )
-}
-
-function LayerToggle({
-  icon, label, active, colorClass, activeBg, onClick,
-}: {
-  icon: React.ReactNode; label: string; active: boolean
-  colorClass: string; activeBg: string; onClick: () => void
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={`flex items-center gap-1.5 w-full px-2 py-1 rounded text-[11px] font-medium transition-colors ${
-        active
-          ? `${activeBg} ${colorClass} border`
-          : 'text-muted-foreground hover:text-foreground hover:bg-muted/50 border border-transparent'
-      }`}
-    >
-      {icon}
-      {label}
-    </button>
   )
 }

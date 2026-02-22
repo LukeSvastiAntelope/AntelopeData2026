@@ -3,12 +3,13 @@
  *
  * Usage:
  *   npx tsx scripts/import-political-data.ts           Seed baseline state data (embedded)
- *   npx tsx scripts/import-political-data.ts --csv      Also import from CSV files in data/
+ *   npx tsx scripts/import-political-data.ts --csv      Also import district CSV (data/cook_pvi.csv)
+ *   npx tsx scripts/import-political-data.ts --csv --state=NJ
+ *   npx tsx scripts/import-political-data.ts --csv --csv-path=./data/cook_pvi.csv
  */
 
 import * as mysql from 'mysql2/promise';
-import * as fs from 'fs';
-import * as path from 'path';
+import { refreshDistrictPoliticalDataFromCsv } from '../src/app/utils/political-data-refresh';
 
 const STATE_DATA: Array<{
   state: string; name: string; pvi: string; pviNum: number;
@@ -95,8 +96,25 @@ async function seedStates(c: mysql.Connection) {
 }
 
 async function main() {
+  const args = process.argv.slice(2);
+  const importCsv = args.includes('--csv');
+  const stateArg = args.find((a) => a.startsWith('--state='));
+  const csvPathArg = args.find((a) => a.startsWith('--csv-path='));
+  const stateFilter = stateArg ? stateArg.split('=')[1]?.toUpperCase() : undefined;
+  const csvPath = csvPathArg ? csvPathArg.split('=')[1] : undefined;
+
   const c = await getConn();
-  try { await seedStates(c); console.log('Done!'); }
+  try {
+    await seedStates(c);
+    if (importCsv) {
+      console.log('Importing district CSV data...');
+      const summary = await refreshDistrictPoliticalDataFromCsv({ csvPath, stateFilter });
+      console.log(
+        `  District import summary: processed=${summary.processedRows}, upserted=${summary.upsertedRows}, skipped=${summary.skippedRows}, source=${summary.sourcePath}`
+      );
+    }
+    console.log('Done!');
+  }
   finally { await c.end(); }
 }
 

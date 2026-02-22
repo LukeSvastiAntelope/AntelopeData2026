@@ -2,6 +2,7 @@ export type ChatMessage = {
   id?: string;
   role: 'user' | 'agent'; 
   content: string; 
+  thinkingSteps?: string[];
   citations?: Record<string, string>; 
   chartSpec?: any; 
   dataCards?: any[]; 
@@ -18,7 +19,7 @@ export interface Conversation {
   updatedAt: string;
   surveyId?: number | null;
   cohortId?: number | null;
-  type?: 'chat' | 'code';
+  type?: 'chat' | 'news' | 'code';
 }
 
 export type StreamingMode = 'off' | 'smart' | 'buffered' | 'instant';

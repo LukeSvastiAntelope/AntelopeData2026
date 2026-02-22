@@ -1040,7 +1040,7 @@ const SurveyPage = () => {
                             sendQualMessage(); 
                           } 
                         }}
-                        className="min-h-[60px] pr-12 resize-none border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
+                        className="min-h-[60px] pr-12 resize-none border-0 bg-background text-foreground placeholder:text-muted-foreground focus-visible:ring-0 focus-visible:ring-offset-0"
                         disabled={chatLoading}
                         rows={2}
                       />

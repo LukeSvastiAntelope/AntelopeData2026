@@ -23,6 +23,8 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const zoom = parseFloat(searchParams.get('zoom') || '4');
+    const state = (searchParams.get('state') || '').trim().toUpperCase();
+    const districtCode = (searchParams.get('district_code') || '').trim().toUpperCase();
 
     const db = await getConnection();
 
@@ -54,10 +56,32 @@ export async function GET(request: NextRequest) {
     }
 
     if (zoom < 9) {
-      // District level - return all districts (or filter by state if viewport is small)
-      const [rows]: any = await db.execute(
-        'SELECT * FROM political_data_districts ORDER BY state, district_number'
-      );
+      // District level - optionally filter by state and/or district for campaign-scoped pulls
+      const where: string[] = [];
+      const params: string[] = [];
+
+      if (state) {
+        where.push('d.state = ?');
+        params.push(state);
+      }
+      if (districtCode) {
+        where.push('d.district_code = ?');
+        params.push(districtCode);
+      }
+
+      const query =
+        `SELECT d.*,
+                demo.total_population,
+                demo.median_household_income,
+                demo.bachelors_or_higher_pct,
+                demo.median_age,
+                demo.source_year
+         FROM political_data_districts d
+         LEFT JOIN political_data_district_demographics demo
+           ON demo.district_code = d.district_code
+         ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
+         ORDER BY d.state, d.district_number`;
+      const [rows]: any = await db.execute(query, params);
 
       return NextResponse.json({
         status: true,
@@ -76,6 +100,18 @@ export async function GET(request: NextRequest) {
             rep: parseInt(r.total_donations_rep) || 0,
             other: parseInt(r.total_donations_other) || 0,
           },
+          demographics: (r.total_population !== null ||
+            r.median_household_income !== null ||
+            r.bachelors_or_higher_pct !== null ||
+            r.median_age !== null)
+            ? {
+                totalPopulation: r.total_population !== null ? parseInt(r.total_population) : null,
+                medianHouseholdIncome: r.median_household_income !== null ? parseInt(r.median_household_income) : null,
+                bachelorsOrHigherPct: r.bachelors_or_higher_pct !== null ? parseFloat(r.bachelors_or_higher_pct) : null,
+                medianAge: r.median_age !== null ? parseFloat(r.median_age) : null,
+                sourceYear: r.source_year !== null ? parseInt(r.source_year) : null,
+              }
+            : null,
         })),
       });
     }

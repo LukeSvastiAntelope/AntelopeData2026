@@ -62,7 +62,7 @@ const BarChart: React.FC<Props> = ({ spec }) => {
       .attr('x2', width - margin.right)
       .attr('y1', d => y(d))
       .attr('y2', d => y(d))
-      .attr('stroke', 'hsl(var(--border))')
+      .attr('stroke', 'var(--border)')
       .attr('stroke-width', 0.5)
       .attr('opacity', 0.3);
 
@@ -77,18 +77,18 @@ const BarChart: React.FC<Props> = ({ spec }) => {
       .attr('y', d => y(d))
       .attr('width', x.bandwidth())
       .attr('height', d => y(0) - y(d))
-      .attr('fill', 'hsl(var(--chart-1))')
+      .attr('fill', 'var(--chart-1)')
       .attr('rx', 4)
       .attr('ry', 4)
       .style('transition', 'all 0.2s ease')
       .on('mouseover', function() {
         select(this)
-          .attr('fill', 'hsl(var(--chart-2))')
+          .attr('fill', 'var(--chart-2)')
           .attr('opacity', 0.8);
       })
       .on('mouseout', function() {
         select(this)
-          .attr('fill', 'hsl(var(--chart-1))')
+          .attr('fill', 'var(--chart-1)')
           .attr('opacity', 1);
       });
 
@@ -97,9 +97,9 @@ const BarChart: React.FC<Props> = ({ spec }) => {
       g
         .attr('transform', `translate(0,${height - margin.bottom})`)
         .call(axisBottom(x).tickSizeOuter(0))
-        .call((g: any) => g.select('.domain').attr('stroke', 'hsl(var(--border))'))
+        .call((g: any) => g.select('.domain').attr('stroke', 'var(--border)'))
         .selectAll('text')
-        .attr('fill', 'hsl(var(--muted-foreground))')
+        .attr('fill', 'var(--muted-foreground)')
         .style('font-size', '11px')
         .style('font-weight', '500');
 
@@ -107,21 +107,21 @@ const BarChart: React.FC<Props> = ({ spec }) => {
       g
         .attr('transform', `translate(${margin.left},0)`)
         .call(axisLeft(y).ticks(4).tickSizeOuter(0))
-        .call((g: any) => g.select('.domain').attr('stroke', 'hsl(var(--border))'))
+        .call((g: any) => g.select('.domain').attr('stroke', 'var(--border)'))
         .selectAll('text')
-        .attr('fill', 'hsl(var(--muted-foreground))')
+        .attr('fill', 'var(--muted-foreground)')
         .style('font-size', '11px')
         .style('font-weight', '500');
 
     // Style tick lines
     svg.append('g').call(xAxis)
       .selectAll('.tick line')
-      .attr('stroke', 'hsl(var(--border))')
+      .attr('stroke', 'var(--border)')
       .attr('opacity', 0.5);
 
     svg.append('g').call(yAxis)
       .selectAll('.tick line')
-      .attr('stroke', 'hsl(var(--border))')
+      .attr('stroke', 'var(--border)')
       .attr('opacity', 0.5);
 
   }, [spec]);

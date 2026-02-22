@@ -2,8 +2,10 @@ import { NextResponse } from "next/server";
 import { TextEncoder } from "util";
 import { createCompletion } from "@/app/utils/services/ai-service";
 import type { getCampaignNewsContextForUser } from "@/app/utils/campaign-news";
+import { CampaignMemoryService } from "@/app/utils/services/campaign-memory-service";
 
 export interface CampaignIdentity {
+  orgId?: number | null;
   candidateName: string | null;
   organizationName: string | null;
   party: string | null;
@@ -17,6 +19,81 @@ interface NewsCopilotParams {
   stream: boolean;
   newsContext: Awaited<ReturnType<typeof getCampaignNewsContextForUser>>;
   campaignIdentity?: CampaignIdentity | null;
+  model?: string;
+  recentMessages?: Array<{ role: 'user' | 'agent'; content: string }>;
+  responseMode?: 'quick_update' | 'decision_support' | 'full_brief';
+  complexity?: 'low' | 'medium' | 'high';
+  memoryContext?: string;
+  userId?: number;
+  featureFlags?: {
+    adaptiveModes?: boolean;
+    memoryRetrieval?: boolean;
+    criticPass?: boolean;
+  };
+}
+
+function modeWordBudget(mode: 'quick_update' | 'decision_support' | 'full_brief') {
+  if (mode === 'quick_update') return '120-220 words';
+  if (mode === 'decision_support') return '250-450 words';
+  return '550-900 words';
+}
+
+function modeSectionContract(mode: 'quick_update' | 'decision_support' | 'full_brief', candidateLabel: string) {
+  if (mode === 'quick_update') {
+    return [
+      '## What Happened',
+      '3-6 concise bullets of the most relevant updates.',
+      '',
+      '## Why It Matters',
+      `1 short paragraph about implications for ${candidateLabel}.`,
+      '',
+      '## Sources',
+      '(This section will be appended automatically — do not generate it.)',
+    ].join('\n');
+  }
+  if (mode === 'decision_support') {
+    return [
+      '## Situation',
+      '2-4 sentences of context.',
+      '',
+      '## Best Next Moves',
+      'Top 3 concrete actions for the next 24-48 hours.',
+      '',
+      '## Risks to Watch',
+      '2-4 bullets of the most material risks.',
+      '',
+      '## Sources',
+      '(This section will be appended automatically — do not generate it.)',
+    ].join('\n');
+  }
+  return [
+    '## Situation Brief',
+    '2-4 sentences synthesizing the overall picture.',
+    '',
+    `## What This Means for ${candidateLabel}`,
+    'A strategic analysis paragraph with opportunities and risks.',
+    '',
+    '## Recommended Actions',
+    'Numbered list of 3-5 concrete steps for the next 48 hours.',
+    '',
+    '## Draft Messaging',
+    '### Talking points (3-5)',
+    '### Rapid-response lines (2-3)',
+    '',
+    '## Confidence & Caveats',
+    'One sentence on confidence and evidence gaps.',
+    '',
+    '## Sources',
+    '(This section will be appended automatically — do not generate it.)',
+  ].join('\n');
+}
+
+function lastAssistantReply(recentMessages?: Array<{ role: 'user' | 'agent'; content: string }>) {
+  const msgs = recentMessages || [];
+  for (let i = msgs.length - 1; i >= 0; i--) {
+    if (msgs[i].role === 'agent' && msgs[i].content?.trim()) return msgs[i].content;
+  }
+  return null;
 }
 
 /**
@@ -28,9 +105,22 @@ interface NewsCopilotParams {
  * Fallback: If the LLM call fails, return a structured template.
  */
 export async function respondFromCampaignNewsOnly(params: NewsCopilotParams) {
-  const { question, stream, newsContext, campaignIdentity } = params;
+  const {
+    question,
+    stream,
+    newsContext,
+    campaignIdentity,
+    model,
+    recentMessages,
+    responseMode = 'full_brief',
+    complexity = 'medium',
+    memoryContext,
+    userId,
+    featureFlags,
+  } = params;
 
-  const items = (newsContext?.items || []).slice(0, 5);
+  const items = (newsContext?.items || []).slice(0, 8);
+  const selectedModel = (model || process.env.NEWS_COPILOT_MODEL || "gpt-4o").trim();
   const candidateLabel =
     campaignIdentity?.candidateName ||
     campaignIdentity?.organizationName ||
@@ -42,6 +132,22 @@ export async function respondFromCampaignNewsOnly(params: NewsCopilotParams) {
     newsContext?.scope?.districtCode ||
     newsContext?.scope?.state ||
     "your district";
+  const requestedWindowLabel = newsContext?.retrieval?.requestedWindowLabel;
+  const appliedWindowLabel = newsContext?.retrieval?.appliedWindowLabel;
+  const windowWidened = Boolean(newsContext?.retrieval?.widened);
+  const coverageNotice = requestedWindowLabel
+    ? windowWidened && appliedWindowLabel
+      ? `Coverage note: user asked for ${requestedWindowLabel}; retrieval widened to ${appliedWindowLabel} due to limited matches.`
+      : `Coverage note: retrieval constrained to ${appliedWindowLabel || requestedWindowLabel}.`
+    : null;
+  const conversationContext = (recentMessages || [])
+    .filter((m) => typeof m?.content === 'string' && m.content.trim().length > 0)
+    .slice(-6)
+    .map((m) => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`)
+    .join('\n\n');
+  const previousAssistantResponse = lastAssistantReply(recentMessages);
+  const adaptiveModesEnabled = featureFlags?.adaptiveModes !== false;
+  const useCriticPass = featureFlags?.criticPass !== false && (complexity === 'medium' || complexity === 'high');
 
   // ── Build a rich article dossier for the LLM ──────────────────────────────
   const articleDossier = items
@@ -70,42 +176,28 @@ export async function respondFromCampaignNewsOnly(params: NewsCopilotParams) {
         .join("\n")
     : "No recent campaign news items were available for your district/state scope.";
 
-  // ── System prompt: campaign-strategist persona ────────────────────────────
+  // ── System prompt: research/synthesis assistant persona ───────────────────
   const systemPrompt = [
-    `You are the AI Campaign Manager for **${candidateLabel}** (${partyLabel}), running for ${officeLabel} in **${districtLabel}**.`,
+    `You are a campaign research copilot for **${candidateLabel}** (${partyLabel}), focused on ${officeLabel} in **${districtLabel}**.`,
     "",
-    "Your job is to read the attached news articles about this district/state and produce a single, synthesized campaign intelligence brief that a campaign manager can act on immediately.",
+    "Your job is to synthesize information from multiple sources and answer the user's exact question directly.",
     "",
     "IMPORTANT RULES:",
-    "- Synthesize across ALL articles. Do NOT just list them one by one — weave the information into a coherent narrative that tells the campaign team what is happening and why it matters.",
+    "- Synthesize across articles; do not copy a fixed script.",
+    "- Lead with a direct answer to the question.",
+    "- If the user asks for updates, prioritize what changed and what is new.",
+    "- If the user asks for recommendations, include recommendations. Otherwise stay analytical.",
     "- Ground every claim in the articles provided. If you are uncertain, say so.",
-    "- Write as an experienced campaign strategist speaking directly to the candidate and their team.",
-    "- Be specific to the ACTUAL content of the articles. Generic advice is useless — tie everything to what the articles actually say.",
-    "- Be concise and action-oriented. Campaign staff are busy.",
+    "- Be specific to the actual source content; avoid generic filler.",
+    "- Keep it concise by default unless the user explicitly asks for a full brief.",
+    "- Respect the requested time window when present. If coverage had to be widened due to sparse results, acknowledge that in Confidence & Caveats.",
     "",
-    "OUTPUT FORMAT (use these exact markdown headings):",
+    `Response mode: ${adaptiveModesEnabled ? responseMode : 'full_brief'}.`,
+    `Target length: ${modeWordBudget(adaptiveModesEnabled ? responseMode : 'full_brief')}.`,
+    "Use only the sections required for the selected response mode.",
     "",
-    "## Situation Brief",
-    "2-4 sentences synthesizing the overall picture across ALL articles into one unified narrative. What is the state of the race / district / political environment right now? What is the dominant narrative? Do not re-list articles — combine them.",
-    "",
-    `## What This Means for ${candidateLabel}`,
-    "A strategic analysis paragraph: How do these developments specifically affect your campaign? What opportunities do they create? What risks do they pose? Reference specific facts from the articles.",
-    "",
-    "## Recommended Actions",
-    "Numbered list of 3-5 concrete, actionable steps the campaign should take in the next 48 hours based on these specific developments. Each action should directly reference something from the articles.",
-    "",
-    "## Draft Messaging",
-    "### Talking points (3-5)",
-    "Specific talking points the candidate can use, directly informed by the article content. Not generic — tied to actual events.",
-    "",
-    "### Rapid-response lines (2-3)",
-    "Short, quotable lines ready for press or social media, responding to specific developments in the articles.",
-    "",
-    "## Confidence & Caveats",
-    "One sentence on how confident you are in this analysis and what information you wish you had.",
-    "",
-    "## Sources",
-    "(This section will be appended automatically — do not generate it.)",
+    "RESPONSE FORMAT:",
+    modeSectionContract(adaptiveModesEnabled ? responseMode : 'full_brief', candidateLabel),
   ].join("\n");
 
   const userPrompt = [
@@ -115,29 +207,123 @@ export async function respondFromCampaignNewsOnly(params: NewsCopilotParams) {
     "",
     "---",
     "",
+    memoryContext ? `Relevant long-term campaign memory:\n${memoryContext}` : '',
+    memoryContext ? "\n---\n" : '',
+    conversationContext ? `Recent conversation context (for follow-up continuity):\n${conversationContext}` : '',
+    conversationContext ? "\n---\n" : '',
+    previousAssistantResponse
+      ? `Most recent assistant answer (avoid repeating unchanged content, focus on deltas):\n${previousAssistantResponse}`
+      : '',
+    previousAssistantResponse ? "\n---\n" : '',
     `The campaign team asks: "${question}"`,
     "",
-    "Produce the campaign intelligence brief now.",
+    "If this is a follow-up, begin with what changed since the prior answer and avoid restating unchanged background.",
   ].join("\n");
 
   // ── Try LLM synthesis; fall back to template on failure ───────────────────
   try {
-    const result = await createCompletion({
-      model: "gpt-4o",
+    const draftPrompt = `${userPrompt}\n\nDraft a first-pass response matching the selected response mode and length budget.`;
+    const reviewPrompt = `You are the campaign chief of staff performing a quality check.
+
+Question: "${question}"
+Requested window: ${requestedWindowLabel || 'not specified'}
+Applied window: ${appliedWindowLabel || 'not specified'}
+Widened: ${windowWidened ? 'yes' : 'no'}
+
+Review and improve the draft below:
+
+---
+{DRAFT}
+---
+
+Requirements:
+- Keep the same section structure.
+- Remove generic filler and tighten recommendations.
+- Ensure every recommendation maps to observed evidence.
+- Ensure the response directly answers the user's question in the first section.
+- If window was widened, explicitly acknowledge that limitation in Confidence & Caveats.
+- Be concise and useful, not templated.`;
+
+    const draftResult = await createCompletion({
+      model: selectedModel,
       messages: [
         { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt },
+        { role: "user", content: draftPrompt },
       ],
       temperature: 0.4,
-      maxTokens: 2000,
+      maxTokens: 1400,
     });
 
-    const content = `${result.content}\n\n## Sources\n${evidenceLines}`;
+    let finalResult = draftResult;
+    if (useCriticPass) {
+      finalResult = await createCompletion({
+        model: selectedModel,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: reviewPrompt.replace('{DRAFT}', draftResult.content || '') },
+        ],
+        temperature: 0.25,
+        maxTokens: responseMode === 'quick_update' ? 700 : responseMode === 'decision_support' ? 1100 : 1600,
+      });
+    }
+
+    // Fallback model for transient provider/model failures.
+    if ((!finalResult.content || !finalResult.content.trim()) && selectedModel !== "gpt-4o") {
+      finalResult = await createCompletion({
+        model: "gpt-4o",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: (useCriticPass ? reviewPrompt.replace('{DRAFT}', draftResult.content || '') : draftPrompt) },
+        ],
+        temperature: 0.25,
+        maxTokens: responseMode === 'quick_update' ? 700 : responseMode === 'decision_support' ? 1100 : 1600,
+      });
+    }
+
+    const content = [
+      finalResult.content,
+      coverageNotice ? `\n## Coverage\n${coverageNotice}\n` : '',
+      `\n## Sources\n${evidenceLines}`,
+    ]
+      .filter(Boolean)
+      .join('\n');
+
+    // Selective write-after-generate memory policy.
+    if (featureFlags?.memoryRetrieval !== false && campaignIdentity?.orgId && userId && content) {
+      const shouldPersist = responseMode !== 'quick_update' || /\b(decision|plan|priority|tomorrow|next)\b/i.test(question);
+      if (shouldPersist) {
+        const memoryType = responseMode === 'decision_support' ? 'event' : 'summary';
+        const memoryContent = `Q: ${question}\nA: ${String(content).slice(0, 900)}`;
+        void CampaignMemoryService.upsertMemory({
+          orgId: campaignIdentity.orgId,
+          userId,
+          memoryType,
+          content: memoryContent,
+          importanceScore: responseMode === 'full_brief' ? 0.7 : 0.6,
+          confidenceScore: 0.6,
+        }).catch((error) => {
+          console.warn('Memory write skipped:', error instanceof Error ? error.message : error);
+        });
+      }
+    }
 
     if (stream) {
       const encoder = new TextEncoder();
       const streamBody = new ReadableStream({
-        start(controller) {
+        async start(controller) {
+          const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+          const progressSteps = [
+            'Reviewing latest district and state headlines',
+            responseMode === 'quick_update' ? 'Summarizing key updates' : 'Drafting response',
+            ...(useCriticPass ? ['Self-checking recommendations against evidence'] : []),
+            'Finalizing response for delivery',
+          ];
+          for (const step of progressSteps) {
+            controller.enqueue(
+              encoder.encode(`data: ${JSON.stringify({ type: "progress", step })}\n\n`)
+            );
+            await sleep(250);
+          }
           controller.enqueue(
             encoder.encode(`data: ${JSON.stringify({ type: "chunk", content })}\n\n`)
           );

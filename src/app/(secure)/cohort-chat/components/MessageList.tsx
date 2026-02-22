@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import ChartRenderer from '@/components/ChartRenderer';
@@ -13,6 +13,158 @@ interface MessageListProps {
   messagesEndRef: React.RefObject<HTMLDivElement>;
 }
 
+type SourceLogo = {
+  url: string;
+  host: string;
+  label: string;
+};
+
+type ParsedSource = SourceLogo & {
+  raw: string;
+};
+
+function splitContentAndSources(content: string): { mainContent: string; sources: ParsedSource[] } {
+  if (!content) return { mainContent: content, sources: [] };
+  const markerMatch = content.match(/\n##\s*Sources\s*\n/i) || content.match(/^##\s*Sources\s*\n/i);
+  if (!markerMatch || markerMatch.index === undefined) {
+    return { mainContent: content, sources: [] };
+  }
+
+  const splitAt = markerMatch.index;
+  const mainContent = content.slice(0, splitAt).trim();
+  const sourcesBlock = content.slice(splitAt + markerMatch[0].length);
+  const lines = sourcesBlock
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  const sources: ParsedSource[] = [];
+  const seenUrls = new Set<string>();
+
+  for (const line of lines) {
+    const urlMatch = line.match(/https?:\/\/[^\s)]+/i);
+    if (!urlMatch) continue;
+    const url = urlMatch[0];
+    if (seenUrls.has(url)) continue;
+    seenUrls.add(url);
+    try {
+      const host = new URL(url).hostname.replace(/^www\./, '');
+      const labelMatch = line.match(/\[([^\]]+)\]/);
+      sources.push({
+        url,
+        host,
+        label: labelMatch?.[1] || host,
+        raw: line,
+      });
+    } catch {
+      continue;
+    }
+  }
+
+  return { mainContent: mainContent || content, sources };
+}
+
+function uniqueSourceLogos(sources: ParsedSource[]): SourceLogo[] {
+  const logos: SourceLogo[] = [];
+  const seenHosts = new Set<string>();
+  for (const source of sources) {
+    if (seenHosts.has(source.host)) continue;
+    seenHosts.add(source.host);
+    logos.push({ url: source.url, host: source.host, label: source.label });
+  }
+  return logos.slice(0, 12);
+}
+
+function AgentMessageBody({ message }: { message: ChatMessage }) {
+  const [showSourceDetails, setShowSourceDetails] = useState(false);
+  const rawContent = typeof message.content === 'string' ? message.content : '';
+  const { mainContent, sources } = splitContentAndSources(rawContent);
+  const sourceLogos = uniqueSourceLogos(sources);
+  const visibleLogos = sourceLogos.slice(0, 6);
+  const remaining = sourceLogos.length - visibleLogos.length;
+
+  return (
+    <TooltipProvider delayDuration={150}>
+      <div className="space-y-1">
+        {(!rawContent || rawContent.trim() === '') ? (
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+              <span className="text-sm text-muted-foreground">Thinking...</span>
+            </div>
+            {message.thinkingSteps && message.thinkingSteps.length > 0 && (
+              <ul className="space-y-1">
+                {message.thinkingSteps.slice(-3).map((step, sIdx) => (
+                  <li key={sIdx} className="text-xs text-muted-foreground">
+                    • {step}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        ) : (
+          <MarkdownWithCitations text={mainContent} citations={message.citations} isUpload={message.isUpload} />
+        )}
+
+        {message.dataCards && <DataCards dataCards={message.dataCards} />}
+
+        {sourceLogos.length > 0 && (
+          <div className="mt-3 space-y-2">
+            <div className="flex items-center gap-2">
+              <div className="flex -space-x-2">
+                {visibleLogos.map((src, sourceIdx) => (
+                  <a
+                    key={`${src.host}-${sourceIdx}`}
+                    href={src.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    title={src.label}
+                    className="inline-flex h-7 w-7 items-center justify-center rounded-full ring-2 ring-background overflow-hidden bg-muted"
+                  >
+                    <img
+                      src={`https://www.google.com/s2/favicons?sz=64&domain=${encodeURIComponent(src.host)}`}
+                      alt={src.label}
+                      className="h-4 w-4 rounded-full"
+                    />
+                  </a>
+                ))}
+                {remaining > 0 && (
+                  <span className="inline-flex h-7 w-7 items-center justify-center rounded-full ring-2 ring-background bg-muted text-[10px] text-muted-foreground">
+                    +{remaining}
+                  </span>
+                )}
+              </div>
+              <button
+                type="button"
+                className="text-xs text-muted-foreground hover:text-foreground underline-offset-2 hover:underline"
+                onClick={() => setShowSourceDetails((v) => !v)}
+              >
+                {showSourceDetails ? 'Hide source details' : 'View source details'}
+              </button>
+            </div>
+
+            {showSourceDetails && (
+              <div className="rounded-md border border-border/60 bg-muted/20 p-2 space-y-1">
+                {sources.map((source, idx) => (
+                  <a
+                    key={`${source.url}-${idx}`}
+                    href={source.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="block text-xs text-muted-foreground hover:text-foreground hover:underline break-all"
+                  >
+                    {idx + 1}. {source.label} — {source.url}
+                  </a>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </TooltipProvider>
+  );
+}
+
 export function MessageList({ 
   messages, 
   isLoading, 
@@ -22,7 +174,7 @@ export function MessageList({
   const lastMessage = messages[messages.length - 1];
   const hasAgentPlaceholder = !!lastMessage && lastMessage.role === 'agent' && (!lastMessage.content || lastMessage.content.trim() === '');
   return (
-    <ScrollArea className="flex-1 min-h-0" style={{ paddingBottom: '96px' }}>
+    <ScrollArea className="flex-1 min-h-0">
       <div className="p-4 space-y-6">
         {messages.map((m, idx) => (
           <div 
@@ -35,25 +187,12 @@ export function MessageList({
           >
             <div className={cn(
               'rounded-lg px-4 py-3 max-w-[85%] chat-message',
-              m.role === 'user' ? 'bg-primary text-white' : 'text-foreground'
+              m.role === 'user' ? 'bg-primary text-primary-foreground' : 'text-foreground'
             )}>
               {m.role === 'agent' ? (
-                <TooltipProvider delayDuration={150}>
-                  <div className="space-y-1">
-                    {/* If this is the pending agent placeholder, show the inline loader where content will appear */}
-                    {(!m.content || m.content.trim() === '') ? (
-                      <div className="flex items-center gap-2">
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
-                        <span className="text-sm text-muted-foreground">Thinking...</span>
-                      </div>
-                    ) : (
-                      <MarkdownWithCitations text={m.content} citations={m.citations} isUpload={m.isUpload} />
-                    )}
-                    {m.dataCards && <DataCards dataCards={m.dataCards} />}
-                  </div>
-                </TooltipProvider>
+                <AgentMessageBody message={m} />
               ) : (
-                <div className="font-medium text-white">
+                <div className="font-medium text-primary-foreground">
                   {m.content}
                 </div>
               )}

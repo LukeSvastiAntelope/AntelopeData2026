@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { UserRepo } from '@/app/utils/database/user-repo';
+import { getConnection } from '@/app/utils/database/db';
 
 /**
  * GET /api/me
  *
- * Returns the current user and their agent profile using the
- * x-user-id header injected by the auth middleware.
+ * Returns the current user, their agent profile, and primary organization
+ * using the x-user-id header injected by the auth middleware.
  */
 export async function GET(req: NextRequest) {
   try {
@@ -34,6 +35,37 @@ export async function GET(req: NextRequest) {
       agent = await UserRepo.createAgent(userId);
     }
 
+    // Fetch primary organization (campaign context)
+    let organization = null;
+    try {
+      const db = await getConnection();
+      const [orgRows]: any = await db.execute(
+        `SELECT o.id, o.name, o.office_type, o.state, o.district_code,
+                o.candidate_name, o.party, o.election_year
+         FROM organizations o
+         JOIN organization_members om ON o.id = om.organization_id
+         WHERE om.user_id = ? AND om.status = 'active'
+         ORDER BY om.role = 'owner' DESC, o.created_at ASC
+         LIMIT 1`,
+        [userId]
+      );
+      if (orgRows.length > 0) {
+        const row = orgRows[0];
+        organization = {
+          id: row.id,
+          name: row.name,
+          officeType: row.office_type || null,
+          state: row.state || null,
+          districtCode: row.district_code || null,
+          candidateName: row.candidate_name || null,
+          party: row.party || null,
+          electionYear: row.election_year || null,
+        };
+      }
+    } catch {
+      // Org tables may not exist yet
+    }
+
     return NextResponse.json({
       status: true,
       user: {
@@ -45,6 +77,7 @@ export async function GET(req: NextRequest) {
         is_first_login: user.is_first_login,
       },
       agent,
+      organization,
     });
   } catch (error) {
     console.error('Error in /api/me:', error);

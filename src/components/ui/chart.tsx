@@ -81,7 +81,7 @@ const ChartStyle = ({ id, config }: { id: string; config: ChartConfig }) => {
 [data-chart=${id}] {
   ${colorConfig
     .map(([key]) => {
-      return `  --color-${key}: hsl(var(--color-${key}));`
+      return `  --color-${key}: var(--color-${key});`
     })
     .join("\n")}
 }

@@ -27,98 +27,114 @@
 
 :root {
   --radius: 0.625rem;
-  
-  /* Light theme - Zinc color scheme (neutral grays) */
-  --background: 0 0% 98%;
-  --foreground: 240 10% 3.9%;
-  --card: 0 0% 100%;
-  --card-foreground: 240 10% 3.9%;
-  --popover: 0 0% 100%;
-  --popover-foreground: 240 10% 3.9%;
-  --primary: 240 5.9% 10%;
-  --primary-foreground: 0 0% 98%;
-  --secondary: 240 4.8% 95.9%;
-  --secondary-foreground: 240 5.9% 10%;
-  --muted: 240 4.8% 95.9%;
-  --muted-foreground: 240 3.8% 46.1%;
-  --accent: 240 4.8% 95.9%;
-  --accent-foreground: 240 5.9% 10%;
-  --destructive: 0 84.2% 60.2%;
-  --destructive-foreground: 0 0% 98%;
-  --border: 240 5.9% 90%;
-  --input: 240 5.9% 90%;
-  --ring: 240 5.9% 10%;
-  
-  /* Chart colors for light theme - Modern ShadCN palette */
-  --chart-1: 221 83% 53%;
-  --chart-2: 142 71% 45%;
-  --chart-3: 43 74% 66%;
-  --chart-4: 262 83% 58%;
-  --chart-5: 346 77% 49%;
-  
-  /* Sidebar colors for light theme */
-  --sidebar: 0 0% 98%;
-  --sidebar-foreground: 240 5.9% 10%;
-  --sidebar-primary: 240 5.9% 10%;
-  --sidebar-primary-foreground: 0 0% 98%;
-  --sidebar-accent: 240 4.8% 95.9%;
-  --sidebar-accent-foreground: 240 5.9% 10%;
-  --sidebar-border: 240 5.9% 90%;
-  --sidebar-ring: 240 5.9% 10%;
-  
-  /* Custom gradient colors for light theme */
-  --gradient-primary: 240 5.9% 10%;
-  --gradient-secondary: 43 74% 66%;
-  --success: 142 71% 45%;
-  --warning: 43 74% 66%;
-  --info: 221 83% 53%;
+
+  /* Light theme - Neutral (preset: radix-nova, base=radix, theme=neutral) */
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.58 0.22 27);
+  --destructive-foreground: oklch(0.985 0 0);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+
+  /* Chart colors - preset palette */
+  --chart-1: oklch(0.809 0.105 251.813);
+  --chart-2: oklch(0.623 0.214 259.815);
+  --chart-3: oklch(0.546 0.245 262.881);
+  --chart-4: oklch(0.488 0.243 264.376);
+  --chart-5: oklch(0.424 0.199 265.638);
+
+  /* Sidebar colors */
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
+
+  /* Custom colors (preserved for app-specific use) */
+  --gradient-primary: oklch(0.205 0 0);
+  --gradient-secondary: oklch(0.7 0.18 85);
+  --success: oklch(0.6 0.18 145);
+  --warning: oklch(0.75 0.18 85);
+  --info: oklch(0.6 0.2 250);
+
+  /* Neutral scale for charts (replaces zinc-* references) */
+  --neutral-300: oklch(0.87 0 0);
+  --neutral-400: oklch(0.71 0 0);
+  --neutral-500: oklch(0.56 0 0);
+  --neutral-600: oklch(0.45 0 0);
+  --neutral-700: oklch(0.37 0 0);
+  --neutral-800: oklch(0.27 0 0);
 }
 
 .dark {
-  /* Dark theme - Zinc color scheme (neutral grays) */
-  --background: 240 5.9% 10%;
-  --foreground: 0 0% 98%;
-  --card: 240 10% 3.9%;
-  --card-foreground: 0 0% 98%;
-  --popover: 240 10% 3.9%;
-  --popover-foreground: 0 0% 98%;
-  --primary: 0 0% 98%;
-  --primary-foreground: 240 5.9% 10%;
-  --secondary: 240 3.7% 15.9%;
-  --secondary-foreground: 0 0% 98%;
-  --muted: 240 3.7% 15.9%;
-  --muted-foreground: 240 5% 64.9%;
-  --accent: 240 3.7% 15.9%;
-  --accent-foreground: 0 0% 98%;
-  --destructive: 0 62.8% 30.6%;
-  --destructive-foreground: 0 0% 98%;
-  --border: 240 3.7% 15.9%;
-  --input: 240 3.7% 15.9%;
-  --ring: 240 4.9% 83.9%;
-  
-  /* Chart colors for dark theme - Modern ShadCN palette */
-  --chart-1: 221 83% 53%;
-  --chart-2: 142 71% 45%;
-  --chart-3: 43 74% 66%;
-  --chart-4: 262 83% 58%;
-  --chart-5: 346 77% 49%;
-  
-  /* Sidebar colors for dark theme */
-  --sidebar: 240 5.9% 10%;
-  --sidebar-foreground: 0 0% 98%;
-  --sidebar-primary: 0 0% 98%;
-  --sidebar-primary-foreground: 240 5.9% 10%;
-  --sidebar-accent: 240 3.7% 15.9%;
-  --sidebar-accent-foreground: 0 0% 98%;
-  --sidebar-border: 240 3.7% 15.9%;
-  --sidebar-ring: 240 4.9% 83.9%;
-  
-  /* Custom gradient colors for dark theme */
-  --gradient-primary: 0 0% 98%;
-  --gradient-secondary: 43 74% 66%;
-  --success: 142 71% 45%;
-  --warning: 43 74% 66%;
-  --info: 221 83% 53%;
+  /* Dark theme - Neutral (preset: radix-nova) */
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.87 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.371 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --destructive-foreground: oklch(0.985 0 0);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+
+  /* Chart colors */
+  --chart-1: oklch(0.809 0.105 251.813);
+  --chart-2: oklch(0.623 0.214 259.815);
+  --chart-3: oklch(0.546 0.245 262.881);
+  --chart-4: oklch(0.488 0.243 264.376);
+  --chart-5: oklch(0.424 0.199 265.638);
+
+  /* Sidebar colors */
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.556 0 0);
+
+  /* Custom colors */
+  --gradient-primary: oklch(0.985 0 0);
+  --gradient-secondary: oklch(0.7 0.18 85);
+  --success: oklch(0.6 0.18 145);
+  --warning: oklch(0.75 0.18 85);
+  --info: oklch(0.6 0.2 250);
+
+  /* Neutral scale for charts (lighter grays for visibility on dark bg) */
+  --neutral-300: oklch(0.4 0 0);
+  --neutral-400: oklch(0.5 0 0);
+  --neutral-500: oklch(0.6 0 0);
+  --neutral-600: oklch(0.68 0 0);
+  --neutral-700: oklch(0.76 0 0);
+  --neutral-800: oklch(0.85 0 0);
 }
 
 @layer base {
@@ -148,9 +164,36 @@
     @apply text-card-foreground;
   }
   
-  /* Input field styling for both themes */
+  /* Input field styling for both themes - explicit colors for dark mode visibility */
   input[type="text"], input[type="email"], input[type="password"], textarea {
     @apply bg-background border-input text-foreground;
+  }
+
+  /* Placeholder contrast in dark mode */
+  .dark input[type="text"]::placeholder,
+  .dark input[type="email"]::placeholder,
+  .dark input[type="password"]::placeholder,
+  .dark textarea::placeholder {
+    color: var(--muted-foreground);
+    opacity: 1;
+  }
+
+  /* Caret visibility in dark mode */
+  .dark input[type="text"],
+  .dark input[type="email"],
+  .dark input[type="password"],
+  .dark textarea {
+    caret-color: var(--foreground);
+  }
+
+  /* Override bg-transparent on form controls in dark mode - ensures visibility when components override base styles */
+  .dark textarea.bg-transparent,
+  .dark input.bg-transparent {
+    background-color: var(--background) !important;
+    color: var(--foreground);
+  }
+  .dark textarea.bg-transparent::placeholder {
+    color: var(--muted-foreground);
   }
   
   input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focus, textarea:focus {
@@ -160,15 +203,15 @@
 
 /* Updated gradient styles using CSS variables */
 .bg-mainGradient {
-  background: hsl(var(--background));
+  background: var(--background);
 }
 
 .text-gradient {
-  color: hsl(var(--gradient-primary));
+  color: var(--gradient-primary);
 }
 
 .text-gradient-red {
-  color: hsl(var(--warning));
+  color: var(--warning);
 }
 
 /* Enhanced custom styles */
@@ -186,16 +229,16 @@
 }
 
 ::-webkit-scrollbar-track {
-  background: hsl(var(--muted));
+  background: var(--muted);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: hsl(var(--muted-foreground));
+  background: var(--muted-foreground);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: hsl(var(--ring));
+  background: var(--ring);
 }
 
 /* Chat message animations */

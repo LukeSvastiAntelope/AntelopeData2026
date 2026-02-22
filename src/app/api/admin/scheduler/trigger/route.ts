@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { runDailyPlatformTasks } from '@/app/utils/scheduler';
 
 /**
  * POST /api/admin/scheduler/trigger
@@ -10,16 +11,12 @@ import { NextResponse } from 'next/server';
 export async function POST() {
     try {
         console.log('Manual trigger: Running daily platform tasks...');
-
-        // Future: Add survey lifecycle tasks here
-        // e.g., close expired surveys, send tracking poll reminders, etc.
+        const summary = await runDailyPlatformTasks();
 
         return NextResponse.json({
             success: true,
-            message: 'Manual trigger completed. No scheduled tasks configured yet.',
-            summary: {
-                tasksRun: 0,
-            },
+            message: 'Manual trigger completed.',
+            summary,
         });
     } catch (error) {
         console.error('Failed to trigger manual tasks:', error);
