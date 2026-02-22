@@ -82,6 +82,17 @@ export interface UserDB {
     role: "user" | "admin";
 }
 
+export interface UserOrganization {
+    id: number;
+    name: string;
+    officeType: string | null;
+    state: string | null;
+    districtCode: string | null;
+    candidateName: string | null;
+    party: 'D' | 'R' | 'I' | 'L' | 'G' | 'O' | null;
+    electionYear: number | null;
+}
+
 export interface AgentDB {
     id: number;
     name: string;
@@ -135,6 +146,7 @@ export interface IAgentContext {
     setAgent: Dispatch<SetStateAction<IAgentProfile | null>>;
     user: UserDB | null;
     setUser: Dispatch<SetStateAction<UserDB | null>>;
+    organization: UserOrganization | null;
     isAgentProfileLoading: boolean;
     setIsAgentProfileLoading: Dispatch<SetStateAction<boolean>>;
 }

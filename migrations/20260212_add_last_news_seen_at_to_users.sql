@@ -1,0 +1,2 @@
+ALTER TABLE users
+  ADD COLUMN last_news_seen_at DATETIME NULL DEFAULT NULL;

@@ -128,7 +128,7 @@ const CreatePage = () => {
                 <Link href="/about">Learn More</Link>
               </Button>
               <Button variant="outline" size="sm" asChild>
-                <Link href="/surveys">View Dashboard</Link>
+                <Link href="/dashboard">View Dashboard</Link>
               </Button>
             </div>
           </div>

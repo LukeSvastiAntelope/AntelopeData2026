@@ -20,6 +20,7 @@ import {
   LogOut,
   Info,
   Shield,
+  LayoutDashboard,
   FileText,
   Brain,
   MessageCircle,
@@ -42,6 +43,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { PartyIcon, partyColor, partyBgColor } from "@/components/party-icons"
 
 interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> {
   collapsible?: "offcanvas" | "icon" | "none";
@@ -49,9 +51,14 @@ interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> {
 
 export function AppSidebar({ className, collapsible = "offcanvas", ...props }: SidebarProps) {
   const pathname = usePathname()
-  const { agent, user } = useAgent()
+  const { agent, user, organization } = useAgent()
 
   const mainNavItems = [
+    {
+      title: "Dashboard",
+      href: "/dashboard",
+      icon: LayoutDashboard
+    },
     {
       title: "Surveys",
       href: "/surveys",
@@ -61,11 +68,6 @@ export function AppSidebar({ className, collapsible = "offcanvas", ...props }: S
       title: "Voter Profiles",
       href: "/digital-twins",
       icon: Brain
-    },
-    {
-      title: "Channels",
-      href: "/channels",
-      icon: MessageCircle
     },
     {
       title: "Reports",
@@ -119,7 +121,7 @@ export function AppSidebar({ className, collapsible = "offcanvas", ...props }: S
     >
       <SidebarHeader className="flex flex-col gap-4 pb-4">
         <div className="flex items-center px-2">
-          <Link href="/surveys" className="flex items-center px-4">
+          <Link href="/dashboard" className="flex items-center px-4">
             <LogoText 
               className="text-zinc-900 dark:text-zinc-100 transition-opacity group-data-[collapsible=offcanvas]:opacity-0"
               width={120} 
@@ -192,12 +194,18 @@ export function AppSidebar({ className, collapsible = "offcanvas", ...props }: S
                   <DropdownMenuTrigger asChild>
                     <SidebarMenuButton className="data-[slot=sidebar-menu-button]:!p-2 flex-1 data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground">
                       <div className="flex items-center gap-3 min-w-0">
-                        <Avatar className="h-8 w-8 rounded-lg">
-                          <AvatarImage src={undefined} alt={user.display_name || user.email || "User"} />
-                          <AvatarFallback className="rounded-lg">
-                            {(user.display_name || user.email)?.charAt(0)?.toUpperCase() || "U"}
-                          </AvatarFallback>
-                        </Avatar>
+                        {organization?.party && (organization.party === 'R' || organization.party === 'D') ? (
+                          <div className={`h-8 w-8 rounded-lg flex items-center justify-center ${organization.party === 'R' ? 'bg-red-500/15' : 'bg-blue-500/15'}`}>
+                            <PartyIcon party={organization.party} size={18} className={partyColor(organization.party)} />
+                          </div>
+                        ) : (
+                          <Avatar className="h-8 w-8 rounded-lg">
+                            <AvatarImage src={undefined} alt={user.display_name || user.email || "User"} />
+                            <AvatarFallback className="rounded-lg">
+                              {(user.display_name || user.email)?.charAt(0)?.toUpperCase() || "U"}
+                            </AvatarFallback>
+                          </Avatar>
+                        )}
                         <div className="grid flex-1 overflow-hidden text-left leading-tight group-data-[collapsible=offcanvas]:hidden">
                           <span className="truncate text-sm font-medium text-sidebar-foreground">
                             {user.display_name || user.email?.split('@')[0] || 'User'}
@@ -206,19 +214,24 @@ export function AppSidebar({ className, collapsible = "offcanvas", ...props }: S
                             {user.email}
                           </span>
                         </div>
-                        {/* removed kebab icon next to name */}
                       </div>
                     </SidebarMenuButton>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent className="w-60 rounded-lg translate-x-2" align="start" alignOffset={8} sideOffset={8}>
                     <DropdownMenuLabel className="p-0 font-normal">
                       <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
-                        <Avatar className="h-8 w-8 rounded-lg">
-                          <AvatarImage src={undefined} alt={user.display_name || user.email || "User"} />
-                          <AvatarFallback className="rounded-lg">
-                            {(user.display_name || user.email)?.charAt(0)?.toUpperCase() || "U"}
-                          </AvatarFallback>
-                        </Avatar>
+                        {organization?.party && (organization.party === 'R' || organization.party === 'D') ? (
+                          <div className={`h-8 w-8 rounded-lg flex items-center justify-center ${organization.party === 'R' ? 'bg-red-500/15' : 'bg-blue-500/15'}`}>
+                            <PartyIcon party={organization.party} size={18} className={partyColor(organization.party)} />
+                          </div>
+                        ) : (
+                          <Avatar className="h-8 w-8 rounded-lg">
+                            <AvatarImage src={undefined} alt={user.display_name || user.email || "User"} />
+                            <AvatarFallback className="rounded-lg">
+                              {(user.display_name || user.email)?.charAt(0)?.toUpperCase() || "U"}
+                            </AvatarFallback>
+                          </Avatar>
+                        )}
                         <div className="grid flex-1 text-left leading-tight">
                           <span className="truncate text-sm font-medium">
                             {user.display_name || user.email?.split('@')[0] || 'User'}

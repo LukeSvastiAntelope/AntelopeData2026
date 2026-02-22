@@ -22,7 +22,7 @@ export function initializeScheduler() {
     try {
         scheduleDailyTasks();
         schedulerInitialized = true;
-        console.log('🚀 Daily bet analysis scheduler initialized successfully');
+        console.log('🚀 Daily platform scheduler initialized successfully');
     } catch (error) {
         console.error('❌ Failed to initialize scheduler:', error);
     }

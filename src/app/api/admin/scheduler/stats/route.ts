@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { openSql } from '@/app/utils/database/db';
+import { getDailyTaskRuntimeStats } from '@/app/utils/scheduler';
 
 export async function GET() {
     try {
@@ -12,12 +13,18 @@ export async function GET() {
         // Get active surveys count
         const [activeRows]: any = await db.execute("SELECT COUNT(*) as count FROM surveys WHERE status = 'active'");
         const activeSurveys = activeRows[0]?.count || 0;
+        const runtime = getDailyTaskRuntimeStats();
 
         const stats = {
             totalSurveys,
             activeSurveys,
-            lastRun: "Never",
+            lastRun: runtime.lastRunAt || "Never",
             nextRun: "2:00 AM EST",
+            lastRunStatus: runtime.lastRunStatus,
+            refreshSummary: runtime.lastRunSummary,
+            districtRefresh: runtime.lastRunSummary?.csv?.data || null,
+            campaignNewsDigest: runtime.lastRunSummary?.campaignNewsDigest || null,
+            lastRunError: runtime.lastRunError,
         };
 
         return NextResponse.json({

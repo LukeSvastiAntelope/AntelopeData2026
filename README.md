@@ -1,5 +1,12 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## Project structure
+
+- `docs/` – Documentation (plans, setup guides, architecture, database schemas)
+- `reference/` – Reference materials (fonts, sample data, media)
+- `scripts/` – Build/import scripts; `scripts/legacy/` for one-off maintenance scripts
+- `migrations/` – Database migrations
+
 ## Getting Started
 
 First, run the development server:

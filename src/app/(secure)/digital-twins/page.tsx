@@ -221,7 +221,7 @@ const DigitalTwinsPage = () => {
                     <CardDescription>Total profiles by age cohort</CardDescription>
                   </CardHeader>
                   <CardContent className="px-0 pt-2 pb-4 sm:px-0 sm:pt-2">
-                    <ChartContainer config={{ count: { color: "hsl(var(--zinc-600))" } }} className="aspect-auto h-[220px] w-full">
+                    <ChartContainer config={{ count: { color: "var(--neutral-600)" } }} className="aspect-auto h-[220px] w-full">
                       <AreaChart 
                         data={aggregation.ageData}
                         margin={{
@@ -237,8 +237,8 @@ const DigitalTwinsPage = () => {
                             <stop offset="95%" stopColor="hsl(0, 0%, 40%)" stopOpacity={0.1} />
                           </linearGradient>
                         </defs>
-                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted))" />
-                        <XAxis dataKey="group" tickLine={false} axisLine={false} stroke="hsl(var(--muted-foreground))" />
+                        <CartesianGrid strokeDasharray="3 3" stroke="var(--muted)" />
+                        <XAxis dataKey="group" tickLine={false} axisLine={false} stroke="var(--muted-foreground)" />
                         <YAxis allowDecimals={false} tickLine={false} axisLine={false} />
                         <ChartTooltip content={<ChartTooltipContent />} />
                         <Area type="monotone" dataKey="count" stroke="hsl(0, 0%, 40%)" strokeWidth={2} fill="url(#fillAge)" />
@@ -344,7 +344,7 @@ const DigitalTwinsPage = () => {
                             dataKey="count"
                             position="right"
                             offset={8}
-                            fill="hsl(var(--foreground))"
+                            fill="var(--foreground)"
                             fontSize={12}
                           />
                         </Bar>

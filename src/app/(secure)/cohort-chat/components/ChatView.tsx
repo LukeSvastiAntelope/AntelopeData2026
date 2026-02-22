@@ -19,7 +19,9 @@ type ChatViewProps = {
   surveys: { id: number; title: string }[];
   selectedSurveyId: number | null;
   onInlineSurveySelect: (surveyId: number) => void;
+  onSelectNewsCopilot: () => void;
   onUploadClick: () => void;
+  isNewsMode?: boolean;
 };
 
 export default function ChatView(props: ChatViewProps) {
@@ -36,7 +38,9 @@ export default function ChatView(props: ChatViewProps) {
     surveys,
     selectedSurveyId,
     onInlineSurveySelect,
+    onSelectNewsCopilot,
     onUploadClick,
+    isNewsMode,
   } = props;
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -60,8 +64,10 @@ export default function ChatView(props: ChatViewProps) {
         surveys={surveys}
         selectedSurveyId={selectedSurveyId}
         onInlineSurveySelect={onInlineSurveySelect}
+        onSelectNewsCopilot={onSelectNewsCopilot}
         onUploadClick={onUploadClick}
         containerRef={containerRef}
+        isNewsMode={isNewsMode}
       />
     </div>
   );

@@ -74,6 +74,11 @@ function toMessageSignature(messages: unknown[]) {
   }
 }
 
+function looksLikeNewsQuestion(question: string): boolean {
+  return /(news|headline|headlines|what changed|this week|today|yesterday|press|media|story|stories|update|updates|events?|talking points?|newsletter|subject line|comms|messaging|rapid response|fundrais|endorsement)/i.test(
+    question || ''
+  );
+}
 
 
 
@@ -112,6 +117,7 @@ export default function CohortChatPage() {
   const [pythonEnvironmentInitialized, setPythonEnvironmentInitialized] = useState(false);
   const [systemPrompt, setSystemPrompt] = useState(DEFAULT_SYSTEM_PROMPT);
   const [streamingMode, setStreamingMode] = useState<'off' | 'smart' | 'buffered' | 'instant'>('off');
+  const [rightPanelTab, setRightPanelTab] = useState<'conversations' | 'cohort' | 'agent'>('conversations');
 
   const [showCohortCreator, setShowCohortCreator] = useState(false);
   
@@ -135,8 +141,15 @@ export default function CohortChatPage() {
 
   // Derived view state boundaries
   const isCodeConversation = currentConversationType === 'code';
-  const isNewsConversation = currentConversationType === 'news';
+  const isNewsConversation = currentConversationType === 'news' || copilotMode === 'news';
   const activeMessages = isCodeConversation ? codeMessages : messages;
+  const showCohortTab = !isNewsConversation;
+
+  useEffect(() => {
+    if (!showCohortTab && rightPanelTab === 'cohort') {
+      setRightPanelTab('conversations');
+    }
+  }, [rightPanelTab, showCohortTab]);
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {
@@ -467,7 +480,27 @@ FORMATTING REQUIREMENTS:
     console.log('🚨 FRONTEND DEBUG: selectedSurveyId value:', selectedSurveyId);
     console.log('🚨 FRONTEND DEBUG: Will send surveyId:', selectedSurveyId || 'NOT_SENT');
 
-    const newsOnlyMode = copilotMode === 'news';
+    const inferredNewsIntent = looksLikeNewsQuestion(question);
+    const shouldAutoSwitchToNews =
+      inferredNewsIntent &&
+      currentConversationType !== 'news' &&
+      copilotMode !== 'news';
+
+    if (shouldAutoSwitchToNews) {
+      createNewConversation('news');
+    }
+
+    const newsOnlyMode =
+      copilotMode === 'news' ||
+      currentConversationType === 'news' ||
+      inferredNewsIntent;
+    const recentConversationMessages = (messages || [])
+      .filter((m) => typeof m?.content === 'string' && m.content.trim().length > 0)
+      .slice(-8)
+      .map((m) => ({
+        role: m.role,
+        content: m.content,
+      }));
     const payload: any = {
       cohort: !newsOnlyMode && selectedCohortId ? { id: selectedCohortId } : undefined,
       question,
@@ -477,6 +510,7 @@ FORMATTING REQUIREMENTS:
         ? { survey: false, twins: false, web: true }
         : sources,
       systemPrompt: enhancedSystemPrompt,
+      recentMessages: recentConversationMessages,
     };
 
     // Only include surveyId in Survey Copilot mode
@@ -672,6 +706,25 @@ FORMATTING REQUIREMENTS:
               });
               setIsLoading(false);
               return;
+            }
+
+            if (eventType === 'progress' && typeof data.step === 'string') {
+              setMessages(prev => {
+                const updated = [...prev];
+                const last = updated[updated.length - 1];
+                if (last && last.role === 'agent' && (last as any).id === agentId) {
+                  const existingSteps = Array.isArray((last as any).thinkingSteps)
+                    ? (last as any).thinkingSteps
+                    : [];
+                  const nextSteps = existingSteps.includes(data.step)
+                    ? existingSteps
+                    : [...existingSteps, data.step];
+                  (last as any).thinkingSteps = nextSteps;
+                  updated[updated.length - 1] = last;
+                }
+                return updated;
+              });
+              continue;
             }
 
             if (eventType === 'chunk' && typeof data.content === 'string') {
@@ -1219,6 +1272,9 @@ FORMATTING REQUIREMENTS:
   // Add new state for inline survey selector
   const [showSurveyDropdown, setShowSurveyDropdown] = useState(false);
   const activateNewsCopilot = () => {
+    if (currentConversationType !== 'news') {
+      createNewConversation('news');
+    }
     setCopilotMode('news');
     setSelectedSurveyId(null);
     setSelectedCohortId(null);
@@ -1369,7 +1425,7 @@ FORMATTING REQUIREMENTS:
                         onConversationSwitch={switchConversation}
                         onNewConversation={handleNewConversation}
                         conversationsLoading={conversationsLoading}
-                        currentConversationType={currentConversationType}
+                        currentConversationType={isNewsConversation ? 'news' : currentConversationType}
             isCollapsed={isCollapsed}
             onToggleRightPanel={() => setIsCollapsed(!isCollapsed)}
           />
@@ -1569,10 +1625,10 @@ FORMATTING REQUIREMENTS:
       <div className="relative">
         <div className={cn('h-screen bg-background transition-all duration-300 ease-in-out sticky top-0', isCollapsed? 'w-0':'w-[350px] overflow-y-auto px-4 py-2')}>
           {!isCollapsed && (
-            <Tabs defaultValue="conversations" className="w-full">
-              <TabsList className="grid w-full grid-cols-3">
+            <Tabs value={rightPanelTab} onValueChange={(v) => setRightPanelTab(v as 'conversations' | 'cohort' | 'agent')} className="w-full">
+              <TabsList className={cn("grid w-full", showCohortTab ? "grid-cols-3" : "grid-cols-2")}>
                 <TabsTrigger value="conversations">Conversations</TabsTrigger>
-                <TabsTrigger value="cohort">Cohort</TabsTrigger>
+                {showCohortTab && <TabsTrigger value="cohort">Cohort</TabsTrigger>}
                 <TabsTrigger value="agent">Agent</TabsTrigger>
               </TabsList>
 
@@ -1595,64 +1651,66 @@ FORMATTING REQUIREMENTS:
                 )}
               </TabsContent>
 
-              <TabsContent value="cohort" className="space-y-4 mt-4">
-                <CohortPanel
-                  surveys={surveys}
-                  selectedSurveyId={selectedSurveyId}
-                  onSurveyChange={handleSurveyChange}
-                  cohorts={cohorts}
-                  selectedCohortId={selectedCohortId}
-                  onSelectCohort={(id) => setSelectedCohortId(id)}
-                  showCohortCreator={showCohortCreator}
-                  setShowCohortCreator={setShowCohortCreator}
-                  filterRules={filterRules}
-                  setFilterRules={setFilterRules}
-                  saving={saving}
-                  onCreateCohort={async (name, cohortFilterRules) => {
-                          setSaving(true);
-                          try {
-                            const res = await fetch('/api/cohorts', {
-                              method: 'POST',
-                              headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({ 
-                                name, 
-                                filter: cohortFilterRules, 
-                                visibility: 'private',
-                                surveyId: selectedSurveyId 
-                              }),
-                            });
-                            const data = await res.json();
-                            if (data.status) {
-                              const newCohort = { 
-                                id: data.id, 
-                                name, 
-                                filter: cohortFilterRules, 
-                                visibility: 'private', 
-                                description: '', 
-                                createdBy: 1, 
-                                createdAt: '', 
-                                updatedAt: '' 
-                              } as any;
-                              setCohorts([...cohorts, newCohort]);
-                              setSelectedCohortId(data.id);
-                              setShowCohortCreator(false);
-                              setNewCohortName('');
-                              setFilterRules([]);
-                        toast.success(`Cohort \"${name}\" created successfully!`);
-                            } else {
-                              throw new Error(data.message || 'Failed to create cohort');
+              {showCohortTab && (
+                <TabsContent value="cohort" className="space-y-4 mt-4">
+                  <CohortPanel
+                    surveys={surveys}
+                    selectedSurveyId={selectedSurveyId}
+                    onSurveyChange={handleSurveyChange}
+                    cohorts={cohorts}
+                    selectedCohortId={selectedCohortId}
+                    onSelectCohort={(id) => setSelectedCohortId(id)}
+                    showCohortCreator={showCohortCreator}
+                    setShowCohortCreator={setShowCohortCreator}
+                    filterRules={filterRules}
+                    setFilterRules={setFilterRules}
+                    saving={saving}
+                    onCreateCohort={async (name, cohortFilterRules) => {
+                            setSaving(true);
+                            try {
+                              const res = await fetch('/api/cohorts', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ 
+                                  name, 
+                                  filter: cohortFilterRules, 
+                                  visibility: 'private',
+                                  surveyId: selectedSurveyId 
+                                }),
+                              });
+                              const data = await res.json();
+                              if (data.status) {
+                                const newCohort = { 
+                                  id: data.id, 
+                                  name, 
+                                  filter: cohortFilterRules, 
+                                  visibility: 'private', 
+                                  description: '', 
+                                  createdBy: 1, 
+                                  createdAt: '', 
+                                  updatedAt: '' 
+                                } as any;
+                                setCohorts([...cohorts, newCohort]);
+                                setSelectedCohortId(data.id);
+                                setShowCohortCreator(false);
+                                setNewCohortName('');
+                                setFilterRules([]);
+                          toast.success(`Cohort \"${name}\" created successfully!`);
+                              } else {
+                                throw new Error(data.message || 'Failed to create cohort');
+                              }
+                            } catch (error) {
+                              console.error('Error creating cohort:', error);
+                              toast.error('Failed to create cohort');
+                            } finally {
+                              setSaving(false);
                             }
-                          } catch (error) {
-                            console.error('Error creating cohort:', error);
-                            toast.error('Failed to create cohort');
-                          } finally {
-                            setSaving(false);
-                          }
-                        }}
-                  onDeleteCohort={handleDeleteCohort}
-                  canDelete={messages.length > 0 && !!selectedCohortId}
-                />
-              </TabsContent>
+                          }}
+                    onDeleteCohort={handleDeleteCohort}
+                    canDelete={messages.length > 0 && !!selectedCohortId}
+                  />
+                </TabsContent>
+              )}
               
               <TabsContent value="agent" className="space-y-4 mt-4">
                 <ConfigurationPanel

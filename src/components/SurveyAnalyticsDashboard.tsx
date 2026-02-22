@@ -94,12 +94,12 @@ interface AIAnalyticsData {
   }
 }
 
-// Chart color scheme (ShadCN neutral zinc theme)
+// Chart color scheme (ShadCN radix-nova neutral theme)
 const CHART_COLORS = {
-  primary: 'hsl(var(--primary))',
-  secondary: 'hsl(var(--secondary))',
-  muted: 'hsl(var(--muted))',
-  accent: 'hsl(var(--accent))',
+  primary: 'var(--primary)',
+  secondary: 'var(--secondary)',
+  muted: 'var(--muted)',
+  accent: 'var(--accent)',
   zinc: ['#71717a', '#a1a1aa', '#d4d4d8', '#e4e4e7', '#f4f4f5', '#fafafa'],
   gradient: ['#18181b', '#27272a', '#3f3f46', '#52525b', '#71717a', '#a1a1aa']
 }
@@ -721,8 +721,8 @@ function ChartCard({ chart }: { chart: any }) {
                           key={`cell-${xIndex}-${yIndex}`}
                           className="h-6 min-w-16 border border-border/20 flex items-center justify-center text-[11px] font-medium rounded"
                           style={{
-                            backgroundColor: `hsl(var(--primary) / ${0.1 + intensity * 0.7})`,
-                            color: intensity > 0.5 ? 'hsl(var(--primary-foreground))' : 'hsl(var(--foreground))'
+                            backgroundColor: `color-mix(in oklch, var(--primary) ${(0.1 + intensity * 0.7) * 100}%, transparent)`,
+                            color: intensity > 0.5 ? 'var(--primary-foreground)' : 'var(--foreground)'
                           }}
                           title={`${xVal} × ${yVal}: ${value}`}
                         >
@@ -740,7 +740,7 @@ function ChartCard({ chart }: { chart: any }) {
                   className="h-2 w-32 rounded bg-gradient-to-r"
                   style={{
                     backgroundImage:
-                      'linear-gradient(to right, hsl(var(--primary)/0.1), hsl(var(--primary)/0.8))'
+                      'linear-gradient(to right, color-mix(in oklch, var(--primary) 10%, transparent), color-mix(in oklch, var(--primary) 80%, transparent))'
                   }}
                 />
                 <span className="text-xs text-muted-foreground">Most ({maxValue})</span>

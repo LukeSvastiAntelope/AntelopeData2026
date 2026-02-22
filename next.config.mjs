@@ -1,5 +1,6 @@
 /** @type {import('next').NextConfig} */
 import path from 'path';
+
 const nextConfig = {
     eslint: {
         // Prevent ESLint warnings from failing CI builds
@@ -53,12 +54,19 @@ const nextConfig = {
         contentDispositionType: 'attachment',
         contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
     },
-    webpack: (config, { dev }) => {
-        // Existing rule for Wallet Adapter CSS
+    webpack: (config, { dev, webpack }) => {
+        // Bypass PostCSS for Wallet Adapter CSS
         config.module.rules.push({
             test: /node_modules\/@solana\/wallet-adapter-react-ui\/styles\.css$/,
             type: 'asset/source',
         });
+
+        // Disable CSS minification - postcss-scss fails on SVG data URLs in some deps
+        const minimizers = config.optimization?.minimizer ?? [];
+        if (Array.isArray(minimizers) && minimizers.length > 1) {
+            // Keep only the JS minimizer (first), drop the CSS minimizer (second)
+            config.optimization.minimizer = minimizers.slice(0, 1)
+        }
 
         // Provide default export shim for csv-parse to satisfy @irys/sdk
         config.resolve = config.resolve || {};
