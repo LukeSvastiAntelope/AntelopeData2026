@@ -235,8 +235,8 @@ const AISurveyBuilderPage = () => {
 
     try {
       const controller = new AbortController()
-      // Allow enough time for backend processing (backend timeout is 30s in production)
-      const timeoutMs = process.env.NODE_ENV === 'production' ? 35000 : 60000
+      const isSlowModel = selectedModel.includes('gpt-5') || selectedModel.includes('o1') || selectedModel.includes('o3') || selectedModel.includes('o4')
+      const timeoutMs = isSlowModel ? 300_000 : 120_000
       const timeoutId = window.setTimeout(() => {
         controller.abort(new Error(`Request timeout after ${timeoutMs / 1000} seconds`))
       }, timeoutMs)
