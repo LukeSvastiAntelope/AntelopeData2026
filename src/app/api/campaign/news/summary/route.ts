@@ -67,6 +67,8 @@ export async function GET(request: NextRequest) {
         summary: r.summary || null,
         publishedAt: r.published_at ? new Date(r.published_at).toISOString() : null,
         relevanceScore: parseFloat(r.relevance_score) || 0,
+        state: r.state || null,
+        districtCode: r.district_code || null,
       })),
       scopes: {
         states,

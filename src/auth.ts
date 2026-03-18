@@ -4,6 +4,7 @@ import { authConfig } from "@/auth.config";
 import { UserRepo } from "@/app/utils/database/user-repo";
 import { validateEmail } from "@/app/utils/validation";
 import bcrypt from "bcryptjs";
+import { openSql } from "@/app/utils/database/db";
 
 const isDev = process.env.NODE_ENV !== "production";
 const logDebug = (...args: unknown[]) => {
@@ -41,15 +42,42 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
         try {
           logDebug('Getting user by email:', email);
-          const user = await UserRepo.getUserByEmail(email);
+          let user;
+          try {
+            user = await UserRepo.getUserByEmail(email);
+          } catch (dbError) {
+            console.error("Auth DB error:", dbError);
+            throw new Error('DatabaseError');
+          }
           if (!user) {
             logDebug('No user found with email:', email);
             return null;
           }
 
-          logDebug('User found:', { id: user.id, email: user.email, hasPassword: !!user.password });
+          const storedPassword = user.password ? String(user.password) : '';
+          logDebug('User found:', { id: user.id, email: user.email, hasPassword: !!storedPassword });
 
-          const isPasswordValid = bcrypt.compareSync(password, user.password);
+          // Password validation:
+          // - Most accounts store bcrypt hashes
+          // - Some legacy accounts may have plaintext passwords (or empty password)
+          let isPasswordValid = false;
+          const looksBcrypt = storedPassword.startsWith('$2a$') || storedPassword.startsWith('$2b$') || storedPassword.startsWith('$2y$');
+          if (storedPassword && looksBcrypt) {
+            isPasswordValid = bcrypt.compareSync(password, storedPassword);
+          } else if (storedPassword) {
+            // Legacy plaintext (best-effort): accept if exact match, then upgrade to bcrypt hash
+            isPasswordValid = password === storedPassword;
+            if (isPasswordValid) {
+              try {
+                const db = await openSql();
+                const upgraded = bcrypt.hashSync(password, 10);
+                await db.execute('UPDATE users SET password = ? WHERE id = ?', [upgraded, user.id]);
+                logDebug('Upgraded plaintext password to bcrypt hash for user:', user.id);
+              } catch (e) {
+                console.warn('Failed to upgrade legacy password hash:', e);
+              }
+            }
+          }
           logDebug('Password validation result:', isPasswordValid);
 
           if (!isPasswordValid) {
@@ -57,9 +85,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             return null;
           }
 
+          // Treat NULL as verified (older rows may not have set the flag explicitly)
           if (user.is_verified === 0) {
             logDebug('User not verified:', email);
-            return null;
+            throw new Error('EmailNotVerified');
           }
 
           return {
@@ -69,8 +98,12 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             image: null
           } as any;
         } catch (error) {
+          // Re-throw our known codes so the UI can show the right message
+          if (error instanceof Error && ['EmailNotVerified', 'DatabaseError'].includes(error.message)) {
+            throw error;
+          }
           console.error("Auth error:", error);
-          return null;
+          throw error;
         }
       }
     })

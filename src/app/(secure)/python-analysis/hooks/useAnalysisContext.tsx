@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useCallback } from 'react';
+import * as XLSX from 'xlsx';
+import Papa from 'papaparse';
 
 export interface Dataset {
   name: string;
@@ -55,18 +57,80 @@ export function useAnalysisContext() {
 
   const loadDataset = useCallback(async (file: File): Promise<Dataset> => {
     try {
-      const text = await file.text();
-      const lines = text.split('\n').filter(line => line.trim());
-      
-      if (lines.length === 0) {
-        throw new Error('Empty file');
-      }
+      const ext = '.' + (file.name.split('.').pop() || '').toLowerCase();
 
-      // Parse CSV (simple implementation)
-      const columns = lines[0].split(',').map(col => col.trim().replace(/"/g, ''));
-      const data = lines.slice(1).map(line => 
-        line.split(',').map(cell => cell.trim().replace(/"/g, ''))
-      );
+      let columns: string[] = [];
+      let data: any[][] = [];
+
+      if (ext === '.xlsx' || ext === '.xls') {
+        const buf = await file.arrayBuffer();
+        const wb = XLSX.read(buf, { type: 'array' });
+        const sheetName = wb.SheetNames[0];
+        const sheet = wb.Sheets[sheetName];
+        const rows = XLSX.utils.sheet_to_json<Record<string, any>>(sheet, { defval: '' });
+        if (!rows.length) throw new Error('Empty spreadsheet');
+        columns = Object.keys(rows[0] || {});
+        data = rows.map(r => columns.map(c => String((r as any)[c] ?? '')));
+      } else if (ext === '.docx') {
+        const { extractRawText } = await import('mammoth');
+        const buf = await file.arrayBuffer();
+        const res = await extractRawText({ arrayBuffer: buf as any });
+        const text = (res.value || '').trim();
+        if (!text) throw new Error('Empty .docx');
+
+        // Very simple contact extraction into a tabular dataset.
+        // Columns: name (optional), phone, email, raw_line
+        const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+        const emailRe = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi;
+        const phoneRe = /(\+?\d[\d\s().-]{7,}\d)/g;
+        const extracted: Array<{ phone?: string; email?: string; raw_line: string }> = [];
+        for (const line of lines) {
+          const emails = line.match(emailRe) || [];
+          const phones = line.match(phoneRe) || [];
+          if (!emails.length && !phones.length) continue;
+          if (emails.length || phones.length) {
+            const max = Math.max(emails.length || 1, phones.length || 1);
+            for (let i = 0; i < max; i++) {
+              extracted.push({
+                email: emails[i],
+                phone: phones[i],
+                raw_line: line,
+              });
+            }
+          }
+        }
+        columns = ['phone', 'email', 'raw_line'];
+        data = extracted.map(r => [r.phone || '', r.email || '', r.raw_line]);
+        if (!data.length) {
+          // fallback to one-column dataset so user can still analyze text
+          columns = ['text'];
+          data = lines.map(l => [l]);
+        }
+      } else {
+        const text = await file.text();
+        if (!text.trim()) throw new Error('Empty file');
+
+        const delimiter = ext === '.tsv' ? '\t' : undefined;
+        const parsed = Papa.parse<Record<string, any>>(text, {
+          header: true,
+          skipEmptyLines: true,
+          delimiter,
+          dynamicTyping: false,
+        });
+
+        if (parsed.errors?.length) {
+          throw new Error(parsed.errors[0]?.message || 'Failed to parse file');
+        }
+        const rows = (parsed.data || []).filter(Boolean);
+        columns = (parsed.meta.fields || []).filter(Boolean) as string[];
+        if (!columns.length || !rows.length) {
+          // Fallback: treat as 1-column text dataset
+          columns = ['text'];
+          data = text.split(/\r?\n/).filter(l => l.trim()).map(l => [l.trim()]);
+        } else {
+          data = rows.map(r => columns.map(c => String((r as any)[c] ?? '')));
+        }
+      }
 
       // Infer data types
       const dtypes: Record<string, string> = {};

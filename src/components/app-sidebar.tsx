@@ -30,6 +30,9 @@ import {
   CircleUser,
   Building2,
   FileUp,
+  HandCoins,
+  ClipboardList,
+  Scale,
 } from "lucide-react"
 import LogoText from "@/components/logo-text"; // Added import
 import LogoIcon from "@/components/logo-icon"; // Added import
@@ -83,6 +86,21 @@ export function AppSidebar({ className, collapsible = "offcanvas", ...props }: S
       title: "Voter Files",
       href: "/voter-file",
       icon: FileUp
+    },
+    {
+      title: "Fundraising",
+      href: "/fundraising",
+      icon: HandCoins
+    },
+    {
+      title: "Volunteer/Staff Management",
+      href: "/volunteer-staff",
+      icon: ClipboardList
+    },
+    {
+      title: "Compliance",
+      href: "/compliance",
+      icon: Scale
     },
     {
       title: "Team",

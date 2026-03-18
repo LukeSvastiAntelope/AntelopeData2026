@@ -26,7 +26,8 @@ import {
   Info,
   Brain,
   Rocket,
-  ListChecks
+  ListChecks,
+  MessageSquareText
 } from "lucide-react"
 import { AnonymityLevel } from '@/app/utils/interface'
 import { 
@@ -555,6 +556,20 @@ const EditSurveyPage = () => {
               <CardDescription>Enable distribution channels for this survey. Telegram uses private chat with your bot.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
+              <div className="flex items-center justify-between gap-3 rounded-lg border p-3 bg-muted/30">
+                <div>
+                  <div className="font-medium flex items-center gap-2">
+                    <MessageSquareText className="h-4 w-4" />
+                    Content messaging
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    Upload a CSV of emails/phones, generate short bespoke messages/polls with AI, and send via configured channels.
+                  </div>
+                </div>
+                <Button variant="outline" asChild>
+                  <a href={`/surveys/${surveyId}/content-messaging`}>Open</a>
+                </Button>
+              </div>
               <div className="flex items-center justify-between">
                 <div>
                   <div className="font-medium">Telegram</div>
