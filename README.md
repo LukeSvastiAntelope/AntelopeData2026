@@ -7,18 +7,69 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 - `scripts/` – Build/import scripts; `scripts/legacy/` for one-off maintenance scripts
 - `migrations/` – Database migrations
 
-## Getting Started
+## Setup
 
-First, run the development server:
+### Prerequisites
+
+- **Node.js** 18+
+- **MySQL** 8.x — create a database for the app (e.g. `marketmaker`)
+- **Yarn** (or use corepack: `corepack enable` then `yarn`)
+
+### 1. Install dependencies
 
 ```bash
-npm run dev
-# or
+yarn install
+```
+
+### 2. Environment variables
+
+Copy the example env file and set the required variables:
+
+```bash
+cp .env.example .env.local
+```
+
+Edit `.env.local`. **Required:**
+
+- **`AUTH_SECRET`** — NextAuth secret (e.g. `openssl rand -base64 32`)
+- **`JWT_SECRET_KEY`** — JWT secret (e.g. `openssl rand -base64 32`)
+- **`MYSQL_HOST`**, **`MYSQL_PORT`**, **`MYSQL_USER`**, **`MYSQL_PASSWORD`**, **`MYSQL_DATABASE`**
+- **`NEXT_PUBLIC_APP_URL`** / **`PUBLIC_BASE_URL`** — e.g. `http://localhost:3000`
+
+For predictions and agent features you’ll also need **`OPENAI_API_KEY`** and **`PINECONE_API_KEY`**. See `.env.example` for all optional vars (Stripe, Telegram, SendGrid, etc.).
+
+### 3. Database
+
+Create the MySQL database, then run migrations in date order from `migrations/`. The script loads `dotenv` from the project root (`.env` or `.env.local` if you symlink or copy vars into `.env` for the script):
+
+```bash
+node scripts/run-migration.js 20240614_create_cohorts_table.sql
+```
+
+Run other migration files in chronological order as needed.
+
+### 4. Run the dev server
+
+```bash
 yarn dev
-# or
-pnpm dev
-# or
-bun dev
+```
+
+Open [http://localhost:3000](http://localhost:3000) in your browser.
+
+### 5. Optional: scheduler
+
+With the app running, to register the daily bet analysis cron:
+
+```bash
+yarn run init-scheduler
+```
+
+## Getting Started
+
+After setup, run the development server:
+
+```bash
+yarn dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.

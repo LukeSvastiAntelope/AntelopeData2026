@@ -30,6 +30,23 @@ const ABBREV_TO_STATE_NAME: Record<string, string> = Object.fromEntries(
   Object.entries(STATE_NAME_TO_ABBREV).map(([name, abbrev]) => [abbrev, name])
 )
 
+// Approximate US state centroids [lng, lat] for plotting news events
+const STATE_CENTROIDS: Record<string, [number, number]> = {
+  AL: [-86.9, 32.3], AK: [-153.5, 64.2], AZ: [-111.6, 34.2], AR: [-92.4, 34.9],
+  CA: [-119.4, 36.8], CO: [-105.3, 38.9], CT: [-72.8, 41.6], DE: [-75.5, 38.9],
+  DC: [-77.0, 38.9], FL: [-81.5, 27.7], GA: [-83.6, 32.2], HI: [-155.6, 19.7],
+  ID: [-114.4, 44.4], IL: [-89.6, 40.0], IN: [-86.1, 40.3], IA: [-93.6, 41.9],
+  KS: [-98.4, 38.5], KY: [-84.3, 37.7], LA: [-91.9, 31.2], ME: [-69.4, 45.4],
+  MD: [-76.6, 38.9], MA: [-71.4, 42.1], MI: [-84.5, 43.3], MN: [-94.3, 46.0],
+  MS: [-89.6, 32.7], MO: [-91.8, 37.9], MT: [-110.4, 47.0], NE: [-99.5, 41.1],
+  NV: [-116.4, 39.3], NH: [-71.6, 43.2], NJ: [-74.6, 40.2], NM: [-105.3, 34.4],
+  NY: [-75.5, 43.0], NC: [-79.0, 35.5], ND: [-99.5, 47.5], OH: [-82.8, 40.4],
+  OK: [-97.5, 35.6], OR: [-120.6, 43.9], PA: [-77.2, 41.0], RI: [-71.6, 41.6],
+  SC: [-81.2, 33.9], SD: [-99.5, 44.4], TN: [-86.6, 35.8], TX: [-99.3, 31.4],
+  UT: [-111.6, 39.3], VT: [-72.6, 44.1], VA: [-78.4, 37.5], WA: [-120.7, 47.4],
+  WV: [-80.5, 38.6], WI: [-89.6, 44.3], WY: [-107.6, 43.0],
+}
+
 const US_STATES_GEOJSON_URL =
   'https://raw.githubusercontent.com/PublicaMundi/MappingAPI/master/data/geojson/us-states.json'
 
@@ -87,8 +104,21 @@ interface DistrictFeature {
   } | null
 }
 
+export type CustomLayerStyle = 'color' | 'saturation' | 'heatmap'
+export type CustomLayerGeoType = 'state' | 'district'
+export interface CustomLayerData {
+  type: CustomLayerGeoType
+  values: Record<string, number>
+  columnName: string
+  style: CustomLayerStyle
+  minVal?: number
+  maxVal?: number
+  aiSummary?: string
+}
+
 interface DashboardMapProps {
-  layers?: { political: boolean; districts: boolean; responses: boolean; voters: boolean }
+  layers?: { political: boolean; districts: boolean; responses: boolean; voters: boolean; fundraising?: boolean; customizable?: boolean }
+  customLayerData?: CustomLayerData | null
 }
 
 // ---------------------------------------------------------------------------
@@ -108,7 +138,47 @@ function pviToColor(pvi: number, alpha: number = 0.6): string {
 // Component
 // ---------------------------------------------------------------------------
 
-export default function DashboardMap({ layers }: DashboardMapProps) {
+function valueToColor(style: CustomLayerStyle, normalized: number): string {
+  const n = Math.max(0, Math.min(1, normalized))
+  if (style === 'saturation') {
+    const alpha = 0.25 + n * 0.7
+    return `rgba(99, 102, 241, ${alpha})`
+  }
+  if (style === 'heatmap') {
+    if (n <= 0.25) {
+      const t = n / 0.25
+      const r = Math.round(34 + t * (6 - 34))
+      const g = Math.round(197 + t * (182 - 197))
+      const b = Math.round(247 + t * (233 - 247))
+      return `rgba(${r},${g},${b},0.75)`
+    }
+    if (n <= 0.5) {
+      const t = (n - 0.25) / 0.25
+      const r = Math.round(6 + t * (255 - 6))
+      const g = Math.round(182 + t * (230 - 182))
+      const b = Math.round(233 + t * (26 - 233))
+      return `rgba(${r},${g},${b},0.75)`
+    }
+    if (n <= 0.75) {
+      const t = (n - 0.5) / 0.25
+      const r = 255
+      const g = Math.round(230 - t * (230 - 211))
+      const b = Math.round(26 + t * (47 - 26))
+      return `rgba(${r},${g},${b},0.75)`
+    }
+    const t = (n - 0.75) / 0.25
+    const r = 255
+    const g = Math.round(211 - t * (211 - 94))
+    const b = Math.round(47 + t * (60 - 47))
+    return `rgba(${r},${g},${b},0.85)`
+  }
+  const r = Math.round(59 + n * (239 - 59))
+  const g = Math.round(130 - n * 130)
+  const b = Math.round(246 - n * (82 - 246))
+  return `rgba(${r},${g},${b},0.65)`
+}
+
+export default function DashboardMap({ layers, customLayerData }: DashboardMapProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<any>(null)
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
@@ -120,7 +190,23 @@ export default function DashboardMap({ layers }: DashboardMapProps) {
   const [campaignNewsScopes, setCampaignNewsScopes] = useState<{ states: string[]; districts: string[] }>({ states: [], districts: [] })
   const [campaignNewsSummary, setCampaignNewsSummary] = useState<{
     unreadCount: number
-    items: Array<{ title: string; source: string; url: string; publishedAt: string | null }>
+    items: Array<{
+      title: string
+      source: string
+      url: string
+      publishedAt: string | null
+      state?: string | null
+      districtCode?: string | null
+    }>
+  } | null>(null)
+  const [newsEventPopup, setNewsEventPopup] = useState<{
+    lngLat: [number, number]
+    title: string
+    source: string
+    url: string
+    publishedAt: string | null
+    state: string | null
+    districtCode: string | null
   } | null>(null)
   const [showCampaignNewsNotice, setShowCampaignNewsNotice] = useState(true)
   const [hoveredStateName, setHoveredStateName] = useState<string | null>(null)
@@ -131,6 +217,10 @@ export default function DashboardMap({ layers }: DashboardMapProps) {
   const showDistrictsLayer = layers?.districts ?? false
   const showSurveyLayer = layers?.responses ?? true
   const showVoterLayer = layers?.voters ?? true
+  const showFundraisingLayer = layers?.fundraising ?? false
+  const showCustomizableLayer = layers?.customizable ?? false
+
+  const [fundraisingOverlays, setFundraisingOverlays] = useState<any[]>([])
 
   // -----------------------------------------------------------------------
   // Data fetching
@@ -165,6 +255,14 @@ export default function DashboardMap({ layers }: DashboardMapProps) {
       })
       .catch((e) => console.error('Failed to fetch campaign news scopes:', e))
   }, [])
+
+  useEffect(() => {
+    if (!showFundraisingLayer) return
+    fetch('/api/dashboard/fundraising/overlays')
+      .then(r => r.json())
+      .then(d => { if (d?.status) setFundraisingOverlays(Array.isArray(d.overlays) ? d.overlays : []) })
+      .catch(() => setFundraisingOverlays([]))
+  }, [showFundraisingLayer])
 
   // -----------------------------------------------------------------------
   // Map init — single effect, mirrors the working test-map page exactly
@@ -301,6 +399,18 @@ export default function DashboardMap({ layers }: DashboardMapProps) {
           paint: { 'line-color': '#f59e0b', 'line-width': 3, 'line-dasharray': [3, 2] },
         })
 
+        // ---- Custom overlay (uploaded data: color / saturation / heatmap) ----
+        map.addLayer({
+          id: 'custom-state-fills', type: 'fill', source: 'us-states',
+          layout: { visibility: 'none' },
+          paint: { 'fill-color': 'rgba(128, 128, 128, 0.1)', 'fill-opacity': 0.7 },
+        })
+        map.addLayer({
+          id: 'custom-district-fills', type: 'fill', source: 'us-districts',
+          layout: { visibility: 'none' },
+          paint: { 'fill-color': 'rgba(128, 128, 128, 0.1)', 'fill-opacity': 0.65 },
+        })
+
         // ---- Response points ----
         map.addSource('response-points', {
           type: 'geojson',
@@ -329,6 +439,37 @@ export default function DashboardMap({ layers }: DashboardMapProps) {
             'circle-color': '#6366f1', 'circle-opacity': 0.7,
             'circle-stroke-width': 1,
             'circle-stroke-color': isDark ? '#1e1b4b' : '#fff',
+          },
+        })
+
+        // ---- News event points (from news chat / campaign news with location + date) ----
+        map.addSource('news-event-points', {
+          type: 'geojson',
+          data: { type: 'FeatureCollection', features: [] },
+        })
+        map.addLayer({
+          id: 'news-event-points-circles', type: 'circle', source: 'news-event-points',
+          paint: {
+            'circle-radius': ['interpolate', ['linear'], ['zoom'], 3, 6, 6, 12, 10, 18],
+            'circle-color': '#f59e0b',
+            'circle-opacity': 0.9,
+            'circle-stroke-width': 2,
+            'circle-stroke-color': isDark ? '#1c1917' : '#fff',
+          },
+        })
+        map.addLayer({
+          id: 'news-event-points-symbols', type: 'symbol', source: 'news-event-points',
+          minzoom: 5,
+          layout: {
+            'text-field': ['get', 'dateShort'],
+            'text-size': 10,
+            'text-anchor': 'top',
+            'text-offset': [0, 0.8],
+          },
+          paint: {
+            'text-color': isDark ? '#fef3c7' : '#78350f',
+            'text-halo-color': isDark ? '#1c1917' : '#fff',
+            'text-halo-width': 1.5,
           },
         })
 
@@ -407,6 +548,25 @@ export default function DashboardMap({ layers }: DashboardMapProps) {
           }
         }
       })
+
+      // ---- News event point click: show popup with title, date, location ----
+      map.on('click', 'news-event-points-circles', (e: any) => {
+        if (e.features?.length && e.lngLat) {
+          const f = e.features[0]
+          const p = f.properties || {}
+          setNewsEventPopup({
+            lngLat: [e.lngLat.lng, e.lngLat.lat],
+            title: p.title || 'News',
+            source: p.source || '',
+            url: p.url || '',
+            publishedAt: p.publishedAt || null,
+            state: p.state || null,
+            districtCode: p.districtCode || null,
+          })
+        }
+      })
+      map.on('mouseenter', 'news-event-points-circles', () => { map.getCanvas().style.cursor = 'pointer' })
+      map.on('mouseleave', 'news-event-points-circles', () => { map.getCanvas().style.cursor = '' })
     }
 
     const timeout = setTimeout(() => {
@@ -432,6 +592,54 @@ export default function DashboardMap({ layers }: DashboardMapProps) {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // -----------------------------------------------------------------------
+  // Update news event points (from campaign news with state + date)
+  // -----------------------------------------------------------------------
+  useEffect(() => {
+    if (status !== 'ready' || !mapRef.current) return
+    const map = mapRef.current
+    const items = campaignNewsSummary?.items?.filter((i) => i.state) || []
+    if (items.length === 0) {
+      try {
+        const src = map.getSource('news-event-points')
+        if (src) (src as any).setData({ type: 'FeatureCollection', features: [] })
+      } catch {}
+      return
+    }
+    const stateCount: Record<string, number> = {}
+    const features = items.map((item) => {
+      const state = (item.state || '').toUpperCase()
+      const centroid = STATE_CENTROIDS[state]
+      if (!centroid) return null
+      const idx = stateCount[state] = (stateCount[state] || 0) + 1
+      const jitter = (idx - 1) * 0.15
+      const [lng, lat] = [centroid[0] + jitter * 0.5, centroid[1] + jitter * 0.3]
+      const publishedAt = item.publishedAt ? new Date(item.publishedAt) : null
+      const dateShort = publishedAt
+        ? publishedAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: publishedAt.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined })
+        : ''
+      return {
+        type: 'Feature' as const,
+        geometry: { type: 'Point' as const, coordinates: [lng, lat] },
+        properties: {
+          title: item.title,
+          source: item.source || '',
+          url: item.url || '',
+          publishedAt: item.publishedAt || null,
+          state: item.state || null,
+          districtCode: item.districtCode || null,
+          dateShort,
+        },
+      }
+    }).filter(Boolean)
+    try {
+      const src = map.getSource('news-event-points')
+      if (src) (src as any).setData({ type: 'FeatureCollection', features })
+    } catch (e) {
+      console.warn('Failed to set news event points:', e)
+    }
+  }, [status, campaignNewsSummary])
 
   // -----------------------------------------------------------------------
   // Update survey data
@@ -576,6 +784,53 @@ export default function DashboardMap({ layers }: DashboardMapProps) {
   }, [showDistrictsLayer, status])
 
   // -----------------------------------------------------------------------
+  // Custom overlay (uploaded data): color / saturation / heatmap by state or district
+  // -----------------------------------------------------------------------
+  useEffect(() => {
+    if (status !== 'ready' || !mapRef.current) return
+    const map = mapRef.current
+    const showCustom = showCustomizableLayer && customLayerData && Object.keys(customLayerData.values).length > 0
+    const minVal = customLayerData?.minVal ?? 0
+    const maxVal = customLayerData?.maxVal ?? 1
+    const range = Math.max(1e-9, maxVal - minVal)
+    const style = customLayerData?.style ?? 'color'
+
+    const buildExpr = (geoProperty: 'name' | 'district_code') => {
+      const keys = Object.keys(customLayerData!.values)
+      const expr: any[] = ['match', ['get', geoProperty]]
+      for (const key of keys) {
+        const v = customLayerData!.values[key]
+        const normalized = (v - minVal) / range
+        expr.push(key, valueToColor(style, normalized))
+      }
+      expr.push('rgba(128, 128, 128, 0.08)')
+      return expr
+    }
+
+    try {
+      if (showCustom && customLayerData!.type === 'state') {
+        map.setPaintProperty('custom-state-fills', 'fill-color', buildExpr('name'))
+        map.setLayoutProperty('custom-state-fills', 'visibility', 'visible')
+      } else {
+        map.setLayoutProperty('custom-state-fills', 'visibility', 'none')
+      }
+    } catch (e) {
+      console.warn('Custom state fills:', e)
+    }
+
+    try {
+      if (showCustom && customLayerData!.type === 'district') {
+        map.setPaintProperty('custom-district-fills', 'fill-color', buildExpr('district_code'))
+        map.setLayoutProperty('custom-district-fills', 'visibility', 'visible')
+      } else {
+        map.setLayoutProperty('custom-district-fills', 'visibility', 'none')
+      }
+    } catch (e) {
+      console.warn('Custom district fills:', e)
+    }
+  }, [status, showCustomizableLayer, customLayerData])
+
+  // -----------------------------------------------------------------------
   // "My district" / "My state" highlight based on org campaign context
   // -----------------------------------------------------------------------
   useEffect(() => {
@@ -662,6 +917,39 @@ export default function DashboardMap({ layers }: DashboardMapProps) {
     <div style={{ position: 'relative', width: '100%', height: '100%' }}>
       <div ref={containerRef} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} />
 
+      {showFundraisingLayer && fundraisingOverlays.length > 0 && (
+        <div style={{ position: 'absolute', bottom: 12, left: 12, zIndex: 11 }} className="max-w-[360px]">
+          <div className="rounded-lg border border-border/50 bg-background/90 backdrop-blur-md shadow-lg p-3">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              Fundraising insights
+            </p>
+            <div className="mt-2 space-y-2">
+              {fundraisingOverlays.filter((o:any)=>o.status==='enabled').slice(0, 2).map((o: any) => (
+                <div key={o.id} className="text-xs">
+                  <div className="font-medium text-foreground truncate" title={o.report?.title || 'Report'}>
+                    {o.report?.title || 'Report'}
+                  </div>
+                  {Array.isArray(o.enabledMetrics) && o.enabledMetrics.length > 0 ? (
+                    <div className="text-muted-foreground">
+                      Showing: {o.enabledMetrics.join(', ')}
+                    </div>
+                  ) : (
+                    <div className="text-muted-foreground">
+                      {o.report?.summary ? String(o.report.summary).slice(0, 160) : 'No summary yet.'}
+                    </div>
+                  )}
+                </div>
+              ))}
+              {fundraisingOverlays.filter((o:any)=>o.status==='enabled').length > 2 && (
+                <div className="text-[11px] text-muted-foreground">
+                  +{fundraisingOverlays.filter((o:any)=>o.status==='enabled').length - 2} more pinned
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {status === 'loading' && (
         <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10 }}
           className="bg-background/80 backdrop-blur-sm"
@@ -689,6 +977,54 @@ export default function DashboardMap({ layers }: DashboardMapProps) {
           <Globe className="h-3 w-3" />
         </Button>
       </div>
+
+      {/* News event popup (click a news marker on the map) */}
+      {newsEventPopup && (
+        <div
+          style={{ position: 'absolute', top: 12, left: 12, zIndex: 12 }}
+          className="max-w-[320px] rounded-lg border border-amber-300/50 bg-background/95 backdrop-blur-md shadow-lg p-3"
+        >
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-semibold text-amber-600 dark:text-amber-400 mb-1">
+                {newsEventPopup.state}
+                {newsEventPopup.districtCode ? ` · ${newsEventPopup.districtCode}` : ''}
+              </p>
+              <p className="text-sm font-medium leading-tight line-clamp-2" title={newsEventPopup.title}>
+                {newsEventPopup.title}
+              </p>
+              {newsEventPopup.publishedAt && (
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  {new Date(newsEventPopup.publishedAt).toLocaleDateString(undefined, {
+                    month: 'short', day: 'numeric', year: 'numeric',
+                  })}
+                </p>
+              )}
+              <div className="flex items-center gap-2 mt-2">
+                {newsEventPopup.url && (
+                  <a
+                    href={newsEventPopup.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-xs text-primary hover:underline"
+                  >
+                    Open article
+                  </a>
+                )}
+              </div>
+            </div>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-6 w-6 p-0 shrink-0"
+              onClick={() => setNewsEventPopup(null)}
+              aria-label="Close"
+            >
+              ×
+            </Button>
+          </div>
+        </div>
+      )}
 
       {showCampaignNewsNotice && (campaignNewsSummary?.unreadCount || 0) > 0 && (
         <div

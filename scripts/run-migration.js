@@ -3,6 +3,8 @@
 const mysql = require('mysql2/promise');
 const fs = require('fs');
 const path = require('path');
+// Load .env.local first (Next.js convention), then .env so local overrides work
+require('dotenv').config({ path: '.env.local' });
 require('dotenv').config();
 
 async function runMigration() {

@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
-import { Upload, MessageCircle, Code, PlayCircle, Plus } from 'lucide-react';
+import { Upload, MessageCircle, Code, PlayCircle, Plus, Download } from 'lucide-react';
 import { FileUpload } from './components/FileUpload';
 import { ConversationView } from './components/ConversationView';
 import { ChatInput } from './components/ChatInput';
@@ -52,6 +52,7 @@ export default function PythonAnalysisPage() {
   const [messages, setMessages] = useState<AnalysisMessage[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const processedStepsRef = useRef<Set<string>>(new Set());
   const lastStatusRef = useRef<string>('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -90,11 +91,83 @@ export default function PythonAnalysisPage() {
       setMessages([{
         id: 'welcome',
         type: 'system',
-        content: '🐍 **Python Analysis Environment Ready**\n\nI can help you analyze data using Python! Upload a CSV file or ask me questions about data analysis.',
+        content: '🐍 **Python Analysis Environment Ready**\n\nUpload a dataset (CSV/TSV/TXT/Excel/Word .docx) then ask segmentation questions like:\n- "Isolate women aged 35+ without college degrees"\n- "Filter to ZIPs in my district"\n\nAfter you transform/filter `df`, use Export to download the current dataframe.',
         timestamp: new Date()
       }]);
     }
   }, [pyodide, messages.length]);
+
+  const downloadFile = (filename: string, content: string, mime: string) => {
+    const blob = new Blob([content], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleExportCsv = async () => {
+    if (!pyodide) return;
+    setExporting(true);
+    try {
+      const csv = pyodide.runPython(`
+import pandas as pd
+__antelope_csv = ""
+try:
+  __antelope_csv = df.to_csv(index=False)
+except Exception as e:
+  __antelope_csv = f"__ERROR__:{e}"
+__antelope_csv
+`);
+      const out = String(csv || '');
+      if (out.startsWith('__ERROR__:')) throw new Error(out.replace('__ERROR__:', ''));
+      downloadFile('fundraising_export.csv', out, 'text/csv;charset=utf-8');
+    } catch (e: any) {
+      setMessages(prev => [...prev, {
+        id: `export-error-${Date.now()}`,
+        type: 'error',
+        content: `❌ **Export failed**: ${e?.message || e}`,
+        timestamp: new Date()
+      }]);
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const handleExportDoc = async () => {
+    if (!pyodide) return;
+    setExporting(true);
+    try {
+      const csv = pyodide.runPython(`
+import pandas as pd
+__antelope_csv = ""
+try:
+  __antelope_csv = df.to_csv(index=False)
+except Exception as e:
+  __antelope_csv = f"__ERROR__:{e}"
+__antelope_csv
+`);
+      const out = String(csv || '');
+      if (out.startsWith('__ERROR__:')) throw new Error(out.replace('__ERROR__:', ''));
+      const html = `<!doctype html><html><head><meta charset="utf-8"></head><body><pre>${out
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')}</pre></body></html>`;
+      downloadFile('fundraising_export.doc', html, 'application/msword');
+    } catch (e: any) {
+      setMessages(prev => [...prev, {
+        id: `export-error-${Date.now()}`,
+        type: 'error',
+        content: `❌ **Export failed**: ${e?.message || e}`,
+        timestamp: new Date()
+      }]);
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const handleFileUpload = async (file: File) => {
     // Add file upload message with just metadata, no text content
@@ -729,6 +802,18 @@ export default function PythonAnalysisPage() {
                 )}
               </div>
               <div className="flex items-center gap-2">
+                {currentDataset && (
+                  <>
+                    <Button size="sm" variant="outline" onClick={handleExportCsv} disabled={!pyodide || exporting}>
+                      <Download className="h-4 w-4 mr-2" />
+                      Export CSV
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={handleExportDoc} disabled={!pyodide || exporting}>
+                      <Download className="h-4 w-4 mr-2" />
+                      Export Word
+                    </Button>
+                  </>
+                )}
                 {!currentDataset && (
                   <Button
                     variant="ghost"

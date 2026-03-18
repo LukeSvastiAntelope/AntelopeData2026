@@ -3,7 +3,7 @@
 import { Button } from "@/components/ui/button"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Rocket, FileText } from "lucide-react"
+import { Rocket, FileText, MessageSquareText, PhoneCall } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
 import Link from "next/link"
@@ -16,6 +16,7 @@ export default function FrontLanding() {
   const [uploadFile, setUploadFile] = useState<File | null>(null)
   const [uploadLoading, setUploadLoading] = useState(false)
   const [uploadPreview, setUploadPreview] = useState<any>(null)
+  const [salesChatOpen, setSalesChatOpen] = useState(false)
 
   const handleSignUp = () => {
     router.push("/register")
@@ -72,19 +73,46 @@ export default function FrontLanding() {
       <div className="mx-auto rounded-lg bg-card text-card-foreground shadow-lg">
         {/* Header */}
         <div className="px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center">
+          {/* Top nav row (must be ABOVE logo) */}
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
               <SidebarTrigger className="-ml-0.5 h-5 w-5 text-muted-foreground hover:text-foreground" />
-              <div className="h-4 border-l border-border mx-4" />
             </div>
-            <div className="absolute left-1/2 transform -translate-x-1/2">
-              <LogoText 
+
+            <nav className="flex-1 overflow-x-auto whitespace-nowrap">
+              <div className="flex items-center justify-center gap-5 px-2 text-sm min-w-max">
+                <Link href="/about-us" className="text-muted-foreground hover:text-foreground transition-colors">
+                  About Us/Blog
+                </Link>
+                <Link href="/solutions" className="text-muted-foreground hover:text-foreground transition-colors">
+                  Solutions/Pricing
+                </Link>
+                <Link href="/resources" className="text-muted-foreground hover:text-foreground transition-colors">
+                  Resources
+                </Link>
+                <Link href="/who-we-serve" className="text-muted-foreground hover:text-foreground transition-colors">
+                  Who We Serve
+                </Link>
+                <Link href="/features-demo" className="text-muted-foreground hover:text-foreground transition-colors">
+                  Features+Demo
+                </Link>
+              </div>
+            </nav>
+
+            <Link href="/login" className="text-sm font-semibold text-primary hover:underline shrink-0">
+              Login
+            </Link>
+          </div>
+
+          {/* Logo row (explicitly below nav) */}
+          <div className="mt-4 flex items-center justify-center">
+            <Link href="/" className="flex items-center">
+              <LogoText
                 className="text-zinc-900 dark:text-zinc-100"
-                width={120} 
-                height={30} 
+                width={140}
+                height={34}
               />
-            </div>
-            <Link href="/login" className="text-sm font-medium text-primary hover:underline">Login</Link>
+            </Link>
           </div>
         </div>
 
@@ -313,6 +341,49 @@ export default function FrontLanding() {
             </div>
           </section>
         </div>
+      </div>
+
+      {/* Bottom-right sales chat (stub) */}
+      <div className="fixed bottom-4 right-4 z-50">
+        {salesChatOpen && (
+          <div className="mb-2 w-[340px] max-w-[92vw] rounded-lg border border-border/60 bg-background/95 backdrop-blur shadow-lg overflow-hidden">
+            <div className="px-3 py-2 border-b border-border/60 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <MessageSquareText className="h-4 w-4" />
+                <div className="text-sm font-medium">Antelope Help (preview)</div>
+              </div>
+              <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => setSalesChatOpen(false)}>
+                Close
+              </Button>
+            </div>
+            <div className="p-3 text-sm space-y-2 max-h-[260px] overflow-auto">
+              <div className="text-muted-foreground">
+                This widget will route messages to our team for onboarding and sales support.
+              </div>
+              <div className="rounded-md bg-muted/40 p-2">
+                <div className="text-xs text-muted-foreground">Examples:</div>
+                <ul className="text-xs mt-1 space-y-1">
+                  <li>- “Can you show me a demo for a city council race?”</li>
+                  <li>- “What does pricing look like for a small campaign?”</li>
+                  <li>- “Can we import NGP VAN data?”</li>
+                </ul>
+              </div>
+            </div>
+            <div className="p-3 border-t border-border/60">
+              <textarea
+                disabled
+                placeholder="Stuck? Ask for a sales call here! (coming soon)"
+                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-muted-foreground resize-none"
+                rows={2}
+              />
+            </div>
+          </div>
+        )}
+
+        <Button onClick={() => setSalesChatOpen(v => !v)} className="rounded-full shadow-lg">
+          <PhoneCall className="h-4 w-4 mr-2" />
+          Stuck? Ask for a sales call here!
+        </Button>
       </div>
     </div>
     </>

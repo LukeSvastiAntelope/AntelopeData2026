@@ -3,8 +3,12 @@
 import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { Button } from "@/components/ui/button";
+import { MessageSquareText, PhoneCall } from "lucide-react";
 
 export default function Home() {
+  const [salesChatOpen, setSalesChatOpen] = useState(false);
+
   const faqData = [
     {
       question: "What is Antelope Politico?",
@@ -91,6 +95,34 @@ Whether you're running a local school board race or a statewide campaign, Antelo
 
   return (
     <main className="flex flex-col items-center justify-start min-h-screen bg-mainGradient bg-cover bg-center bg-no-repeat m-0 pt-0 px-4 md:px-8 text-white font-sans">
+
+      {/* Top nav (must be ABOVE logo) */}
+      <div className="w-full max-w-screen-lg mx-auto pt-4">
+        <div className="flex items-center justify-between gap-3">
+          <nav className="flex-1 overflow-x-auto whitespace-nowrap">
+            <div className="flex items-center justify-center gap-5 px-2 text-sm min-w-max">
+              <Link href="/about-us" className="text-white/80 hover:text-white transition-colors">
+                About Us/Blog
+              </Link>
+              <Link href="/solutions" className="text-white/80 hover:text-white transition-colors">
+                Solutions/Pricing
+              </Link>
+              <Link href="/resources" className="text-white/80 hover:text-white transition-colors">
+                Resources
+              </Link>
+              <Link href="/who-we-serve" className="text-white/80 hover:text-white transition-colors">
+                Who We Serve
+              </Link>
+              <Link href="/features-demo" className="text-white/80 hover:text-white transition-colors">
+                Features+Demo
+              </Link>
+            </div>
+          </nav>
+          <Link href="/login" className="shrink-0 text-sm font-semibold text-white hover:underline">
+            Login
+          </Link>
+        </div>
+      </div>
 
       <div className="announcement text-sm">
         Want to join the Antelope team? Connect with us on <a href="https://t.me/+F5F2ah0bBzU0ZDAx" target="_blank" className="underline telegram-inline-icon">Telegram</a>
@@ -214,6 +246,49 @@ Whether you're running a local school board race or a statewide campaign, Antelo
           ))}
         </div>
       </section>
+
+      {/* Bottom-right sales chat (stub) */}
+      <div className="fixed bottom-4 right-4 z-50">
+        {salesChatOpen && (
+          <div className="mb-2 w-[340px] max-w-[92vw] rounded-lg border border-white/15 bg-black/40 backdrop-blur shadow-lg overflow-hidden">
+            <div className="px-3 py-2 border-b border-white/10 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <MessageSquareText className="h-4 w-4" />
+                <div className="text-sm font-medium">Antelope Help (preview)</div>
+              </div>
+              <Button size="sm" variant="ghost" className="h-7 px-2 text-white" onClick={() => setSalesChatOpen(false)}>
+                Close
+              </Button>
+            </div>
+            <div className="p-3 text-sm space-y-2 max-h-[260px] overflow-auto">
+              <div className="text-white/80">
+                This widget will route messages to our team for onboarding and sales support.
+              </div>
+              <div className="rounded-md bg-white/5 p-2">
+                <div className="text-xs text-white/70">Examples:</div>
+                <ul className="text-xs mt-1 space-y-1 text-white/80">
+                  <li>- “Can you show me a demo for a city council race?”</li>
+                  <li>- “What does pricing look like for a small campaign?”</li>
+                  <li>- “Can we import NGP VAN data?”</li>
+                </ul>
+              </div>
+            </div>
+            <div className="p-3 border-t border-white/10">
+              <textarea
+                disabled
+                placeholder="Stuck? Ask for a sales call here! (coming soon)"
+                className="w-full rounded-md border border-white/15 bg-black/20 px-3 py-2 text-sm text-white/70 resize-none"
+                rows={2}
+              />
+            </div>
+          </div>
+        )}
+
+        <Button onClick={() => setSalesChatOpen(v => !v)} className="rounded-full shadow-lg">
+          <PhoneCall className="h-4 w-4 mr-2" />
+          Stuck? Ask for a sales call here!
+        </Button>
+      </div>
     </main>
   );
 }

@@ -53,11 +53,11 @@ export function FileUpload({ onFileUploaded, disabled }: FileUploadProps) {
 
     try {
       // Validate file type
-      const validTypes = ['.csv', '.xlsx', '.xls'];
+      const validTypes = ['.csv', '.tsv', '.txt', '.xlsx', '.xls', '.docx'];
       const fileExtension = '.' + file.name.split('.').pop()?.toLowerCase();
       
       if (!validTypes.includes(fileExtension)) {
-        throw new Error('Please upload a CSV or Excel file (.csv, .xlsx, .xls)');
+        throw new Error('Please upload CSV/TSV/TXT, Excel (.xlsx, .xls), or Word (.docx)');
       }
 
       // Validate file size (50MB limit)
@@ -144,7 +144,7 @@ export function FileUpload({ onFileUploaded, disabled }: FileUploadProps) {
                 }
               </p>
               <p className="text-xs text-gray-500 mt-2">
-                Supports CSV, Excel (.xlsx, .xls) • Max 50MB
+                Supports CSV/TSV/TXT, Excel (.xlsx, .xls), Word (.docx) • Max 50MB
               </p>
             </>
           )}
@@ -153,7 +153,7 @@ export function FileUpload({ onFileUploaded, disabled }: FileUploadProps) {
         <input
           id="file-input"
           type="file"
-          accept=".csv,.xlsx,.xls"
+          accept=".csv,.tsv,.txt,.xlsx,.xls,.docx"
           onChange={handleFileSelect}
           className="hidden"
           disabled={disabled || uploading}

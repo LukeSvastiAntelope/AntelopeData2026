@@ -7,7 +7,7 @@
       "build": "NODE_OPTIONS=\"--max-old-space-size=4096\" next build",
       "start": "next start",
       "lint": "next lint",
-      "postinstall": "cp node_modules/maplibre-gl/dist/maplibre-gl.css public/maplibre-gl.css 2>/dev/null || true",
+      "postinstall": "node -e \"const fs=require('fs');const p='node_modules/maplibre-gl/dist/maplibre-gl.css';const o='public/maplibre-gl.css';try{fs.copyFileSync(p,o);console.log('maplibre-gl.css copied');}catch(e){}\"",
       "init-scheduler": "node scripts/init-scheduler.js",
       "cron:surveys": "node scripts/close-expired-surveys.js"
    },
@@ -78,6 +78,7 @@
       "maplibre-gl": "^5.18.0",
       "motion-dom": "^12.19.0",
       "multer": "^2.0.1",
+      "mammoth": "^1.8.0",
       "mysql2": "^3.14.2",
       "next": "^15.3.6",
       "next-auth": "^5.0.0-beta.25",

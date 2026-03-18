@@ -49,7 +49,7 @@ export function ChatInput({
   const handleFileSelect = (type: 'dataset' | 'codebook') => {
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = type === 'dataset' ? '.csv,.xlsx,.xls' : '.xlsx,.xls,.csv';
+    input.accept = type === 'dataset' ? '.csv,.tsv,.txt,.xlsx,.xls,.docx' : '.xlsx,.xls,.csv';
     input.onchange = (e) => {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (file && onFileUpload) {

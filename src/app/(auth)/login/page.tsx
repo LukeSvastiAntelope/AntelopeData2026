@@ -8,7 +8,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2 } from "lucide-react";
+import { Loader2, Linkedin, PhoneCall, MessageSquareText } from "lucide-react";
 import { signIn } from "next-auth/react";
 import { useSession } from "next-auth/react";
 
@@ -19,6 +19,7 @@ const LoginPage = () => {
     });
     const [isLoading, setIsLoading] = useState(false);
     const [isResetting, setIsResetting] = useState(false);
+    const [salesChatOpen, setSalesChatOpen] = useState(false);
     const { data: session, status } = useSession();
 
     const router = useRouter();
@@ -54,7 +55,15 @@ const LoginPage = () => {
 
             if (result?.error) {
                 console.error('Client signIn error:', result.error);
-                toast.error(result.error === 'CredentialsSignin' ? 'Invalid credentials.' : result.error);
+                if (result.error === 'CredentialsSignin') {
+                    toast.error('Invalid email or password.');
+                } else if (result.error === 'EmailNotVerified') {
+                    toast.error('Your account is not verified yet. Please check your email for the confirmation link.');
+                } else if (result.error === 'DatabaseError') {
+                    toast.error('Service temporarily unavailable. Please try again in a moment.');
+                } else {
+                    toast.error(result.error);
+                }
                 return;
             }
 
@@ -111,6 +120,36 @@ const LoginPage = () => {
 
     return (
         <div className="container relative min-h-screen flex-col items-center justify-center grid lg:max-w-none lg:grid-cols-1 lg:px-0">
+            {/* Top nav (BEFORE logo + Welcome back) */}
+            <div className="absolute top-0 left-0 right-0 px-6 py-4">
+                <div className="mx-auto max-w-5xl">
+                    <div className="flex items-center justify-between gap-3">
+                        <nav className="flex-1 overflow-x-auto whitespace-nowrap">
+                            <div className="flex items-center gap-3 text-[17px] min-w-max">
+                                <Link href="/about-us" className="text-foreground/90 hover:text-foreground transition-colors border-2 border-black/70 dark:border-white/30 rounded-md px-2.5 py-1 bg-white/70 dark:bg-white/5 hover:bg-white dark:hover:bg-white/10 font-semibold shadow-sm">
+                                    About Us/Blog
+                                </Link>
+                                <Link href="/solutions" className="text-foreground/90 hover:text-foreground transition-colors border-2 border-black/70 dark:border-white/30 rounded-md px-2.5 py-1 bg-white/70 dark:bg-white/5 hover:bg-white dark:hover:bg-white/10 font-semibold shadow-sm">
+                                    Solutions/Pricing
+                                </Link>
+                                <Link href="/resources" className="text-foreground/90 hover:text-foreground transition-colors border-2 border-black/70 dark:border-white/30 rounded-md px-2.5 py-1 bg-white/70 dark:bg-white/5 hover:bg-white dark:hover:bg-white/10 font-semibold shadow-sm">
+                                    Resources
+                                </Link>
+                                <Link href="/who-we-serve" className="text-foreground/90 hover:text-foreground transition-colors border-2 border-black/70 dark:border-white/30 rounded-md px-2.5 py-1 bg-white/70 dark:bg-white/5 hover:bg-white dark:hover:bg-white/10 font-semibold shadow-sm">
+                                    Who We Serve
+                                </Link>
+                                <Link href="/features-demo" className="text-foreground/90 hover:text-foreground transition-colors border-2 border-black/70 dark:border-white/30 rounded-md px-2.5 py-1 bg-white/70 dark:bg-white/5 hover:bg-white dark:hover:bg-white/10 font-semibold shadow-sm">
+                                    Features+Demo
+                                </Link>
+                            </div>
+                        </nav>
+                        <Link href="/register" className="shrink-0 text-sm font-semibold text-primary hover:underline">
+                            Sign up
+                        </Link>
+                    </div>
+                </div>
+            </div>
+
             <div className="flex flex-col items-center space-y-6">
                 <img 
                     src="/assets/images/logo.svg"
@@ -238,8 +277,76 @@ const LoginPage = () => {
                                 Sign up
                             </Link>
                         </div>
+
+                        {/* OAuth + LinkedIn (requested) */}
+                        <div className="w-full space-y-2">
+                            <Button
+                                variant="outline"
+                                type="button"
+                                className="w-full"
+                                disabled={isLoading}
+                                onClick={async () => {
+                                    try {
+                                        await signIn('google', { callbackUrl: '/surveys' });
+                                    } catch {
+                                        toast.error('OAuth is not configured yet.');
+                                    }
+                                }}
+                            >
+                                Continue with OAuth
+                            </Button>
+                            <Button variant="outline" asChild className="w-full">
+                                <a href="https://www.linkedin.com/company/108247205" target="_blank" rel="noreferrer">
+                                    <Linkedin className="mr-2 h-4 w-4" />
+                                    LinkedIn
+                                </a>
+                            </Button>
+                        </div>
                     </CardFooter>
                 </Card>
+            </div>
+
+            {/* Bottom-right sales chat (stub) */}
+            <div className="fixed bottom-4 right-4 z-50">
+                {salesChatOpen && (
+                    <div className="mb-2 w-[340px] max-w-[92vw] rounded-lg border border-border/60 bg-background/95 backdrop-blur shadow-lg overflow-hidden">
+                        <div className="px-3 py-2 border-b border-border/60 flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <MessageSquareText className="h-4 w-4" />
+                                <div className="text-sm font-medium">Antelope Help (preview)</div>
+                            </div>
+                            <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => setSalesChatOpen(false)}>
+                                Close
+                            </Button>
+                        </div>
+                        <div className="p-3 text-sm space-y-2 max-h-[260px] overflow-auto">
+                            <div className="text-muted-foreground">
+                                This widget will route messages to our team for onboarding and sales support.
+                            </div>
+                            <div className="rounded-md bg-muted/40 p-2">
+                                <div className="text-xs text-muted-foreground">Examples:</div>
+                                <ul className="text-xs mt-1 space-y-1">
+                                    <li>- “Can you show me a demo for a small campaign?”</li>
+                                    <li>- “What does pricing look like?”</li>
+                                    <li>- “Can we import NGP VAN data?”</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div className="p-3 border-t border-border/60">
+                            <textarea
+                                disabled
+                                placeholder="Stuck? Ask for a sales call here! (coming soon)"
+                                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-muted-foreground resize-none"
+                                rows={2}
+                            />
+                        </div>
+                    </div>
+                )}
+
+                <Button onClick={() => setSalesChatOpen(v => !v)} className="rounded-full shadow-lg">
+                    <PhoneCall className="h-4 w-4 mr-2" />
+                    Stuck? Ask for a sales call here!
+                </Button>
             </div>
         </div>
     );
