@@ -5,6 +5,8 @@ import { useTheme } from 'next-themes'
 import { Button } from '@/components/ui/button'
 import { Users, FileText, Loader2, Globe } from 'lucide-react'
 import { PartyIcon, partyColor } from '@/components/party-icons'
+import type { GeofencePolygon, CanvassAddress } from '@/lib/geofencing'
+import { normalizeRing } from '@/lib/geofencing'
 
 // ---------------------------------------------------------------------------
 // State name <-> abbreviation lookups
@@ -116,9 +118,19 @@ export interface CustomLayerData {
   aiSummary?: string
 }
 
+export interface GeofencingMapProps {
+  fences: GeofencePolygon[]
+  draftVertices: [number, number][]
+  drawMode: null | 'include' | 'exclude'
+  addresses: CanvassAddress[]
+  onDrawVertex?: (lng: number, lat: number) => void
+}
+
 interface DashboardMapProps {
-  layers?: { political: boolean; districts: boolean; responses: boolean; voters: boolean; fundraising?: boolean; customizable?: boolean }
+  layers?: { political: boolean; districts: boolean; responses: boolean; voters: boolean; fundraising?: boolean; customizable?: boolean; geofencing?: boolean }
   customLayerData?: CustomLayerData | null
+  geofencing?: GeofencingMapProps | null
+  onDistrictSelect?: (district: { districtCode: string; state: string; districtNumber: number }) => void
 }
 
 // ---------------------------------------------------------------------------
@@ -178,7 +190,7 @@ function valueToColor(style: CustomLayerStyle, normalized: number): string {
   return `rgba(${r},${g},${b},0.65)`
 }
 
-export default function DashboardMap({ layers, customLayerData }: DashboardMapProps) {
+export default function DashboardMap({ layers, customLayerData, geofencing, onDistrictSelect }: DashboardMapProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<any>(null)
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
@@ -219,8 +231,11 @@ export default function DashboardMap({ layers, customLayerData }: DashboardMapPr
   const showVoterLayer = layers?.voters ?? true
   const showFundraisingLayer = layers?.fundraising ?? false
   const showCustomizableLayer = layers?.customizable ?? false
+  const showGeofencingLayer = layers?.geofencing ?? false
 
   const [fundraisingOverlays, setFundraisingOverlays] = useState<any[]>([])
+  const geofenceVertexRef = useRef<((lng: number, lat: number) => void) | undefined>(undefined)
+  geofenceVertexRef.current = geofencing?.onDrawVertex
 
   // -----------------------------------------------------------------------
   // Data fetching
@@ -473,6 +488,100 @@ export default function DashboardMap({ layers, customLayerData }: DashboardMapPr
           },
         })
 
+        // ---- Geofencing (canvass zones) + address pins ----
+        map.addSource('geofence-polygons', {
+          type: 'geojson',
+          data: { type: 'FeatureCollection', features: [] },
+        })
+        map.addLayer({
+          id: 'geofence-fills',
+          type: 'fill',
+          source: 'geofence-polygons',
+          filter: ['==', ['get', 'mode'], 'include'],
+          layout: { visibility: 'none' },
+          paint: {
+            'fill-color': 'rgba(34, 197, 94, 0.25)',
+            'fill-outline-color': 'rgba(22, 163, 74, 0.9)',
+          },
+        })
+        map.addLayer({
+          id: 'geofence-fills-exclude',
+          type: 'fill',
+          source: 'geofence-polygons',
+          filter: ['==', ['get', 'mode'], 'exclude'],
+          layout: { visibility: 'none' },
+          paint: {
+            'fill-color': 'rgba(239, 68, 68, 0.22)',
+            'fill-outline-color': 'rgba(220, 38, 38, 0.95)',
+          },
+        })
+        map.addLayer({
+          id: 'geofence-lines',
+          type: 'line',
+          source: 'geofence-polygons',
+          layout: { visibility: 'none' },
+          paint: {
+            'line-color': ['match', ['get', 'mode'], 'include', '#16a34a', 'exclude', '#dc2626', '#64748b'],
+            'line-width': 2,
+          },
+        })
+        map.addSource('geofence-draft-line', {
+          type: 'geojson',
+          data: { type: 'FeatureCollection', features: [] },
+        })
+        map.addLayer({
+          id: 'geofence-draft-line-layer',
+          type: 'line',
+          source: 'geofence-draft-line',
+          layout: { visibility: 'none' },
+          paint: {
+            'line-color': '#0ea5e9',
+            'line-width': 2,
+            'line-dasharray': [2, 2],
+          },
+        })
+        map.addSource('geofence-draft-points', {
+          type: 'geojson',
+          data: { type: 'FeatureCollection', features: [] },
+        })
+        map.addLayer({
+          id: 'geofence-draft-points-layer',
+          type: 'circle',
+          source: 'geofence-draft-points',
+          layout: { visibility: 'none' },
+          paint: {
+            'circle-radius': 5,
+            'circle-color': '#0ea5e9',
+            'circle-stroke-width': 2,
+            'circle-stroke-color': isDark ? '#0f172a' : '#fff',
+          },
+        })
+        map.addSource('canvass-address-points', {
+          type: 'geojson',
+          data: { type: 'FeatureCollection', features: [] },
+        })
+        map.addLayer({
+          id: 'canvass-address-circles',
+          type: 'circle',
+          source: 'canvass-address-points',
+          layout: { visibility: 'none' },
+          paint: {
+            'circle-radius': ['interpolate', ['linear'], ['zoom'], 10, 3, 16, 6],
+            'circle-color': [
+              'match',
+              ['get', 'status'],
+              'canvass',
+              '#22c55e',
+              'skip',
+              '#ef4444',
+              '#94a3b8',
+            ],
+            'circle-opacity': 0.92,
+            'circle-stroke-width': 1,
+            'circle-stroke-color': isDark ? '#0f172a' : '#fff',
+          },
+        })
+
         // Initial fly handled by the geoData effect (uses orgCenter when available)
       })
 
@@ -536,6 +645,13 @@ export default function DashboardMap({ layers, customLayerData }: DashboardMapPr
       map.on('click', 'district-fills', (e: any) => {
         if (e.features?.length) {
           const feature = e.features[0]
+          const props = feature.properties || {}
+          const districtCode = props?.district_code || ''
+          const stateAbbrev = props?.state || ''
+          const districtNumber = props?.district_number || 0
+          if (districtCode && onDistrictSelect) {
+            onDistrictSelect({ districtCode, state: stateAbbrev, districtNumber })
+          }
           if (feature.geometry?.type === 'MultiPolygon' || feature.geometry?.type === 'Polygon') {
             const bounds = new maplibregl.LngLatBounds()
             const coords = feature.geometry.type === 'Polygon'
@@ -829,6 +945,119 @@ export default function DashboardMap({ layers, customLayerData }: DashboardMapPr
       console.warn('Custom district fills:', e)
     }
   }, [status, showCustomizableLayer, customLayerData])
+
+  // -----------------------------------------------------------------------
+  // Geofencing: polygons, draft vertices, canvass address pins
+  // -----------------------------------------------------------------------
+  useEffect(() => {
+    if (status !== 'ready' || !mapRef.current) return
+    const map = mapRef.current
+    const fences = geofencing?.fences ?? []
+    const features = fences.map((f) => ({
+      type: 'Feature' as const,
+      properties: { mode: f.mode, id: f.id },
+      geometry: { type: 'Polygon' as const, coordinates: [normalizeRing(f.ring)] },
+    }))
+    try {
+      const src = map.getSource('geofence-polygons')
+      if (src) (src as any).setData({ type: 'FeatureCollection', features })
+    } catch (e) {
+      console.warn('geofence-polygons setData:', e)
+    }
+  }, [status, geofencing?.fences])
+
+  useEffect(() => {
+    if (status !== 'ready' || !mapRef.current) return
+    const map = mapRef.current
+    const draft = geofencing?.draftVertices ?? []
+    const lineFeatures =
+      draft.length >= 2
+        ? [
+            {
+              type: 'Feature' as const,
+              properties: {},
+              geometry: { type: 'LineString' as const, coordinates: draft },
+            },
+          ]
+        : []
+    const pointFeatures = draft.map((coord, i) => ({
+      type: 'Feature' as const,
+      properties: { i },
+      geometry: { type: 'Point' as const, coordinates: coord },
+    }))
+    try {
+      const lineSrc = map.getSource('geofence-draft-line')
+      if (lineSrc) (lineSrc as any).setData({ type: 'FeatureCollection', features: lineFeatures })
+      const ptSrc = map.getSource('geofence-draft-points')
+      if (ptSrc) (ptSrc as any).setData({ type: 'FeatureCollection', features: pointFeatures })
+    } catch (e) {
+      console.warn('geofence draft setData:', e)
+    }
+  }, [status, geofencing?.draftVertices])
+
+  useEffect(() => {
+    if (status !== 'ready' || !mapRef.current) return
+    const map = mapRef.current
+    const rows = geofencing?.addresses ?? []
+    const features = rows.map((a) => ({
+      type: 'Feature' as const,
+      properties: { id: a.id, status: a.status, label: a.label || '' },
+      geometry: { type: 'Point' as const, coordinates: [a.lng, a.lat] },
+    }))
+    try {
+      const src = map.getSource('canvass-address-points')
+      if (src) (src as any).setData({ type: 'FeatureCollection', features })
+    } catch (e) {
+      console.warn('canvass-address-points setData:', e)
+    }
+  }, [status, geofencing?.addresses])
+
+  useEffect(() => {
+    if (status !== 'ready' || !mapRef.current) return
+    const map = mapRef.current
+    const show = showGeofencingLayer
+    const hasDraft = (geofencing?.draftVertices?.length ?? 0) > 0
+    const hasFences = (geofencing?.fences?.length ?? 0) > 0
+    const hasAddr = (geofencing?.addresses?.length ?? 0) > 0
+    const vis = show ? 'visible' : 'none'
+    const draftVis = show && hasDraft ? 'visible' : 'none'
+    const addrVis = show && hasAddr ? 'visible' : 'none'
+    try {
+      map.setLayoutProperty('geofence-fills', 'visibility', show && hasFences ? 'visible' : 'none')
+      map.setLayoutProperty('geofence-fills-exclude', 'visibility', show && hasFences ? 'visible' : 'none')
+      map.setLayoutProperty('geofence-lines', 'visibility', show && hasFences ? 'visible' : 'none')
+      map.setLayoutProperty('geofence-draft-line-layer', 'visibility', draftVis)
+      map.setLayoutProperty('geofence-draft-points-layer', 'visibility', draftVis)
+      map.setLayoutProperty('canvass-address-circles', 'visibility', addrVis)
+    } catch (e) {
+      console.warn('geofence visibility:', e)
+    }
+  }, [status, showGeofencingLayer, geofencing?.fences, geofencing?.draftVertices, geofencing?.addresses])
+
+  useEffect(() => {
+    if (status !== 'ready' || !mapRef.current) return
+    const map = mapRef.current
+    const mode = geofencing?.drawMode
+    if (!mode || !geofencing?.onDrawVertex) {
+      try {
+        map.getCanvas().style.cursor = ''
+      } catch {}
+      return
+    }
+    const handler = (e: any) => {
+      geofenceVertexRef.current?.(e.lngLat.lng, e.lngLat.lat)
+    }
+    map.on('click', handler)
+    try {
+      map.getCanvas().style.cursor = 'crosshair'
+    } catch {}
+    return () => {
+      try {
+        map.off('click', handler)
+        map.getCanvas().style.cursor = ''
+      } catch {}
+    }
+  }, [status, geofencing?.drawMode, geofencing?.onDrawVertex])
 
   // -----------------------------------------------------------------------
   // "My district" / "My state" highlight based on org campaign context

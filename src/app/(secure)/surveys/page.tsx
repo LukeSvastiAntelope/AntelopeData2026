@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Plus, Upload, Search, ArrowUpDown } from 'lucide-react'
+import { Plus, Upload, Search, ArrowUpDown, Calculator, Sigma } from 'lucide-react'
 
 type SurveyRow = {
   id: number
@@ -29,6 +29,14 @@ export default function SurveysPage() {
   const [tab, setTab] = useState<'all' | 'own' | 'org' | 'featured'>('all')
   const [sortKey, setSortKey] = useState<'created_at' | 'title' | 'response_count'>('created_at')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
+  const [populationSize, setPopulationSize] = useState('500000')
+  const [confidenceLevel, setConfidenceLevel] = useState<'90' | '95' | '99'>('95')
+  const [marginOfError, setMarginOfError] = useState('3')
+  const [estimatedProportion, setEstimatedProportion] = useState('50')
+  const [designEffect, setDesignEffect] = useState('1')
+  const [stdDevInput, setStdDevInput] = useState('')
+  const [ciProportion, setCiProportion] = useState('50')
+  const [ciSampleSize, setCiSampleSize] = useState('1000')
 
   useEffect(() => {
     let mounted = true
@@ -105,6 +113,54 @@ export default function SurveysPage() {
     setSortDir(key === 'title' ? 'asc' : 'desc')
   }
 
+  const zScoreByConfidence: Record<'90' | '95' | '99', number> = {
+    '90': 1.645,
+    '95': 1.96,
+    '99': 2.576,
+  }
+
+  const stats = useMemo(() => {
+    const N = Number(populationSize)
+    const z = zScoreByConfidence[confidenceLevel]
+    const moe = Number(marginOfError) / 100
+    const p = Number(estimatedProportion) / 100
+    const deff = Math.max(0.1, Number(designEffect) || 1)
+
+    const safeP = Number.isFinite(p) ? Math.min(0.99, Math.max(0.01, p)) : 0.5
+    const safeMoe = Number.isFinite(moe) ? Math.min(0.25, Math.max(0.001, moe)) : 0.03
+    const safeN = Number.isFinite(N) && N > 0 ? N : null
+
+    const n0 = ((z * z) * safeP * (1 - safeP)) / (safeMoe * safeMoe)
+    const nInfinite = Math.ceil(n0 * deff)
+    const nFinite = safeN ? Math.ceil((safeN * nInfinite) / (safeN + nInfinite - 1)) : null
+
+    const ciP = Number(ciProportion) / 100
+    const ciN = Number(ciSampleSize)
+    const safeCiP = Number.isFinite(ciP) ? Math.min(0.99, Math.max(0.01, ciP)) : 0.5
+    const safeCiN = Number.isFinite(ciN) && ciN > 0 ? ciN : 1
+    const moeFromN = z * Math.sqrt((safeCiP * (1 - safeCiP)) / safeCiN)
+
+    const numbers = stdDevInput
+      .split(/[,\s]+/)
+      .map((v) => Number(v.trim()))
+      .filter((v) => Number.isFinite(v))
+    const mean = numbers.length ? numbers.reduce((a, b) => a + b, 0) / numbers.length : null
+    const sampleStdDev = numbers.length > 1 && mean !== null
+      ? Math.sqrt(numbers.reduce((sum, x) => sum + Math.pow(x - mean, 2), 0) / (numbers.length - 1))
+      : null
+
+    return {
+      nInfinite,
+      nFinite,
+      moeFromNPercent: +(moeFromN * 100).toFixed(2),
+      ciLowPercent: +((safeCiP - moeFromN) * 100).toFixed(2),
+      ciHighPercent: +((safeCiP + moeFromN) * 100).toFixed(2),
+      count: numbers.length,
+      mean: mean === null ? null : +mean.toFixed(4),
+      sampleStdDev: sampleStdDev === null ? null : +sampleStdDev.toFixed(4),
+    }
+  }, [populationSize, confidenceLevel, marginOfError, estimatedProportion, designEffect, ciProportion, ciSampleSize, stdDevInput])
+
   return (
     <div className="flex-1 p-2 w-full bg-background">
       <div className="mx-auto rounded-lg bg-card text-card-foreground shadow-lg">
@@ -144,6 +200,98 @@ export default function SurveysPage() {
               />
             </div>
           </div>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Calculator className="h-4 w-4" />
+                Population Size Calculator
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">Population (N)</p>
+                  <Input value={populationSize} onChange={(e) => setPopulationSize(e.target.value)} inputMode="numeric" />
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">Confidence</p>
+                  <select
+                    className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                    value={confidenceLevel}
+                    onChange={(e) => setConfidenceLevel(e.target.value as '90' | '95' | '99')}
+                  >
+                    <option value="90">90%</option>
+                    <option value="95">95%</option>
+                    <option value="99">99%</option>
+                  </select>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">Margin of error (%)</p>
+                  <Input value={marginOfError} onChange={(e) => setMarginOfError(e.target.value)} inputMode="decimal" />
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">Expected support p (%)</p>
+                  <Input value={estimatedProportion} onChange={(e) => setEstimatedProportion(e.target.value)} inputMode="decimal" />
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">Design effect</p>
+                  <Input value={designEffect} onChange={(e) => setDesignEffect(e.target.value)} inputMode="decimal" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="rounded-md border border-border p-3">
+                  <p className="text-xs text-muted-foreground">Recommended sample (large population)</p>
+                  <p className="text-xl font-semibold">{stats.nInfinite.toLocaleString()}</p>
+                </div>
+                <div className="rounded-md border border-border p-3">
+                  <p className="text-xs text-muted-foreground">Recommended sample (finite population)</p>
+                  <p className="text-xl font-semibold">{stats.nFinite ? stats.nFinite.toLocaleString() : '—'}</p>
+                </div>
+              </div>
+
+              <details className="rounded-md border border-border p-3">
+                <summary className="cursor-pointer text-sm font-medium flex items-center gap-2">
+                  <Sigma className="h-4 w-4 inline" />
+                  Advanced statistical tools
+                </summary>
+                <div className="mt-3 space-y-4">
+                  <div className="space-y-2">
+                    <p className="text-xs text-muted-foreground">Standard deviation (comma or space separated values)</p>
+                    <Input
+                      value={stdDevInput}
+                      onChange={(e) => setStdDevInput(e.target.value)}
+                      placeholder="e.g. 42, 38, 51, 47, 44"
+                    />
+                    <p className="text-sm">
+                      n = <span className="font-medium">{stats.count}</span>
+                      {' · '}mean = <span className="font-medium">{stats.mean ?? '—'}</span>
+                      {' · '}sample SD = <span className="font-medium">{stats.sampleStdDev ?? '—'}</span>
+                    </p>
+                  </div>
+
+                  <div className="space-y-2 pt-2 border-t border-border">
+                    <p className="text-xs text-muted-foreground">Margin of error / confidence interval from sample size</p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">Observed support (%)</p>
+                        <Input value={ciProportion} onChange={(e) => setCiProportion(e.target.value)} inputMode="decimal" />
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">Sample size (n)</p>
+                        <Input value={ciSampleSize} onChange={(e) => setCiSampleSize(e.target.value)} inputMode="numeric" />
+                      </div>
+                    </div>
+                    <p className="text-sm">
+                      MOE ≈ <span className="font-medium">±{stats.moeFromNPercent}%</span>
+                      {' · '}CI ≈ <span className="font-medium">{stats.ciLowPercent}% to {stats.ciHighPercent}%</span>
+                    </p>
+                  </div>
+                </div>
+              </details>
+            </CardContent>
+          </Card>
 
           {loading ? <p className="text-muted-foreground text-sm">Loading surveys...</p> : null}
           {error ? <p className="text-sm text-destructive">{error}</p> : null}

@@ -264,6 +264,15 @@ Whether you're running a local school board race or a statewide campaign, Antelo
               <div className="text-white/80">
                 This widget will route messages to our team for onboarding and sales support.
               </div>
+              <div className="rounded-md border border-violet-400/30 bg-violet-500/10 p-2">
+                <div className="text-xs text-white/90 font-medium">New: Convince-the-Bot Pricing</div>
+                <p className="text-xs text-white/80 mt-1">
+                  Use the Pricing Bot from the corner widget on the home or login screen — then keep convincing for a deeper discount.
+                </p>
+                <Button size="sm" asChild className="mt-2">
+                  <Link href="/login">Open login (Pricing Bot)</Link>
+                </Button>
+              </div>
               <div className="rounded-md bg-white/5 p-2">
                 <div className="text-xs text-white/70">Examples:</div>
                 <ul className="text-xs mt-1 space-y-1 text-white/80">
