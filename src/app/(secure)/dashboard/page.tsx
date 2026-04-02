@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import dynamic from 'next/dynamic'
 import { useSidebar } from "@/components/ui/sidebar"
-import { PanelLeft, Landmark, MapPin, Vote, Grid3x3, ChevronDown, ChevronRight, HandCoins, Bot, Plus, Play, Trash2, Loader2, Newspaper, Building2, Globe, Palette, Upload, Sparkles } from 'lucide-react'
+import { PanelLeft, Landmark, MapPin, Vote, Grid3x3, ChevronDown, ChevronRight, HandCoins, Bot, Plus, Play, Trash2, Loader2, Newspaper, Building2, Globe, Palette, Upload, Sparkles, Fence, Check, X } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -16,6 +16,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { toast } from '@/components/ui/sonner'
+import type { GeofencePolygon } from '@/lib/geofencing'
+import { classifyAddresses, normalizeRing } from '@/lib/geofencing'
 
 type AutomationType = 'news_scraper' | 'company_scraper' | 'bbc_commodity_bot'
 
@@ -35,6 +37,44 @@ interface Automation {
   enabled: boolean
   last_run_at: string | null
   created_at: string | null
+}
+
+interface DistrictIntelResponse {
+  district: {
+    districtCode: string
+    state: string
+    districtNumber: number
+    pvi: string | null
+    margin2024: number
+    incumbentName: string | null
+    incumbentParty: string | null
+    demographics: {
+      totalPopulation: number | null
+      medianHouseholdIncome: number | null
+      bachelorsOrHigherPct: number | null
+      medianAge: number | null
+    }
+  }
+  external: {
+    censusStatus: string
+    fecStatus: string
+    openStatesStatus: string
+    ballotpediaStatus: string
+    mitElectionLabStatus: string
+  }
+  intelligence: {
+    narrative: string
+    recommendedNextSteps: string[]
+  }
+}
+
+interface DistrictDeepReport {
+  title: string
+  executiveSummary: string
+  strategicAngles?: string[]
+  riskFlags?: string[]
+  messageTestingIdeas?: string[]
+  caveats?: string[]
 }
 
 export type CustomLayerStyle = 'color' | 'saturation' | 'heatmap'
@@ -121,7 +161,13 @@ export default function DashboardPage() {
     voters: true,
     fundraising: false,
     customizable: false,
+    geofencing: false,
   })
+  const [geofences, setGeofences] = useState<GeofencePolygon[]>([])
+  const [geofenceDraftVertices, setGeofenceDraftVertices] = useState<[number, number][]>([])
+  const [geofenceDrawMode, setGeofenceDrawMode] = useState<null | 'include' | 'exclude'>(null)
+  const [geofenceAddressRows, setGeofenceAddressRows] = useState<{ id: string; lng: number; lat: number; label?: string }[]>([])
+  const [geofenceCsvLoading, setGeofenceCsvLoading] = useState(false)
   const [customLayerData, setCustomLayerData] = useState<CustomLayerData | null>(null)
   const [customFileRows, setCustomFileRows] = useState<Record<string, string>[] | null>(null)
   const [customFileColumns, setCustomFileColumns] = useState<string[]>([])
@@ -141,6 +187,11 @@ export default function DashboardPage() {
   const [createSubmitting, setCreateSubmitting] = useState(false)
   const [runningId, setRunningId] = useState<number | null>(null)
   const [deletingId, setDeletingId] = useState<number | null>(null)
+  const [selectedDistrict, setSelectedDistrict] = useState<{ districtCode: string; state: string; districtNumber: number } | null>(null)
+  const [districtIntel, setDistrictIntel] = useState<DistrictIntelResponse | null>(null)
+  const [districtIntelLoading, setDistrictIntelLoading] = useState(false)
+  const [districtDeepReport, setDistrictDeepReport] = useState<DistrictDeepReport | null>(null)
+  const [districtDeepLoading, setDistrictDeepLoading] = useState(false)
 
   const fetchAutomations = useCallback(async () => {
     try {
@@ -157,6 +208,53 @@ export default function DashboardPage() {
   useEffect(() => {
     fetchAutomations()
   }, [fetchAutomations])
+
+  const canvassClassifiedAddresses = useMemo(
+    () => classifyAddresses(geofenceAddressRows, geofences),
+    [geofenceAddressRows, geofences]
+  )
+
+  const geofenceStats = useMemo(() => {
+    const rows = canvassClassifiedAddresses
+    const canvass = rows.filter((r) => r.status === 'canvass').length
+    const skip = rows.filter((r) => r.status === 'skip').length
+    const neutral = rows.filter((r) => r.status === 'neutral').length
+    return { canvass, skip, neutral, total: rows.length }
+  }, [canvassClassifiedAddresses])
+
+  const handleGeofenceVertex = useCallback((lng: number, lat: number) => {
+    setGeofenceDraftVertices((prev) => [...prev, [lng, lat]])
+  }, [])
+
+  const geofencingMapProps = useMemo(
+    () => ({
+      fences: geofences,
+      draftVertices: geofenceDraftVertices,
+      drawMode: geofenceDrawMode,
+      addresses: canvassClassifiedAddresses,
+      onDrawVertex: handleGeofenceVertex,
+    }),
+    [geofences, geofenceDraftVertices, geofenceDrawMode, canvassClassifiedAddresses, handleGeofenceVertex]
+  )
+
+  const finishGeofencePolygon = () => {
+    if (geofenceDraftVertices.length < 3) {
+      toast.error('Add at least three clicks on the map to close a zone.')
+      return
+    }
+    if (!geofenceDrawMode) return
+    const mode = geofenceDrawMode
+    const ring = normalizeRing(geofenceDraftVertices)
+    setGeofences((prev) => [...prev, { id: crypto.randomUUID(), mode, ring }])
+    setGeofenceDraftVertices([])
+    setGeofenceDrawMode(null)
+    toast.success(mode === 'include' ? 'Canvass zone saved.' : 'Exclusion zone saved.')
+  }
+
+  const cancelGeofenceDraft = () => {
+    setGeofenceDraftVertices([])
+    setGeofenceDrawMode(null)
+  }
 
   const toggleLayer = (key: keyof typeof layers) => {
     setLayers(prev => ({ ...prev, [key]: !prev[key] }))
@@ -257,10 +355,61 @@ export default function DashboardPage() {
     }
   }
 
+  const loadDistrictIntel = useCallback(async (districtCode: string) => {
+    setDistrictIntelLoading(true)
+    setDistrictDeepReport(null)
+    try {
+      const res = await fetch(`/api/dashboard/district-intel?districtCode=${encodeURIComponent(districtCode)}`)
+      const data = await res.json()
+      if (!res.ok || !data?.status) {
+        toast.error(data?.message || 'Failed to load district intelligence')
+        return
+      }
+      setDistrictIntel(data)
+    } catch {
+      toast.error('Failed to load district intelligence')
+    } finally {
+      setDistrictIntelLoading(false)
+    }
+  }, [])
+
+  const generateDeepDistrictReport = useCallback(async () => {
+    if (!selectedDistrict) return
+    setDistrictDeepLoading(true)
+    try {
+      const res = await fetch('/api/dashboard/district-intel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ districtCode: selectedDistrict.districtCode }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data?.status) {
+        toast.error(data?.message || 'Failed to generate deep report')
+        return
+      }
+      if (data?.report) {
+        setDistrictDeepReport(data.report)
+        toast.success('Deep report generated.')
+      }
+    } catch {
+      toast.error('Failed to generate deep report')
+    } finally {
+      setDistrictDeepLoading(false)
+    }
+  }, [selectedDistrict])
+
   return (
     <div style={{ display: 'flex', width: '100%', height: '100vh', overflow: 'hidden' }}>
       <div style={{ flex: 1, minWidth: 0, position: 'relative' }}>
-        <DashboardMap layers={layers} customLayerData={layers.customizable ? customLayerData : null} />
+        <DashboardMap
+          layers={layers}
+          customLayerData={layers.customizable ? customLayerData : null}
+          geofencing={geofencingMapProps}
+          onDistrictSelect={(district) => {
+            setSelectedDistrict(district)
+            loadDistrictIntel(district.districtCode)
+          }}
+        />
         <div style={{ position: 'absolute', top: 12, left: 12, zIndex: 20 }}>
           <button onClick={toggleSidebar} className={toggleBtnClass} title="Toggle sidebar">
             <PanelLeft className="h-3.5 w-3.5" />
@@ -300,8 +449,153 @@ export default function DashboardPage() {
                 <LayerToggle icon={<Vote className="h-3 w-3" />} label="Voters" active={layers.voters} colorClass="text-purple-400" activeBg="bg-purple-500/10 border-purple-500/20" onClick={() => toggleLayer('voters')} />
                 <LayerToggle icon={<HandCoins className="h-3 w-3" />} label="Fundraising" active={layers.fundraising} colorClass="text-emerald-400" activeBg="bg-emerald-500/10 border-emerald-500/20" onClick={() => toggleLayer('fundraising')} />
                 <LayerToggle icon={<Palette className="h-3 w-3" />} label="Customizable" active={layers.customizable} colorClass="text-violet-400" activeBg="bg-violet-500/10 border-violet-500/20" onClick={() => toggleLayer('customizable')} />
+                <LayerToggle icon={<Fence className="h-3 w-3" />} label="Geofencing" active={layers.geofencing} colorClass="text-cyan-400" activeBg="bg-cyan-500/10 border-cyan-500/20" onClick={() => toggleLayer('geofencing')} />
               </div>
             </Section>
+
+            {layers.geofencing && (
+              <Section title="Canvass geofencing" defaultOpen>
+                <div className="space-y-2 text-[10px] text-muted-foreground">
+                  <p>
+                    Draw green <span className="text-emerald-500 font-medium">include</span> or red{' '}
+                    <span className="text-red-500 font-medium">exclude</span> zones. Upload a register CSV with lat/lng to see which
+                    addresses fall inside your turf (zoom in for street-level planning).
+                  </p>
+                  <div className="flex flex-wrap gap-1">
+                    <Button
+                      size="sm"
+                      variant={geofenceDrawMode === 'include' ? 'default' : 'outline'}
+                      className="h-7 text-[10px] px-2"
+                      onClick={() => {
+                        setGeofenceDrawMode('include')
+                        setGeofenceDraftVertices([])
+                        toast.info('Include zone: click the map to add corners, then Finish.')
+                      }}
+                    >
+                      Draw include
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={geofenceDrawMode === 'exclude' ? 'destructive' : 'outline'}
+                      className="h-7 text-[10px] px-2"
+                      onClick={() => {
+                        setGeofenceDrawMode('exclude')
+                        setGeofenceDraftVertices([])
+                        toast.info('Exclude zone: click the map to add corners, then Finish.')
+                      }}
+                    >
+                      Draw exclude
+                    </Button>
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    <Button size="sm" variant="secondary" className="h-7 text-[10px] px-2 gap-0.5" onClick={finishGeofencePolygon} disabled={!geofenceDrawMode || geofenceDraftVertices.length < 3}>
+                      <Check className="h-3 w-3" /> Finish zone
+                    </Button>
+                    <Button size="sm" variant="ghost" className="h-7 text-[10px] px-2 gap-0.5" onClick={cancelGeofenceDraft}>
+                      <X className="h-3 w-3" /> Cancel
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 text-[10px] px-2"
+                      onClick={() => {
+                        if (!confirm('Clear all geofence zones?')) return
+                        setGeofences([])
+                        setGeofenceDraftVertices([])
+                        setGeofenceDrawMode(null)
+                      }}
+                    >
+                      Clear zones
+                    </Button>
+                  </div>
+                  <p className="text-[9px] pt-1 border-t border-border/50">
+                    Rules: exclude wins. With include zones, only addresses inside an include (and not in exclude) are “canvass”.
+                    With no include zones, everywhere except excludes is canvass.
+                  </p>
+                  <label className="flex items-center justify-center gap-1.5 w-full px-2 py-1.5 rounded border border-dashed border-border text-[11px] cursor-pointer hover:bg-muted/50">
+                    <Upload className="h-3 w-3" />
+                    Register CSV (lat/lng)
+                    <input
+                      type="file"
+                      accept=".csv"
+                      className="sr-only"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0]
+                        if (!file) return
+                        setGeofenceCsvLoading(true)
+                        try {
+                          const text = await file.text()
+                          const lines = text.split(/\r?\n/).filter(Boolean)
+                          if (lines.length < 2) {
+                            toast.error('CSV needs a header row and data rows.')
+                            return
+                          }
+                          const header = lines[0].split(',').map((h) => h.trim().replace(/^"|"$/g, ''))
+                          const latCol =
+                            header.find((h) => /^(lat|latitude)$/i.test(h.trim())) ||
+                            header.find((h) => /\blat(itude)?\b/i.test(h)) ||
+                            ''
+                          const lngCol =
+                            header.find((h) => /^(lng|lon|longitude|long)$/i.test(h.trim())) ||
+                            header.find((h) => /\b(lng|lon|longitude)\b/i.test(h)) ||
+                            ''
+                          if (!latCol || !lngCol) {
+                            toast.error('Could not find latitude/longitude columns (try lat, latitude, lng, longitude).')
+                            return
+                          }
+                          const labelCol = header.find((h) => /address|street|line1|addr/i.test(h)) || header[0]
+                          const out: { id: string; lng: number; lat: number; label?: string }[] = []
+                          for (let i = 1; i < lines.length; i++) {
+                            const vals = lines[i].match(/("([^"]*)")|([^,]+)/g)?.map((s) => (s?.startsWith('"') ? s.slice(1, -1) : s?.trim() ?? '')) ?? lines[i].split(',')
+                            const row: Record<string, string> = {}
+                            header.forEach((h, j) => {
+                              row[h] = vals[j] ?? ''
+                            })
+                            const lat = parseFloat(String(row[latCol] ?? '').replace(/,/g, ''))
+                            const lng = parseFloat(String(row[lngCol] ?? '').replace(/,/g, ''))
+                            if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue
+                            out.push({
+                              id: `row-${i}`,
+                              lat,
+                              lng,
+                              label: row[labelCol] || undefined,
+                            })
+                          }
+                          setGeofenceAddressRows(out)
+                          toast.success(`Loaded ${out.length} addresses with coordinates.`)
+                        } catch {
+                          toast.error('Failed to parse CSV.')
+                        } finally {
+                          setGeofenceCsvLoading(false)
+                          e.target.value = ''
+                        }
+                      }}
+                    />
+                  </label>
+                  {geofenceCsvLoading && (
+                    <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                      <Loader2 className="h-3 w-3 animate-spin" /> Parsing…
+                    </div>
+                  )}
+                  {geofenceStats.total > 0 && (
+                    <div className="rounded border border-border/60 bg-muted/20 px-2 py-1.5 text-[10px] space-y-0.5">
+                      <p className="font-medium text-foreground">Addresses vs fences</p>
+                      <p>
+                        <span className="text-emerald-600 dark:text-emerald-400">Canvass {geofenceStats.canvass}</span>
+                        {' · '}
+                        <span className="text-red-600 dark:text-red-400">Skip {geofenceStats.skip}</span>
+                        {geofenceStats.neutral > 0 && (
+                          <>
+                            {' · '}
+                            <span className="text-slate-500">Neutral {geofenceStats.neutral}</span>
+                          </>
+                        )}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </Section>
+            )}
 
             {(layers.political || layers.districts) && (
               <Section title="Legend">
@@ -336,6 +630,101 @@ export default function DashboardPage() {
                   )}
                   {customLayerData.aiSummary && (
                     <p className="text-[9px] text-muted-foreground italic border-t border-border/60 pt-1.5 mt-1">{customLayerData.aiSummary}</p>
+                  )}
+                </div>
+              </Section>
+            )}
+
+            {layers.districts && (
+              <Section title="District intelligence" defaultOpen={true}>
+                <div className="space-y-2">
+                  {!selectedDistrict ? (
+                    <p className="text-[10px] text-muted-foreground">
+                      Click a district on the map to load a public-data intelligence brief.
+                    </p>
+                  ) : (
+                    <>
+                      <div className="rounded border border-border/60 bg-muted/20 px-2 py-1.5">
+                        <p className="text-[11px] font-medium">{selectedDistrict.districtCode}</p>
+                        <p className="text-[9px] text-muted-foreground">State {selectedDistrict.state} · District {selectedDistrict.districtNumber}</p>
+                      </div>
+                      <div className="flex gap-1">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="flex-1 h-7 text-[10px]"
+                          onClick={() => loadDistrictIntel(selectedDistrict.districtCode)}
+                          disabled={districtIntelLoading}
+                        >
+                          {districtIntelLoading ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
+                          Refresh report
+                        </Button>
+                        <Button
+                          size="sm"
+                          className="flex-1 h-7 text-[10px]"
+                          onClick={() => {
+                            const code = selectedDistrict.districtCode
+                            window.location.href = `/cohort-chat?district=${encodeURIComponent(code)}`
+                          }}
+                        >
+                          Open in chat
+                        </Button>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        className="w-full h-7 text-[10px]"
+                        onClick={generateDeepDistrictReport}
+                        disabled={districtDeepLoading}
+                      >
+                        {districtDeepLoading ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
+                        Generate deeper report (LLM)
+                      </Button>
+                      {districtIntel ? (
+                        <div className="space-y-1.5 rounded border border-border/60 px-2 py-1.5">
+                          <p className="text-[10px] text-muted-foreground">
+                            PVI {districtIntel.district.pvi || 'N/A'} · Margin 2024 {districtIntel.district.margin2024.toFixed(1)}
+                          </p>
+                          <p className="text-[10px] text-muted-foreground">
+                            Incumbent: {districtIntel.district.incumbentName || 'Unknown'} ({districtIntel.district.incumbentParty || 'N/A'})
+                          </p>
+                          <p className="text-[9px] text-muted-foreground line-clamp-4">{districtIntel.intelligence.narrative}</p>
+                          <div className="flex flex-wrap gap-1 pt-1">
+                            <span className="text-[9px] px-1 py-0.5 rounded bg-muted">Census: {districtIntel.external.censusStatus}</span>
+                            <span className="text-[9px] px-1 py-0.5 rounded bg-muted">FEC: {districtIntel.external.fecStatus}</span>
+                            <span className="text-[9px] px-1 py-0.5 rounded bg-muted">OpenStates: {districtIntel.external.openStatesStatus}</span>
+                            <span className="text-[9px] px-1 py-0.5 rounded bg-muted">Ballotpedia: {districtIntel.external.ballotpediaStatus}</span>
+                            <span className="text-[9px] px-1 py-0.5 rounded bg-muted">MIT Lab: {districtIntel.external.mitElectionLabStatus}</span>
+                          </div>
+                        </div>
+                      ) : null}
+                      {districtDeepReport ? (
+                        <div className="space-y-1 rounded border border-primary/30 bg-primary/5 px-2 py-1.5">
+                          <p className="text-[10px] font-medium">{districtDeepReport.title}</p>
+                          <p className="text-[9px] text-muted-foreground line-clamp-6">{districtDeepReport.executiveSummary}</p>
+                          {districtDeepReport.strategicAngles?.length ? (
+                            <div>
+                              <p className="text-[9px] font-medium">Strategic angles</p>
+                              <ul className="text-[9px] text-muted-foreground list-disc pl-3">
+                                {districtDeepReport.strategicAngles.slice(0, 3).map((item, idx) => (
+                                  <li key={idx}>{item}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          ) : null}
+                          {districtDeepReport.messageTestingIdeas?.length ? (
+                            <div>
+                              <p className="text-[9px] font-medium">Message tests</p>
+                              <ul className="text-[9px] text-muted-foreground list-disc pl-3">
+                                {districtDeepReport.messageTestingIdeas.slice(0, 3).map((item, idx) => (
+                                  <li key={idx}>{item}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          ) : null}
+                        </div>
+                      ) : null}
+                    </>
                   )}
                 </div>
               </Section>

@@ -3,12 +3,16 @@
 import { Button } from "@/components/ui/button"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Rocket, FileText, MessageSquareText, PhoneCall } from "lucide-react"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Textarea } from "@/components/ui/textarea"
+import { Rocket, FileText, MessageSquareText, PhoneCall, Loader2, Bot, Sparkles, HeartHandshake } from "lucide-react"
 import { useRouter } from "next/navigation"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import Link from "next/link"
 import LogoText from "@/components/logo-text"
 import toast from "react-hot-toast"
+
+type ChatMsg = { role: 'user' | 'assistant'; content: string }
 
 export default function FrontLanding() {
   const router = useRouter()
@@ -17,6 +21,46 @@ export default function FrontLanding() {
   const [uploadLoading, setUploadLoading] = useState(false)
   const [uploadPreview, setUploadPreview] = useState<any>(null)
   const [salesChatOpen, setSalesChatOpen] = useState(false)
+  const [salesTab, setSalesTab] = useState<'sales-call' | 'pricing-bot'>('sales-call')
+
+  const [pricingForm, setPricingForm] = useState({
+    positionRunningFor: '',
+    candidateName: '',
+    districtCode: '',
+    campaignWebsite: '',
+    reductionSoughtPct: 25,
+    issue: '',
+    supporterName: '',
+    convinceText: '',
+    email: '',
+  })
+  const [pricingLoading, setPricingLoading] = useState(false)
+  const [pricingResult, setPricingResult] = useState<null | {
+    quoteToken: string
+    finalPrice: number
+    listPrice: number
+    discountPct: number
+    favorabilityScore: number
+    needsHumanReview: boolean
+    rationale: string[]
+    personalityLine?: string
+    shareText?: string
+    referralLink?: string
+  }>(null)
+  const [followUpOpen, setFollowUpOpen] = useState(false)
+  const [followUpStartLoading, setFollowUpStartLoading] = useState(false)
+  const [chatSessionId, setChatSessionId] = useState<string | null>(null)
+  const [followMessages, setFollowMessages] = useState<ChatMsg[]>([])
+  const [followDraft, setFollowDraft] = useState('')
+  const [followSending, setFollowSending] = useState(false)
+  const [negotiatedQuote, setNegotiatedQuote] = useState<null | {
+    finalPrice: number
+    discountPct: number
+    favorabilityScore: number
+    listPrice: number
+  }>(null)
+  const [reviewLoading, setReviewLoading] = useState(false)
+  const [origin, setOrigin] = useState('')
 
   const handleSignUp = () => {
     router.push("/register")
@@ -63,6 +107,204 @@ export default function FrontLanding() {
     setUploadPreview(null);
     setUploadLoading(false);
   };
+
+  useEffect(() => {
+    setOrigin(typeof window !== 'undefined' ? window.location.origin : '')
+  }, [])
+
+  const displayPrice = negotiatedQuote ?? pricingResult
+  const activeQuoteToken =
+    followUpOpen && chatSessionId ? chatSessionId : pricingResult?.quoteToken
+
+  const handlePricingQuote = async () => {
+    setPricingLoading(true)
+    setFollowUpOpen(false)
+    setChatSessionId(null)
+    setFollowMessages([])
+    setNegotiatedQuote(null)
+    try {
+      const res = await fetch('/api/pricing-bot/quote', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          campaignType: pricingForm.positionRunningFor,
+          candidateName: pricingForm.candidateName,
+          districtCode: pricingForm.districtCode,
+          campaignWebsite: pricingForm.campaignWebsite,
+          reductionSoughtPct: pricingForm.reductionSoughtPct,
+          convinceText: pricingForm.convinceText,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data?.status) {
+        toast.error(data?.message || 'Failed to generate quote.')
+        return
+      }
+      setPricingResult({
+        quoteToken: data.quote.quoteToken,
+        finalPrice: data.quote.finalPrice,
+        listPrice: data.quote.listPrice,
+        discountPct: data.quote.discountPct ?? Math.round(((data.quote.listPrice - data.quote.finalPrice) / data.quote.listPrice) * 100),
+        favorabilityScore: Number(data.quote.favorabilityScore || 0),
+        needsHumanReview: data.quote.needsHumanReview,
+        rationale: Array.isArray(data.rationale) ? data.rationale : [],
+        personalityLine: data.personalityLine,
+        shareText: data.shareText,
+        referralLink: data.referralLink,
+      })
+      toast.success('Pricing quote generated.')
+    } catch {
+      toast.error('Failed to generate quote.')
+    } finally {
+      setPricingLoading(false)
+    }
+  }
+
+  const startFollowUpNegotiation = async () => {
+    if (!pricingForm.positionRunningFor.trim() || !pricingForm.candidateName.trim()) {
+      toast.error('Position and candidate name are required to continue.')
+      return
+    }
+    setFollowUpStartLoading(true)
+    try {
+      const res = await fetch('/api/pricing-bot/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'start',
+          profile: {
+            campaignType: pricingForm.positionRunningFor,
+            candidateName: pricingForm.candidateName,
+            districtCode: pricingForm.districtCode,
+            campaignWebsite: pricingForm.campaignWebsite,
+            reductionSoughtPct: pricingForm.reductionSoughtPct,
+          },
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data?.status) {
+        toast.error(data?.message || 'Could not open follow-up chat.')
+        return
+      }
+      setChatSessionId(data.sessionId)
+      setFollowMessages((data.messages || []) as ChatMsg[])
+      setFollowUpOpen(true)
+      setNegotiatedQuote(null)
+      toast.success('Keep making your case below.')
+    } catch {
+      toast.error('Could not open follow-up chat.')
+    } finally {
+      setFollowUpStartLoading(false)
+    }
+  }
+
+  const sendFollowUpMessage = async () => {
+    const text = followDraft.trim()
+    if (!text || !chatSessionId) return
+    setFollowSending(true)
+    try {
+      const res = await fetch('/api/pricing-bot/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'message', sessionId: chatSessionId, userMessage: text }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data?.status) {
+        toast.error(data?.message || 'Send failed.')
+        return
+      }
+      setFollowMessages((data.messages || []) as ChatMsg[])
+      setNegotiatedQuote({
+        finalPrice: data.quote.finalPrice,
+        discountPct: data.quote.discountPct,
+        favorabilityScore: Number(data.cumulativeFavorabilityScore ?? data.quote.favorabilityScore ?? 0),
+        listPrice: data.quote.listPrice,
+      })
+      setPricingResult((prev) =>
+        prev
+          ? {
+              ...prev,
+              shareText: data.shareText ?? prev.shareText,
+              referralLink: data.referralLink ?? prev.referralLink,
+            }
+          : prev
+      )
+      setFollowDraft('')
+    } catch {
+      toast.error('Send failed.')
+    } finally {
+      setFollowSending(false)
+    }
+  }
+
+  const applyShareBonus = async (action: 'linkedin' | 'facebook' | 'campaign_email') => {
+    if (!activeQuoteToken) return
+    try {
+      const res = await fetch('/api/pricing-bot/share-bonus', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ quoteToken: activeQuoteToken, action }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data?.status) return
+      const fp = data.quote.finalPrice
+      const dp = data.quote.discountPct
+      if (followUpOpen && negotiatedQuote) {
+        setNegotiatedQuote((q) => (q ? { ...q, finalPrice: fp, discountPct: dp } : q))
+      } else {
+        setPricingResult((prev) => (prev ? { ...prev, finalPrice: fp, discountPct: dp } : prev))
+      }
+      toast.success('+5% share bonus applied (once).')
+    } catch {}
+  }
+
+  const handleOpenCampaignActionKit = () => {
+    if (!displayPrice) return
+    const d = pricingForm.districtCode?.trim()
+    if (!d) {
+      toast.error('Add a US House district (e.g. NJ-5) to open your district report.')
+      return
+    }
+    const params = new URLSearchParams()
+    params.set('district', d)
+    if (pricingForm.candidateName) params.set('candidate', pricingForm.candidateName)
+    if (pricingForm.positionRunningFor) params.set('position', pricingForm.positionRunningFor)
+    if (pricingForm.issue) params.set('issue', pricingForm.issue)
+    params.set('quoted', String(displayPrice.finalPrice))
+    params.set('discount', String(displayPrice.discountPct))
+    router.push(`/campaign-action-kit?${params.toString()}`)
+  }
+
+  const handleHumanReview = async () => {
+    if (!pricingResult) return
+    setReviewLoading(true)
+    try {
+      const res = await fetch('/api/pricing-bot/review', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: pricingForm.email || null,
+          pricingForm,
+          pricingResult: { ...pricingResult, ...negotiatedQuote, quoteToken: activeQuoteToken },
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data?.status) {
+        toast.error(data?.message || 'Failed to submit human review.')
+        return
+      }
+      toast.success(`Human review submitted (${data.requestId}).`)
+    } catch {
+      toast.error('Failed to submit human review.')
+    } finally {
+      setReviewLoading(false)
+    }
+  }
+
+  const openPricingBotPanel = () => {
+    setSalesChatOpen(true)
+    setSalesTab('pricing-bot')
+  }
 
   return (
     <>
@@ -346,7 +588,7 @@ export default function FrontLanding() {
       {/* Bottom-right sales chat (stub) */}
       <div className="fixed bottom-4 right-4 z-50">
         {salesChatOpen && (
-          <div className="mb-2 w-[340px] max-w-[92vw] rounded-lg border border-border/60 bg-background/95 backdrop-blur shadow-lg overflow-hidden">
+          <div className="mb-2 w-[380px] max-w-[95vw] rounded-lg border border-violet-500/50 bg-background backdrop-blur shadow-lg overflow-hidden">
             <div className="px-3 py-2 border-b border-border/60 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <MessageSquareText className="h-4 w-4" />
@@ -356,26 +598,152 @@ export default function FrontLanding() {
                 Close
               </Button>
             </div>
-            <div className="p-3 text-sm space-y-2 max-h-[260px] overflow-auto">
-              <div className="text-muted-foreground">
-                This widget will route messages to our team for onboarding and sales support.
-              </div>
-              <div className="rounded-md bg-muted/40 p-2">
-                <div className="text-xs text-muted-foreground">Examples:</div>
-                <ul className="text-xs mt-1 space-y-1">
-                  <li>- “Can you show me a demo for a city council race?”</li>
-                  <li>- “What does pricing look like for a small campaign?”</li>
-                  <li>- “Can we import NGP VAN data?”</li>
-                </ul>
-              </div>
-            </div>
-            <div className="p-3 border-t border-border/60">
-              <textarea
-                disabled
-                placeholder="Stuck? Ask for a sales call here! (coming soon)"
-                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-muted-foreground resize-none"
-                rows={2}
-              />
+            <div className="p-3 text-sm max-h-[min(78vh,560px)] overflow-auto">
+              <Tabs value={salesTab} onValueChange={(v) => setSalesTab(v as 'sales-call' | 'pricing-bot')}>
+                <TabsList className="grid grid-cols-2 w-full">
+                  <TabsTrigger value="sales-call">Sales Call</TabsTrigger>
+                  <TabsTrigger value="pricing-bot">Pricing Bot</TabsTrigger>
+                </TabsList>
+                <TabsContent value="sales-call" className="space-y-2 mt-3">
+                  <div className="text-muted-foreground">
+                    This widget routes messages to our team for onboarding and sales support.
+                  </div>
+                  <div className="rounded-md bg-muted/40 p-2">
+                    <div className="text-xs text-muted-foreground">Examples:</div>
+                    <ul className="text-xs mt-1 space-y-1">
+                      <li>- “Can you show me a demo for a city council race?”</li>
+                      <li>- “What does pricing look like for a small campaign?”</li>
+                      <li>- “Can we import NGP VAN data?”</li>
+                    </ul>
+                  </div>
+                </TabsContent>
+                <TabsContent value="pricing-bot" className="space-y-3 mt-3">
+                  <div className="rounded-xl border border-violet-500/40 bg-gradient-to-br from-violet-500/15 via-cyan-500/15 to-emerald-500/15 p-3 shadow-sm">
+                    <div className="flex items-center gap-2">
+                      <div className="h-10 w-10 rounded-full bg-background/70 border border-violet-400/40 flex items-center justify-center">
+                        <Bot className="h-5 w-5 text-violet-500" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold">Pricing Bot Challenge</p>
+                        <p className="text-[11px] text-muted-foreground">Start at $650/mo (first 3 months). Make your case, then keep negotiating if you want more off.</p>
+                      </div>
+                      <Sparkles className="h-5 w-5 ml-auto text-cyan-500" />
+                    </div>
+                    <div className="mt-2 rounded-md border border-violet-500/30 bg-violet-500/10 px-2 py-1.5 text-[11px] font-medium">
+                      Can you drop our price from <span className="font-bold">$650</span> toward <span className="font-bold">$99</span>? Make your case.
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 gap-3">
+                    <label className="space-y-1">
+                      <span className="text-xs font-medium text-foreground">Position running for</span>
+                      <input className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm" value={pricingForm.positionRunningFor} onChange={(e) => setPricingForm((p) => ({ ...p, positionRunningFor: e.target.value }))} placeholder="e.g. Congress, Mayor, City Council" />
+                    </label>
+                    <label className="space-y-1">
+                      <span className="text-xs font-medium text-foreground">Candidate name</span>
+                      <input className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm" value={pricingForm.candidateName} onChange={(e) => setPricingForm((p) => ({ ...p, candidateName: e.target.value }))} placeholder="Full name" />
+                    </label>
+                    <label className="space-y-1">
+                      <span className="text-xs font-medium text-foreground">US campaign district <span className="font-normal text-muted-foreground">(if applicable)</span></span>
+                      <input className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm" value={pricingForm.districtCode} onChange={(e) => setPricingForm((p) => ({ ...p, districtCode: e.target.value }))} placeholder="e.g. NJ-5" />
+                    </label>
+                    <label className="space-y-1">
+                      <span className="text-xs font-medium text-foreground">Campaign website <span className="font-normal text-muted-foreground">(optional)</span></span>
+                      <input className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm" type="url" inputMode="url" value={pricingForm.campaignWebsite} onChange={(e) => setPricingForm((p) => ({ ...p, campaignWebsite: e.target.value }))} placeholder="https://yourcampaign.com" />
+                    </label>
+                    <label className="space-y-1">
+                      <span className="text-xs font-medium text-foreground">Discount percentage sought</span>
+                      <p className="text-[11px] text-muted-foreground leading-snug">Roughly how much you want off list (0–90%). The bot treats this as a target, not a guarantee.</p>
+                      <input className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm" type="number" min={0} max={90} value={pricingForm.reductionSoughtPct} onChange={(e) => setPricingForm((p) => ({ ...p, reductionSoughtPct: Number(e.target.value || 0) }))} />
+                    </label>
+                  </div>
+                  <label className="block space-y-1">
+                    <span className="text-xs font-medium text-foreground">Make your case</span>
+                    <Textarea value={pricingForm.convinceText} onChange={(e) => setPricingForm((p) => ({ ...p, convinceText: e.target.value }))} placeholder="Convince the bot why this campaign deserves a stronger price..." rows={3} />
+                  </label>
+                  <Button onClick={handlePricingQuote} disabled={pricingLoading} className="w-full">
+                    {pricingLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Pricing...</> : 'Get pricing quote'}
+                  </Button>
+                  {pricingResult && (
+                    <div className="rounded-md border border-border/70 bg-muted/30 p-2 space-y-2">
+                      <div>
+                        <div className="flex items-center justify-between text-[10px] text-muted-foreground mb-1">
+                          <span>Cumulative favorability</span>
+                          <span>{(displayPrice?.favorabilityScore ?? pricingResult.favorabilityScore)}/100</span>
+                        </div>
+                        <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
+                          <div
+                            className="h-full bg-gradient-to-r from-amber-500 via-lime-500 to-emerald-500 transition-all"
+                            style={{ width: `${Math.max(3, displayPrice?.favorabilityScore ?? pricingResult.favorabilityScore)}%` }}
+                          />
+                        </div>
+                      </div>
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-xs text-muted-foreground">List ${pricingResult.listPrice}/mo (first 3 months)</span>
+                        <span className="text-sm font-semibold">${displayPrice?.finalPrice ?? pricingResult.finalPrice}/mo · {displayPrice?.discountPct ?? pricingResult.discountPct}% off (first 3 months)</span>
+                        {negotiatedQuote && followUpOpen ? (
+                          <span className="text-[10px] text-muted-foreground">Updated after follow-up negotiation.</span>
+                        ) : null}
+                      </div>
+                      {pricingResult.personalityLine ? <div className="text-[11px] rounded border border-violet-500/30 bg-violet-500/10 px-2 py-1">{pricingResult.personalityLine}</div> : null}
+                      {pricingResult.shareText ? <Textarea readOnly value={pricingResult.shareText} rows={2} className="text-[11px]" /> : null}
+                      {pricingResult.referralLink ? <Textarea readOnly rows={2} value={`${origin}${pricingResult.referralLink}`} className="text-[11px]" /> : null}
+                      {!followUpOpen ? (
+                        <button
+                          type="button"
+                          onClick={startFollowUpNegotiation}
+                          disabled={followUpStartLoading}
+                          className="w-full rounded-lg border border-violet-500/50 bg-violet-500/15 px-3 py-2 text-left text-xs font-medium text-foreground transition hover:bg-violet-500/25 disabled:opacity-60"
+                        >
+                          {followUpStartLoading ? (
+                            <span className="flex items-center gap-2"><Loader2 className="h-3 w-3 animate-spin" /> Opening…</span>
+                          ) : (
+                            <>Want a further discount? <span className="text-violet-600 dark:text-violet-300">Click here to keep convincing Antelope!</span></>
+                          )}
+                        </button>
+                      ) : null}
+                      {followUpOpen && followMessages.length > 0 ? (
+                        <div className="space-y-2 rounded-md border border-violet-500/30 bg-background/80 p-2">
+                          <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Keep negotiating</p>
+                          <div className="max-h-36 overflow-y-auto space-y-1.5 text-[11px]">
+                            {followMessages.map((m, i) => (
+                              <div key={i} className={`rounded px-2 py-1 ${m.role === 'user' ? 'bg-primary/15 ml-3' : 'bg-muted/80 mr-2'}`}>
+                                {m.content}
+                              </div>
+                            ))}
+                          </div>
+                          <Textarea
+                            value={followDraft}
+                            onChange={(e) => setFollowDraft(e.target.value)}
+                            placeholder="Your next argument…"
+                            rows={2}
+                            className="text-xs"
+                          />
+                          <Button size="sm" className="w-full" type="button" onClick={() => void sendFollowUpMessage()} disabled={followSending || !followDraft.trim()}>
+                            {followSending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Send'}
+                          </Button>
+                        </div>
+                      ) : null}
+                      <div className="flex gap-2">
+                        <Button size="sm" variant="outline" className="flex-1" onClick={async () => {
+                          if (pricingResult.shareText) {
+                            await navigator.clipboard.writeText(pricingResult.shareText)
+                            toast.success('Share text copied.')
+                          }
+                        }}>
+                          Copy to share
+                        </Button>
+                        <Button size="sm" variant={pricingResult.needsHumanReview ? 'default' : 'secondary'} className="flex-1" onClick={handleHumanReview} disabled={reviewLoading}>
+                          {reviewLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <HeartHandshake className="h-4 w-4 mr-1" />}
+                          Human review
+                        </Button>
+                      </div>
+                      <Button size="sm" className="w-full" onClick={handleOpenCampaignActionKit}>
+                        Build campaign action kit
+                      </Button>
+                    </div>
+                  )}
+                </TabsContent>
+              </Tabs>
             </div>
           </div>
         )}
@@ -384,6 +752,25 @@ export default function FrontLanding() {
           <PhoneCall className="h-4 w-4 mr-2" />
           Stuck? Ask for a sales call here!
         </Button>
+        <div className="mt-2 w-[380px] max-w-[95vw] rounded-xl border border-violet-500/50 bg-background backdrop-blur shadow-lg p-4">
+          <div className="flex items-start gap-2">
+            <div className="h-12 w-12 rounded-full border border-violet-400/50 bg-violet-500/10 flex items-center justify-center shadow-sm">
+              <Bot className="h-6 w-6 text-violet-500" />
+            </div>
+            <div>
+              <p className="text-lg font-semibold leading-tight">Pricing Bot</p>
+              <p className="text-sm text-muted-foreground mt-1 leading-snug">
+                Opens from the corner. Make your case, then keep convincing Antelope for a deeper discount.
+              </p>
+            </div>
+          </div>
+          <div className="mt-3 rounded-md border border-violet-500/40 bg-violet-500/20 px-3 py-2 text-sm font-medium">
+            Think you can drop us from <span className="font-bold">$650</span> to as low as <span className="font-bold">$99</span> (for the first 3 months)?
+          </div>
+          <Button size="lg" className="w-full mt-3 text-base font-semibold" onClick={openPricingBotPanel}>
+            Open Pricing Bot Challenge
+          </Button>
+        </div>
       </div>
     </div>
     </>
