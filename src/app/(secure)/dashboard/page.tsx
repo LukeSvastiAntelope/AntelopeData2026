@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import dynamic from 'next/dynamic'
 import { useSidebar } from "@/components/ui/sidebar"
-import { PanelLeft, Landmark, MapPin, Vote, Grid3x3, ChevronDown, ChevronRight, HandCoins, Bot, Plus, Play, Trash2, Loader2, Newspaper, Building2, Globe, Palette, Upload, Sparkles, Fence, Check, X } from 'lucide-react'
+import { PanelLeft, Landmark, MapPin, Vote, Grid3x3, ChevronDown, ChevronRight, HandCoins, Bot, Plus, Play, Trash2, Loader2, Newspaper, Building2, Globe, Palette, Upload, Sparkles, Fence, Check, X, MessageSquare } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -15,6 +15,14 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
+import {
+  buildChoroplethFromRows,
+  buildPinsFromRows,
+  detectLatLngColumns,
+  filterUploadedRows,
+  type MapAssistantModelResult,
+} from '@/lib/custom-map-assistant'
 import { toast } from '@/components/ui/sonner'
 import type { GeofencePolygon } from '@/lib/geofencing'
 import { classifyAddresses, normalizeRing } from '@/lib/geofencing'
@@ -178,6 +186,11 @@ export default function DashboardPage() {
   const [customUploadLoading, setCustomUploadLoading] = useState(false)
   const [customAiAnalyzing, setCustomAiAnalyzing] = useState(false)
   const [customAiSummary, setCustomAiSummary] = useState<string | null>(null)
+  const [customMapPins, setCustomMapPins] = useState<{ lng: number; lat: number; label: string }[]>([])
+  const [mapAssistantOpen, setMapAssistantOpen] = useState(false)
+  const [mapAssistantInput, setMapAssistantInput] = useState('')
+  const [mapAssistantLoading, setMapAssistantLoading] = useState(false)
+  const [mapAssistantMessages, setMapAssistantMessages] = useState<{ role: 'user' | 'assistant'; content: string }[]>([])
   const [automations, setAutomations] = useState<Automation[]>([])
   const [automationsLoading, setAutomationsLoading] = useState(true)
   const [createOpen, setCreateOpen] = useState(false)
@@ -398,12 +411,111 @@ export default function DashboardPage() {
     }
   }, [selectedDistrict])
 
+  useEffect(() => {
+    if (!customFileRows?.length) setCustomMapPins([])
+  }, [customFileRows])
+
+  const sendMapAssistantMessage = useCallback(async () => {
+    const text = mapAssistantInput.trim()
+    if (!text) return
+    const hasData = !!(customFileRows && customFileRows.length > 0)
+    setMapAssistantLoading(true)
+    setMapAssistantMessages((prev) => [...prev, { role: 'user', content: text }])
+    setMapAssistantInput('')
+    try {
+      const latLng = hasData ? detectLatLngColumns(customFileColumns) : null
+      const res = await fetch('/api/dashboard/custom-map/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: text,
+          hasUploadedData: hasData,
+          columns: hasData ? customFileColumns : [],
+          rowsSample: hasData && customFileRows ? customFileRows.slice(0, 25) : [],
+          rowCount: hasData && customFileRows ? customFileRows.length : 0,
+          context: hasData
+            ? {
+                geoColumn: customGeoColumn,
+                geoType: customGeoType,
+                valueColumn: customSelectedColumn,
+                style: customSelectedStyle,
+                latLngSummary: latLng ? `${latLng.lat} / ${latLng.lng}` : 'none',
+              }
+            : {},
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data?.result) {
+        toast.error(data?.error || 'Assistant failed')
+        setMapAssistantMessages((prev) => [...prev, { role: 'assistant', content: 'Request failed. Try again.' }])
+        return
+      }
+      const r = data.result as MapAssistantModelResult
+      setMapAssistantMessages((prev) => [...prev, { role: 'assistant', content: r.reply }])
+
+      if (!hasData || !customFileRows) {
+        return
+      }
+
+      const filtered = filterUploadedRows(customFileRows, r.filterKeywords, r.districtText)
+      if (filtered.length === 0) {
+        toast.success('No rows match — try broader wording or check column names.')
+      }
+      if (r.showPins) {
+        if (latLng) {
+          const labelCol =
+            r.pinLabelColumn && customFileColumns.includes(r.pinLabelColumn)
+              ? r.pinLabelColumn
+              : customFileColumns.find((c) => /name|title|school|facility|label|hospital/i.test(c)) ?? null
+          setCustomMapPins(buildPinsFromRows(filtered, latLng.lat, latLng.lng, labelCol))
+        } else {
+          setCustomMapPins([])
+          toast.success('Add latitude & longitude columns to your CSV to plot pins.')
+        }
+      } else {
+        setCustomMapPins([])
+      }
+      if (r.applyChoropleth && filtered.length > 0) {
+        const vc =
+          r.valueColumn && customFileColumns.includes(r.valueColumn) ? r.valueColumn : customSelectedColumn
+        const st = r.style ?? customSelectedStyle
+        const gt = r.geoType ?? customGeoType
+        const chor = buildChoroplethFromRows(filtered, customGeoColumn, vc, gt, st, ABBREV_TO_STATE_NAME)
+        if (chor) {
+          setCustomLayerData({
+            ...chor,
+            aiSummary: `Assistant · ${filtered.length}/${customFileRows.length} rows`,
+          })
+          setCustomSelectedColumn(vc)
+          if (r.style) setCustomSelectedStyle(st)
+          if (r.geoType) setCustomGeoType(gt)
+        }
+      }
+      setLayers((prev) => ({ ...prev, customizable: true }))
+      toast.success('Map updated')
+    } catch {
+      toast.error('Assistant request failed')
+      setMapAssistantMessages((prev) => [...prev, { role: 'assistant', content: 'Network error.' }])
+    } finally {
+      setMapAssistantLoading(false)
+    }
+  }, [
+    mapAssistantInput,
+    customFileRows,
+    customFileColumns,
+    customGeoColumn,
+    customGeoType,
+    customSelectedColumn,
+    customSelectedStyle,
+  ])
+
   return (
     <div style={{ display: 'flex', width: '100%', height: '100vh', overflow: 'hidden' }}>
       <div style={{ flex: 1, minWidth: 0, position: 'relative' }}>
         <DashboardMap
           layers={layers}
           customLayerData={layers.customizable ? customLayerData : null}
+          customMapPins={customMapPins}
           geofencing={geofencingMapProps}
           onDistrictSelect={(district) => {
             setSelectedDistrict(district)
@@ -453,6 +565,109 @@ export default function DashboardPage() {
               </div>
             </Section>
 
+            <div className="rounded-md border border-border/50 bg-muted/15 px-1.5 py-1.5 space-y-1.5">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground px-0.5">
+                Map assistant
+              </p>
+              {!mapAssistantOpen ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  className="w-full h-8 justify-center gap-1.5 text-[10px]"
+                  onClick={() => setMapAssistantOpen(true)}
+                >
+                  <MessageSquare className="h-3 w-3 shrink-0" />
+                  Open chat
+                </Button>
+              ) : (
+                <div className="rounded border border-border/40 bg-background flex flex-col overflow-hidden">
+                  <div className="flex items-center justify-between gap-1 px-1.5 py-1 border-b border-border/40 shrink-0">
+                    <span className="text-[10px] font-medium text-muted-foreground truncate">Chat</span>
+                    <div className="flex items-center gap-0 shrink-0">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 px-1.5 text-[9px]"
+                        onClick={() => {
+                          setCustomMapPins([])
+                          toast.success('Pins cleared')
+                        }}
+                      >
+                        Clear pins
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 shrink-0"
+                        onClick={() => setMapAssistantOpen(false)}
+                        aria-label="Collapse map assistant"
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="max-h-[160px] overflow-y-auto px-1.5">
+                    <div className="space-y-1.5 py-1.5">
+                      {mapAssistantMessages.length === 0 ? (
+                        <p className="text-[10px] text-muted-foreground leading-snug">
+                          Ask about layers or upload a CSV for custom pins. Use <strong>Customizable</strong> for your data.
+                        </p>
+                      ) : (
+                        mapAssistantMessages.map((m, i) => (
+                          <div
+                            key={i}
+                            className={`text-[10px] leading-snug rounded px-1.5 py-1 ${
+                              m.role === 'user'
+                                ? 'bg-primary/12 text-foreground ml-2'
+                                : 'bg-muted/40 text-muted-foreground mr-2'
+                            }`}
+                          >
+                            {m.content}
+                          </div>
+                        ))
+                      )}
+                      {mapAssistantLoading && (
+                        <div className="flex items-center gap-1 text-[9px] text-muted-foreground py-0.5">
+                          <Loader2 className="h-3 w-3 animate-spin" /> Thinking…
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="p-1.5 border-t border-border/40 space-y-1 shrink-0">
+                    <Textarea
+                      value={mapAssistantInput}
+                      onChange={(e) => setMapAssistantInput(e.target.value)}
+                      placeholder={
+                        customFileRows && customFileRows.length > 0
+                          ? 'Filter schools, change style…'
+                          : 'Ask about the map…'
+                      }
+                      className="min-h-[48px] text-[10px] resize-none py-1.5"
+                      disabled={mapAssistantLoading}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault()
+                          void sendMapAssistantMessage()
+                        }
+                      }}
+                    />
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="w-full h-7 text-[10px]"
+                      disabled={mapAssistantLoading || !mapAssistantInput.trim()}
+                      onClick={() => void sendMapAssistantMessage()}
+                    >
+                      {mapAssistantLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Send'}
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+
             {layers.geofencing && (
               <Section title="Canvass geofencing" defaultOpen>
                 <div className="space-y-2 text-[10px] text-muted-foreground">
@@ -469,7 +684,7 @@ export default function DashboardPage() {
                       onClick={() => {
                         setGeofenceDrawMode('include')
                         setGeofenceDraftVertices([])
-                        toast.info('Include zone: click the map to add corners, then Finish.')
+                        toast.success('Include zone: click the map to add corners, then Finish.')
                       }}
                     >
                       Draw include
@@ -481,7 +696,7 @@ export default function DashboardPage() {
                       onClick={() => {
                         setGeofenceDrawMode('exclude')
                         setGeofenceDraftVertices([])
-                        toast.info('Exclude zone: click the map to add corners, then Finish.')
+                        toast.success('Exclude zone: click the map to add corners, then Finish.')
                       }}
                     >
                       Draw exclude
@@ -732,7 +947,10 @@ export default function DashboardPage() {
 
             <Section title="Upload data set to map" defaultOpen={false}>
               <div className="space-y-2">
-                <p className="text-[10px] text-muted-foreground">CSV with state or district column + a numeric column (e.g. Census, IPSOS).</p>
+                <p className="text-[10px] text-muted-foreground">
+                  CSV with state or district column + a numeric column (e.g. Census). For facility pins, include latitude &amp; longitude
+                  columns. After upload, use <strong>Map assistant</strong> (under Map Layers) to filter rows or switch styling in plain language.
+                </p>
                 <label className="flex items-center justify-center gap-1.5 w-full px-2 py-1.5 rounded border border-dashed border-border text-[11px] cursor-pointer hover:bg-muted/50 transition-colors">
                   <Upload className="h-3 w-3" />
                   Choose CSV
@@ -761,6 +979,7 @@ export default function DashboardPage() {
                         setCustomSelectedColumn(header.find(h => /value|rate|pct|percent|pop|population|income|median/i.test(h)) ?? header[1] ?? header[0])
                         setCustomGeoColumn(header.find(h => /state|district|name|geo|fips/i.test(h)) ?? header[0])
                         setCustomAiSummary(null)
+                        setCustomMapPins([])
                         toast.success(`Loaded ${rows.length} rows`)
                       } catch (err) {
                         toast.error('Failed to parse CSV')

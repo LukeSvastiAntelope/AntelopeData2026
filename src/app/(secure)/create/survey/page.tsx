@@ -64,6 +64,14 @@ interface Survey {
   sourceMetadata?: any
 }
 
+/** Maps template metadata to stored survey anonymity levels (DB + UI Select only allow full | semi_anonymous | anonymous). */
+function templateAnonymityToSurveyLevel(
+  recommended: SurveyTemplate['recommendedAnonymityLevel']
+): AnonymityLevel {
+  if (recommended === 'political') return 'semi_anonymous'
+  return recommended
+}
+
 const CreateSurveyPage = () => {
   const router = useRouter()
   const [survey, setSurvey] = useState<Survey>({
@@ -93,7 +101,7 @@ const CreateSurveyPage = () => {
       ...prev,
       title: template.title,
       description: template.description,
-      anonymityLevel: template.recommendedAnonymityLevel as AnonymityLevel,
+      anonymityLevel: templateAnonymityToSurveyLevel(template.recommendedAnonymityLevel),
       demographicsRequired: true,
       questions
     }))
