@@ -107,12 +107,11 @@ export async function buildPublicDistrictBrief(districtCodeInput: string): Promi
   }
   const censusStatus: SourceHealth = censusRaw ? 'ok' : stateFips ? 'partial' : 'unavailable'
 
-  const fecKey = process.env.FEC_API_KEY
-  const fecUrl = fecKey
-    ? `https://api.open.fec.gov/v1/candidates/search/?api_key=${encodeURIComponent(fecKey)}&office=H&state=${stateAbbrev}&district=${districtNumber}&per_page=6`
-    : ''
-  const fecRaw = fecUrl ? await safeJson(fecUrl) : null
-  const fecStatus: SourceHealth = fecRaw?.results ? 'ok' : fecKey ? 'partial' : 'unavailable'
+  // OpenFEC DEMO_KEY works for low-volume calls; set FEC_API_KEY for production rate limits.
+  const fecKey = (process.env.FEC_API_KEY || 'DEMO_KEY').trim()
+  const fecUrl = `https://api.open.fec.gov/v1/candidates/search/?api_key=${encodeURIComponent(fecKey)}&office=H&state=${stateAbbrev}&district=${districtNumber}&per_page=6`
+  const fecRaw = await safeJson(fecUrl)
+  const fecStatus: SourceHealth = fecRaw?.results?.length ? 'ok' : fecRaw ? 'partial' : 'unavailable'
   const sampleCandidates =
     fecRaw?.results?.slice(0, 5).map((c: Record<string, unknown>) => ({
       name: String(c.name || 'Unknown'),
@@ -181,7 +180,9 @@ export async function buildPublicDistrictBrief(districtCodeInput: string): Promi
       : 'Population: Census ACS when available.',
     fecStatus === 'ok' && sampleCandidates.length
       ? `FEC shows ${sampleCandidates.length}+ House filings for this seat — vet active committees.`
-      : 'FEC: configure FEC_API_KEY for live committee and filing context.',
+      : fecStatus === 'partial'
+        ? 'FEC: OpenFEC returned no House rows for this district filter (check at-large / district on fec.gov).'
+        : 'FEC: OpenFEC unavailable (network). Set FEC_API_KEY for higher rate limits.',
     'Ballotpedia & Open States: use links below for race narrative and state legislative bridges.',
   ]
 

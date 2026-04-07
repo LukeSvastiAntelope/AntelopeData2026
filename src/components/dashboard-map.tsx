@@ -7,6 +7,7 @@ import { Users, FileText, Loader2, Globe } from 'lucide-react'
 import { PartyIcon, partyColor } from '@/components/party-icons'
 import type { GeofencePolygon, CanvassAddress } from '@/lib/geofencing'
 import { normalizeRing } from '@/lib/geofencing'
+import type { CustomMapPin } from '@/lib/custom-map-assistant'
 
 // ---------------------------------------------------------------------------
 // State name <-> abbreviation lookups
@@ -129,6 +130,8 @@ export interface GeofencingMapProps {
 interface DashboardMapProps {
   layers?: { political: boolean; districts: boolean; responses: boolean; voters: boolean; fundraising?: boolean; customizable?: boolean; geofencing?: boolean }
   customLayerData?: CustomLayerData | null
+  /** Point pins from uploaded CSV (lat/lng), e.g. schools/hospitals filtered via map assistant */
+  customMapPins?: CustomMapPin[] | null
   geofencing?: GeofencingMapProps | null
   onDistrictSelect?: (district: { districtCode: string; state: string; districtNumber: number }) => void
 }
@@ -190,7 +193,7 @@ function valueToColor(style: CustomLayerStyle, normalized: number): string {
   return `rgba(${r},${g},${b},0.65)`
 }
 
-export default function DashboardMap({ layers, customLayerData, geofencing, onDistrictSelect }: DashboardMapProps) {
+export default function DashboardMap({ layers, customLayerData, customMapPins, geofencing, onDistrictSelect }: DashboardMapProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<any>(null)
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
@@ -454,6 +457,44 @@ export default function DashboardMap({ layers, customLayerData, geofencing, onDi
             'circle-color': '#6366f1', 'circle-opacity': 0.7,
             'circle-stroke-width': 1,
             'circle-stroke-color': isDark ? '#1e1b4b' : '#fff',
+          },
+        })
+
+        // ---- Uploaded CSV point pins (facilities, etc.) ----
+        map.addSource('custom-upload-pins', {
+          type: 'geojson',
+          data: { type: 'FeatureCollection', features: [] },
+        })
+        map.addLayer({
+          id: 'custom-upload-pins-circles',
+          type: 'circle',
+          source: 'custom-upload-pins',
+          layout: { visibility: 'none' },
+          paint: {
+            'circle-radius': ['interpolate', ['linear'], ['zoom'], 4, 4, 10, 10, 16, 14],
+            'circle-color': '#a855f7',
+            'circle-opacity': 0.92,
+            'circle-stroke-width': 2,
+            'circle-stroke-color': isDark ? '#1e1b4b' : '#fff',
+          },
+        })
+        map.addLayer({
+          id: 'custom-upload-pins-labels',
+          type: 'symbol',
+          source: 'custom-upload-pins',
+          minzoom: 9,
+          layout: {
+            visibility: 'none',
+            'text-field': ['get', 'label'],
+            'text-size': 10,
+            'text-anchor': 'top',
+            'text-offset': [0, 0.9],
+            'text-max-width': 14,
+          },
+          paint: {
+            'text-color': isDark ? '#e9d5ff' : '#581c87',
+            'text-halo-color': isDark ? '#1e1b4b' : '#fff',
+            'text-halo-width': 1.2,
           },
         })
 
@@ -945,6 +986,29 @@ export default function DashboardMap({ layers, customLayerData, geofencing, onDi
       console.warn('Custom district fills:', e)
     }
   }, [status, showCustomizableLayer, customLayerData])
+
+  // Uploaded CSV pins (facilities, filtered points)
+  useEffect(() => {
+    if (status !== 'ready' || !mapRef.current) return
+    const map = mapRef.current
+    const pins = customMapPins ?? []
+    const features = pins.map((p) => ({
+      type: 'Feature' as const,
+      properties: { label: p.label },
+      geometry: { type: 'Point' as const, coordinates: [p.lng, p.lat] },
+    }))
+    try {
+      const src = map.getSource('custom-upload-pins')
+      if (src) (src as { setData: (d: object) => void }).setData({ type: 'FeatureCollection', features })
+    } catch (e) {
+      console.warn('custom-upload-pins setData:', e)
+    }
+    const vis = showCustomizableLayer && features.length > 0 ? 'visible' : 'none'
+    try {
+      map.setLayoutProperty('custom-upload-pins-circles', 'visibility', vis)
+      map.setLayoutProperty('custom-upload-pins-labels', 'visibility', vis)
+    } catch {}
+  }, [status, showCustomizableLayer, customMapPins])
 
   // -----------------------------------------------------------------------
   // Geofencing: polygons, draft vertices, canvass address pins

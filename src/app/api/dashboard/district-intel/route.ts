@@ -60,11 +60,10 @@ async function getBaseDistrictIntel(districtCodeRaw: string) {
   const censusRaw = censusUrl ? await safeJson(censusUrl) : null
   const censusStatus: SourceStatus = censusRaw ? 'ok' : 'partial'
 
-  const fecKey = process.env.FEC_API_KEY
-  const fecUrl = fecKey
-    ? `https://api.open.fec.gov/v1/candidates/search/?api_key=${encodeURIComponent(fecKey)}&office=H&state=${stateAbbrev}&district=${districtNumber}&per_page=5`
-    : ''
-  const fecRaw = fecUrl ? await safeJson(fecUrl) : null
+  // OpenFEC allows DEMO_KEY for low-volume testing; set FEC_API_KEY in production.
+  const fecKey = (process.env.FEC_API_KEY || 'DEMO_KEY').trim()
+  const fecUrl = `https://api.open.fec.gov/v1/candidates/search/?api_key=${encodeURIComponent(fecKey)}&office=H&state=${stateAbbrev}&district=${districtNumber}&per_page=5`
+  const fecRaw = await safeJson(fecUrl)
   const fecStatus: SourceStatus = fecRaw ? 'ok' : 'unavailable'
 
   const openStatesKey = process.env.OPENSTATES_API_KEY
@@ -75,13 +74,14 @@ async function getBaseDistrictIntel(districtCodeRaw: string) {
   const openStatesStatus: SourceStatus = openStatesRaw ? 'ok' : 'unavailable'
 
   const ballotpediaStatus: SourceStatus = 'unavailable'
+  // MIT Election Lab publishes research datasets; there is no single public REST API wired here (links only in district brief / action kit).
   const mitElectionLabStatus: SourceStatus = 'unavailable'
 
   const summary = [
     `${districtCode} baseline: PVI ${local.cook_pvi || 'N/A'}, 2024 margin ${parseFloat(local.margin_2024 || 0).toFixed(1)}.`,
     `Incumbent: ${local.incumbent_name || 'Unknown'} (${local.incumbent_party || 'N/A'}).`,
     `Demographics: pop ${local.total_population ? Number(local.total_population).toLocaleString() : 'N/A'}, median HH income ${local.median_household_income ? `$${Number(local.median_household_income).toLocaleString()}` : 'N/A'}, median age ${local.median_age || 'N/A'}.`,
-    `Data source health -> Census: ${censusStatus}, FEC: ${fecStatus}, OpenStates: ${openStatesStatus}, Ballotpedia: ${ballotpediaStatus}, MIT Election Lab: ${mitElectionLabStatus}.`,
+    `Data source health -> Census: ${censusStatus}, FEC: ${fecStatus}, OpenStates: ${openStatesStatus}, Ballotpedia: ${ballotpediaStatus}, MIT Election Lab: ${mitElectionLabStatus} (no live API in this app—use MIT data portal for files).`,
   ].join(' ')
 
   return {
