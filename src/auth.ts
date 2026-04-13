@@ -1,4 +1,5 @@
 import NextAuth from "next-auth";
+import { CredentialsSignin } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { authConfig } from "@/auth.config";
 import { UserRepo } from "@/app/utils/database/user-repo";
@@ -14,8 +15,18 @@ const logDebug = (...args: unknown[]) => {
 };
 
 // This file runs in a Node.js runtime (API route). It can safely import mysql2 and bcryptjs.
+// Omit `secret` when unset so setEnvDefaults can fill from AUTH_SECRET / NEXTAUTH_SECRET.
+const authSecret = process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET;
+
+function credentialsSignIn(code: string) {
+  const e = new CredentialsSignin();
+  e.code = code;
+  return e;
+}
+
 export const { handlers, signIn, signOut, auth } = NextAuth({
   ...authConfig,
+  ...(authSecret ? { secret: authSecret } : {}),
   providers: [
     Credentials({
       name: "credentials",
@@ -47,7 +58,11 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             user = await UserRepo.getUserByEmail(email);
           } catch (dbError) {
             console.error("Auth DB error:", dbError);
-            throw new Error('DatabaseError');
+            const e = dbError as NodeJS.ErrnoException & { sqlState?: string };
+            if (e.code === "ECONNREFUSED") {
+              throw credentialsSignIn("DbConnectionRefused");
+            }
+            throw credentialsSignIn("DatabaseError");
           }
           if (!user) {
             logDebug('No user found with email:', email);
@@ -88,7 +103,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           // Treat NULL as verified (older rows may not have set the flag explicitly)
           if (user.is_verified === 0) {
             logDebug('User not verified:', email);
-            throw new Error('EmailNotVerified');
+            throw credentialsSignIn("EmailNotVerified");
           }
 
           return {
@@ -98,12 +113,11 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             image: null
           } as any;
         } catch (error) {
-          // Re-throw our known codes so the UI can show the right message
-          if (error instanceof Error && ['EmailNotVerified', 'DatabaseError'].includes(error.message)) {
+          if (error instanceof CredentialsSignin) {
             throw error;
           }
           console.error("Auth error:", error);
-          throw error;
+          throw credentialsSignIn("DatabaseError");
         }
       }
     })

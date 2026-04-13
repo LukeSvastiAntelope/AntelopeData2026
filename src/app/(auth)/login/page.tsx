@@ -103,13 +103,23 @@ const LoginPage = () => {
             console.log('Authentication result:', result);
 
             if (result?.error) {
-                console.error('Client signIn error:', result.error);
+                console.error('Client signIn error:', result.error, result.code ?? '');
                 if (result.error === 'CredentialsSignin') {
-                    toast.error('Invalid email or password.');
-                } else if (result.error === 'EmailNotVerified') {
-                    toast.error('Your account is not verified yet. Please check your email for the confirmation link.');
-                } else if (result.error === 'DatabaseError') {
-                    toast.error('Service temporarily unavailable. Please try again in a moment.');
+                    if (result.code === 'EmailNotVerified') {
+                        toast.error('Your account is not verified yet. Please check your email for the confirmation link.');
+                    } else if (result.code === 'DbConnectionRefused') {
+                        toast.error(
+                            'Cannot reach MySQL. Start your database server (or Docker) and ensure MYSQL_HOST and MYSQL_PORT in .env.local match (e.g. 127.0.0.1:3306).'
+                        );
+                    } else if (result.code === 'DatabaseError') {
+                        toast.error('Service temporarily unavailable. Please try again in a moment.');
+                    } else {
+                        toast.error('Invalid email or password.');
+                    }
+                } else if (result.error === 'Configuration') {
+                    toast.error(
+                        'Auth is misconfigured (usually missing AUTH_SECRET in .env.local, or host URL mismatch). Check the dev server terminal and set AUTH_SECRET, AUTH_TRUST_HOST=true, and AUTH_URL to match how you open the app (e.g. http://localhost:3000).'
+                    );
                 } else {
                     toast.error(result.error);
                 }
