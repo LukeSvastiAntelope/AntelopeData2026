@@ -1,7 +1,7 @@
 'use client';
 
 import Link from "next/link";
-import { toast } from "react-hot-toast";
+import { toast } from "@/components/ui/sonner";
 import { useState } from "react";
 import { validateEmail, validatePassword, validateDisplayName } from "@/app/utils/validation";
 import { useRouter } from "next/navigation";
