@@ -122,3 +122,5 @@ temp/
 data/*.csv
 data/*.tsv
 data/*.xlsx
+
+NOTES.md
