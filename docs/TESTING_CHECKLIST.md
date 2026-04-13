@@ -1,288 +1,327 @@
-# Survey System Testing Checklist
-
-## ✅ **CRITICAL BUGS FIXED** 
-1. **Survey Creation API Transaction Error** - ✅ Fixed `db.rollback is not a function` error
-2. **Question Type Data Truncation** - ✅ Fixed ENUM mismatch between frontend and database
-3. **Complete Flow Tested** - ✅ End-to-end survey creation, response, and digital twin querying working
-
-## 🚀 Quick Start Testing
-
-### Prerequisites
-1. **Database Setup**: Ensure survey tables are created (`node setup_survey_tables.js`)
-2. **Server Running**: `npm run dev` on port 3000
-3. **Authentication**: Have a valid user session for protected routes
-4. **✅ Bug Fixes Verified**: All critical API issues resolved
+# E2E Manual Testing Guide — AntelopeCM
 
 ---
 
-## 📋 Manual Testing Checklist
+## Phase 0: Credentials to Request from Owner
 
-### 1. **✅ VERIFIED: Core API Functionality** 
-- [x] **Database connectivity** - Working
-- [x] **Survey creation in database** - Working  
-- [x] **Public survey access** - Working
-- [x] **Survey response submission** - Working
-- [x] **Digital twin creation** - Working
-- [x] **Digital twin querying** - Working
-- [x] **Error handling** - Working
+Gather these before starting. None are committed to the repo.
 
-### 2. **🔥 PRIORITY: Frontend UI Testing** 
-- [ ] **Test survey creation through UI** - `/create/survey` → create → save/publish
-- [ ] **Verify no errors in browser console** - Check for JavaScript errors
-- [ ] **Confirm survey saves to database** - Check surveys table
-- [ ] **Test with different question types** - text, single-choice, multiple-choice, rating, yes-no
-
-### 3. **Navigation & Access** ✅
-- [ ] Visit `/create` - Survey option appears with pink Users icon
-- [ ] Click "Survey / Questionnaire" - Navigates to `/create/survey`
-- [ ] Page loads without errors
-- [ ] Sidebar and header render correctly
-
-### 4. **Survey Creation UI** ✅
-- [ ] **Basic Info Section**
-  - [ ] Title field accepts input
-  - [ ] Description field accepts input
-  - [ ] Public/Private toggle works
-  - [ ] Form validation shows errors for empty required fields
-
-- [ ] **Question Builder**
-  - [ ] "Add Question" button works
-  - [ ] Question type dropdown shows all options (text, single_choice, multiple_choice, rating, yes_no)
-  - [ ] Question text field accepts input
-  - [ ] Required toggle works
-  - [ ] Options field appears for choice questions
-  - [ ] Scale field appears for rating questions
-  - [ ] Delete question button works
-
-- [ ] **Preview Mode**
-  - [ ] Preview toggle shows/hides preview
-  - [ ] Preview renders questions correctly
-  - [ ] All question types display properly
-
-- [ ] **Save/Publish**
-  - [ ] Save as Draft button works
-  - [ ] Publish Survey button works
-  - [ ] Success message appears
-  - [ ] Redirects appropriately
-
-### 5. **Public Survey Display** ✅
-- [ ] **Access Survey**
-  - [ ] Visit `/survey/[slug]` for published survey
-  - [ ] Page loads without authentication
-  - [ ] Survey title and description display
-  - [ ] Questions render in correct order
-
-- [ ] **Demographics Form**
-  - [ ] Age field accepts input
-  - [ ] Gender dropdown works
-  - [ ] Location field accepts input
-  - [ ] Occupation field accepts input
-
-- [ ] **Question Interactions**
-  - [ ] Text inputs work
-  - [ ] Radio buttons work (single choice)
-  - [ ] Checkboxes work (multiple choice)
-  - [ ] Rating scale works
-  - [ ] Yes/No buttons work
-  - [ ] Required field validation works
-
-- [ ] **Form Submission**
-  - [ ] Submit button works
-  - [ ] Loading state shows
-  - [ ] Success page displays
-  - [ ] Digital twin token is shown
-  - [ ] Copy token button works
-
-### 6. **Custom Components** ✅
-- [ ] **Radio Group Component**
-  - [ ] Single selection works
-  - [ ] Visual feedback on selection
-  - [ ] Keyboard navigation works
-  - [ ] Styling matches design system
-
-- [ ] **Checkbox Component**
-  - [ ] Multiple selection works
-  - [ ] Check/uncheck animations
-  - [ ] Proper spacing and alignment
-  - [ ] Accessible labels
-
-### 7. **Responsive Design** 📱
-- [ ] **Mobile (320px-768px)**
-  - [ ] Survey creation form is usable
-  - [ ] Questions stack properly
-  - [ ] Buttons are touch-friendly
-  - [ ] Text is readable
-
-- [ ] **Tablet (768px-1024px)**
-  - [ ] Layout adapts appropriately
-  - [ ] Form elements are properly sized
-  - [ ] Navigation works
-
-- [ ] **Desktop (1024px+)**
-  - [ ] Full layout displays correctly
-  - [ ] Optimal use of screen space
-  - [ ] Hover states work
-
-### 8. **Error Handling** 🚨
-- [ ] **Network Errors**
-  - [ ] Graceful handling of API failures
-  - [ ] User-friendly error messages
-  - [ ] Retry mechanisms where appropriate
-
-- [ ] **Validation Errors**
-  - [ ] Required field validation
-  - [ ] Format validation (email, etc.)
-  - [ ] Clear error messaging
-  - [ ] Error state styling
-
-- [ ] **Edge Cases**
-  - [ ] Very long survey titles/descriptions
-  - [ ] Many questions (10+ questions)
-  - [ ] Special characters in inputs
-  - [ ] Empty option lists
+| Credential | Used For | How to Get |
+|---|---|---|
+| `MYSQL_HOST/PORT/USER/PASSWORD/DATABASE` | All DB operations | Ask owner |
+| `AUTH_SECRET` | NextAuth session signing | Ask owner OR run: `openssl rand -base64 32` |
+| `JWT_SECRET_KEY` | JWT tokens | Ask owner |
+| `ANTHROPIC_API_KEY` | AI analytics, digital twins, reports | Ask owner |
+| `OPENAI_API_KEY` | Survey generation, avatar enrichment | Ask owner |
+| `PINECONE_API_KEY` | Twin semantic search | Ask owner |
+| `SENDGRID_API_KEY` | Email verification, password reset | Ask owner |
+| `TELEGRAM_BOT_TOKEN` | Telegram channel integration | Ask owner (optional) |
+| `STRIPE_SECRET_KEY` + `STRIPE_WEBHOOK_SECRET` | Payments | Ask owner (optional) |
 
 ---
 
-## 🔧 Automated Testing
+## Phase 1: Environment Setup
 
-### Run the Test Suite
+### 1.1 Fill in `.env.local`
+
+The file `AntelopeCM/.env.local` has been created with placeholder values.
+Open it and replace every `<ask owner>` value with the real credentials.
+
+### 1.2 Run Database Migrations
+
+From the `AntelopeCM/` directory, run all 44 migrations in chronological order:
+
 ```bash
-# Install dependencies if needed
-npm install mysql2
+cd AntelopeCM
 
-# Update database config in test file
-# Edit test_survey_system.js - update dbConfig and TEST_USER_ID
-
-# Run comprehensive tests
-node test_survey_system.js
+node scripts/run-migration.js 20240614_create_cohorts_table.sql
+node scripts/run-migration.js 20240614_add_demographic_columns.sql
+node scripts/run-migration.js 20240714_add_answer_code_to_survey_answers.sql
+node scripts/run-migration.js 20250122_add_analytics_system.sql
+node scripts/run-migration.js 20250122_add_demographics_customization.sql
+node scripts/run-migration.js 20250122_add_ethnicity_demographic.sql
+node scripts/run-migration.js 20250122_add_survey_cloning_support.sql
+node scripts/run-migration.js 20250122_add_survey_source_tracking.sql
+node scripts/run-migration.js 20250123_add_report_generation_tables.sql
+node scripts/run-migration.js 20250123_add_survey_id_to_cohorts.sql
+node scripts/run-migration.js 20250125_add_survey_anonymity_system.sql
+node scripts/run-migration.js 20250125_add_survey_anonymity_system_v2.sql
+node scripts/run-migration.js 20250125_add_survey_anonymity_system_safe.sql
+node scripts/run-migration.js 20250127_email_migration.sql
+node scripts/run-migration.js 20250127_fix_anonymous_profile_enum.sql
+node scripts/run-migration.js 20250128_normalize_demographic_fields.sql
+node scripts/run-migration.js 20250131_add_stopped_status.sql
+node scripts/run-migration.js 20250131_update_survey_status_model.sql
+node scripts/run-migration.js 20250201_add_channels_tables.sql
+node scripts/run-migration.js 20250201_create_conversations_table.sql
+node scripts/run-migration.js 20250201_add_conversation_type.sql
+node scripts/run-migration.js 20250208_add_organizations.sql
+node scripts/run-migration.js 20250208_add_tracking_polls.sql
+node scripts/run-migration.js 20250208_add_voter_file_enrichment.sql
+node scripts/run-migration.js 20250209_add_org_location.sql
+node scripts/run-migration.js 20250210_add_political_data.sql
+node scripts/run-migration.js 20250211_add_campaign_fields.sql
+node scripts/run-migration.js 20250701_add_schedule_fields.sql
+node scripts/run-migration.js 20250701_add_schedule_fields_safe.sql
+node scripts/run-migration.js 20250713_add_indexes.sql
+node scripts/run-migration.js 20250715_create_survey_question_stats.sql
+node scripts/run-migration.js 20250811_add_twin_persona_capabilities.sql
+node scripts/run-migration.js 20260212_add_campaign_news_digest.sql
+node scripts/run-migration.js 20260212_add_last_news_seen_at_to_users.sql
+node scripts/run-migration.js 20260212_add_political_data_district_demographics.sql
+node scripts/run-migration.js 20260213_add_news_conversation_type.sql
+node scripts/run-migration.js 20260221_add_campaign_memory_tables.sql
+node scripts/run-migration.js 20260222_add_agent_situation_documents.sql
+node scripts/run-migration.js 20260309_add_dashboard_automations.sql
+node scripts/run-migration.js 20260318_add_dashboard_map_overlays.sql
+node scripts/run-migration.js add_agent_token_to_survey_responses.sql
+node scripts/run-migration.js fix_sort_memory_issue.sql
 ```
 
-### Expected Test Results
-- ✅ Database connection successful
-- ✅ Survey creation works
-- ✅ Public survey access works
-- ✅ Survey response submission works
-- ✅ Digital twin creation works
-- ✅ Agent querying works
-- ✅ Error handling works
-- ✅ Data integrity maintained
+### 1.3 Start Dev Server
 
----
-
-## 🎯 Critical User Flows
-
-### Flow 1: Create and Publish Survey
-1. Login → `/create` → "Survey / Questionnaire"
-2. Fill survey details
-3. Add 3-5 questions of different types
-4. Preview survey
-5. Publish survey
-6. Verify survey appears in listings
-
-### Flow 2: Complete Survey Response
-1. Visit public survey URL (no login)
-2. Fill demographics
-3. Answer all questions
-4. Submit response
-5. Receive digital twin token
-6. Copy/save token
-
-### Flow 3: Query Digital Twin
-1. Use agent token from Flow 2
-2. Send various queries to `/api/agents/query`
-3. Verify responses are contextual
-4. Test different question types
-
----
-
-## 🔍 Performance Testing
-
-### Load Testing
-- [ ] 10+ concurrent survey submissions
-- [ ] Large surveys (20+ questions)
-- [ ] Multiple digital twin queries
-- [ ] Database performance under load
-
-### Response Times
-- [ ] Survey creation < 2 seconds
-- [ ] Public survey load < 1 second
-- [ ] Response submission < 3 seconds
-- [ ] Digital twin query < 5 seconds
-
----
-
-## 🛡️ Security Testing
-
-### Authentication
-- [ ] Protected routes require valid tokens
-- [ ] Public routes work without auth
-- [ ] Token expiration handled properly
-
-### Input Validation
-- [ ] SQL injection prevention
-- [ ] XSS prevention
-- [ ] Input sanitization
-- [ ] File upload restrictions (if any)
-
-### Data Privacy
-- [ ] Survey responses are private
-- [ ] Digital twin tokens are unique
-- [ ] No data leakage between surveys
-
----
-
-## 📊 Browser Compatibility
-
-### Desktop Browsers
-- [ ] Chrome (latest)
-- [ ] Firefox (latest)
-- [ ] Safari (latest)
-- [ ] Edge (latest)
-
-### Mobile Browsers
-- [ ] Chrome Mobile
-- [ ] Safari Mobile
-- [ ] Samsung Internet
-- [ ] Firefox Mobile
-
----
-
-## ✅ Sign-off Criteria
-
-**Ready for Production when:**
-- [ ] All manual tests pass
-- [ ] Automated test suite passes
-- [ ] No critical bugs found
-- [ ] Performance meets requirements
-- [ ] Security review complete
-- [ ] Cross-browser testing complete
-- [ ] Mobile responsiveness verified
-
----
-
-## 🐛 Bug Reporting Template
-
-```
-**Bug Title**: [Brief description]
-**Severity**: Critical/High/Medium/Low
-**Steps to Reproduce**:
-1. 
-2. 
-3. 
-
-**Expected Result**: 
-**Actual Result**: 
-**Browser/Device**: 
-**Screenshots**: [If applicable]
-**Additional Notes**: 
+```bash
+yarn dev
+# → http://localhost:3000
 ```
 
 ---
 
-## 📈 Next Steps After Testing
+## Phase 2: Feature-by-Feature Flows
 
-1. **Performance Optimization**: Based on load test results
-2. **UI/UX Improvements**: Based on user feedback
-3. **Additional Features**: AI survey generation, analytics
-4. **Integration**: Connect with existing prediction system
-5. **Monitoring**: Set up error tracking and analytics 
+---
+
+### Flow 1: Authentication
+
+**Minimum requirements:** MySQL + `SENDGRID_API_KEY`
+
+1. Go to `http://localhost:3000/register`
+2. Fill in email, password, display name → Submit
+3. Check email for verification link → Click it
+4. Confirm redirect to `/setup-profile`
+5. Fill in profile details → Save
+6. Go to `/login` → log in with the new account
+7. Confirm redirect to `/surveys`
+8. Test logout
+9. Test "Forgot Password": request reset email → click link → enter new password → log in again
+
+**Verify:**
+- [ ] Session persists on page refresh
+- [ ] `/surveys`, `/admin` redirect to `/login` when logged out
+- [ ] Network tab → any authenticated API call has `x-user-id` request header
+
+---
+
+### Flow 2: Survey Lifecycle
+
+**Minimum requirements:** MySQL
+**For AI analytics step:** + `ANTHROPIC_API_KEY`
+
+#### 2A — Create a Survey
+
+1. Go to `/create/survey`
+2. Choose "Start from scratch"
+3. Title: `Test Survey 2026`, add description, set to Public
+4. Add one question of each type:
+   - Text: "What is your name?"
+   - Single-choice: "What party do you affiliate with?" (Democrat / Republican / Independent)
+   - Multiple-choice: "What issues matter most?" (Economy / Healthcare / Education / Immigration)
+   - Rating 1-5: "How would you rate the candidate?"
+   - Yes/No: "Are you a registered voter?"
+5. Save as Draft → verify `/surveys` shows "draft" badge
+6. Click Publish → verify status changes to "active"
+
+- [ ] Draft saved correctly
+- [ ] Status transitions to active after publish
+
+#### 2B — Collect Responses
+
+1. From survey list, copy the public URL (`/public/surveys/[slug]`)
+2. Open in incognito window
+3. Fill in demographic info if prompted
+4. Answer all questions → Submit
+5. Repeat 3–4 times with different answers
+
+- [ ] Submissions succeed without login
+- [ ] Each submission creates a unique response record
+
+#### 2C — View Results
+
+1. Go to `/surveys/[id]/results`
+2. Verify all responses appear
+3. Click an individual response → verify all answers visible
+4. Go to `/surveys/[id]/analytics` → generate AI analytics (needs `ANTHROPIC_API_KEY`)
+5. Export CSV → open file, verify all responses and columns present
+
+- [ ] All responses visible
+- [ ] AI analytics generates without error
+- [ ] CSV export contains correct data
+
+#### 2D — Status Transitions
+
+- [ ] Close survey → status shows "closed"
+- [ ] Reopen → status returns to "active"
+- [ ] Stop → status shows "stopped"
+- [ ] Clone → new survey appears with "(copy)" suffix
+
+---
+
+### Flow 3: Digital Twins
+
+**Minimum requirements:** MySQL + `ANTHROPIC_API_KEY` + `OPENAI_API_KEY` + `PINECONE_API_KEY`
+**Prerequisite:** 5+ survey responses from Flow 2B
+
+1. Go to `/surveys/[id]/twins`
+2. Click "Generate Digital Twins" → wait for processing
+3. Navigate to `/digital-twins`
+4. Verify profiles appear with demographics and age distribution chart
+5. Search: "registered voter who cares about healthcare" → verify relevant profiles returned
+6. Click a twin's profile
+7. Ask: "What would convince you to vote for a new candidate?"
+8. Verify the AI response reflects the twin's demographic profile
+
+- [ ] Twins generated without error
+- [ ] Semantic search returns relevant results
+- [ ] Twin responses are contextually coherent
+
+---
+
+### Flow 4: Voter File Import
+
+**Minimum requirements:** MySQL only
+
+Prepare a CSV with columns: `first_name, last_name, address, city, state, zip, phone, party`
+
+1. Go to `/voter-file`
+2. Upload the CSV via drag-and-drop
+3. Step 2: Review auto-detected column mapping — verify confidence scores
+4. Adjust any incorrect mappings manually
+5. Step 3: Click "Execute Import"
+6. Step 4: Verify matched/enriched/skipped counts
+
+- [ ] Column mapping auto-detected correctly
+- [ ] Import completes with accurate counts
+- [ ] Skipped rows have a reason shown
+
+---
+
+### Flow 5: Dashboard & Map Analysis
+
+**Minimum requirements:** MySQL + political data loaded (from migrations)
+
+1. Go to `/dashboard`
+2. Verify district intelligence panel loads (PVI, margins, demographics)
+3. Click "Custom Map" tab
+4. Draw a polygon on the map
+5. Click "Analyze" → verify voter counts and demographics for the region appear
+6. Check "Political Alignment" charts for data
+
+- [ ] District panel loads without error
+- [ ] Polygon draw triggers analysis
+- [ ] Results show voter/demographic breakdown
+
+---
+
+### Flow 6: Channels (Telegram)
+
+**Minimum requirements:** `TELEGRAM_BOT_TOKEN`
+
+1. Go to `/channels`
+2. Find Telegram → click "Set up"
+3. Enter bot token → click Connect
+4. Verify status shows "Connected"
+5. Go to a survey → Distribution tab → enable Telegram distribution
+6. Message your Telegram bot → survey link should be sent
+7. Complete survey via Telegram → verify response appears in results
+
+- [ ] Bot connects successfully
+- [ ] Survey distributed via Telegram
+- [ ] Response from Telegram visible in results
+
+---
+
+### Flow 7: Admin Panel
+
+**Minimum requirements:** MySQL + admin role
+**Setup:** Set `role = 'admin'` in `users` table for your test user
+
+1. Log in as admin user
+2. Go to `/admin`
+3. Users tab: all users listed, search by email works
+4. Surveys tab: all platform surveys visible
+5. Check platform stats (user count, survey count, response count, twin count)
+6. Scheduler tab: verify stats visible, trigger a job manually
+7. Create a throwaway user → delete it from admin panel
+
+- [ ] Admin panel accessible only to admin role
+- [ ] User search works
+- [ ] Platform stats are accurate
+- [ ] Manual job trigger runs without error
+
+---
+
+### Flow 8: Reports
+
+**Minimum requirements:** MySQL + `ANTHROPIC_API_KEY`
+**Prerequisite:** A survey with responses
+
+1. Go to survey analytics
+2. Click "Generate Report"
+3. Monitor `/reports` → new entry appears with "generating" status
+4. Wait for completion → status changes to "ready"
+5. Open report → verify structured sections: summary, findings, recommendations
+
+- [ ] Report generation starts without error
+- [ ] Status transitions from generating → ready
+- [ ] Report content is structured and coherent
+
+---
+
+## Phase 3: Sign-off Checklist
+
+- [ ] Register → verify email → login flow works end-to-end
+- [ ] Survey can be created, published, responded to, and closed
+- [ ] AI analytics generates real insights (not error state)
+- [ ] Digital twins are created and answer questions coherently
+- [ ] Voter file import matches and enriches records correctly
+- [ ] Admin can see all users and surveys
+- [ ] Dashboard map analysis returns data for a drawn polygon
+- [ ] Protected pages return 401/redirect when logged out
+
+---
+
+## Known Gaps — Not Testable Without Credentials
+
+| Feature | Blocker |
+|---|---|
+| Email verification & password reset | `SENDGRID_API_KEY` |
+| AI analytics, twin generation, report generation | `ANTHROPIC_API_KEY` + `OPENAI_API_KEY` |
+| Twin semantic search | `PINECONE_API_KEY` |
+| Telegram distribution | `TELEGRAM_BOT_TOKEN` |
+| Payments / Stripe webhook | `STRIPE_SECRET_KEY` + `STRIPE_WEBHOOK_SECRET` |
+| Google Sheets survey import | `GOOGLE_SHEETS_API_KEY` (ask owner — not in CLAUDE.md) |
+
+---
+
+## Bug Reporting Template
+
+```
+Title:
+Severity: Critical / High / Medium / Low
+
+Steps to Reproduce:
+1.
+2.
+3.
+
+Expected:
+Actual:
+Browser / Device:
+Screenshots:
+Notes:
+```
+
+## Notes
+On custom create survery, bring down add question down so the user doesn't need to scroll up to add a question
+we need coniditional forms not just simple q&a.
+UI needs significant improvement. The survery creation is overwhelming even for a techinical person. Our audience is non technical
