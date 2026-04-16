@@ -5,6 +5,7 @@ import { SidebarTrigger } from "@/components/ui/sidebar"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
+import { Card, CardContent } from "@/components/ui/card"
 import { Rocket, FileText, MessageSquareText, PhoneCall, Loader2, Bot, Sparkles, HeartHandshake } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
@@ -458,6 +459,15 @@ export default function FrontLanding() {
                   <span className="text-muted-foreground">or</span>
                   <Button 
                     size="lg" 
+                    variant="outline"
+                    className="px-8 py-3 text-lg font-medium"
+                    onClick={() => router.push("/login")}
+                  >
+                    Login
+                  </Button>
+                  <span className="text-muted-foreground">or</span>
+                  <Button 
+                    size="lg" 
                     className="px-8 py-3 text-lg font-medium"
                     onClick={handleSignUp}
                   >
@@ -580,6 +590,31 @@ export default function FrontLanding() {
                   </p>
                 </div>
               </div>
+            </div>
+          </section>
+
+          <section className="py-16">
+            <div className="max-w-5xl mx-auto">
+              <Card className="relative overflow-hidden border-2 border-border shadow-xl">
+                <div className="absolute top-0 left-0 right-0 h-1 bg-foreground" />
+                <CardContent className="p-12 text-center space-y-6">
+                  <h2 className="text-4xl font-bold text-card-foreground">
+                    See Antelope in action
+                  </h2>
+                  <p className="text-lg text-muted-foreground max-w-3xl mx-auto leading-relaxed">
+                    Watch how Antelope can automate your survey data workflow—from importing responses to generating insights through AI-powered chat and advanced analytics.
+                  </p>
+                  <div className="flex items-center justify-center gap-4 pt-4">
+                    <Button
+                      size="lg"
+                      className="px-8 py-6 text-lg font-medium bg-primary hover:bg-primary/90"
+                      onClick={() => window.open('https://www.youtube.com/watch?v=Dgr7KQ__i1k', '_blank')}
+                    >
+                      Watch Demo
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
           </section>
         </div>

@@ -120,6 +120,36 @@ function tryParseJsonFromText(text: string) {
     return null;
 }
 
+function normalizeGeneratedSurveyShape(raw: any, prompt: string, mode?: string) {
+    // Some models/providers wrap the payload (e.g. { survey: {...} }).
+    // Normalize to the expected shape { title, description, questions }.
+    let data = raw;
+    if (data && typeof data === 'object') {
+        if (data.survey && typeof data.survey === 'object') data = data.survey;
+        if (data.quiz && typeof data.quiz === 'object') data = data.quiz;
+        if (data.data && typeof data.data === 'object') data = data.data;
+        if (data.result && typeof data.result === 'object') data = data.result;
+    }
+
+    // If questions are nested (rare but seen), unwrap.
+    if (data?.questions && !Array.isArray(data.questions) && Array.isArray((data.questions as any)?.questions)) {
+        data = { ...data, questions: (data.questions as any).questions };
+    }
+
+    // Provide reasonable defaults to avoid hard failures when only title/description are missing.
+    if (data && typeof data === 'object') {
+        if (!data.title || typeof data.title !== 'string') {
+            data.title = mode === 'quiz' ? 'AI Quiz' : 'AI Survey';
+        }
+        if (!data.description || typeof data.description !== 'string') {
+            const trimmed = (prompt || '').trim();
+            data.description = trimmed ? trimmed.slice(0, 180) : (mode === 'quiz' ? 'AI-generated quiz' : 'AI-generated survey');
+        }
+    }
+
+    return data;
+}
+
 function getOpenAiSurveyJsonSchema(mode?: string) {
     if (mode === 'quiz') {
         return {
@@ -127,6 +157,8 @@ function getOpenAiSurveyJsonSchema(mode?: string) {
             schema: {
                 type: 'object',
                 additionalProperties: false,
+                // OpenAI Structured Outputs (strict) expects `required` to include every key in `properties`.
+                // Keep fields "optional" by allowing empty values, not by omitting them from `required`.
                 required: ['title', 'description', 'questions'],
                 properties: {
                     title: { type: 'string' },
@@ -137,7 +169,8 @@ function getOpenAiSurveyJsonSchema(mode?: string) {
                         items: {
                             type: 'object',
                             additionalProperties: false,
-                            required: ['type', 'prompt', 'isRequired', 'correctOptionIds'],
+                            // Must include all keys from `properties` when using strict json_schema.
+                            required: ['type', 'prompt', 'options', 'correctOptionIds', 'explanation', 'isRequired', 'points'],
                             properties: {
                                 type: {
                                     type: 'string',
@@ -147,10 +180,13 @@ function getOpenAiSurveyJsonSchema(mode?: string) {
                                 options: {
                                     type: 'array',
                                     items: { type: 'string' },
+                                    // Allow empty for "text" questions, etc.
+                                    minItems: 0,
                                 },
                                 correctOptionIds: {
                                     type: 'array',
                                     items: { type: 'integer' },
+                                    minItems: 0,
                                 },
                                 explanation: { type: 'string' },
                                 isRequired: { type: 'boolean' },
@@ -168,7 +204,8 @@ function getOpenAiSurveyJsonSchema(mode?: string) {
         schema: {
             type: 'object',
             additionalProperties: false,
-            required: ['title', 'description', 'questions'],
+            // OpenAI Structured Outputs (strict) expects `required` to include every key in `properties`.
+            required: ['title', 'description', 'purpose', 'targetAudience', 'questions'],
             properties: {
                 title: { type: 'string' },
                 description: { type: 'string' },
@@ -180,7 +217,8 @@ function getOpenAiSurveyJsonSchema(mode?: string) {
                     items: {
                         type: 'object',
                         additionalProperties: false,
-                        required: ['type', 'prompt', 'isRequired'],
+                        // Must include all keys from `properties` when using strict json_schema.
+                        required: ['type', 'prompt', 'options', 'isRequired', 'reasoning'],
                         properties: {
                             type: {
                                 type: 'string',
@@ -190,6 +228,8 @@ function getOpenAiSurveyJsonSchema(mode?: string) {
                             options: {
                                 type: 'array',
                                 items: { type: 'string' },
+                                // Allow empty for question types that don't use choices (e.g. "text").
+                                minItems: 0,
                             },
                             isRequired: { type: 'boolean' },
                             reasoning: { type: 'string' },
@@ -203,6 +243,7 @@ function getOpenAiSurveyJsonSchema(mode?: string) {
 
 // POST /api/ai/generate-survey - Generate survey using AI
 export async function POST(req: NextRequest) {
+    console.log('Generating survey using AI...');
     const requestId = getRequestId();
     try {
         const userId = req.headers.get('x-user-id');
@@ -254,11 +295,10 @@ export async function POST(req: NextRequest) {
             }
             aiClient = new OpenAI({
                 apiKey: process.env.OPENAI_API_KEY,
-                // Production deployments (serverless) may have strict execution limits; fail fast and let the UI retry/switch models.
-                timeout: isProd ? 12000 : 240000,
-                maxRetries: 0,
+                timeout: 120_000,
+                maxRetries: 2,
             });
-            console.log('[gen-survey] Using OpenAI', { requestId, model: modelConfig.model, timeoutMs: isProd ? 12000 : 240000 });
+            console.log('[gen-survey] Using OpenAI', { requestId, model: modelConfig.model });
         } else if (modelConfig.type === "deepseek") {
             if (!process.env.DEEPSEEK_API_KEY) {
                 return NextResponse.json({ 
@@ -268,8 +308,8 @@ export async function POST(req: NextRequest) {
             aiClient = new OpenAI({
                 apiKey: process.env.DEEPSEEK_API_KEY,
                 baseURL: 'https://api.deepseek.com',
-                timeout: isProd ? 12000 : 120000,
-                maxRetries: 0,
+                timeout: 120_000,
+                maxRetries: 2,
             });
             console.log('[gen-survey] Using DeepSeek', { requestId, model: modelConfig.model });
         } else if (modelConfig.type === "gemini") {
@@ -281,8 +321,8 @@ export async function POST(req: NextRequest) {
             aiClient = new OpenAI({
                 apiKey: process.env.GEMINI_API_KEY,
                 baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai/',
-                timeout: isProd ? 12000 : 120000,
-                maxRetries: 0,
+                timeout: 120_000,
+                maxRetries: 2,
             });
             console.log('[gen-survey] Using Gemini', { requestId, model: modelConfig.model });
         } else if (modelConfig.type === "anthropic") {
@@ -384,6 +424,7 @@ Guidelines:
             const isReasoningModel = (
                 modelConfig.model.includes('o1') ||
                 modelConfig.model.includes('o3') ||
+                modelConfig.model.includes('o4') ||
                 modelConfig.model.includes('gpt-5')
             );
             const useNewTokenParam = modelConfig.type === "openai" && isReasoningModel;
@@ -416,10 +457,7 @@ Guidelines:
                 requestParams.temperature = 0.7;
             }
             
-            const tokenBudget =
-                modelConfig.model.includes('gpt-5')
-                    ? (isProd ? 3000 : 8000)
-                    : (isProd ? 700 : 800);
+            const tokenBudget = modelConfig.model.includes('gpt-5') ? 8000 : 2000;
             if (useNewTokenParam) {
                 requestParams.max_completion_tokens = tokenBudget;
             } else {
@@ -437,7 +475,8 @@ Guidelines:
             });
             
             // Retry wrapper for transient errors (DNS, timeouts, rate limits)
-            const maxAttempts = 3;
+            // Increased to 5 attempts with exponential backoff for better resilience
+            const maxAttempts = 5;
             let lastError: any = null;
             for (let attempt = 1; attempt <= maxAttempts; attempt++) {
                 try {
@@ -569,7 +608,10 @@ Guidelines:
                         message: err?.message
                     });
                     if (attempt < maxAttempts && isTransient) {
-                        const delayMs = 500 * Math.pow(2, attempt - 1);
+                        // Exponential backoff: 1s, 2s, 4s, 8s for rate limits and transient errors
+                        const baseDelay = status === 429 ? 2000 : 1000;
+                        const delayMs = baseDelay * Math.pow(2, attempt - 1);
+                        console.log(`[gen-survey] Retrying after ${delayMs}ms (attempt ${attempt}/${maxAttempts})`);
                         await new Promise(res => setTimeout(res, delayMs));
                         continue;
                     }
@@ -582,6 +624,7 @@ Guidelines:
             const isReasoningOverall = (
                 modelConfig.model.includes('o1') ||
                 modelConfig.model.includes('o3') ||
+                modelConfig.model.includes('o4') ||
                 modelConfig.model.includes('gpt-5')
             );
             console.error('[gen-survey] No aiResponse', { elapsedMs: Date.now() - t0, model: modelConfig.model });
@@ -603,17 +646,57 @@ Guidelines:
 
         // Parse the AI response
         let surveyData;
-        surveyData = tryParseJsonFromText(aiResponse);
-        if (!surveyData) {
-            console.error('[gen-survey] JSON parse failed', { requestId });
-            if (!isProd) {
-                // Development-only: include raw output to speed up debugging without impacting production privacy.
-                return NextResponse.json({
-                    status: false,
-                    errorId: requestId,
-                    message: 'Failed to parse AI response as JSON (dev only includes raw output).',
-                    raw: aiResponse,
-                }, { status: 502 });
+        try {
+            // Remove any markdown code blocks if present
+            const cleanedResponse = aiResponse.replace(/```json\n?|\n?```/g, '').trim();
+            surveyData = JSON.parse(cleanedResponse);
+        } catch (parseError) {
+            console.error('[gen-survey] JSON parse failed on first attempt:', parseError);
+            console.error('[gen-survey] Raw AI response (first 1000 chars):', aiResponse?.substring(0, 1000));
+            
+            // Try more aggressive JSON extraction for all models
+            try {
+                const text = aiResponse || '';
+                
+                // Remove markdown code fences more aggressively
+                let cleaned = text.replace(/```(?:json)?\s*\n?/g, '').replace(/```\s*$/g, '').trim();
+                
+                // Try to find JSON object boundaries
+                const start = cleaned.indexOf('{');
+                const end = cleaned.lastIndexOf('}');
+                
+                if (start !== -1 && end !== -1 && end > start) {
+                    const candidate = cleaned.slice(start, end + 1);
+                    surveyData = JSON.parse(candidate);
+                    console.warn('[gen-survey] Parsed JSON via heuristic extraction');
+                } else {
+                    throw new Error('No JSON object found in response');
+                }
+            } catch (e2) {
+                console.error('[gen-survey] Heuristic JSON extraction failed:', e2);
+                console.error('[gen-survey] Full AI response:', aiResponse);
+                
+                // Check if it's a reasoning model that might need special handling
+                const isReasoningModel = (
+                    modelConfig.model.includes('o1') ||
+                    modelConfig.model.includes('o3') ||
+                    modelConfig.model.includes('gpt-5') ||
+                    modelConfig.model.includes('gpt-4o')
+                );
+                
+                if (isReasoningModel) {
+                    return NextResponse.json({
+                        status: true,
+                        modelUsed: modelConfig.label,
+                        surveyRaw: aiResponse,
+                        note: 'Model returned non-JSON content; showing raw output.'
+                    });
+                }
+                
+                return NextResponse.json({ 
+                    error: 'Failed to parse AI response. The model did not return valid JSON. Please try again or switch models.',
+                    details: aiResponse?.substring(0, 500) // Include snippet for debugging
+                }, { status: 500 });
             }
             return NextResponse.json({
                 status: false,
@@ -621,6 +704,9 @@ Guidelines:
                 message: 'AI returned an invalid format. Please try again (or switch models).',
             }, { status: 502 });
         }
+
+        // Normalize shape + defaults to reduce intermittent "invalid structure" failures.
+        surveyData = normalizeGeneratedSurveyShape(surveyData, prompt, mode);
 
         // Validate the structure
         if (!surveyData.title || !surveyData.questions || !Array.isArray(surveyData.questions)) {

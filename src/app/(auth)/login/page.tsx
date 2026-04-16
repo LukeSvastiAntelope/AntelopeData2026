@@ -11,8 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2, Linkedin, PhoneCall, MessageSquareText, Bot, Sparkles, HeartHandshake } from "lucide-react";
-import { signIn } from "next-auth/react";
-import { useSession } from "next-auth/react";
+import { signIn, useSession } from "next-auth/react";
 
 const LoginPage = () => {
     const [formData, setFormData] = useState<{ email: string; password: string }>({
