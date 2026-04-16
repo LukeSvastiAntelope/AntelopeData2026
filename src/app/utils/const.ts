@@ -24,12 +24,80 @@ export const SPORTS_CATEGORIES = [
 ]
 
 export const GPT_MODELS = [
-    // OpenAI Models
+    // OpenAI — GPT-5.x flagship family
     {
-        key: "o3-mini",
-        label: "o3-mini",
+        key: 'gpt-5.2',
+        label: 'GPT-5.2',
         type: "openai",
-        model: "o3-mini"
+        model: 'gpt-5.2'
+    },
+    {
+        key: 'gpt-5.2-pro',
+        label: 'GPT-5.2 Pro',
+        type: "openai",
+        model: 'gpt-5.2-pro'
+    },
+    {
+        key: 'gpt-5.1',
+        label: 'GPT-5.1',
+        type: "openai",
+        model: 'gpt-5.1'
+    },
+    {
+        key: 'gpt-5',
+        label: 'GPT-5',
+        type: "openai",
+        model: 'gpt-5'
+    },
+    {
+        key: 'gpt-5-pro',
+        label: 'GPT-5 Pro',
+        type: "openai",
+        model: 'gpt-5-pro'
+    },
+    {
+        key: 'gpt-5-mini',
+        label: 'GPT-5 Mini',
+        type: "openai",
+        model: 'gpt-5-mini'
+    },
+    {
+        key: 'gpt-5-nano',
+        label: 'GPT-5 Nano',
+        type: "openai",
+        model: 'gpt-5-nano'
+    },
+    // OpenAI — GPT-4.1 family (non-reasoning)
+    {
+        key: 'gpt-4.1',
+        label: 'GPT-4.1',
+        type: "openai",
+        model: 'gpt-4.1'
+    },
+    {
+        key: 'gpt-4.1-mini',
+        label: 'GPT-4.1 Mini',
+        type: "openai",
+        model: 'gpt-4.1-mini'
+    },
+    {
+        key: 'gpt-4.1-nano',
+        label: 'GPT-4.1 Nano',
+        type: "openai",
+        model: 'gpt-4.1-nano'
+    },
+    // OpenAI — o-series reasoning models
+    {
+        key: 'o4-mini',
+        label: 'o4-mini',
+        type: "openai",
+        model: 'o4-mini'
+    },
+    {
+        key: 'o3-pro',
+        label: 'o3-pro',
+        type: "openai",
+        model: 'o3-pro'
     },
     {
         key: "o3",
@@ -38,17 +106,18 @@ export const GPT_MODELS = [
         model: "o3"
     },
     {
+        key: "o3-mini",
+        label: "o3-mini",
+        type: "openai",
+        model: "o3-mini"
+    },
+    {
         key: 'o1',
         label: 'o1',
         type: "openai",
         model: 'o1'
     },
-    {
-        key: 'o1-mini',
-        label: 'o1-mini',
-        type: "openai",
-        model: 'o1-mini'
-    },
+    // OpenAI — GPT-4o family (legacy)
     {
         key: 'gpt-4o',
         label: 'GPT-4o',
@@ -66,49 +135,6 @@ export const GPT_MODELS = [
         label: 'GPT-4 Turbo',
         type: "openai",
         model: 'gpt-4-turbo'
-    },
-    {
-        key: 'gpt-4',
-        label: 'GPT-4',
-        type: "openai",
-        model: 'gpt-4'
-    },
-    // GPT-5 family (if available via account)
-    {
-        key: 'gpt-5',
-        label: 'GPT-5',
-        type: "openai",
-        model: 'gpt-5'
-    },
-    {
-        key: 'gpt-5-turbo',
-        label: 'GPT-5 Turbo',
-        type: "openai",
-        model: 'gpt-5-turbo'
-    },
-    {
-        key: 'gpt-5-mini',
-        label: 'GPT-5 Mini',
-        type: "openai",
-        model: 'gpt-5-mini'
-    },
-    {
-        key: 'gpt-4.1',
-        label: 'GPT-4.1',
-        type: "openai",
-        model: 'gpt-4.1'
-    },
-    {
-        key: 'gpt-4.1-mini',
-        label: 'GPT-4.1 Mini',
-        type: "openai",
-        model: 'gpt-4.1-mini'
-    },
-    {
-        key: 'gpt-3.5-turbo',
-        label: 'GPT-3.5 Turbo',
-        type: "openai",
-        model: 'gpt-3.5-turbo'
     },
     
     // DeepSeek Models

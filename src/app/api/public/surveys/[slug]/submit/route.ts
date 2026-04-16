@@ -227,7 +227,9 @@ export async function POST(
             responseId: result.responseId,
             agentToken: result.agentToken,
             isExistingTwin: result.isExistingTwin,
-            message: 'Survey response submitted successfully. Your digital twin has been created!' 
+            message: result.isExistingTwin 
+                ? 'Survey response submitted successfully. Tokens earned!' 
+                : 'Survey response submitted successfully. Create an account to claim your tokens!' 
         });
 
     } catch (error) {

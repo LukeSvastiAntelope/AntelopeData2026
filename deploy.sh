@@ -94,7 +94,14 @@ for (const k of REQUIRED) {
   const v = process.env[k];
   if (!v) missing.push(k);
 }
+// If running via GitHub Actions, env vars should be present and we want a hard fail.
+// If running manually (SSH) and .env.production already exists, keep it and continue.
 if (missing.length) {
+  const envPath = '.env.production';
+  if (fs.existsSync(envPath)) {
+    console.warn('[deploy] Missing required env vars (manual run). Keeping existing .env.production. Missing:', missing.join(', '));
+    process.exit(0);
+  }
   console.error('[deploy] Missing required env vars:', missing.join(', '));
   process.exit(2);
 }
