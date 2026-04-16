@@ -1,0 +1,24 @@
+# Local MySQL — aligns with default .env.local (127.0.0.1:3306, DB marketmaker).
+# Start: docker compose up -d
+# Stop:  docker compose down
+# Logs:  docker compose logs -f mysql
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: marketmaker-mysql
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
+      MYSQL_DATABASE: marketmaker
+    volumes:
+      - marketmaker_mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+      start_period: 30s
+
+volumes:
+  marketmaker_mysql_data:
