@@ -31,7 +31,8 @@ jobs:
         NODE_OPTIONS: "--max-old-space-size=4096"
         # Add your environment variables here
         NODE_ENV: production
-        NEXT_PUBLIC_APP_URL: https://getantelope.com
+        # Same defaults as production URL; secrets override when set
+        NEXT_PUBLIC_APP_URL: ${{ secrets.NEXT_PUBLIC_APP_URL || 'https://getantelope.com' }}
         ENVIRONMENT_MODE: production
         HOUSE_FEE_RATE: 1
         CREDIT_BALANCE: 1000
@@ -53,7 +54,7 @@ jobs:
         STRIPE_SECRET_WEBHOOK_KEY: ${{ secrets.STRIPE_SECRET_WEBHOOK_KEY }}
         SPORTS_DB_API_KEY: ${{ secrets.SPORTS_DB_API_KEY }}
         PINATA_KEY: ${{ secrets.PINATA_KEY }}
-        PINATA_SECRET: ${{ secrets.PINATA_SECRET}}
+        PINATA_SECRET: ${{ secrets.PINATA_SECRET }}
         PINATA_JWT: ${{ secrets.PINATA_JWT }}
         PINATA_GATEWAY: ${{ secrets.PINATA_GATEWAY }}
         MYSQL_HOST: ${{ secrets.MYSQL_HOST }}
@@ -65,7 +66,7 @@ jobs:
         AUTH_DISCORD_ID: ${{ secrets.AUTH_DISCORD_ID }}
         AUTH_DISCORD_SECRET: ${{ secrets.AUTH_DISCORD_SECRET }}
         # New Telegram Integration Variables
-        PUBLIC_BASE_URL: ${{ secrets.PUBLIC_BASE_URL }}
+        PUBLIC_BASE_URL: ${{ secrets.PUBLIC_BASE_URL || 'https://getantelope.com' }}
         SECURE_STORAGE_KEY: ${{ secrets.SECURE_STORAGE_KEY }}
         TELEGRAM_WEBHOOK_SECRET: ${{ secrets.TELEGRAM_WEBHOOK_SECRET }}
     
@@ -73,8 +74,8 @@ jobs:
       uses: appleboy/ssh-action@master
       env:
         NODE_ENV: production
-        PUBLIC_BASE_URL: ${{ secrets.PUBLIC_BASE_URL }}
-        NEXT_PUBLIC_APP_URL: ${{ secrets.NEXT_PUBLIC_APP_URL }}
+        PUBLIC_BASE_URL: ${{ secrets.PUBLIC_BASE_URL || 'https://getantelope.com' }}
+        NEXT_PUBLIC_APP_URL: ${{ secrets.NEXT_PUBLIC_APP_URL || 'https://getantelope.com' }}
         SECURE_STORAGE_KEY: ${{ secrets.SECURE_STORAGE_KEY }}
         TELEGRAM_WEBHOOK_SECRET: ${{ secrets.TELEGRAM_WEBHOOK_SECRET }}
         MYSQL_HOST: ${{ secrets.MYSQL_HOST }}
@@ -87,6 +88,7 @@ jobs:
         OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
         GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         SERPAPI_API_KEY: ${{ secrets.SERPAPI_API_KEY }}
         PINECONE_API_KEY: ${{ secrets.PINECONE_API_KEY }}
         COINMARKETCAP_API_KEY: ${{ secrets.COINMARKETCAP_API_KEY }}
