@@ -14,6 +14,24 @@ jobs:
     
     steps:
     - uses: actions/checkout@v4
+
+    # Fail fast: appleboy/ssh-action gets host/key from DROPLET_HOST and DROPLET_SSH_KEY.
+    # If unset (common after moving repos), inputs.host is '' and the deploy step errors obscurely.
+    - name: Verify DigitalOcean SSH secrets
+      shell: bash
+      run: |
+        if [[ -z "${DROPLET_HOST}" ]]; then
+          echo "::error::Missing repository secret DROPLET_HOST (droplet IP or hostname). GitHub → Settings → Secrets and variables → Actions."
+          exit 1
+        fi
+        if [[ -z "${DROPLET_SSH_KEY}" ]]; then
+          echo "::error::Missing repository secret DROPLET_SSH_KEY (full private key PEM). GitHub → Settings → Secrets and variables → Actions."
+          exit 1
+        fi
+        echo "DROPLET_HOST and DROPLET_SSH_KEY are set."
+      env:
+        DROPLET_HOST: ${{ secrets.DROPLET_HOST }}
+        DROPLET_SSH_KEY: ${{ secrets.DROPLET_SSH_KEY }}
     
     - name: Setup Node.js
       uses: actions/setup-node@v4
