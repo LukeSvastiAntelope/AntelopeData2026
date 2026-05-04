@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, useRef, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -48,6 +48,7 @@ import {
   getPrivacyNotice,
   getRecommendedAnonymityLevel 
 } from '@/app/utils/anonymity-config'
+import { getTemplateById } from '@/app/utils/political-survey-templates'
 
 interface GeneratedQuestion {
   type: 'text' | 'single-choice' | 'multiple-choice' | 'rating' | 'yes-no'
@@ -68,9 +69,11 @@ interface GeneratedSurvey {
 const DEFAULT_AI_SURVEY_MODEL =
   process.env.NODE_ENV === 'production' ? 'gpt-4o-mini' : 'gpt-4o'
 
-const AISurveyBuilderPage = () => {
+const AISurveyBuilderPageInner = () => {
   const router = useRouter()
-  
+  const searchParams = useSearchParams()
+  const templatePromptApplied = useRef(false)
+
   const [prompt, setPrompt] = useState('')
   const [selectedModel, setSelectedModel] = useState(DEFAULT_AI_SURVEY_MODEL)
   const [isGenerating, setIsGenerating] = useState(false)
@@ -114,6 +117,20 @@ const AISurveyBuilderPage = () => {
       setSelectedModel(savedModel);
     }
   }, []);
+
+  // Prefill prompt when opened from a template card on /create/survey
+  useEffect(() => {
+    if (templatePromptApplied.current) return
+    const templateId = searchParams.get('templateId')
+    if (!templateId) return
+    const t = getTemplateById(templateId)
+    if (!t) return
+    templatePromptApplied.current = true
+    setPrompt(
+      `Create a political survey inspired by the "${t.title}" template (${t.category}). ${t.description} ` +
+        `Target roughly ${t.questions.length} substantive questions with similar themes; improve wording for clarity where helpful.`
+    )
+  }, [searchParams])
   
   // Save model preference when it changes
   const handleModelChange = (model: string) => {
@@ -247,6 +264,7 @@ const AISurveyBuilderPage = () => {
       const response = await fetch('/api/ai/generate-survey', {
         method: 'POST',
         headers,
+        credentials: 'include',
         body: JSON.stringify({ prompt, model: selectedModel }),
         signal: controller.signal
       })
@@ -322,17 +340,31 @@ const AISurveyBuilderPage = () => {
           setModelUsed(data.modelUsed)
         }
       } else {
-        const errorData = await response.json()
-        
-        // Distinguish between provider issues and validation issues
+        let errorData: { message?: string; error?: string } = {}
+        try {
+          errorData = await response.json()
+        } catch {
+          // non-JSON error body
+        }
+        const serverMsg = (errorData.message || errorData.error || '').trim()
+
         if (response.status === 429) {
-          setError('⚠️ Rate limit reached. The AI service is temporarily limiting requests.\n\nPlease wait 30 seconds and try again, or switch to a different model.')
+          setError(
+            serverMsg ||
+              '⚠️ Rate limit reached. The AI service is temporarily limiting requests.\n\nPlease wait 30 seconds and try again, or switch to a different model.'
+          )
         } else if (response.status === 503 || response.status === 504) {
-          setError('⚠️ AI service temporarily unavailable or timed out.\n\nThis usually resolves quickly. Please:\n• Wait a moment and try again\n• Or switch to gpt-4o-mini for faster responses')
+          setError(
+            serverMsg ||
+              '⚠️ AI service temporarily unavailable or timed out.\n\nThis usually resolves quickly. Please:\n• Wait a moment and try again\n• Or switch to gpt-4o-mini for faster responses'
+          )
         } else if (response.status >= 500) {
-          setError('⚠️ AI service error. The provider is experiencing issues.\n\nPlease try again in a few moments.')
+          setError(
+            serverMsg ||
+              '⚠️ AI service error. The provider is experiencing issues.\n\nPlease try again in a few moments.'
+          )
         } else {
-          setError(errorData.message || 'Failed to generate survey. Please try again with a more detailed prompt.')
+          setError(serverMsg || 'Failed to generate survey. Please try again with a more detailed prompt.')
         }
       }
     } catch (error: any) {
@@ -644,7 +676,7 @@ const AISurveyBuilderPage = () => {
                 <div>
                   <h3 className="font-semibold mb-2">AI-Powered Survey Generation</h3>
                   <p className="text-muted-foreground text-sm">
-                    Describe what kind of survey you want to create, and our AI will generate relevant questions, 
+                    Describe what kind of survey you want to create, and our AI will generate relevant questions,
                     answer options, and survey structure. You can then edit, reorder, and add new questions manually.
                   </p>
                 </div>
@@ -740,7 +772,7 @@ const AISurveyBuilderPage = () => {
                   <ul className="text-sm text-blue-800 dark:text-blue-200 space-y-2">
                     <li className="flex items-start gap-2">
                       <span className="text-blue-600 dark:text-blue-400 mt-0.5">•</span>
-                      <span><strong>Specify the number of questions</strong> you want (e.g., "Create 8 questions about...")</span>
+                      <span><strong>Specify the number of questions</strong> you want (e.g., &quot;Create 8 questions about...&quot;)</span>
                     </li>
                     <li className="flex items-start gap-2">
                       <span className="text-blue-600 dark:text-blue-400 mt-0.5">•</span>
@@ -748,15 +780,15 @@ const AISurveyBuilderPage = () => {
                     </li>
                     <li className="flex items-start gap-2">
                       <span className="text-blue-600 dark:text-blue-400 mt-0.5">•</span>
-                      <span><strong>Include your target audience</strong> (e.g., "for college students" or "for restaurant customers")</span>
+                      <span><strong>Include your target audience</strong> (e.g., &quot;for college students&quot; or &quot;for restaurant customers&quot;)</span>
                     </li>
                     <li className="flex items-start gap-2">
                       <span className="text-blue-600 dark:text-blue-400 mt-0.5">•</span>
-                      <span><strong>State the survey purpose</strong> clearly (e.g., "to measure satisfaction" or "to gather feedback")</span>
+                      <span><strong>State the survey purpose</strong> clearly (e.g., &quot;to measure satisfaction&quot; or &quot;to gather feedback&quot;)</span>
                     </li>
                     <li className="flex items-start gap-2">
                       <span className="text-blue-600 dark:text-blue-400 mt-0.5">•</span>
-                      <span><strong>Be specific about topics</strong> you want covered (e.g., "include questions about pricing, quality, and service")</span>
+                      <span><strong>Be specific about topics</strong> you want covered (e.g., &quot;include questions about pricing, quality, and service&quot;)</span>
                     </li>
                   </ul>
                 </div>
@@ -831,8 +863,9 @@ const AISurveyBuilderPage = () => {
                 </div>
               </div>
 
-              <Button 
-                onClick={generateSurvey} 
+              <Button
+                type="button"
+                onClick={() => void generateSurvey()}
                 disabled={isGenerating || !prompt.trim()}
                 className="w-full"
               >
@@ -1095,9 +1128,21 @@ const AISurveyBuilderPage = () => {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   {editableQuestions.length === 0 ? (
-                    <div className="text-center py-8 text-muted-foreground">
-                      <Target className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                      <p>No questions yet. Generate with AI or add manually.</p>
+                    <div className="text-center py-8 text-muted-foreground space-y-4">
+                      <Target className="h-12 w-12 mx-auto opacity-50" />
+                      <p>No questions yet. Run AI generation again or add questions manually.</p>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        onClick={() => void generateSurvey()}
+                        disabled={isGenerating || !prompt.trim()}
+                      >
+                        <Wand2 className="h-4 w-4 mr-2" />
+                        Generate Survey with AI
+                      </Button>
+                      {!prompt.trim() ? (
+                        <p className="text-xs max-w-sm mx-auto">Enter a survey description in the box above, then click here or the main generate button.</p>
+                      ) : null}
                     </div>
                   ) : (
                     editableQuestions.map((question, questionIndex) => (
@@ -1420,4 +1465,16 @@ const AISurveyBuilderPage = () => {
   )
 }
 
-export default AISurveyBuilderPage 
+export default function AISurveyBuilderPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-[40vh] items-center justify-center p-6 text-sm text-muted-foreground">
+          Loading AI survey builder…
+        </div>
+      }
+    >
+      <AISurveyBuilderPageInner />
+    </Suspense>
+  )
+}

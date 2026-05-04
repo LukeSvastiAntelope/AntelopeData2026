@@ -87,6 +87,9 @@ const CreateSurveyPage = () => {
   const [showPreview, setShowPreview] = useState(false)
   const [showTemplates, setShowTemplates] = useState(true)
 
+  const aiSurveyUrlForTemplate = (template: SurveyTemplate) =>
+    `/create/survey/ai?templateId=${encodeURIComponent(template.id)}`
+
   const loadTemplate = (template: SurveyTemplate) => {
     const questions: SurveyQuestion[] = template.questions.map((q, idx) => ({
       id: `q_${Date.now()}_${idx}`,
@@ -226,11 +229,6 @@ const CreateSurveyPage = () => {
     }
   }
 
-  const generateWithAI = () => {
-    // Placeholder for AI-powered survey generation
-    alert('AI Survey Generation coming soon! This will help you create surveys automatically based on your research goals.')
-  }
-
   return (
     <div className="flex-1 p-2 w-full bg-background">
       <div className="mx-auto rounded-lg bg-card text-card-foreground shadow-lg">
@@ -280,7 +278,7 @@ const CreateSurveyPage = () => {
                       </Button>
                     </div>
                     <CardDescription>
-                      Choose a pre-built political survey template to get started quickly, or create your own from scratch.
+                      Choose a pre-built political survey template, open the AI survey builder with that idea as a starting prompt, or start blank.
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
@@ -288,16 +286,25 @@ const CreateSurveyPage = () => {
                       {POLITICAL_SURVEY_TEMPLATES.map((template) => (
                         <div
                           key={template.id}
-                          className="border rounded-lg p-4 cursor-pointer hover:border-primary hover:bg-muted/50 transition-colors"
-                          onClick={() => loadTemplate(template)}
+                          className="border rounded-lg p-4 flex flex-col gap-3 hover:border-primary hover:bg-muted/50 transition-colors"
                         >
-                          <div className="flex items-center gap-2 mb-2">
-                            <Badge variant="outline" className="text-xs capitalize">{template.category}</Badge>
-                            <span className="text-xs text-muted-foreground">{template.estimatedTime}</span>
+                          <div className="flex-1 min-h-0">
+                            <div className="flex items-center gap-2 mb-2">
+                              <Badge variant="outline" className="text-xs capitalize">{template.category}</Badge>
+                              <span className="text-xs text-muted-foreground">{template.estimatedTime}</span>
+                            </div>
+                            <h4 className="font-semibold text-sm mb-1">{template.title}</h4>
+                            <p className="text-xs text-muted-foreground line-clamp-2">{template.description}</p>
+                            <p className="text-xs text-muted-foreground mt-2">{template.questions.length} questions</p>
                           </div>
-                          <h4 className="font-semibold text-sm mb-1">{template.title}</h4>
-                          <p className="text-xs text-muted-foreground line-clamp-2">{template.description}</p>
-                          <p className="text-xs text-muted-foreground mt-2">{template.questions.length} questions</p>
+                          <div className="flex flex-col gap-2 pt-2 border-t border-border">
+                            <Button type="button" size="sm" className="w-full" onClick={() => loadTemplate(template)}>
+                              Use template
+                            </Button>
+                            <Button type="button" size="sm" variant="outline" className="w-full" asChild>
+                              <Link href={aiSurveyUrlForTemplate(template)}>Create survey with AI</Link>
+                            </Button>
+                          </div>
                         </div>
                       ))}
                     </div>

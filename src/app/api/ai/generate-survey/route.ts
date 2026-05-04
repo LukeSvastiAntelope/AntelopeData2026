@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import OpenAI from 'openai';
 import Anthropic from '@anthropic-ai/sdk';
 import { GPT_MODELS } from '@/app/utils/const';
+import { auth } from '@/auth';
 
 // Allow longer processing time during generation
 export const maxDuration = 300;
@@ -24,6 +25,30 @@ function safeErrorMeta(err: any) {
     const name = err?.name;
     const message = typeof err?.message === 'string' ? err.message : undefined;
     return { status, code, name, message };
+}
+
+/** How long OpenAI asked us to wait on 429 (retry-after-ms / Retry-After), else a safe default. */
+function openAi429WaitMs(err: any): number {
+    const raw = err?.headers;
+    if (!raw) return 12_000;
+    const get = (key: string): string | undefined => {
+        if (typeof raw.get === 'function') {
+            return raw.get(key) ?? raw.get(key.toLowerCase()) ?? undefined;
+        }
+        const rec = raw as Record<string, string | undefined>;
+        return rec[key] ?? rec[key.toLowerCase()];
+    };
+    const msHdr = get('retry-after-ms');
+    if (msHdr) {
+        const n = Number.parseFloat(msHdr);
+        if (!Number.isNaN(n) && n >= 500) return Math.min(Math.floor(n), 120_000);
+    }
+    const secHdr = get('retry-after');
+    if (secHdr) {
+        const n = Number.parseFloat(secHdr);
+        if (!Number.isNaN(n) && n >= 0.25) return Math.min(Math.floor(n * 1000), 120_000);
+    }
+    return 12_000;
 }
 
 function classifyUpstreamError(err: any): {
@@ -64,7 +89,8 @@ function classifyUpstreamError(err: any): {
     if (meta.status === 429) {
         return {
             httpStatus: 429,
-            clientMessage: 'AI provider is rate limiting requests. Please retry shortly or switch to a faster model.',
+            clientMessage:
+                'OpenAI rate limit (requests or tokens per minute for this key/model). Wait 1–2 minutes, choose GPT-4o Mini, or review limits at https://platform.openai.com/settings/organization/limits — then try again.',
             retryable: true,
         };
     }
@@ -246,12 +272,20 @@ export async function POST(req: NextRequest) {
     console.log('Generating survey using AI...');
     const requestId = getRequestId();
     try {
-        const userId = req.headers.get('x-user-id');
-        
+        let userId = req.headers.get('x-user-id')?.trim() || '';
         if (!userId) {
-            return NextResponse.json({ 
-                error: 'User not authenticated' 
-            }, { status: 401 });
+            const session = await auth();
+            const sid = session?.user && 'id' in session.user ? (session.user as { id?: string }).id : undefined;
+            if (sid) userId = String(sid);
+        }
+        if (!userId) {
+            return NextResponse.json(
+                {
+                    error: 'User not authenticated',
+                    message: 'Sign in again, refresh the page, then try generating the survey.',
+                },
+                { status: 401 }
+            );
         }
 
         let body: any = {};
@@ -289,14 +323,17 @@ export async function POST(req: NextRequest) {
         
         if (modelConfig.type === "openai") {
             if (!process.env.OPENAI_API_KEY) {
-                return NextResponse.json({ 
-                    error: 'OpenAI API key not configured' 
+                return NextResponse.json({
+                    error: 'OpenAI API key not configured',
+                    message:
+                        'Add OPENAI_API_KEY to .env.local (see https://platform.openai.com/api-keys) and restart the dev server.',
                 }, { status: 503 });
             }
             aiClient = new OpenAI({
                 apiKey: process.env.OPENAI_API_KEY,
-                timeout: 120_000,
-                maxRetries: 2,
+                timeout: 180_000,
+                // We implement our own 429 / backoff + optional model fallback below; SDK retries stack and worsen rate limits.
+                maxRetries: 0,
             });
             console.log('[gen-survey] Using OpenAI', { requestId, model: modelConfig.model });
         } else if (modelConfig.type === "deepseek") {
@@ -308,8 +345,8 @@ export async function POST(req: NextRequest) {
             aiClient = new OpenAI({
                 apiKey: process.env.DEEPSEEK_API_KEY,
                 baseURL: 'https://api.deepseek.com',
-                timeout: 120_000,
-                maxRetries: 2,
+                timeout: 180_000,
+                maxRetries: 0,
             });
             console.log('[gen-survey] Using DeepSeek', { requestId, model: modelConfig.model });
         } else if (modelConfig.type === "gemini") {
@@ -321,8 +358,8 @@ export async function POST(req: NextRequest) {
             aiClient = new OpenAI({
                 apiKey: process.env.GEMINI_API_KEY,
                 baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai/',
-                timeout: 120_000,
-                maxRetries: 2,
+                timeout: 180_000,
+                maxRetries: 0,
             });
             console.log('[gen-survey] Using Gemini', { requestId, model: modelConfig.model });
         } else if (modelConfig.type === "anthropic") {
@@ -474,10 +511,11 @@ Guidelines:
                 promptLen: prompt.length
             });
             
-            // Retry wrapper for transient errors (DNS, timeouts, rate limits)
-            // Increased to 5 attempts with exponential backoff for better resilience
-            const maxAttempts = 5;
+            // Retry wrapper for transient errors (DNS, timeouts, rate limits).
+            // OpenAI client uses maxRetries: 0 so we do not stack SDK retries on top of this loop (that worsens 429s).
+            const maxAttempts = 6;
             let lastError: any = null;
+            let did429MiniFallback = false;
             for (let attempt = 1; attempt <= maxAttempts; attempt++) {
                 try {
                     const tStart = Date.now();
@@ -568,6 +606,28 @@ Guidelines:
                         status === 429 ||
                         (status >= 500 && status < 600) ||
                         isTimeoutLike;
+                    // First 429 on a heavier OpenAI model: wait per OpenAI headers, then retry once as gpt-4o-mini (separate TPM bucket).
+                    if (
+                        status === 429 &&
+                        modelConfig.type === 'openai' &&
+                        modelConfig.model !== 'gpt-4o-mini' &&
+                        !did429MiniFallback
+                    ) {
+                        const mini = GPT_MODELS.find((m) => m.key === 'gpt-4o-mini');
+                        if (mini) {
+                            did429MiniFallback = true;
+                            modelConfig = mini;
+                            requestParams.model = mini.model;
+                            const wait = openAi429WaitMs(err);
+                            console.warn('[gen-survey] OpenAI 429: backing off then retrying as gpt-4o-mini', {
+                                requestId,
+                                waitMs: wait,
+                                previousModel: originalModelKey,
+                            });
+                            await new Promise((res) => setTimeout(res, wait));
+                            continue;
+                        }
+                    }
                     // If production is hitting function timeouts with a slower model, fall back once to a faster model.
                     if (isProd && attempt === 1 && originalModelKey === 'gpt-4o' && (isTransient || isTimeoutLike)) {
                         const fallback = GPT_MODELS.find(m => m.key === 'gpt-4o-mini');
@@ -608,11 +668,17 @@ Guidelines:
                         message: err?.message
                     });
                     if (attempt < maxAttempts && isTransient) {
-                        // Exponential backoff: 1s, 2s, 4s, 8s for rate limits and transient errors
-                        const baseDelay = status === 429 ? 2000 : 1000;
-                        const delayMs = baseDelay * Math.pow(2, attempt - 1);
+                        let delayMs: number;
+                        if (status === 429) {
+                            delayMs = Math.min(
+                                120_000,
+                                Math.max(openAi429WaitMs(err), 6000 * attempt)
+                            );
+                        } else {
+                            delayMs = 1000 * Math.pow(2, attempt - 1);
+                        }
                         console.log(`[gen-survey] Retrying after ${delayMs}ms (attempt ${attempt}/${maxAttempts})`);
-                        await new Promise(res => setTimeout(res, delayMs));
+                        await new Promise((res) => setTimeout(res, delayMs));
                         continue;
                     }
                     throw err;
