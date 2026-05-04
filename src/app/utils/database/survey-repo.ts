@@ -43,6 +43,61 @@ function orgAccessWhere(alias: string = 's', editOnly: boolean = false): string 
     )`;
 }
 
+/** Normalize survey_questions.options (JSON array or legacy string) to string labels. */
+function normalizeQuestionOptions(raw: unknown): string[] {
+    if (!raw) return [];
+    if (Array.isArray(raw)) {
+        return raw.map((o) => {
+            if (typeof o === 'string') return o;
+            if (o && typeof o === 'object' && 'label' in (o as Record<string, unknown>)) {
+                return String((o as { label: unknown }).label);
+            }
+            return String(o);
+        });
+    }
+    if (typeof raw === 'string') {
+        try {
+            const p = JSON.parse(raw);
+            return Array.isArray(p) ? normalizeQuestionOptions(p) : [];
+        } catch {
+            return [];
+        }
+    }
+    return [];
+}
+
+function randomSyntheticAnswer(question: { type?: string | null; options?: unknown }): string | string[] {
+    const type = String(question.type || 'text').toLowerCase().replace(/\s+/g, '-');
+    const opts = normalizeQuestionOptions(question.options);
+
+    switch (type) {
+        case 'single-choice':
+        case 'true-false': {
+            if (opts.length) return opts[Math.floor(Math.random() * opts.length)];
+            return type === 'true-false' ? (Math.random() > 0.5 ? 'True' : 'False') : 'Option A';
+        }
+        case 'multiple-choice': {
+            if (!opts.length) return ['Synthetic A', 'Synthetic B'];
+            const pickCount = Math.max(1, Math.min(opts.length, 1 + Math.floor(Math.random() * Math.min(3, opts.length))));
+            const shuffled = [...opts].sort(() => Math.random() - 0.5);
+            return shuffled.slice(0, pickCount);
+        }
+        case 'rating': {
+            if (opts.length) return opts[Math.floor(Math.random() * opts.length)];
+            return String(1 + Math.floor(Math.random() * 5));
+        }
+        case 'yes-no':
+            return Math.random() > 0.5 ? 'Yes' : 'No';
+        case 'number':
+            return String(Math.floor(Math.random() * 10000));
+        case 'email':
+            return `synthetic-${Date.now()}-${Math.random().toString(36).slice(2, 10)}@example.invalid`;
+        case 'text':
+        default:
+            return `Test response ${Math.random().toString(36).slice(2, 12)} — lorem ipsum dolor sit amet.`;
+    }
+}
+
 export const SurveyRepo = {
     /**
      * Update responder agent persona/capability profile and increment version
@@ -448,6 +503,113 @@ export const SurveyRepo = {
             connection.release();
             throw error;
         }
+    },
+
+    /**
+     * Insert synthetic survey responses for analytics/testing (dashboard "Test" action).
+     * Requires same manage access as survey edits (owner or org owner/admin/analyst).
+     */
+    seedTestSurveyResponses: async (surveyId: number, userId: number, count: number): Promise<{ inserted: number }> => {
+        const db = await getMySQLConnection();
+        const [accessRows] = await db.execute<RowDataPacket[]>(
+            `SELECT s.id, s.anonymity_level FROM surveys s
+             WHERE s.id = ? AND (
+               s.created_by = ?
+               OR EXISTS (
+                 SELECT 1 FROM organization_members om
+                 WHERE om.organization_id = s.organization_id
+                   AND om.user_id = ?
+                   AND om.status = 'active'
+                   AND om.role IN ('owner', 'admin', 'analyst')
+               )
+             )`,
+            [surveyId, userId, userId]
+        );
+        if (!accessRows.length) {
+            throw new Error('Survey not found or access denied');
+        }
+
+        const anonymityLevel = (accessRows[0].anonymity_level || 'full') as AnonymityLevel;
+
+        const [questionRows] = await db.execute<RowDataPacket[]>(
+            'SELECT id, type, options FROM survey_questions WHERE survey_id = ? ORDER BY question_order ASC',
+            [surveyId]
+        );
+        if (!questionRows.length) {
+            throw new Error('Survey has no questions');
+        }
+
+        const safeCount = Math.min(100, Math.max(1, Math.floor(count)));
+
+        for (let i = 0; i < safeCount; i++) {
+            const token = `${Date.now()}-${i}-${Math.random().toString(36).slice(2, 11)}`;
+            const answers = questionRows.map((q: RowDataPacket) => ({
+                questionId: q.id as number,
+                value: randomSyntheticAnswer({ type: q.type, options: q.options }),
+            }));
+
+            let demographics: Record<string, string> = {};
+            if (anonymityLevel === 'full') {
+                demographics = {
+                    name: `Synthetic Respondent ${i + 1}`,
+                    email: `synthetic-${surveyId}-${token}@example.invalid`,
+                    age: String(18 + Math.floor(Math.random() * 52)),
+                    location: ['Austin, TX', 'Denver, CO', 'Chicago, IL'][i % 3],
+                };
+            } else if (anonymityLevel === 'semi_anonymous') {
+                demographics = {
+                    age: String(21 + Math.floor(Math.random() * 45)),
+                    location: 'Metro region',
+                    occupation: ['Service', 'Tech', 'Education', 'Healthcare'][i % 4],
+                };
+            }
+
+            await SurveyRepo.submitSurveyResponse(
+                {
+                    surveyId,
+                    demographics,
+                    answers,
+                    source: 'api',
+                },
+                '127.0.0.1',
+                `MarketMaker-SyntheticTest/${token}`
+            );
+        }
+
+        return { inserted: safeCount };
+    },
+
+    /**
+     * Delete all synthetic test responses for a survey (those seeded by seedTestSurveyResponses).
+     * Requires same manage access as seedTestSurveyResponses.
+     */
+    deleteTestSurveyResponses: async (surveyId: number, userId: number): Promise<{ deleted: number }> => {
+        const db = await getMySQLConnection();
+        const [accessRows] = await db.execute<RowDataPacket[]>(
+            `SELECT s.id FROM surveys s
+             WHERE s.id = ? AND (
+               s.created_by = ?
+               OR EXISTS (
+                 SELECT 1 FROM organization_members om
+                 WHERE om.organization_id = s.organization_id
+                   AND om.user_id = ?
+                   AND om.status = 'active'
+                   AND om.role IN ('owner', 'admin', 'analyst')
+               )
+             )`,
+            [surveyId, userId, userId]
+        );
+        if (!accessRows.length) {
+            throw new Error('Survey not found or access denied');
+        }
+
+        const [result] = await db.execute<ResultSetHeader>(
+            `DELETE FROM survey_responses
+             WHERE survey_id = ? AND user_agent LIKE 'MarketMaker-SyntheticTest/%'`,
+            [surveyId]
+        );
+
+        return { deleted: result.affectedRows };
     },
 
     getSurveysByCreator: async (createdBy: number) => {

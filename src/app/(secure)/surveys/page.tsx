@@ -9,7 +9,15 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Plus, Upload, Search, ArrowUpDown, Calculator, Sigma, Sparkles } from 'lucide-react'
+import { Plus, Upload, Search, ArrowUpDown, Calculator, Sigma, Sparkles, MoreHorizontal, FlaskConical, Eraser, Copy, Share2, Radio, BarChart2, Pencil } from 'lucide-react'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 
 type SurveyRow = {
   id: number
@@ -19,6 +27,8 @@ type SurveyRow = {
   created_at?: string | null
   response_count?: number
   survey_type?: 'own' | 'org' | 'featured' | string
+  is_editable?: boolean
+  slug?: string | null
 }
 
 export default function SurveysPage() {
@@ -30,19 +40,34 @@ export default function SurveysPage() {
   const [sortKey, setSortKey] = useState<'created_at' | 'title' | 'response_count'>('created_at')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const [populationSize, setPopulationSize] = useState('500000')
-  const [confidenceLevel, setConfidenceLevel] = useState<'90' | '95' | '99'>('95')
+  const [confidenceLevel, setConfidenceLevel] = useState<'99' | '95' | '90' | '85' | '80' | '75' | '70' | '65' | '60' | '55' | '50'>('95')
   const [marginOfError, setMarginOfError] = useState('3')
   const [estimatedProportion, setEstimatedProportion] = useState('50')
   const [designEffect, setDesignEffect] = useState('1')
   const [stdDevInput, setStdDevInput] = useState('')
   const [ciProportion, setCiProportion] = useState('50')
   const [ciSampleSize, setCiSampleSize] = useState('1000')
+  const [testLoadingId, setTestLoadingId] = useState<number | null>(null)
+  const [reverseTestLoadingId, setReverseTestLoadingId] = useState<number | null>(null)
+  const [cloneLoadingId, setCloneLoadingId] = useState<number | null>(null)
+  const [testMessage, setTestMessage] = useState<string | null>(null)
+
+  const refetchSurveys = async () => {
+    const res = await fetch('/api/surveys', { credentials: 'include' })
+    const data = await res.json()
+    if (!res.ok || !data?.status) {
+      setError(data?.message || data?.error || 'Failed to load surveys')
+      return
+    }
+    setSurveys(Array.isArray(data.surveys) ? data.surveys : [])
+    setError(null)
+  }
 
   useEffect(() => {
     let mounted = true
     const load = async () => {
       try {
-        const res = await fetch('/api/surveys')
+        const res = await fetch('/api/surveys', { credentials: 'include' })
         const data = await res.json()
         if (!mounted) return
         if (!res.ok || !data?.status) {
@@ -113,10 +138,18 @@ export default function SurveysPage() {
     setSortDir(key === 'title' ? 'asc' : 'desc')
   }
 
-  const zScoreByConfidence: Record<'90' | '95' | '99', number> = {
-    '90': 1.645,
-    '95': 1.96,
+  const zScoreByConfidence: Record<string, number> = {
     '99': 2.576,
+    '95': 1.960,
+    '90': 1.645,
+    '85': 1.440,
+    '80': 1.282,
+    '75': 1.150,
+    '70': 1.036,
+    '65': 0.935,
+    '60': 0.842,
+    '55': 0.755,
+    '50': 0.674,
   }
 
   const stats = useMemo(() => {
@@ -220,31 +253,84 @@ export default function SurveysPage() {
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
                 <div>
-                  <p className="text-xs text-muted-foreground mb-1">Population (N)</p>
+                  <TooltipProvider delayDuration={200}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <p className="text-xs text-muted-foreground mb-1 cursor-help underline decoration-dotted decoration-muted-foreground/50 w-fit">Population (N)</p>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-[220px] text-xs">
+                        The total size of the group you want to draw conclusions about (e.g. 500,000 registered voters in your city). Leave blank or very large to ignore the finite-population correction.
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                   <Input value={populationSize} onChange={(e) => setPopulationSize(e.target.value)} inputMode="numeric" />
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground mb-1">Confidence</p>
+                  <TooltipProvider delayDuration={200}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <p className="text-xs text-muted-foreground mb-1 cursor-help underline decoration-dotted decoration-muted-foreground/50 w-fit">Confidence</p>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-[220px] text-xs">
+                        How certain you want to be that your results reflect the true population. 95% is the research standard — it means if you ran the survey 100 times, 95 of those results would contain the true value. Lower confidence = smaller required sample.
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                   <select
                     className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
                     value={confidenceLevel}
-                    onChange={(e) => setConfidenceLevel(e.target.value as '90' | '95' | '99')}
+                    onChange={(e) => setConfidenceLevel(e.target.value as '99' | '95' | '90' | '85' | '80' | '75' | '70' | '65' | '60' | '55' | '50')}
                   >
-                    <option value="90">90%</option>
-                    <option value="95">95%</option>
                     <option value="99">99%</option>
+                    <option value="95">95%</option>
+                    <option value="90">90%</option>
+                    <option value="85">85%</option>
+                    <option value="80">80%</option>
+                    <option value="75">75%</option>
+                    <option value="70">70%</option>
+                    <option value="65">65%</option>
+                    <option value="60">60%</option>
+                    <option value="55">55%</option>
+                    <option value="50">50%</option>
                   </select>
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground mb-1">Margin of error (%)</p>
+                  <TooltipProvider delayDuration={200}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <p className="text-xs text-muted-foreground mb-1 cursor-help underline decoration-dotted decoration-muted-foreground/50 w-fit">Margin of error (%)</p>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-[220px] text-xs">
+                        How much your result can differ from the true population value (±). A 3% MOE at 95% confidence means your finding of, say, 52% support could be anywhere from 49%–55% in reality. Smaller MOE = larger required sample.
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                   <Input value={marginOfError} onChange={(e) => setMarginOfError(e.target.value)} inputMode="decimal" />
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground mb-1">Expected support p (%)</p>
+                  <TooltipProvider delayDuration={200}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <p className="text-xs text-muted-foreground mb-1 cursor-help underline decoration-dotted decoration-muted-foreground/50 w-fit">Expected support p (%)</p>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-[220px] text-xs">
+                        Your best estimate of the true proportion in the population (e.g. 40% if you expect 40% to answer "yes"). 50% is the most conservative — it produces the largest sample size. If you already have a prior estimate, enter it here to reduce the required sample.
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                   <Input value={estimatedProportion} onChange={(e) => setEstimatedProportion(e.target.value)} inputMode="decimal" />
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground mb-1">Design effect</p>
+                  <TooltipProvider delayDuration={200}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <p className="text-xs text-muted-foreground mb-1 cursor-help underline decoration-dotted decoration-muted-foreground/50 w-fit">Design effect</p>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-[220px] text-xs">
+                        A multiplier for non-simple-random sampling. Use 1 for a standard online survey. Use 1.5–2.5 if you're sampling clusters (e.g. households in chosen neighborhoods) — responses within a cluster tend to be similar, reducing the effective information per respondent and requiring a larger sample.
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                   <Input value={designEffect} onChange={(e) => setDesignEffect(e.target.value)} inputMode="decimal" />
                 </div>
               </div>
@@ -304,6 +390,11 @@ export default function SurveysPage() {
 
           {loading ? <p className="text-muted-foreground text-sm">Loading surveys...</p> : null}
           {error ? <p className="text-sm text-destructive">{error}</p> : null}
+          {testMessage ? (
+            <p className="text-sm text-muted-foreground" role="status">
+              {testMessage}
+            </p>
+          ) : null}
           {!loading && !error ? (
             <Card>
               <CardHeader className="pb-3">
@@ -360,14 +451,186 @@ export default function SurveysPage() {
                             {survey.created_at ? new Date(survey.created_at).toLocaleDateString() : 'Unknown'}
                           </TableCell>
                           <TableCell className="text-right">
-                            <div className="inline-flex gap-2">
-                              <Button size="sm" variant="outline" asChild>
-                                <Link href={`/surveys/${survey.id}/results`}>Results</Link>
-                              </Button>
-                              <Button size="sm" asChild>
-                                <Link href={`/surveys/${survey.id}/edit`}>Open</Link>
-                              </Button>
-                            </div>
+                            <TooltipProvider delayDuration={300}>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-8 w-8 p-0"
+                                    aria-label="Survey actions"
+                                    disabled={testLoadingId === survey.id || reverseTestLoadingId === survey.id || cloneLoadingId === survey.id}
+                                  >
+                                    {(testLoadingId === survey.id || reverseTestLoadingId === survey.id || cloneLoadingId === survey.id)
+                                      ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-muted-foreground border-t-transparent" />
+                                      : <MoreHorizontal className="h-4 w-4" />
+                                    }
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-48">
+                                  {/* Open / edit */}
+                                  <DropdownMenuItem asChild>
+                                    <Link href={`/surveys/${survey.id}/edit`} className="flex items-center gap-2 cursor-pointer">
+                                      <Pencil className="h-4 w-4" />
+                                      Open
+                                    </Link>
+                                  </DropdownMenuItem>
+
+                                  {/* Results */}
+                                  <DropdownMenuItem asChild>
+                                    <Link href={`/surveys/${survey.id}/results`} className="flex items-center gap-2 cursor-pointer">
+                                      <BarChart2 className="h-4 w-4" />
+                                      Results
+                                    </Link>
+                                  </DropdownMenuItem>
+
+                                  <DropdownMenuSeparator />
+
+                                  {/* Test — only for editable surveys */}
+                                  {survey.is_editable !== false ? (
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <DropdownMenuItem
+                                          className="flex items-center gap-2 cursor-pointer"
+                                          disabled={testLoadingId === survey.id}
+                                          onSelect={async (e) => {
+                                            e.preventDefault()
+                                            setTestMessage(null)
+                                            setTestLoadingId(survey.id)
+                                            try {
+                                              const res = await fetch(`/api/surveys/${survey.id}/test-responses`, {
+                                                method: 'POST',
+                                                headers: { 'Content-Type': 'application/json' },
+                                                credentials: 'include',
+                                                body: JSON.stringify({ count: 20 }),
+                                              })
+                                              const data = await res.json().catch(() => ({}))
+                                              if (!res.ok || !data?.status) {
+                                                setTestMessage(data?.message || 'Could not add test responses.')
+                                                return
+                                              }
+                                              setTestMessage(data?.message || `Added ${data.inserted ?? 20} test responses.`)
+                                              await refetchSurveys()
+                                            } catch {
+                                              setTestMessage('Could not add test responses.')
+                                            } finally {
+                                              setTestLoadingId(null)
+                                            }
+                                          }}
+                                        >
+                                          <FlaskConical className="h-4 w-4" />
+                                          {testLoadingId === survey.id ? 'Testing…' : 'Test'}
+                                        </DropdownMenuItem>
+                                      </TooltipTrigger>
+                                      <TooltipContent side="left">
+                                        Add 20 synthetic responses to test
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  ) : null}
+
+                                  {/* Reverse Test — only for editable surveys */}
+                                  {survey.is_editable !== false ? (
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <DropdownMenuItem
+                                          className="flex items-center gap-2 cursor-pointer text-destructive focus:text-destructive"
+                                          disabled={reverseTestLoadingId === survey.id}
+                                          onSelect={async (e) => {
+                                            e.preventDefault()
+                                            setTestMessage(null)
+                                            setReverseTestLoadingId(survey.id)
+                                            try {
+                                              const res = await fetch(`/api/surveys/${survey.id}/test-responses`, {
+                                                method: 'DELETE',
+                                                credentials: 'include',
+                                              })
+                                              const data = await res.json().catch(() => ({}))
+                                              if (!res.ok || !data?.status) {
+                                                setTestMessage(data?.message || 'Could not remove test responses.')
+                                                return
+                                              }
+                                              setTestMessage(data?.message || 'Synthetic responses removed.')
+                                              await refetchSurveys()
+                                            } catch {
+                                              setTestMessage('Could not remove test responses.')
+                                            } finally {
+                                              setReverseTestLoadingId(null)
+                                            }
+                                          }}
+                                        >
+                                          <Eraser className="h-4 w-4" />
+                                          {reverseTestLoadingId === survey.id ? 'Removing…' : 'Reverse Test'}
+                                        </DropdownMenuItem>
+                                      </TooltipTrigger>
+                                      <TooltipContent side="left">
+                                        Remove all synthetic test responses
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  ) : null}
+
+                                  {/* Clone — only for editable surveys */}
+                                  {survey.is_editable !== false ? (
+                                    <DropdownMenuItem
+                                      className="flex items-center gap-2 cursor-pointer"
+                                      disabled={cloneLoadingId === survey.id}
+                                      onSelect={async (e) => {
+                                        e.preventDefault()
+                                        setCloneLoadingId(survey.id)
+                                        try {
+                                          const res = await fetch(`/api/surveys/${survey.id}/clone`, {
+                                            method: 'POST',
+                                            credentials: 'include',
+                                          })
+                                          const data = await res.json().catch(() => ({}))
+                                          if (!res.ok || !data?.status) {
+                                            setTestMessage(data?.message || 'Could not clone survey.')
+                                            return
+                                          }
+                                          setTestMessage('Survey cloned successfully.')
+                                          await refetchSurveys()
+                                        } catch {
+                                          setTestMessage('Could not clone survey.')
+                                        } finally {
+                                          setCloneLoadingId(null)
+                                        }
+                                      }}
+                                    >
+                                      <Copy className="h-4 w-4" />
+                                      {cloneLoadingId === survey.id ? 'Cloning…' : 'Clone'}
+                                    </DropdownMenuItem>
+                                  ) : null}
+
+                                  <DropdownMenuSeparator />
+
+                                  {/* Share — copy public link */}
+                                  <DropdownMenuItem
+                                    className="flex items-center gap-2 cursor-pointer"
+                                    onSelect={() => {
+                                      const slug = survey.slug
+                                      const url = slug
+                                        ? `${window.location.origin}/survey/${slug}`
+                                        : `${window.location.origin}/survey/${survey.id}`
+                                      navigator.clipboard.writeText(url).then(() => {
+                                        setTestMessage('Survey link copied to clipboard.')
+                                      }).catch(() => {
+                                        setTestMessage('Could not copy link.')
+                                      })
+                                    }}
+                                  >
+                                    <Share2 className="h-4 w-4" />
+                                    Share
+                                  </DropdownMenuItem>
+
+                                  {/* Distribute — channels page */}
+                                  <DropdownMenuItem asChild>
+                                    <Link href={`/surveys/${survey.id}/distribute`} className="flex items-center gap-2 cursor-pointer">
+                                      <Radio className="h-4 w-4" />
+                                      Distribute
+                                    </Link>
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </TooltipProvider>
                           </TableCell>
                         </TableRow>
                       ))
