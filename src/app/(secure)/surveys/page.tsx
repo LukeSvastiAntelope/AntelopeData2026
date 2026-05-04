@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Plus, Upload, Search, ArrowUpDown, Calculator, Sigma } from 'lucide-react'
+import { Plus, Upload, Search, ArrowUpDown, Calculator, Sigma, Sparkles } from 'lucide-react'
 
 type SurveyRow = {
   id: number
@@ -182,14 +182,23 @@ export default function SurveysPage() {
         <div className="border-b border-border" />
         <div className="p-6 space-y-6">
           <div className="flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
-            <Tabs value={tab} onValueChange={(v) => setTab(v as 'all' | 'own' | 'org' | 'featured')}>
-              <TabsList>
-                <TabsTrigger value="all">All ({counts.all})</TabsTrigger>
-                <TabsTrigger value="own">Mine ({counts.own})</TabsTrigger>
-                <TabsTrigger value="org">Org ({counts.org})</TabsTrigger>
-                <TabsTrigger value="featured">Featured ({counts.featured})</TabsTrigger>
-              </TabsList>
-            </Tabs>
+            <div className="flex flex-wrap items-center gap-2">
+              <Tabs value={tab} onValueChange={(v) => setTab(v as 'all' | 'own' | 'org' | 'featured')}>
+                <TabsList>
+                  <TabsTrigger value="all">All ({counts.all})</TabsTrigger>
+                  <TabsTrigger value="own">Mine ({counts.own})</TabsTrigger>
+                  <TabsTrigger value="org">Org ({counts.org})</TabsTrigger>
+                  <TabsTrigger value="featured">Featured ({counts.featured})</TabsTrigger>
+                </TabsList>
+              </Tabs>
+              <Link
+                href="/create/survey/ai"
+                className="inline-flex h-9 items-center justify-center gap-1.5 whitespace-nowrap rounded-md bg-background px-3 text-sm font-medium text-foreground shadow-sm ring-offset-background transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                <Sparkles className="h-4 w-4 shrink-0 text-primary" />
+                AI create survey
+              </Link>
+            </div>
             <div className="relative w-full md:w-80">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input

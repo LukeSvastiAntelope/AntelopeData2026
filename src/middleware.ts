@@ -120,8 +120,31 @@ export default auth((req) => {
         });
     }
 
-    // Protect pages that require authentication
-    const protectedPages = ['/cohort-chat', '/cohort-chat/chat', '/surveys', '/admin', '/digital-twins', '/profile', '/setup-profile', '/team', '/reports', '/python-analysis', '/channels', '/voter-file'];
+    // Protect pages that require authentication (prefix match)
+    const protectedPages = [
+        '/cohort-chat',
+        '/cohort-chat/chat',
+        '/surveys',
+        '/create',
+        '/admin',
+        '/digital-twins',
+        '/profile',
+        '/setup-profile',
+        '/team',
+        '/reports',
+        '/python-analysis',
+        '/channels',
+        '/voter-file',
+        '/dashboard',
+        '/fundraising',
+        '/blog',
+        '/clients',
+        '/compliance',
+        '/volunteer-staff',
+        '/about',
+        '/pricing',
+        '/contact',
+    ];
     if (protectedPages.some(page => path.startsWith(page))) {
         if (!session) {
             return NextResponse.redirect(new URL('/login', req.url));
@@ -133,15 +156,29 @@ export default auth((req) => {
 
 export const config = {
     matcher: [
-        // Match all API routes and protected pages
+        // Match all API routes and protected pages (must cover every path in protectedPages)
         '/api/:path*',
         '/cohort-chat/:path*',
-        '/surveys/:path*', 
+        '/surveys/:path*',
+        '/create/:path*',
         '/admin/:path*',
         '/digital-twins/:path*',
         '/profile/:path*',
         '/setup-profile/:path*',
         '/voter-file/:path*',
+        '/team/:path*',
+        '/reports/:path*',
+        '/python-analysis/:path*',
+        '/channels/:path*',
+        '/dashboard/:path*',
+        '/fundraising/:path*',
+        '/blog/:path*',
+        '/clients/:path*',
+        '/compliance/:path*',
+        '/volunteer-staff/:path*',
+        '/about/:path*',
+        '/pricing/:path*',
+        '/contact/:path*',
         '/login',
         '/register',
         '/logout'

@@ -80,6 +80,7 @@ export default function QuizSurveyBuilderPage() {
       const res = await fetch('/api/ai/generate-survey', {
         method: 'POST',
         headers,
+        credentials: 'include',
         body: JSON.stringify({ prompt, model: selectedModel, mode: 'quiz' })
       })
       if (!res.ok) {
