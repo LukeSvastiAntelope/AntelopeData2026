@@ -33,7 +33,10 @@ import {
   GripVertical,
   Copy,
   Minimize2,
-  Maximize2
+  Maximize2,
+  Sparkles,
+  Loader2,
+  RefreshCw
 } from "lucide-react"
 import { AnonymityLevel } from '@/app/utils/interface'
 import { 
@@ -134,6 +137,13 @@ const EditSurveyPage = () => {
   const [showGenModal, setShowGenModal] = useState<{ open: boolean; qIndex: number|null; prompt: string }>({ open: false, qIndex: null, prompt: '' })
   const [genLoading, setGenLoading] = useState(false)
 
+  // AI generate-from-prompt (bottom card)
+  const [aiPrompt, setAiPrompt] = useState('')
+  const [aiModel, setAiModel] = useState('gpt-4o-mini')
+  const [aiGenerating, setAiGenerating] = useState(false)
+  const [aiError, setAiError] = useState<string | null>(null)
+  const [aiSuccess, setAiSuccess] = useState(false)
+
   const openGenerateFor = (i: number, seed?: string) => {
     const q = questions[i]
     const base = seed || q?.prompt || ''
@@ -163,6 +173,43 @@ const EditSurveyPage = () => {
       setError(e.message || 'Failed to generate image')
     } finally {
       setGenLoading(false)
+    }
+  }
+
+  const handleAiGenerate = async () => {
+    if (!aiPrompt.trim()) return
+    setAiGenerating(true)
+    setAiError(null)
+    setAiSuccess(false)
+    try {
+      const res = await fetch('/api/ai/generate-survey', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ prompt: aiPrompt.trim(), model: aiModel, mode: 'standard' }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data.status) throw new Error(data.message || data.error || 'Generation failed')
+
+      const generated = data.survey || data
+      if (generated.title && !title) setTitle(generated.title)
+      if (generated.description && !description) setDescription(generated.description)
+      if (Array.isArray(generated.questions) && generated.questions.length > 0) {
+        const mapped: SurveyQuestion[] = generated.questions.map((q: any, i: number) => ({
+          type: q.type || 'text',
+          prompt: q.prompt || q.question || '',
+          options: q.options || [],
+          isRequired: q.isRequired ?? true,
+          order: i,
+        }))
+        setQuestions(prev => [...prev, ...mapped])
+      }
+      setAiSuccess(true)
+      setAiPrompt('')
+    } catch (e: any) {
+      setAiError(e.message || 'AI generation failed')
+    } finally {
+      setAiGenerating(false)
     }
   }
 
@@ -981,6 +1028,72 @@ const EditSurveyPage = () => {
                   <li>Times are in your local timezone</li>
                 </ul>
               </div>
+            </CardContent>
+          </Card>
+
+          {/* AI Generate from Prompt */}
+          <Card className="border-primary/30">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Sparkles className="h-4 w-4 text-primary" />
+                Create with AI
+              </CardTitle>
+              <CardDescription>
+                Describe your survey in plain English and AI will generate questions for you. New questions are appended below any existing ones.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label>Prompt</Label>
+                <Textarea
+                  value={aiPrompt}
+                  onChange={e => setAiPrompt(e.target.value)}
+                  placeholder='e.g. "A 10-question survey about community satisfaction with local parks, covering safety, cleanliness, facilities, and overall enjoyment. Mix of rating, yes/no, and open-ended."'
+                  className="min-h-[100px]"
+                />
+              </div>
+              <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-end">
+                <div className="flex-1 space-y-2">
+                  <Label>AI Model</Label>
+                  <Select value={aiModel} onValueChange={setAiModel}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-72">
+                      {getAllModels().map(m => (
+                        <SelectItem key={m.id} value={m.id}>
+                          {m.name}
+                          <span className="ml-2 text-xs text-muted-foreground">{m.provider}</span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button
+                  onClick={handleAiGenerate}
+                  disabled={aiGenerating || !aiPrompt.trim()}
+                  className="shrink-0"
+                >
+                  {aiGenerating
+                    ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Generating…</>
+                    : <><Sparkles className="h-4 w-4 mr-2" />Generate Questions</>}
+                </Button>
+              </div>
+
+              {aiError && (
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>{aiError}</AlertDescription>
+                </Alert>
+              )}
+              {aiSuccess && (
+                <Alert className="border-green-500 bg-green-50 dark:bg-green-950/20">
+                  <RefreshCw className="h-4 w-4 text-green-600" />
+                  <AlertDescription className="text-green-700 dark:text-green-400">
+                    Questions generated and added below. Review them and save when ready.
+                  </AlertDescription>
+                </Alert>
+              )}
             </CardContent>
           </Card>
 

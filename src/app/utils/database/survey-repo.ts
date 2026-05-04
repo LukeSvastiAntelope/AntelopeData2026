@@ -1942,10 +1942,9 @@ export const SurveyRepo = {
                 // Use new cloning columns
                 [clonedSurveyResult] = await connection.execute<ResultSetHeader>(
                     `INSERT INTO surveys (
-                        title, description, slug, created_by, is_public, status, 
-                        response_count, 
+                        title, description, slug, created_by, is_public, status,
                         start_at, end_at, source, source_metadata, parent_survey_id, cloned_at
-                    ) VALUES (?, ?, ?, ?, ?, 'draft', 0, ?, ?, 'clone', ?, ?, NOW())`,
+                    ) VALUES (?, ?, ?, ?, ?, 'draft', ?, ?, 'clone', ?, ?, NOW())`,
                     [
                         newTitle,
                         originalSurvey.description,
@@ -1967,10 +1966,9 @@ export const SurveyRepo = {
                 // Fallback for systems without cloning columns
                 [clonedSurveyResult] = await connection.execute<ResultSetHeader>(
                     `INSERT INTO surveys (
-                        title, description, slug, created_by, is_public, status, 
-                        response_count,
+                        title, description, slug, created_by, is_public, status,
                         start_at, end_at, source, source_metadata
-                    ) VALUES (?, ?, ?, ?, ?, 'draft', 0, ?, ?, 'clone', ?)`,
+                    ) VALUES (?, ?, ?, ?, ?, 'draft', ?, ?, 'clone', ?)`,
                     [
                         newTitle,
                         originalSurvey.description,
