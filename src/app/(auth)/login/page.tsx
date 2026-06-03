@@ -1,10 +1,10 @@
 'use client';
 
-import Link from "next/link";
 import { toast } from "@/components/ui/sonner";
 import { useState, useEffect } from "react";
 import { validateEmail } from "@/app/utils/validation";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -365,44 +365,16 @@ const LoginPage = () => {
 
     return (
         <div className="container relative min-h-screen flex-col items-center justify-center grid lg:max-w-none lg:grid-cols-1 lg:px-0">
-            {/* Top nav (BEFORE logo + Welcome back) */}
-            <div className="absolute top-0 left-0 right-0 px-6 py-4">
-                <div className="mx-auto max-w-5xl">
-                    <div className="flex items-center justify-between gap-3">
-                        <nav className="flex-1 overflow-x-auto whitespace-nowrap">
-                            <div className="flex items-center gap-3 text-[17px] min-w-max">
-                                <Link href="/about-us" className="text-foreground/90 hover:text-foreground transition-colors border-2 border-black/70 dark:border-white/30 rounded-md px-2.5 py-1 bg-white/70 dark:bg-white/5 hover:bg-white dark:hover:bg-white/10 font-semibold shadow-sm">
-                                    About Us/Blog
-                                </Link>
-                                <Link href="/solutions" className="text-foreground/90 hover:text-foreground transition-colors border-2 border-black/70 dark:border-white/30 rounded-md px-2.5 py-1 bg-white/70 dark:bg-white/5 hover:bg-white dark:hover:bg-white/10 font-semibold shadow-sm">
-                                    Solutions/Pricing
-                                </Link>
-                                <Link href="/resources" className="text-foreground/90 hover:text-foreground transition-colors border-2 border-black/70 dark:border-white/30 rounded-md px-2.5 py-1 bg-white/70 dark:bg-white/5 hover:bg-white dark:hover:bg-white/10 font-semibold shadow-sm">
-                                    Resources
-                                </Link>
-                                <Link href="/who-we-serve" className="text-foreground/90 hover:text-foreground transition-colors border-2 border-black/70 dark:border-white/30 rounded-md px-2.5 py-1 bg-white/70 dark:bg-white/5 hover:bg-white dark:hover:bg-white/10 font-semibold shadow-sm">
-                                    Who We Serve
-                                </Link>
-                                <Link href="/features-demo" className="text-foreground/90 hover:text-foreground transition-colors border-2 border-black/70 dark:border-white/30 rounded-md px-2.5 py-1 bg-white/70 dark:bg-white/5 hover:bg-white dark:hover:bg-white/10 font-semibold shadow-sm">
-                                    Features+Demo
-                                </Link>
-                            </div>
-                        </nav>
-                        <Link href="/register" className="shrink-0 text-sm font-semibold text-primary hover:underline">
-                            Sign up
-                        </Link>
-                    </div>
-                </div>
-            </div>
-
             <div className="flex flex-col items-center space-y-6">
-                <img 
-                    src="/assets/images/logo.svg"
-                    alt="Logo"
-                    width={120}
-                    height={120}
-                    className="mb-2 brightness-0 dark:brightness-0 dark:invert"
-                />
+                <a href="https://antelopedata.org" aria-label="Go to Antelope home page">
+                    <img 
+                        src="/assets/images/logo.svg"
+                        alt="Logo"
+                        width={120}
+                        height={120}
+                        className="mb-2 brightness-0 dark:brightness-0 dark:invert"
+                    />
+                </a>
                 
                 <Card className="w-[350px] bg-background/60 backdrop-blur supports-[backdrop-filter]:bg-background/60">
                     <CardHeader className="space-y-1">
