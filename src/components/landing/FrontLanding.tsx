@@ -6,7 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent } from "@/components/ui/card"
-import { Rocket, FileText, MessageSquareText, PhoneCall, Loader2, Bot, Sparkles, HeartHandshake } from "lucide-react"
+import { Rocket, FileText, MessageSquareText, PhoneCall, Loader2, Bot, Sparkles, HeartHandshake, X } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
 import Link from "next/link"
@@ -22,6 +22,7 @@ export default function FrontLanding() {
   const [uploadLoading, setUploadLoading] = useState(false)
   const [uploadPreview, setUploadPreview] = useState<any>(null)
   const [salesChatOpen, setSalesChatOpen] = useState(false)
+  const [pricingBotPromoMinimized, setPricingBotPromoMinimized] = useState(false)
   const [salesTab, setSalesTab] = useState<'sales-call' | 'pricing-bot'>('sales-call')
 
   const [pricingForm, setPricingForm] = useState({
@@ -787,25 +788,47 @@ export default function FrontLanding() {
           <PhoneCall className="h-4 w-4 mr-2" />
           Stuck? Ask for a sales call here!
         </Button>
-        <div className="mt-2 w-[380px] max-w-[95vw] rounded-xl border border-violet-500/50 bg-background backdrop-blur shadow-lg p-4">
-          <div className="flex items-start gap-2">
-            <div className="h-12 w-12 rounded-full border border-violet-400/50 bg-violet-500/10 flex items-center justify-center shadow-sm">
-              <Bot className="h-6 w-6 text-violet-500" />
+        {pricingBotPromoMinimized ? (
+          <button
+            type="button"
+            onClick={() => setPricingBotPromoMinimized(false)}
+            className="mt-2 flex items-center gap-2 rounded-full border border-violet-500/50 bg-background px-3 py-2 text-sm font-medium shadow-lg transition hover:bg-violet-500/10"
+            aria-label="Open pricing bot panel"
+          >
+            <Bot className="h-4 w-4 text-violet-500" />
+            Pricing Bot
+          </button>
+        ) : (
+          <div className="mt-2 w-[380px] max-w-[95vw] rounded-xl border border-violet-500/50 bg-background backdrop-blur shadow-lg p-4">
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex items-start gap-2">
+                <div className="h-12 w-12 rounded-full border border-violet-400/50 bg-violet-500/10 flex items-center justify-center shadow-sm">
+                  <Bot className="h-6 w-6 text-violet-500" />
+                </div>
+                <div>
+                  <p className="text-lg font-semibold leading-tight">Pricing Bot</p>
+                  <p className="text-sm text-muted-foreground mt-1 leading-snug">
+                    Opens from the corner. Make your case, then keep convincing Antelope for a deeper discount.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPricingBotPromoMinimized(true)}
+                className="rounded p-1 text-muted-foreground transition hover:bg-muted hover:text-foreground"
+                aria-label="Minimize pricing bot panel"
+              >
+                <X className="h-4 w-4" />
+              </button>
             </div>
-            <div>
-              <p className="text-lg font-semibold leading-tight">Pricing Bot</p>
-              <p className="text-sm text-muted-foreground mt-1 leading-snug">
-                Opens from the corner. Make your case, then keep convincing Antelope for a deeper discount.
-              </p>
+            <div className="mt-3 rounded-md border border-violet-500/40 bg-violet-500/20 px-3 py-2 text-sm font-medium">
+              Think you can drop us from <span className="font-bold">$650</span> to as low as <span className="font-bold">$99</span> (for the first 3 months)?
             </div>
+            <Button size="lg" className="w-full mt-3 text-base font-semibold" onClick={openPricingBotPanel}>
+              Open Pricing Bot Challenge
+            </Button>
           </div>
-          <div className="mt-3 rounded-md border border-violet-500/40 bg-violet-500/20 px-3 py-2 text-sm font-medium">
-            Think you can drop us from <span className="font-bold">$650</span> to as low as <span className="font-bold">$99</span> (for the first 3 months)?
-          </div>
-          <Button size="lg" className="w-full mt-3 text-base font-semibold" onClick={openPricingBotPanel}>
-            Open Pricing Bot Challenge
-          </Button>
-        </div>
+        )}
       </div>
     </div>
     </>
