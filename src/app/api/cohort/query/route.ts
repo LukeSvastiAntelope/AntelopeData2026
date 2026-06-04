@@ -14,7 +14,7 @@ import {
   refreshCampaignNewsForUserScope,
   type NewsTimeWindowConfig,
 } from "@/app/utils/campaign-news";
-import { respondFromCampaignNewsOnly } from "./news-copilot";
+import { respondFromCampaignNewsOnly, respondFromGeneralWebOnly } from "./news-copilot";
 import { detectSurveyToolIntent, executeSurveyTool } from "./survey-tools";
 import { orchestrateWithPlanner } from "./agent-orchestrator";
 import {
@@ -149,19 +149,20 @@ function parseNewsTimeWindow(question: string): NewsTimeWindowConfig | null {
 
 type RouteDecision =
   | 'news_only_with_context'
-  | 'news_only_no_context'
+  | 'general_web_only'
   | 'survey_or_analysis';
 
 function decidePrimaryRoute(args: {
   surveyId?: number;
   webSourceEnabled: boolean;
   newsItemCount: number;
+  question: string;
 }): RouteDecision {
-  if (!args.surveyId && args.webSourceEnabled && args.newsItemCount > 0) {
-    return 'news_only_with_context';
-  }
-  if (!args.surveyId && args.webSourceEnabled && args.newsItemCount === 0) {
-    return 'news_only_no_context';
+  if (!args.surveyId && args.webSourceEnabled) {
+    if (args.newsItemCount > 0 && isNewsIntent(args.question)) {
+      return 'news_only_with_context';
+    }
+    return 'general_web_only';
   }
   return 'survey_or_analysis';
 }
@@ -762,6 +763,7 @@ export async function POST(req: NextRequest) {
       surveyId,
       webSourceEnabled,
       newsItemCount: newsContext?.items?.length || 0,
+      question,
     });
     logRoute(traceId, 'route_decision', { primaryRoute });
 
@@ -861,14 +863,21 @@ export async function POST(req: NextRequest) {
         featureFlags,
       });
     }
-    if (primaryRoute === 'news_only_no_context') {
-      logRoute(traceId, 'route_news_no_context', {});
-      return NextResponse.json({
-        status: true,
-        content:
-          requestedNewsTimeWindow
-            ? `No district/state campaign news matched the requested window (${requestedNewsTimeWindow.label}). Try broadening the window (for example, last 14 days) or refresh the digest.`
-            : "No district/state news items are available yet for your campaign scope. Try running the news digest refresh, then ask again.",
+    if (primaryRoute === 'general_web_only') {
+      logRoute(traceId, 'route_general_web', {
+        newsItems: newsContext?.items?.length || 0,
+        hasCampaignIdentity: Boolean(campaignIdentity),
+      });
+      return respondFromGeneralWebOnly({
+        question,
+        stream,
+        campaignIdentity,
+        model,
+        recentMessages,
+        memoryContext,
+        systemPrompt: effectiveSystemPrompt,
+        newsContextSummary: buildNewsContextSummary(newsContext),
+        requestedNewsTimeWindow: requestedNewsTimeWindow?.label || null,
       });
     }
 
