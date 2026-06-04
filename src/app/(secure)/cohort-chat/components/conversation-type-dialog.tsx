@@ -52,7 +52,7 @@ export function ConversationTypeDialog({
               </div>
             </div>
 
-            {/* News Chat Option */}
+            {/* general/news Option */}
             <div 
               className="border rounded-lg p-4 cursor-pointer hover:border-primary transition-colors group"
               onClick={() => handleTypeSelect('news')}
@@ -62,9 +62,9 @@ export function ConversationTypeDialog({
                   <Newspaper className="h-5 w-5 text-amber-700" />
                 </div>
                 <div className="flex-1">
-                  <h3 className="font-medium text-foreground">📰 News Chat</h3>
+                  <h3 className="font-medium text-foreground">📰 general/news</h3>
                   <p className="text-sm text-muted-foreground">
-                    Campaign Copilot focused on district/state news, briefs, and rapid-response suggestions
+                    General questions and public data — news, county clerk records, ballot order, and cross-source analysis
                   </p>
                 </div>
                 <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />

@@ -1554,7 +1554,7 @@ FORMATTING REQUIREMENTS:
                         ) : currentConversationType === 'news' ? (
                           <>
                             <Newspaper className="h-4 w-4" />
-                            News Chat
+                            general/news
                           </>
                         ) : (
                           <>
