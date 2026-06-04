@@ -357,6 +357,165 @@ Requirements:
   }
 }
 
+interface GeneralWebCopilotParams {
+  question: string;
+  stream: boolean;
+  campaignIdentity?: CampaignIdentity | null;
+  model?: string;
+  recentMessages?: Array<{ role: 'user' | 'agent'; content: string }>;
+  memoryContext?: string;
+  systemPrompt?: string;
+  newsContextSummary?: string;
+  requestedNewsTimeWindow?: string | null;
+}
+
+function deliverCopilotContent(content: string, stream: boolean) {
+  if (stream) {
+    const encoder = new TextEncoder();
+    const streamBody = new ReadableStream({
+      start(controller) {
+        controller.enqueue(
+          encoder.encode(`data: ${JSON.stringify({ type: "chunk", content })}\n\n`)
+        );
+        controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+        controller.close();
+      },
+    });
+    return new NextResponse(streamBody, {
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+      },
+    });
+  }
+  return NextResponse.json({ status: true, content });
+}
+
+/**
+ * general/news mode: LLM answers without requiring a survey or a populated news digest.
+ * Used for public-data questions (ballot order, clerk records, regression design, etc.).
+ */
+export async function respondFromGeneralWebOnly(params: GeneralWebCopilotParams) {
+  const {
+    question,
+    stream,
+    campaignIdentity,
+    model,
+    recentMessages,
+    memoryContext,
+    systemPrompt,
+    newsContextSummary,
+    requestedNewsTimeWindow,
+  } = params;
+
+  const selectedModel = (model || process.env.GENERAL_COPILOT_MODEL || "gpt-4o").trim();
+  const candidateLabel =
+    campaignIdentity?.candidateName ||
+    campaignIdentity?.organizationName ||
+    "the campaign";
+  const districtLabel =
+    campaignIdentity?.districtCode ||
+    campaignIdentity?.state ||
+    "your jurisdiction";
+
+  const conversationContext = (recentMessages || [])
+    .filter((m) => typeof m?.content === "string" && m.content.trim().length > 0)
+    .slice(-6)
+    .map((m) => `${m.role === "user" ? "User" : "Assistant"}: ${m.content}`)
+    .join("\n\n");
+
+  const supplementalNews = (newsContextSummary || "").trim();
+  const hasNewsDigest = supplementalNews.length > 0;
+
+  const baseSystem = [
+    `You are a campaign research copilot for **${candidateLabel}** in **${districtLabel}**.`,
+    "This is **general/news** mode: the user is NOT tied to a specific survey cohort.",
+    "",
+    "You help with:",
+    "- Electoral administration and public records (county clerks, canvass, ballot formatting)",
+    "- **Ballot positioning / ballot order** and how to test order effects against outcomes",
+    "- Research design (variables, controls, regression framing, data joins)",
+    "- District/state campaign news when a digest is provided",
+    "",
+    "RULES:",
+    "- Answer the user's exact question first.",
+    "- Separate **facts from inference**. Label speculation clearly.",
+    "- If you lack live data for this jurisdiction, say what to fetch (clerk site, SOS, L2, results files) and suggest a concrete analysis plan.",
+    "- Do not invent statistics, vote totals, or clerk rulings.",
+    "- Use markdown with short sections (## headings) when helpful.",
+    systemPrompt ? `\nAdditional instructions:\n${systemPrompt}` : "",
+  ].join("\n");
+
+  const userPrompt = [
+    requestedNewsTimeWindow
+      ? `User requested news window: ${requestedNewsTimeWindow} (no matching digest may be available).`
+      : "",
+    hasNewsDigest
+      ? `Optional campaign news digest (use only if relevant):\n${supplementalNews}`
+      : "No campaign news digest is loaded for this session.",
+    memoryContext ? `Relevant campaign memory:\n${memoryContext}` : "",
+    conversationContext ? `Recent conversation:\n${conversationContext}` : "",
+    "",
+    `User question: "${question}"`,
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+
+  try {
+    const result = await createCompletion({
+      model: selectedModel,
+      messages: [
+        { role: "system", content: baseSystem },
+        { role: "user", content: userPrompt },
+      ],
+      temperature: 0.35,
+      maxTokens: 1600,
+    });
+
+    let content = (result.content || "").trim();
+    if (!content && selectedModel !== "gpt-4o") {
+      const fallback = await createCompletion({
+        model: "gpt-4o",
+        messages: [
+          { role: "system", content: baseSystem },
+          { role: "user", content: userPrompt },
+        ],
+        temperature: 0.25,
+        maxTokens: 1600,
+      });
+      content = (fallback.content || "").trim();
+    }
+
+    if (!content) {
+      content = [
+        "## Unable to generate a response",
+        "The AI service returned an empty reply. Check that `OPENAI_API_KEY` (or your selected model provider key) is set in `.env.local` / `.env.production`, then try again.",
+        "",
+        "For **general/news** questions without a news digest, you can still ask about methodology (e.g. ballot order effects, merging clerk files with results) and I will outline a data plan.",
+      ].join("\n");
+    }
+
+    if (!hasNewsDigest && !/\b(data plan|methodology|cannot access live)\b/i.test(content)) {
+      content += `\n\n---\n_Note: No live news digest is attached for ${districtLabel}. Answers use general research knowledge unless you connect clerk/results data._`;
+    }
+
+    return deliverCopilotContent(content, stream);
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    console.warn("⚠️ General web copilot LLM failed:", message);
+    const content = [
+      "## AI unavailable",
+      `Could not reach the language model (${message}).`,
+      "",
+      "Verify API keys in your environment, restart the server, and retry.",
+      "",
+      `Your question was: "${question}"`,
+    ].join("\n");
+    return deliverCopilotContent(content, stream);
+  }
+}
+
 // ── Template fallback (used when LLM is unavailable) ──────────────────────
 function buildTemplateFallback(opts: {
   items: any[];
