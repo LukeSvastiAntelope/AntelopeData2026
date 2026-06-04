@@ -91,8 +91,8 @@ export function ChatInput({
                       >
                         <Newspaper className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                         <div className="flex-1 min-w-0">
-                          <div className="text-sm font-medium">News Chat</div>
-                          <div className="text-[11px] text-muted-foreground">District/state campaign news only</div>
+                          <div className="text-sm font-medium">general/news</div>
+                          <div className="text-[11px] text-muted-foreground">News, public records, and cross-source analysis</div>
                         </div>
                       </div>
                       <div className="space-y-1 max-h-60 overflow-y-auto">

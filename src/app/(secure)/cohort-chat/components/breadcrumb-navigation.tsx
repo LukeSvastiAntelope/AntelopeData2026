@@ -132,7 +132,7 @@ export function BreadcrumbNavigation({
                        (currentConversationType === 'code'
                          ? '🧪 Legacy Code Conversation'
                          : currentConversationType === 'news'
-                           ? '📰 New News Chat'
+                           ? '📰 New general/news'
                            : '💬 New Cohort Chat')}
                     </button>
             </DropdownMenuTrigger>

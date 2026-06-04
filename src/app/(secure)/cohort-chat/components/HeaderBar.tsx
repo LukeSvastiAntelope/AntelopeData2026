@@ -46,8 +46,8 @@ export default function HeaderBar(props: Props) {
         {currentConversationType === 'news' ? (
           <div className="flex items-center gap-2">
             <Newspaper className="h-4 w-4 text-amber-500 flex-shrink-0" />
-            <span className="text-sm font-medium">News Chat</span>
-            <span className="text-xs text-muted-foreground">District/state campaign news</span>
+            <span className="text-sm font-medium">general/news</span>
+            <span className="text-xs text-muted-foreground">General questions &amp; public data</span>
           </div>
         ) : (
           <BreadcrumbNavigation
