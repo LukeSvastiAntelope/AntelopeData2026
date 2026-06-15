@@ -1,5 +1,5 @@
 /** @type {import('next').NextConfig} */
-// Cache bust: 2026-06-15
+// Build cache bust - June 2026
 import path from 'path';
 
 const nextConfig = {
