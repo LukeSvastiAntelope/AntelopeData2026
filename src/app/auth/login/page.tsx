@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { toast } from "@/components/ui/sonner";
 import { useState, useEffect } from "react";
@@ -488,7 +488,7 @@ const LoginPage = () => {
                         <div className="text-sm text-muted-foreground text-center">
                                         Don&apos;t have an account?{" "}
                             <Link 
-                                href="/register" 
+                                href="/auth/register" 
                                 className="text-primary underline-offset-4 hover:underline"
                             >
                                 Sign up

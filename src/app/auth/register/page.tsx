@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import Link from "next/link";
 import { toast } from "@/components/ui/sonner";
@@ -53,7 +53,7 @@ const RegisterPage = () => {
                     router.push("/cohort-chat");
                 } else {
                     // User needs to login manually
-                    router.push("/login");
+                    router.push("/auth/login");
                 }
             } else {
                 toast.error(data.message.toString());
@@ -149,7 +149,7 @@ const RegisterPage = () => {
                         <div className="text-sm text-muted-foreground text-center w-full">
                             Already have an account?{" "}
                             <Link 
-                                href="/login" 
+                                href="/auth/login" 
                                 className="text-primary underline-offset-4 hover:underline"
                             >
                                 Sign in

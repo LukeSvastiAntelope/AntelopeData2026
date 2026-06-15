@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -46,7 +46,7 @@ export default function ClientsPage() {
 
               <div className="pt-8 flex gap-4 justify-center">
                 <Button size="lg" asChild>
-                  <Link href="/register">Join Our Beta</Link>
+                  <Link href="/auth/register">Join Our Beta</Link>
                 </Button>
                 <Button size="lg" variant="outline" asChild>
                   <Link href="/contact">Contact Us</Link>

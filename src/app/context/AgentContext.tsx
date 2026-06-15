@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { IAgentProfile, IAgentContext, UserDB, UserOrganization } from '../utils/interface';
@@ -22,8 +22,8 @@ export const AgentProvider = ({ children }: { children: React.ReactNode }) => {
     const { data: session, status } = useSession();
     const pathname = usePathname();
     const router = useRouter();
-    const isAuthPage = pathname === '/login' || pathname === '/register';
-    const isLoginPage = pathname === '/login';
+    const isAuthPage = pathname === '/auth/login' || pathname === '/auth/register';
+    const isLoginPage = pathname === '/auth/login';
 
     const fetchAgentProfile = async () => {
         if (isAgentProfileLoading || !session || hasFetched.current || globalAgentFetched) {
@@ -92,7 +92,7 @@ export const AgentProvider = ({ children }: { children: React.ReactNode }) => {
         // If we're not on an auth page and don't have a session, redirect to login
         if (!session && !isAuthPage) {
             console.log('AgentProvider: No session, redirecting to login');
-            router.push("/login");
+            router.push("/auth/login");
             // Mark initialization complete so the fallback UI does not hang
             setIsInitialized(true);
             return;

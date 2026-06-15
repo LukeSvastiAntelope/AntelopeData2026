@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
@@ -34,7 +34,7 @@ const VerifyContent = () => {
                     setStatus('success');
                     setMessage('Account verified successfully!');
                     // Redirect to login after 2 seconds
-                    setTimeout(() => router.push('/login'), 2000);
+                    setTimeout(() => router.push('/auth/login'), 2000);
                 } else {
                     setStatus('error');
                     setMessage(data.message || 'Verification failed');

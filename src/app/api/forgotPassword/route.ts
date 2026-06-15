@@ -1,4 +1,4 @@
-import { NextRequest } from "next/server";
+﻿import { NextRequest } from "next/server";
 import { UserRepo } from "@/app/utils/database/user-repo";
 import { generateConfirmationToken } from "@/app/utils/api/token";
 import { EmailService } from "@/app/utils/services/email-service";
@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
 
     const token = await generateConfirmationToken(email);
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.PUBLIC_BASE_URL || ''
-    const confirmationLink = `${baseUrl.replace(/\/$/, '')}/resetPassword?token=${token}`;
+    const confirmationLink = `${baseUrl.replace(/\/$/, '')}/auth/resetPassword?token=${token}`;
 
     // Try email first; fall back to returning link in response for dev/debug
     try {

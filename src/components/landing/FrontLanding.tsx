@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { Button } from "@/components/ui/button"
 import { SidebarTrigger } from "@/components/ui/sidebar"
@@ -65,7 +65,7 @@ export default function FrontLanding() {
   const [origin, setOrigin] = useState('')
 
   const handleSignUp = () => {
-    router.push("/register")
+    router.push("/auth/register")
   }
 
   const handleFileUpload = async (file: File) => {
@@ -101,7 +101,7 @@ export default function FrontLanding() {
 
   const handleGetStarted = () => {
     setShowUploadDialog(false);
-    router.push("/register");
+    router.push("/auth/register");
   };
 
   const resetUploadDialog = () => {
@@ -343,7 +343,7 @@ export default function FrontLanding() {
               </div>
             </nav>
 
-            <Link href="/login" className="text-sm font-semibold text-primary hover:underline shrink-0">
+            <Link href="/auth/login" className="text-sm font-semibold text-primary hover:underline shrink-0">
               Login
             </Link>
           </div>
@@ -462,7 +462,7 @@ export default function FrontLanding() {
                     size="lg" 
                     variant="outline"
                     className="px-8 py-3 text-lg font-medium"
-                    onClick={() => router.push("/login")}
+                    onClick={() => router.push("/auth/login")}
                   >
                     Login
                   </Button>
