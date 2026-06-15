@@ -27,9 +27,6 @@ const nextConfig = {
     ],
     experimental: {
         optimizePackageImports: [],
-        outputFileTracingIncludes: {
-            '/**/*': ['./.next/server/app/**/*_client-reference-manifest.js'],
-        },
     },
     images: {
         remotePatterns: [

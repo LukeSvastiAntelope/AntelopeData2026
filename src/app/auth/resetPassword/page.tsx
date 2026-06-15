@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
@@ -81,7 +81,7 @@ const VerifyContent = () => {
             if (data.status) {
                 setStatus('success');
                 setMessage('Password reset successfully!');
-                setTimeout(() => router.push('/login'), 2000);
+                setTimeout(() => router.push('/auth/login'), 2000);
             } else {
                 setStatus('error');
                 setMessage(data.message || 'Password reset failed');

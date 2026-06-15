@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import * as React from "react"
 import Link from "next/link"
@@ -45,31 +45,31 @@ export function PublicAppSidebar({ className, collapsible = "offcanvas", ...prop
   const platformNavItems = [
     {
       title: "Surveys",
-      href: "/login",
+      href: "/auth/login",
       icon: FileTextIcon,
       key: "surveys"
     },
     {
       title: "Voter Profiles",
-      href: "/login",
+      href: "/auth/login",
       icon: BrainIcon,
       key: "voter-profiles"
     },
     {
       title: "Channels",
-      href: "/login",
+      href: "/auth/login",
       icon: MessageCircleIcon,
       key: "channels"
     },
     {
       title: "Reports",
-      href: "/login",
+      href: "/auth/login",
       icon: FileBarChartIcon,
       key: "reports"
     },
     {
       title: "Python Analysis",
-      href: "/login",
+      href: "/auth/login",
       icon: FileTextIcon,
       key: "python-analysis"
     }
@@ -79,7 +79,7 @@ export function PublicAppSidebar({ className, collapsible = "offcanvas", ...prop
   const workspaceNavItems = [
     {
       title: "Voter Files",
-      href: "/login",
+      href: "/auth/login",
       icon: FileUpIcon,
       key: "voter-files"
     }
@@ -145,7 +145,7 @@ export function PublicAppSidebar({ className, collapsible = "offcanvas", ...prop
         </div>
         <div className="px-4">
           <Link 
-            href="/login" 
+            href="/auth/login" 
             className="flex items-center gap-2 w-full px-4 py-2 text-sm font-medium rounded-md bg-foreground text-background border border-border hover:bg-foreground/90 transition-colors"
           >
             <MessageCircleIcon className="h-4 w-4 group-data-[collapsible=offcanvas]:hidden text-background" />
@@ -232,7 +232,7 @@ export function PublicAppSidebar({ className, collapsible = "offcanvas", ...prop
             asChild
             className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
           >
-            <Link href="/login" className="flex items-center gap-2">
+            <Link href="/auth/login" className="flex items-center gap-2">
               <LogInIcon className="h-4 w-4" />
               <span className="text-primary-foreground">Login</span>
             </Link>
@@ -242,7 +242,7 @@ export function PublicAppSidebar({ className, collapsible = "offcanvas", ...prop
             variant="outline"
             className="w-full border-border hover:bg-accent"
           >
-            <Link href="/register" className="flex items-center gap-2">
+            <Link href="/auth/register" className="flex items-center gap-2">
               <UserPlusIcon className="h-4 w-4" />
               <span>Register</span>
             </Link>

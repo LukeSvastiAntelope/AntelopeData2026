@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+﻿import { NextRequest, NextResponse } from 'next/server'
 import { pricingBotStore } from '../_store'
 
 interface PricingQuoteRequest {
@@ -246,7 +246,7 @@ export async function POST(req: NextRequest) {
       rationale,
       personalityLine,
       shareText: `Antelope offered ${discountPctFinal}% off (${finalPrice}/mo for the first ${promoMonths} months)—fair, serious, worth a look.`,
-      referralLink: `/api/pricing-bot/referral/${referralToken}?redirect=/register`,
+      referralLink: `/api/pricing-bot/referral/${referralToken}?redirect=/auth/register`,
     })
   } catch (error) {
     console.error('pricing-bot quote error:', error)

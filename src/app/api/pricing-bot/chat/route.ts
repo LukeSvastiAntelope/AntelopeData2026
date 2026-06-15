@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+﻿import { NextRequest, NextResponse } from 'next/server'
 import { pricingBotStore, type PricingBotProfile, type PricingChatMessage, type PricingBotStats } from '../_store'
 
 const PROMO_MONTHS = 3
@@ -189,7 +189,7 @@ export async function POST(req: NextRequest) {
         },
         messages: [welcome],
         cumulativeFavorabilityScore: 0,
-        referralLink: `/api/pricing-bot/referral/${referralToken}?redirect=/register`,
+        referralLink: `/api/pricing-bot/referral/${referralToken}?redirect=/auth/register`,
       })
     }
 
@@ -262,7 +262,7 @@ export async function POST(req: NextRequest) {
         cumulativeFavorabilityScore: cumulative,
         deltaFavorability: delta,
         shareText: `Antelope: my campaign just earned ${discountPct}% off list ($${finalPrice}/mo for the first ${PROMO_MONTHS} months). Fair partners, sharp strategy.`,
-        referralLink: `/api/pricing-bot/referral/${q.referralToken}?redirect=/register`,
+        referralLink: `/api/pricing-bot/referral/${q.referralToken}?redirect=/auth/register`,
       })
     }
 

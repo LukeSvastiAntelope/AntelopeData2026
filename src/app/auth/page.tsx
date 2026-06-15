@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState } from "react";
 import Link from "next/link";
@@ -118,7 +118,7 @@ Whether you're running a local school board race or a statewide campaign, Antelo
               </Link>
             </div>
           </nav>
-          <Link href="/login" className="shrink-0 text-sm font-semibold text-white hover:underline">
+          <Link href="/auth/login" className="shrink-0 text-sm font-semibold text-white hover:underline">
             Login
           </Link>
         </div>
@@ -157,13 +157,13 @@ Whether you're running a local school board race or a statewide campaign, Antelo
 
         <div className="flex gap-4 mb-12">
           <Link
-            href="/register"
+            href="/auth/register"
             className="px-8 py-3 bg-primary hover:bg-primary/80 text-white rounded-md font-medium"
           >
             Get Started Free
           </Link>
           <Link
-            href="/login"
+            href="/auth/login"
             className="px-8 py-3 border border-white/20 hover:border-white/40 text-white rounded-md font-medium"
           >
             Sign In
@@ -270,7 +270,7 @@ Whether you're running a local school board race or a statewide campaign, Antelo
                   Use the Pricing Bot from the corner widget on the home or login screen — then keep convincing for a deeper discount.
                 </p>
                 <Button size="sm" asChild className="mt-2">
-                  <Link href="/login">Open login (Pricing Bot)</Link>
+                  <Link href="/auth/login">Open login (Pricing Bot)</Link>
                 </Button>
               </div>
               <div className="rounded-md bg-white/5 p-2">

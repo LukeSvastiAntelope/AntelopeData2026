@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -20,7 +20,7 @@ export default function SetupProfilePage() {
         if (status === 'loading') return; // Still loading
         
         if (!session) {
-            router.push('/login');
+            router.push('/auth/login');
             return;
         }
 

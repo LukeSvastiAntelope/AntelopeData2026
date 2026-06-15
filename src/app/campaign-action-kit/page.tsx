@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
@@ -267,10 +267,10 @@ function CampaignActionKitContent() {
           </p>
           <div className="flex flex-wrap justify-center gap-2">
             <Button asChild size="lg" className="bg-violet-600 hover:bg-violet-500 text-white">
-              <Link href="/register">Create your free account</Link>
+              <Link href="/auth/register">Create your free account</Link>
             </Button>
             <Button asChild variant="outline" size="lg" className="border-white/20 text-white hover:bg-white/10">
-              <Link href="/login">Log in</Link>
+              <Link href="/auth/login">Log in</Link>
             </Button>
           </div>
         </div>

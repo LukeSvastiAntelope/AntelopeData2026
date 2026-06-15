@@ -8,8 +8,8 @@ export async function GET(
   const { token } = await params
   const store = pricingBotStore()
   const referral = store.referrals.get(token)
-  const redirectRaw = new URL(req.url).searchParams.get('redirect') || '/register'
-  const redirectTo = redirectRaw.startsWith('/') ? redirectRaw : '/register'
+  const redirectRaw = new URL(req.url).searchParams.get('redirect') || '/auth/register'
+  const redirectTo = redirectRaw.startsWith('/') ? redirectRaw : '/auth/register'
 
   if (referral) {
     referral.clicks += 1

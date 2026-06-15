@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import Link from "next/link"
 // Remove Image import as it's no longer used for logos
@@ -334,7 +334,7 @@ export function AppSidebar({ className, collapsible = "offcanvas", ...props }: S
                         </Link>
                       </DropdownMenuItem>
                       <DropdownMenuItem asChild>
-                        <Link href="/register" className="flex items-center gap-2">
+                        <Link href="/auth/register" className="flex items-center gap-2">
                           <CircleUser className="size-4" />
                           Sign up
                         </Link>

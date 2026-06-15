@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect } from "react";
 import { signOut } from "next-auth/react";
@@ -18,7 +18,7 @@ export default function LogoutPage() {
         // Use NextAuth's proper signOut function
         await signOut({
           redirect: false, // Don't auto-redirect, we'll handle it
-          callbackUrl: "/login"
+          callbackUrl: "/auth/login"
         });
         
         console.log("NextAuth signOut complete, clearing cookies...");
@@ -34,12 +34,12 @@ export default function LogoutPage() {
         console.log("Forcing redirect to login...");
         
         // Force full page reload to login
-        window.location.replace("/login");
+        window.location.replace("/auth/login");
         
       } catch (error) {
         console.error("Logout error:", error);
         // Force redirect even if everything fails
-        window.location.replace("/login");
+        window.location.replace("/auth/login");
       }
     };
 

@@ -491,7 +491,7 @@ const SurveyPage = () => {
                     Liked this survey? Explore other surveys on Antelope!
                   </p>
                   <Button asChild className="w-full" variant="default">
-                    <a href="/register">
+                    <a href="/auth/register">
                       Create Account & Explore More Surveys
                     </a>
                   </Button>

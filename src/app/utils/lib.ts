@@ -1,4 +1,4 @@
-import { useRouter } from 'next/navigation';
+﻿import { useRouter } from 'next/navigation';
 import CryptoJS from 'crypto-js';
 import { toast } from '@/components/ui/sonner';
 
@@ -90,9 +90,9 @@ export const handleAuthError = (router?: any, showToast: boolean = false) => {
   
   // Redirect to login if router is available
   if (router) {
-    router.push('/login');
+    router.push('/auth/login');
   } else if (typeof window !== 'undefined') {
-    window.location.href = '/login';
+    window.location.href = '/auth/login';
   }
 };
 

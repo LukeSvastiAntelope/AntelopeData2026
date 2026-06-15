@@ -80,7 +80,7 @@ export default auth((req) => {
     }
 
     // Redirect authenticated users away from login page (but not register page)
-    if (session && path === '/login') {
+    if (session && path === '/auth/login') {
         // Check if this is a redirect from logout by looking at the referer
         const referer = req.headers.get('referer');
         if (referer && referer.includes('/logout')) {
@@ -89,9 +89,9 @@ export default auth((req) => {
         }
         return NextResponse.redirect(new URL('/surveys', req.url));
     }
-    
+
     // Allow access to register page for all users (logged in or not)
-    if (path === '/register') {
+    if (path === '/auth/register') {
         return NextResponse.next();
     }
 
@@ -129,7 +129,7 @@ export default auth((req) => {
         '/admin',
         '/digital-twins',
         '/profile',
-        '/setup-profile',
+        '/auth',
         '/team',
         '/reports',
         '/python-analysis',
@@ -147,7 +147,7 @@ export default auth((req) => {
     ];
     if (protectedPages.some(page => path.startsWith(page))) {
         if (!session) {
-            return NextResponse.redirect(new URL('/login', req.url));
+            return NextResponse.redirect(new URL('/auth/login', req.url));
         }
     }
 
@@ -164,7 +164,7 @@ export const config = {
         '/admin/:path*',
         '/digital-twins/:path*',
         '/profile/:path*',
-        '/setup-profile/:path*',
+        '/auth/:path*',
         '/voter-file/:path*',
         '/team/:path*',
         '/reports/:path*',
@@ -179,8 +179,6 @@ export const config = {
         '/about/:path*',
         '/pricing/:path*',
         '/contact/:path*',
-        '/login',
-        '/register',
         '/logout'
     ],
 };
