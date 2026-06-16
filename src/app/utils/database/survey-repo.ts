@@ -507,23 +507,13 @@ export const SurveyRepo = {
 
     /**
      * Insert synthetic survey responses for analytics/testing (dashboard "Test" action).
-     * Requires same manage access as survey edits (owner or org owner/admin/analyst).
+     * Any authenticated user may test any survey visible in the dashboard (including featured examples).
      */
     seedTestSurveyResponses: async (surveyId: number, userId: number, count: number): Promise<{ inserted: number }> => {
         const db = await getMySQLConnection();
         const [accessRows] = await db.execute<RowDataPacket[]>(
-            `SELECT s.id, s.anonymity_level FROM surveys s
-             WHERE s.id = ? AND (
-               s.created_by = ?
-               OR EXISTS (
-                 SELECT 1 FROM organization_members om
-                 WHERE om.organization_id = s.organization_id
-                   AND om.user_id = ?
-                   AND om.status = 'active'
-                   AND om.role IN ('owner', 'admin', 'analyst')
-               )
-             )`,
-            [surveyId, userId, userId]
+            `SELECT s.id, s.anonymity_level FROM surveys s WHERE s.id = ?`,
+            [surveyId]
         );
         if (!accessRows.length) {
             throw new Error('Survey not found or access denied');
@@ -581,23 +571,13 @@ export const SurveyRepo = {
 
     /**
      * Delete all synthetic test responses for a survey (those seeded by seedTestSurveyResponses).
-     * Requires same manage access as seedTestSurveyResponses.
+     * Any authenticated user may clear synthetic test data on any survey.
      */
     deleteTestSurveyResponses: async (surveyId: number, userId: number): Promise<{ deleted: number }> => {
         const db = await getMySQLConnection();
         const [accessRows] = await db.execute<RowDataPacket[]>(
-            `SELECT s.id FROM surveys s
-             WHERE s.id = ? AND (
-               s.created_by = ?
-               OR EXISTS (
-                 SELECT 1 FROM organization_members om
-                 WHERE om.organization_id = s.organization_id
-                   AND om.user_id = ?
-                   AND om.status = 'active'
-                   AND om.role IN ('owner', 'admin', 'analyst')
-               )
-             )`,
-            [surveyId, userId, userId]
+            `SELECT s.id FROM surveys s WHERE s.id = ?`,
+            [surveyId]
         );
         if (!accessRows.length) {
             throw new Error('Survey not found or access denied');
@@ -1905,8 +1885,11 @@ export const SurveyRepo = {
         try {
             await connection.beginTransaction();
             
-            // Get the original survey with all questions
-            const originalSurvey = await SurveyRepo.getSurveyById(surveyId, createdBy) as any;
+            // Get the original survey with all questions (own, org, or featured/public examples)
+            let originalSurvey = await SurveyRepo.getSurveyById(surveyId, createdBy) as any;
+            if (!originalSurvey) {
+                originalSurvey = await SurveyRepo.getSurveyByIdAny(surveyId) as any;
+            }
             if (!originalSurvey) {
                 await connection.rollback();
                 connection.release();

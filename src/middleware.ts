@@ -95,6 +95,18 @@ export default auth((req) => {
         return NextResponse.next();
     }
 
+    // Public auth pages (must not be behind the protected /auth prefix below)
+    const publicAuthPages = [
+        '/auth',
+        '/auth/login',
+        '/auth/register',
+        '/auth/verify',
+        '/auth/resetPassword',
+    ];
+    if (publicAuthPages.includes(path)) {
+        return NextResponse.next();
+    }
+
     // Protect API routes that require authentication
     if (path.startsWith('/api/') && !isPublicApiRoute && !isGetPredictionApiRoute) {
         if (!session) {
@@ -129,7 +141,7 @@ export default auth((req) => {
         '/admin',
         '/digital-twins',
         '/profile',
-        '/auth',
+        '/auth/setup-profile',
         '/team',
         '/reports',
         '/python-analysis',

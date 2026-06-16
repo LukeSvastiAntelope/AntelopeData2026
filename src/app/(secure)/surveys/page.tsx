@@ -63,6 +63,73 @@ export default function SurveysPage() {
     setError(null)
   }
 
+  const runSurveyTest = async (surveyId: number) => {
+    setTestMessage(null)
+    setTestLoadingId(surveyId)
+    try {
+      const res = await fetch(`/api/surveys/${surveyId}/test-responses`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ count: 20 }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || !data?.status) {
+        setTestMessage(data?.message || 'Could not add test responses.')
+        return
+      }
+      setTestMessage(data?.message || `Added ${data.inserted ?? 20} test responses.`)
+      await refetchSurveys()
+    } catch {
+      setTestMessage('Could not add test responses.')
+    } finally {
+      setTestLoadingId(null)
+    }
+  }
+
+  const runSurveyReverseTest = async (surveyId: number) => {
+    setTestMessage(null)
+    setReverseTestLoadingId(surveyId)
+    try {
+      const res = await fetch(`/api/surveys/${surveyId}/test-responses`, {
+        method: 'DELETE',
+        credentials: 'include',
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || !data?.status) {
+        setTestMessage(data?.message || 'Could not remove test responses.')
+        return
+      }
+      setTestMessage(data?.message || 'Synthetic responses removed.')
+      await refetchSurveys()
+    } catch {
+      setTestMessage('Could not remove test responses.')
+    } finally {
+      setReverseTestLoadingId(null)
+    }
+  }
+
+  const runCloneSurvey = async (surveyId: number) => {
+    setCloneLoadingId(surveyId)
+    try {
+      const res = await fetch(`/api/surveys/${surveyId}/clone`, {
+        method: 'POST',
+        credentials: 'include',
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || !data?.status) {
+        setTestMessage(data?.message || 'Could not clone survey.')
+        return
+      }
+      setTestMessage('Survey cloned successfully.')
+      await refetchSurveys()
+    } catch {
+      setTestMessage('Could not clone survey.')
+    } finally {
+      setCloneLoadingId(null)
+    }
+  }
+
   useEffect(() => {
     let mounted = true
     const load = async () => {
@@ -486,119 +553,55 @@ export default function SurveysPage() {
 
                                   <DropdownMenuSeparator />
 
-                                  {/* Test — only for editable surveys */}
-                                  {survey.is_editable !== false ? (
-                                    <Tooltip>
-                                      <TooltipTrigger asChild>
-                                        <DropdownMenuItem
-                                          className="flex items-center gap-2 cursor-pointer"
-                                          disabled={testLoadingId === survey.id}
-                                          onSelect={async (e) => {
-                                            e.preventDefault()
-                                            setTestMessage(null)
-                                            setTestLoadingId(survey.id)
-                                            try {
-                                              const res = await fetch(`/api/surveys/${survey.id}/test-responses`, {
-                                                method: 'POST',
-                                                headers: { 'Content-Type': 'application/json' },
-                                                credentials: 'include',
-                                                body: JSON.stringify({ count: 20 }),
-                                              })
-                                              const data = await res.json().catch(() => ({}))
-                                              if (!res.ok || !data?.status) {
-                                                setTestMessage(data?.message || 'Could not add test responses.')
-                                                return
-                                              }
-                                              setTestMessage(data?.message || `Added ${data.inserted ?? 20} test responses.`)
-                                              await refetchSurveys()
-                                            } catch {
-                                              setTestMessage('Could not add test responses.')
-                                            } finally {
-                                              setTestLoadingId(null)
-                                            }
-                                          }}
-                                        >
-                                          <FlaskConical className="h-4 w-4" />
-                                          {testLoadingId === survey.id ? 'Testing…' : 'Test'}
-                                        </DropdownMenuItem>
-                                      </TooltipTrigger>
-                                      <TooltipContent side="left">
-                                        Add 20 synthetic responses to test
-                                      </TooltipContent>
-                                    </Tooltip>
-                                  ) : null}
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <DropdownMenuItem
+                                        className="flex items-center gap-2 cursor-pointer"
+                                        disabled={testLoadingId === survey.id}
+                                        onSelect={(e) => {
+                                          e.preventDefault()
+                                          runSurveyTest(survey.id)
+                                        }}
+                                      >
+                                        <FlaskConical className="h-4 w-4" />
+                                        {testLoadingId === survey.id ? 'Testing…' : 'Test'}
+                                      </DropdownMenuItem>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="left">
+                                      Add 20 synthetic responses to test
+                                    </TooltipContent>
+                                  </Tooltip>
 
-                                  {/* Reverse Test — only for editable surveys */}
-                                  {survey.is_editable !== false ? (
-                                    <Tooltip>
-                                      <TooltipTrigger asChild>
-                                        <DropdownMenuItem
-                                          className="flex items-center gap-2 cursor-pointer text-destructive focus:text-destructive"
-                                          disabled={reverseTestLoadingId === survey.id}
-                                          onSelect={async (e) => {
-                                            e.preventDefault()
-                                            setTestMessage(null)
-                                            setReverseTestLoadingId(survey.id)
-                                            try {
-                                              const res = await fetch(`/api/surveys/${survey.id}/test-responses`, {
-                                                method: 'DELETE',
-                                                credentials: 'include',
-                                              })
-                                              const data = await res.json().catch(() => ({}))
-                                              if (!res.ok || !data?.status) {
-                                                setTestMessage(data?.message || 'Could not remove test responses.')
-                                                return
-                                              }
-                                              setTestMessage(data?.message || 'Synthetic responses removed.')
-                                              await refetchSurveys()
-                                            } catch {
-                                              setTestMessage('Could not remove test responses.')
-                                            } finally {
-                                              setReverseTestLoadingId(null)
-                                            }
-                                          }}
-                                        >
-                                          <Eraser className="h-4 w-4" />
-                                          {reverseTestLoadingId === survey.id ? 'Removing…' : 'Reverse Test'}
-                                        </DropdownMenuItem>
-                                      </TooltipTrigger>
-                                      <TooltipContent side="left">
-                                        Remove all synthetic test responses
-                                      </TooltipContent>
-                                    </Tooltip>
-                                  ) : null}
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <DropdownMenuItem
+                                        className="flex items-center gap-2 cursor-pointer text-destructive focus:text-destructive"
+                                        disabled={reverseTestLoadingId === survey.id}
+                                        onSelect={(e) => {
+                                          e.preventDefault()
+                                          runSurveyReverseTest(survey.id)
+                                        }}
+                                      >
+                                        <Eraser className="h-4 w-4" />
+                                        {reverseTestLoadingId === survey.id ? 'Removing…' : 'Reverse Test'}
+                                      </DropdownMenuItem>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="left">
+                                      Remove all synthetic test responses
+                                    </TooltipContent>
+                                  </Tooltip>
 
-                                  {/* Clone — only for editable surveys */}
-                                  {survey.is_editable !== false ? (
-                                    <DropdownMenuItem
-                                      className="flex items-center gap-2 cursor-pointer"
-                                      disabled={cloneLoadingId === survey.id}
-                                      onSelect={async (e) => {
-                                        e.preventDefault()
-                                        setCloneLoadingId(survey.id)
-                                        try {
-                                          const res = await fetch(`/api/surveys/${survey.id}/clone`, {
-                                            method: 'POST',
-                                            credentials: 'include',
-                                          })
-                                          const data = await res.json().catch(() => ({}))
-                                          if (!res.ok || !data?.status) {
-                                            setTestMessage(data?.message || 'Could not clone survey.')
-                                            return
-                                          }
-                                          setTestMessage('Survey cloned successfully.')
-                                          await refetchSurveys()
-                                        } catch {
-                                          setTestMessage('Could not clone survey.')
-                                        } finally {
-                                          setCloneLoadingId(null)
-                                        }
-                                      }}
-                                    >
-                                      <Copy className="h-4 w-4" />
-                                      {cloneLoadingId === survey.id ? 'Cloning…' : 'Clone'}
-                                    </DropdownMenuItem>
-                                  ) : null}
+                                  <DropdownMenuItem
+                                    className="flex items-center gap-2 cursor-pointer"
+                                    disabled={cloneLoadingId === survey.id}
+                                    onSelect={(e) => {
+                                      e.preventDefault()
+                                      runCloneSurvey(survey.id)
+                                    }}
+                                  >
+                                    <Copy className="h-4 w-4" />
+                                    {cloneLoadingId === survey.id ? 'Cloning…' : 'Clone'}
+                                  </DropdownMenuItem>
 
                                   <DropdownMenuSeparator />
 
