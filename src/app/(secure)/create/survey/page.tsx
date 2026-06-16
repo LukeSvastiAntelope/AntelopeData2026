@@ -1,4 +1,5 @@
 'use client'
+// Touch: force Vercel rebuild to verify "Create with AI" section deploys (2026-06-16)
 
 import { useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
