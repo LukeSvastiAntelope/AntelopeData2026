@@ -27,6 +27,12 @@ const nextConfig = {
     ],
     experimental: {
         optimizePackageImports: [],
+        // Vercel's output file tracer can drop *_client-reference-manifest.js for
+        // App Router route group segments (folder names in parentheses, e.g. (secure)).
+        // Explicitly include them so the build doesn't ENOENT on lstat at deploy time.
+        outputFileTracingIncludes: {
+            '/**/*': ['./.next/server/app/**/*_client-reference-manifest.js'],
+        },
     },
     images: {
         remotePatterns: [
