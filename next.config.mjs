@@ -1,5 +1,5 @@
 /** @type {import('next').NextConfig} */
-// Build cache bust - June 2026
+// Build cache bust - trigger fresh Vercel deploy past (auth) rename (commit 9e4017e)
 import path from 'path';
 
 const nextConfig = {
