@@ -12,9 +12,9 @@ export function PublicLayout({ children }: { children: React.ReactNode }) {
       <div className="flex min-h-screen w-full">
         <PublicAppSidebar />
         
-        <div className="flex flex-col flex-1">
+        <div className="flex flex-col flex-1 min-w-0">
           {/* Main Content */}
-          <SidebarInset>
+          <SidebarInset className="min-w-0">
             {children}
           </SidebarInset>
         </div>

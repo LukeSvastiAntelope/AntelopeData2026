@@ -323,26 +323,6 @@ export default function FrontLanding() {
               <SidebarTrigger className="-ml-0.5 h-5 w-5 text-muted-foreground hover:text-foreground" />
             </div>
 
-            <nav className="flex-1 overflow-x-auto whitespace-nowrap">
-              <div className="flex items-center justify-center gap-5 px-2 text-sm min-w-max">
-                <Link href="/about-us" className="text-muted-foreground hover:text-foreground transition-colors">
-                  About Us/Blog
-                </Link>
-                <Link href="/solutions" className="text-muted-foreground hover:text-foreground transition-colors">
-                  Solutions/Pricing
-                </Link>
-                <Link href="/resources" className="text-muted-foreground hover:text-foreground transition-colors">
-                  Resources
-                </Link>
-                <Link href="/who-we-serve" className="text-muted-foreground hover:text-foreground transition-colors">
-                  Who We Serve
-                </Link>
-                <Link href="/features-demo" className="text-muted-foreground hover:text-foreground transition-colors">
-                  Features+Demo
-                </Link>
-              </div>
-            </nav>
-
             <Link href="/auth/login" className="text-sm font-semibold text-primary hover:underline shrink-0">
               Login
             </Link>
@@ -365,7 +345,7 @@ export default function FrontLanding() {
         {/* Main content */}
         <div className="py-16">
           {/* Hero Section */}
-          <section className="relative w-full h-[30vh] md:h-[35vh] rounded-lg overflow-hidden flex items-start justify-center">
+          <section className="relative w-full py-10 md:py-16 rounded-lg flex items-start justify-center">
             <div className="relative z-10 flex flex-col items-center text-center max-w-3xl px-4 gap-y-6">
               <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-muted/5 border border-primary/10 text-primary font-medium text-xs">
                 <Rocket className="h-3 w-3" />
@@ -379,7 +359,7 @@ export default function FrontLanding() {
               </p>
               
               {/* Action Buttons */}
-              <div className="flex items-center gap-4">
+              <div className="flex flex-wrap items-center justify-center gap-4">
                   <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
                     <DialogTrigger asChild>
                       <Button 

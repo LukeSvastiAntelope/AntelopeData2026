@@ -129,7 +129,10 @@ export default auth((req) => {
         '/admin',
         '/digital-twins',
         '/profile',
-        '/auth',
+        // NOTE: '/auth' is intentionally NOT protected — login/register/reset/verify
+        // must be reachable without a session. Authenticated users are still
+        // redirected away from /auth/login above. Adding '/auth' here causes an
+        // infinite redirect loop (/auth/login -> /auth/login) for logged-out users.
         '/team',
         '/reports',
         '/python-analysis',

@@ -99,25 +99,6 @@ Whether you're running a local school board race or a statewide campaign, Antelo
       {/* Top nav (must be ABOVE logo) */}
       <div className="w-full max-w-screen-lg mx-auto pt-4">
         <div className="flex items-center justify-between gap-3">
-          <nav className="flex-1 overflow-x-auto whitespace-nowrap">
-            <div className="flex items-center justify-center gap-5 px-2 text-sm min-w-max">
-              <Link href="/about-us" className="text-white/80 hover:text-white transition-colors">
-                About Us/Blog
-              </Link>
-              <Link href="/solutions" className="text-white/80 hover:text-white transition-colors">
-                Solutions/Pricing
-              </Link>
-              <Link href="/resources" className="text-white/80 hover:text-white transition-colors">
-                Resources
-              </Link>
-              <Link href="/who-we-serve" className="text-white/80 hover:text-white transition-colors">
-                Who We Serve
-              </Link>
-              <Link href="/features-demo" className="text-white/80 hover:text-white transition-colors">
-                Features+Demo
-              </Link>
-            </div>
-          </nav>
           <Link href="/auth/login" className="shrink-0 text-sm font-semibold text-white hover:underline">
             Login
           </Link>

@@ -10,9 +10,9 @@ import { Label } from "@/components/ui/label"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { GPT_MODELS } from '@/app/utils/const'
+import { SURVEY_MODELS } from '@/app/utils/const'
 import { 
   Sparkles, 
   ArrowLeft, 
@@ -49,6 +49,7 @@ import {
   getRecommendedAnonymityLevel 
 } from '@/app/utils/anonymity-config'
 import { getTemplateById } from '@/app/utils/political-survey-templates'
+import { toast } from '@/components/ui/sonner'
 
 interface GeneratedQuestion {
   type: 'text' | 'single-choice' | 'multiple-choice' | 'rating' | 'yes-no'
@@ -66,8 +67,9 @@ interface GeneratedSurvey {
   purpose?: string
 }
 
+// Default to the recommended curated model (latest GPT/Claude shortlist).
 const DEFAULT_AI_SURVEY_MODEL =
-  process.env.NODE_ENV === 'production' ? 'gpt-4o-mini' : 'gpt-4o'
+  SURVEY_MODELS.find((m) => m.recommended)?.key || SURVEY_MODELS[0].key
 
 const AISurveyBuilderPageInner = () => {
   const router = useRouter()
@@ -81,6 +83,11 @@ const AISurveyBuilderPageInner = () => {
   const [error, setError] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
   const [modelUsed, setModelUsed] = useState<string | null>(null)
+  // Id of the draft auto-saved right after generation, so the survey always
+  // appears in the Surveys list. Re-generating updates this same draft; the
+  // explicit "Save" button updates it and navigates to the editor.
+  const [savedSurveyId, setSavedSurveyId] = useState<number | null>(null)
+  const [autoSaved, setAutoSaved] = useState(false)
 
   const [editableTitle, setEditableTitle] = useState('')
   const [editableDescription, setEditableDescription] = useState('')
@@ -113,7 +120,8 @@ const AISurveyBuilderPageInner = () => {
   // Load saved model preference on mount
   useEffect(() => {
     const savedModel = localStorage.getItem('ai-survey-selected-model');
-    if (savedModel) {
+    // Only restore the saved model if it's still in the curated shortlist.
+    if (savedModel && SURVEY_MODELS.some((m) => m.key === savedModel)) {
       setSelectedModel(savedModel);
     }
   }, []);
@@ -318,7 +326,8 @@ const AISurveyBuilderPageInner = () => {
             optionMedia: (q.options || []).map(() => null) 
           })))
           setModelUsed(data.modelUsed)
-          
+          void persistGeneratedDraft(sanitizedSurvey)
+
           // Show warning about incomplete data
           setError(
             `⚠️ Survey generated with warnings:\n${validation.errors.slice(0, 3).map(e => `• ${e}`).join('\n')}\n\n` +
@@ -333,11 +342,12 @@ const AISurveyBuilderPageInner = () => {
           setEditableDescription(sanitizedSurvey.description)
           setEditableQuestions(sanitizedSurvey.questions)
           setQuestionSectionIdByIndex(sanitizedSurvey.questions.map(() => null))
-          setQuestionMedia(sanitizedSurvey.questions.map((q: any) => ({ 
-            media: undefined, 
-            optionMedia: (q.options || []).map(() => null) 
+          setQuestionMedia(sanitizedSurvey.questions.map((q: any) => ({
+            media: undefined,
+            optionMedia: (q.options || []).map(() => null)
           })))
           setModelUsed(data.modelUsed)
+          void persistGeneratedDraft(sanitizedSurvey)
         }
       } else {
         let errorData: { message?: string; error?: string } = {}
@@ -553,6 +563,62 @@ const AISurveyBuilderPageInner = () => {
     })
   }
 
+  // Auto-persist the freshly generated survey as a draft so it immediately
+  // appears in the Surveys list. POSTs on first generation; PUTs (updates the
+  // same draft) on re-generation. Best-effort — failures fall back to the
+  // explicit Save button.
+  const persistGeneratedDraft = async (survey: GeneratedSurvey) => {
+    try {
+      const token = localStorage.getItem('token')
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      if (token) headers.Authorization = `Bearer ${token}`
+
+      const body = {
+        title: survey.title?.trim() || 'Untitled survey',
+        description: survey.description || '',
+        isPublic: true,
+        anonymityLevel,
+        demographicsRequired,
+        startAt: null,
+        endAt: null,
+        autoPublish: false,
+        questions: survey.questions.map((q, index) => ({
+          type: q.type,
+          prompt: q.prompt,
+          options: q.options,
+          isRequired: q.isRequired,
+          order: index + 1,
+        })),
+        source: 'native',
+        sourceMetadata: {
+          media: {
+            cover: coverMedia,
+            questions: survey.questions.map((q: any) => ({
+              media: undefined,
+              optionMedia: (q.options || []).map(() => null),
+            })),
+          },
+          settings: { presentation: { mode: presentationMode, sections: [] } },
+        },
+      }
+
+      const isUpdate = savedSurveyId != null
+      const res = await fetch(isUpdate ? `/api/surveys/${savedSurveyId}` : '/api/surveys', {
+        method: isUpdate ? 'PUT' : 'POST',
+        headers,
+        credentials: 'include',
+        body: JSON.stringify(body),
+      })
+      if (!res.ok) return
+      const data = await res.json().catch(() => ({} as any))
+      if (!isUpdate && data?.id) setSavedSurveyId(data.id)
+      setAutoSaved(true)
+      toast.success('Saved to your Surveys as a draft.')
+    } catch {
+      // Best-effort; explicit Save remains the fallback.
+    }
+  }
+
   const saveSurvey = async () => {
     if (!editableTitle.trim()) {
       setError('Survey title is required')
@@ -580,9 +646,13 @@ const AISurveyBuilderPageInner = () => {
       const headers: Record<string, string> = { 'Content-Type': 'application/json' }
       if (token) headers.Authorization = `Bearer ${token}`
 
-      const response = await fetch('/api/surveys', {
-        method: 'POST',
+      // If the survey was already auto-saved as a draft, update it (PUT) so we
+      // don't create a duplicate; otherwise create it (POST).
+      const isUpdate = savedSurveyId != null
+      const response = await fetch(isUpdate ? `/api/surveys/${savedSurveyId}` : '/api/surveys', {
+        method: isUpdate ? 'PUT' : 'POST',
         headers,
+        credentials: 'include',
         body: JSON.stringify({
           title: editableTitle,
           description: editableDescription,
@@ -617,7 +687,8 @@ const AISurveyBuilderPageInner = () => {
 
       if (response.ok) {
         const data = await response.json()
-        router.push(`/surveys/${data.id}/edit`)
+        const id = isUpdate ? savedSurveyId : data.id
+        router.push(`/surveys/${id}/edit`)
       } else {
         const errorData = await response.json()
         setError(errorData.message || 'Failed to save survey')
@@ -665,224 +736,223 @@ const AISurveyBuilderPageInner = () => {
         
         <div className="border-b border-border" />
 
-        <div className="p-6 space-y-6">
-          {/* Introduction */}
-          <Card className="border-primary/20 bg-primary/5">
-            <CardContent className="pt-6">
-              <div className="flex items-start gap-4">
-                <div className="p-2 rounded-lg bg-primary/10">
-                  <Brain className="h-6 w-6 text-primary" />
+        <div className="p-6 space-y-6 max-w-5xl mx-auto w-full">
+          {/* Hero */}
+          <div className="flex flex-col gap-4 rounded-xl border border-primary/15 bg-gradient-to-br from-primary/[0.07] via-primary/[0.03] to-transparent p-6">
+            <div className="flex items-start gap-4">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 ring-1 ring-primary/20">
+                <Brain className="h-6 w-6 text-primary" />
+              </div>
+              <div className="min-w-0">
+                <h2 className="text-xl font-semibold tracking-tight">AI-Powered Survey Generation</h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Describe your goal and the AI drafts a methodologically sound survey — clear, unbiased questions
+                  with a balanced mix of types. Review, edit, and reorder everything before saving.
+                </p>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2 pl-16">
+              {[
+                { icon: Target, label: '10–15 questions by default' },
+                { icon: MessageSquare, label: 'Mixed question types' },
+                { icon: Shield, label: 'Neutral, unbiased wording' },
+                { icon: Edit3, label: 'Fully editable' },
+              ].map(({ icon: Icon, label }) => (
+                <span key={label} className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background/70 px-3 py-1 text-xs font-medium text-muted-foreground">
+                  <Icon className="h-3.5 w-3.5 text-primary" />
+                  {label}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          {/* Prompt Input — primary action */}
+          <Card className="border-2 shadow-sm">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <MessageSquare className="h-5 w-5 text-primary" />
+                Describe your survey
+              </CardTitle>
+              <CardDescription>
+                Be specific about the topic, audience, and purpose. Mention a number or exact questions to override the default.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              <div>
+                <Label htmlFor="prompt" className="sr-only">Survey description</Label>
+                <Textarea
+                  id="prompt"
+                  placeholder="e.g. Create a customer satisfaction survey for a coffee shop covering service speed, product quality, atmosphere, and likelihood to recommend — for customers aged 18–45."
+                  value={prompt}
+                  onChange={(e) => setPrompt(e.target.value)}
+                  className="min-h-[140px] resize-y text-base"
+                />
+              </div>
+
+              {/* Example prompts */}
+              <div>
+                <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Need a starting point?</p>
+                <div className="flex flex-wrap gap-2">
+                  {examplePrompts.map((example, index) => (
+                    <button
+                      key={index}
+                      type="button"
+                      onClick={() => setPrompt(example)}
+                      className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted/40 px-3 py-1.5 text-xs text-foreground transition hover:border-primary/40 hover:bg-primary/5"
+                    >
+                      <Lightbulb className="h-3 w-3 text-primary" />
+                      <span>{example}</span>
+                    </button>
+                  ))}
                 </div>
-                <div>
-                  <h3 className="font-semibold mb-2">AI-Powered Survey Generation</h3>
-                  <p className="text-muted-foreground text-sm">
-                    Describe what kind of survey you want to create, and our AI will generate relevant questions,
-                    answer options, and survey structure. You can then edit, reorder, and add new questions manually.
+              </div>
+
+              {/* Model + generate row */}
+              <div className="flex flex-col gap-4 border-t border-border pt-5 sm:flex-row sm:items-end sm:justify-between">
+                <div className="w-full sm:max-w-xs">
+                  <Label htmlFor="model" className="mb-1.5 flex items-center gap-1.5 text-sm font-medium">
+                    <Cpu className="h-3.5 w-3.5 text-muted-foreground" />
+                    AI model
+                  </Label>
+                  <Select value={selectedModel} onValueChange={handleModelChange}>
+                    <SelectTrigger id="model">
+                      <SelectValue placeholder="Select model" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        <SelectLabel>OpenAI · GPT</SelectLabel>
+                        {SURVEY_MODELS.filter((m) => m.provider === 'OpenAI').map((m) => (
+                          <SelectItem key={m.key} value={m.key}>
+                            <div className="flex items-center gap-2">
+                              <span>{m.label}</span>
+                              {m.recommended && <Badge variant="secondary" className="text-[10px]">Recommended</Badge>}
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                      <SelectGroup>
+                        <SelectLabel>Anthropic · Claude</SelectLabel>
+                        {SURVEY_MODELS.filter((m) => m.provider === 'Anthropic').map((m) => (
+                          <SelectItem key={m.key} value={m.key}>
+                            <div className="flex items-center gap-2">
+                              <span>{m.label}</span>
+                              {m.recommended && <Badge variant="secondary" className="text-[10px]">Recommended</Badge>}
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {SURVEY_MODELS.find((m) => m.key === selectedModel)?.blurb || 'Latest GPT and Claude models'}
                   </p>
                 </div>
+
+                <Button
+                  type="button"
+                  size="lg"
+                  onClick={() => void generateSurvey()}
+                  disabled={isGenerating || !prompt.trim()}
+                  className="w-full sm:w-auto"
+                >
+                  {isGenerating ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Generating…
+                    </>
+                  ) : (
+                    <>
+                      <Wand2 className="h-4 w-4 mr-2" />
+                      Generate Survey
+                    </>
+                  )}
+                </Button>
               </div>
             </CardContent>
           </Card>
 
-          {/* Cover media */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Cover Media</CardTitle>
-              <CardDescription>Shown in listings and at the top of your survey. Replace the placeholder with your own image.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex items-start gap-4">
-                <img src={coverMedia?.url || '/assets/images/placeholder-survey.svg'} alt={coverMedia?.alt || 'Cover'} className="h-24 w-24 rounded object-cover ring-1 ring-border" />
-                <div className="space-y-2">
-                  <div>
-                    <Label>Alt text</Label>
-                    <Input value={coverMedia?.alt || ''} onChange={e=>setCoverMedia(prev=>({ ...(prev||{url:'/assets/images/placeholder-survey.svg',type:'image',alt:''}), alt: e.target.value }))} />
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Button type="button" variant="outline" onClick={async ()=>{
-                      const input = document.createElement('input');
-                      input.type = 'file';
-                      input.accept = 'image/png,image/jpeg,image/webp,image/gif';
-                      input.onchange = async ()=>{
-                        const file = input.files?.[0];
-                        if (!file) return;
-                        const fd = new FormData();
-                        fd.append('file', file);
-                        const res = await fetch('/api/media/upload', { method: 'POST', body: fd });
-                        const data = await res.json();
-                        if (data.status) setCoverMedia({ url: data.url, alt: coverMedia?.alt || '', type: 'image' });
-                      }
-                      input.click();
-                    }}>Upload image</Button>
-                    <Button type="button" variant="ghost" onClick={()=>setCoverMedia({ url: '/assets/images/placeholder-survey.svg', alt: 'Placeholder cover', type: 'image' })}>Reset</Button>
+          {/* Advanced setup (cover + presentation) — collapsed by default */}
+          <details className="group rounded-lg border border-border bg-card">
+            <summary className="flex cursor-pointer list-none items-center justify-between px-5 py-3 text-sm font-medium text-card-foreground [&::-webkit-details-marker]:hidden">
+              <span className="flex items-center gap-2">
+                <Edit3 className="h-4 w-4 text-muted-foreground" />
+                Advanced setup — cover image &amp; presentation
+                <span className="text-xs font-normal text-muted-foreground">(optional)</span>
+              </span>
+              <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform group-open:rotate-180" />
+            </summary>
+            <div className="space-y-6 border-t border-border p-5">
+              {/* Cover media */}
+              <div className="space-y-3">
+                <div>
+                  <h4 className="text-sm font-semibold">Cover media</h4>
+                  <p className="text-xs text-muted-foreground">Shown in listings and at the top of your survey.</p>
+                </div>
+                <div className="flex items-start gap-4">
+                  <img src={coverMedia?.url || '/assets/images/placeholder-survey.svg'} alt={coverMedia?.alt || 'Cover'} className="h-24 w-24 rounded object-cover ring-1 ring-border" />
+                  <div className="space-y-2">
+                    <div>
+                      <Label>Alt text</Label>
+                      <Input value={coverMedia?.alt || ''} onChange={e=>setCoverMedia(prev=>({ ...(prev||{url:'/assets/images/placeholder-survey.svg',type:'image',alt:''}), alt: e.target.value }))} />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button type="button" variant="outline" size="sm" onClick={async ()=>{
+                        const input = document.createElement('input');
+                        input.type = 'file';
+                        input.accept = 'image/png,image/jpeg,image/webp,image/gif';
+                        input.onchange = async ()=>{
+                          const file = input.files?.[0];
+                          if (!file) return;
+                          const fd = new FormData();
+                          fd.append('file', file);
+                          const res = await fetch('/api/media/upload', { method: 'POST', body: fd });
+                          const data = await res.json();
+                          if (data.status) setCoverMedia({ url: data.url, alt: coverMedia?.alt || '', type: 'image' });
+                        }
+                        input.click();
+                      }}>Upload image</Button>
+                      <Button type="button" variant="ghost" size="sm" onClick={()=>setCoverMedia({ url: '/assets/images/placeholder-survey.svg', alt: 'Placeholder cover', type: 'image' })}>Reset</Button>
+                    </div>
                   </div>
                 </div>
               </div>
-            </CardContent>
-          </Card>
 
-          {/* Presentation settings */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Presentation</CardTitle>
-              <CardDescription>Choose how questions are presented to respondents.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              {/* Presentation settings */}
+              <div className="space-y-3 border-t border-border pt-5">
                 <div>
+                  <h4 className="text-sm font-semibold">Presentation</h4>
+                  <p className="text-xs text-muted-foreground">Choose how questions are presented to respondents.</p>
+                </div>
+                <div className="max-w-xs">
                   <Label>Mode</Label>
-                  <select value={presentationMode} onChange={e=>setPresentationMode(e.target.value as any)} className="w-full mt-1 px-3 py-2 border border-input bg-background rounded-md">
+                  <select value={presentationMode} onChange={e=>setPresentationMode(e.target.value as any)} className="w-full mt-1 px-3 py-2 border border-input bg-background rounded-md text-sm">
                     <option value="all_at_once">All questions at once</option>
                     <option value="one_by_one">One question at a time</option>
                     <option value="sections">Sections</option>
                   </select>
                 </div>
-              </div>
-              {presentationMode === 'sections' && (
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <Label>Sections</Label>
-                    <Button type="button" size="sm" variant="outline" onClick={()=> setSections(prev=> [...prev, { id: `${Date.now()}_${Math.random().toString(36).slice(2,6)}`, title: `Section ${prev.length+1}` }])}>+ Add Section</Button>
-                  </div>
-                  <div className="space-y-2">
-                    {sections.length === 0 && (
-                      <p className="text-sm text-muted-foreground">No sections yet. Click &quot;+ Add Section&quot; to create one, then assign questions.</p>
-                    )}
-                    {sections.map((s, si)=>(
-                      <div key={s.id} className="flex items-center gap-2">
-                        <Input value={s.title} onChange={e=> setSections(prev=> prev.map((sec, idx)=> idx===si ? ({ ...sec, title: e.target.value }) : sec))} className="flex-1" />
-                        <Button type="button" variant="ghost" size="sm" onClick={()=> setSections(prev=> prev.filter((_, idx)=> idx!==si))}>Remove</Button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Guidelines Card */}
-          <Card className="border-blue-200 bg-blue-50/50 dark:border-blue-900 dark:bg-blue-950/20">
-            <CardContent className="pt-6">
-              <div className="flex items-start gap-3">
-                <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/30">
-                  <Info className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                </div>
-                <div className="flex-1 space-y-3">
-                  <h3 className="font-semibold text-blue-900 dark:text-blue-100">Tips for Best Results</h3>
-                  <ul className="text-sm text-blue-800 dark:text-blue-200 space-y-2">
-                    <li className="flex items-start gap-2">
-                      <span className="text-blue-600 dark:text-blue-400 mt-0.5">•</span>
-                      <span><strong>Specify the number of questions</strong> you want (e.g., &quot;Create 8 questions about...&quot;)</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="text-blue-600 dark:text-blue-400 mt-0.5">•</span>
-                      <span><strong>Mention question types</strong> if you have preferences (multiple choice, rating scales, text input)</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="text-blue-600 dark:text-blue-400 mt-0.5">•</span>
-                      <span><strong>Include your target audience</strong> (e.g., &quot;for college students&quot; or &quot;for restaurant customers&quot;)</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="text-blue-600 dark:text-blue-400 mt-0.5">•</span>
-                      <span><strong>State the survey purpose</strong> clearly (e.g., &quot;to measure satisfaction&quot; or &quot;to gather feedback&quot;)</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="text-blue-600 dark:text-blue-400 mt-0.5">•</span>
-                      <span><strong>Be specific about topics</strong> you want covered (e.g., &quot;include questions about pricing, quality, and service&quot;)</span>
-                    </li>
-                  </ul>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Prompt Input */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <MessageSquare className="h-5 w-5" />
-                Describe Your Survey
-              </CardTitle>
-              <CardDescription>
-                Tell the AI what kind of survey you want to create. Be as specific as possible.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="md:col-span-2">
-                  <Label htmlFor="prompt">Survey Description</Label>
-                  <Textarea
-                    id="prompt"
-                    placeholder="Example: Create a customer satisfaction survey for a coffee shop that asks about service quality, product satisfaction, and likelihood to recommend..."
-                    value={prompt}
-                    onChange={(e) => setPrompt(e.target.value)}
-                    className="mt-1 min-h-[100px]"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="model">AI Model</Label>
-                  <Select value={selectedModel} onValueChange={handleModelChange}>
-                    <SelectTrigger className="mt-1">
-                      <SelectValue placeholder="Select AI model" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {GPT_MODELS.map((model) => (
-                        <SelectItem key={model.key} value={model.key}>
-                          <div className="flex items-center gap-2">
-                            <Cpu className="h-3 w-3" />
-                            <span>{model.label}</span>
-                            <Badge variant="outline" className="text-xs">
-                              {model.type}
-                            </Badge>
-                          </div>
-                        </SelectItem>
+                {presentationMode === 'sections' && (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <Label>Sections</Label>
+                      <Button type="button" size="sm" variant="outline" onClick={()=> setSections(prev=> [...prev, { id: `${Date.now()}_${Math.random().toString(36).slice(2,6)}`, title: `Section ${prev.length+1}` }])}>+ Add Section</Button>
+                    </div>
+                    <div className="space-y-2">
+                      {sections.length === 0 && (
+                        <p className="text-sm text-muted-foreground">No sections yet. Click &quot;+ Add Section&quot; to create one, then assign questions.</p>
+                      )}
+                      {sections.map((s, si)=>(
+                        <div key={s.id} className="flex items-center gap-2">
+                          <Input value={s.title} onChange={e=> setSections(prev=> prev.map((sec, idx)=> idx===si ? ({ ...sec, title: e.target.value }) : sec))} className="flex-1" />
+                          <Button type="button" variant="ghost" size="sm" onClick={()=> setSections(prev=> prev.filter((_, idx)=> idx!==si))}>Remove</Button>
+                        </div>
                       ))}
-                    </SelectContent>
-                  </Select>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Choose which AI model to generate your survey
-                  </p>
-                </div>
-              </div>
-
-              <div>
-                <Label className="text-sm font-medium text-muted-foreground">Example Prompts:</Label>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2">
-                  {examplePrompts.map((example, index) => (
-                    <Button
-                      key={index}
-                      variant="ghost"
-                      size="sm"
-                      className="justify-start text-left h-auto p-2 text-xs"
-                      onClick={() => setPrompt(example)}
-                    >
-                      <Lightbulb className="h-3 w-3 mr-2 flex-shrink-0" />
-                      <span className="truncate">{example}</span>
-                    </Button>
-                  ))}
-                </div>
-              </div>
-
-              <Button
-                type="button"
-                onClick={() => void generateSurvey()}
-                disabled={isGenerating || !prompt.trim()}
-                className="w-full"
-              >
-                {isGenerating ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Generating Survey...
-                  </>
-                ) : (
-                  <>
-                    <Wand2 className="h-4 w-4 mr-2" />
-                    Generate Survey with AI
-                  </>
+                    </div>
+                  </div>
                 )}
-              </Button>
-            </CardContent>
-          </Card>
+              </div>
+            </div>
+          </details>
 
           {/* Error Display */}
           {error && (

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import OpenAI from 'openai';
 import Anthropic from '@anthropic-ai/sdk';
 import { GPT_MODELS } from '@/app/utils/const';
+import { SURVEY_SYSTEM_PROMPT } from '@/app/utils/survey/survey-generation-prompt';
 import { auth } from '@/auth';
 
 // Allow longer processing time during generation
@@ -403,36 +404,7 @@ Guidelines:
 - Provide 3-5 options for choice questions
 - Set at least one correct option (multiple allowed for multi-select)
 - Do NOT include numbering in prompts
-` : `You are an expert survey designer. Create a comprehensive survey based on the user's request. 
-
-Return a JSON object with this exact structure:
-{
-  "title": "Survey Title",
-  "description": "Brief description of the survey purpose",
-  "purpose": "Detailed explanation of what this survey aims to achieve",
-  "targetAudience": "Who should take this survey",
-  "questions": [
-    {
-      "type": "text|single-choice|multiple-choice|rating|yes-no",
-      "prompt": "The question text WITHOUT any numbers",
-      "options": ["option1", "option2"] // only for single-choice and multiple-choice
-      "isRequired": true/false,
-      "reasoning": "Why this question is important for the survey"
-    }
-  ]
-}
-
-Guidelines:
-- Create 5-12 relevant questions
-- Mix different question types appropriately
-- Include demographic questions when relevant
-- Make questions clear and unbiased
-- Provide 3-5 options for choice questions
-- Use rating scales (1-5) for satisfaction/agreement questions
-- Include reasoning for each question
-- Ensure questions flow logically
-- Make critical questions required
-- IMPORTANT: Do NOT include question numbers (like "1.", "2.", etc.) in the prompt field - the system will add numbering automatically`;
+` : SURVEY_SYSTEM_PROMPT;
 
         let aiResponse: string | undefined;
 
@@ -440,12 +412,14 @@ Guidelines:
             // Use Anthropic API
             const completion = await (aiClient as Anthropic).messages.create({
                 model: modelConfig.model,
-                max_tokens: 2000,
+                // Headroom for a 10-15 question survey with options + reasoning (2000 truncates the JSON).
+                max_tokens: 8000,
                 system: systemPrompt,
                 messages: [
                     { role: "user", content: prompt }
                 ],
-                temperature: 0.7,
+                // NOTE: omit `temperature` — the latest Claude models reject it
+                // ("temperature is deprecated for this model"). Defaults are fine for JSON generation.
             });
 
             // Extract text content from Claude's response

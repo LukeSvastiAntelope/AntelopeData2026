@@ -171,25 +171,46 @@ export const GPT_MODELS = [
         model: "gemini-1.5-flash"
     },
     
-    // Anthropic Claude Models
+    // Anthropic Claude Models — latest (4.x family)
+    {
+        key: "claude-opus-4-8",
+        label: "Claude Opus 4.8",
+        type: "anthropic",
+        model: "claude-opus-4-8"
+    },
+    {
+        key: "claude-sonnet-4-6",
+        label: "Claude Sonnet 4.6",
+        type: "anthropic",
+        model: "claude-sonnet-4-6"
+    },
+    {
+        key: "claude-haiku-4-5-20251001",
+        label: "Claude Haiku 4.5",
+        type: "anthropic",
+        model: "claude-haiku-4-5-20251001"
+    },
+    // Legacy Claude models (kept for backwards compatibility)
     {
         key: "claude-3-5-sonnet-latest",
         label: "Claude 3.5 Sonnet",
         type: "anthropic",
         model: "claude-3-5-sonnet-latest"
     },
-    {
-        key: "claude-3-5-haiku-latest",
-        label: "Claude 3.5 Haiku",
-        type: "anthropic",
-        model: "claude-3-5-haiku-latest"
-    },
-    {
-        key: "claude-3-opus-latest",
-        label: "Claude 3 Opus",
-        type: "anthropic",
-        model: "claude-3-opus-latest"
-    },
+];
+
+/**
+ * Curated shortlist of the latest GPT and Claude models shown in the
+ * AI Survey Builder model picker. Keys must match a GPT_MODELS entry.
+ * `recommended: true` marks the default selection.
+ */
+export const SURVEY_MODELS = [
+    { key: 'gpt-4.1',                    label: 'GPT-4.1',            provider: 'OpenAI' as const,    blurb: 'Fast, reliable structured output', recommended: true },
+    { key: 'gpt-5.1',                    label: 'GPT-5.1',           provider: 'OpenAI' as const,    blurb: 'Most capable OpenAI model' },
+    { key: 'gpt-5',                      label: 'GPT-5',             provider: 'OpenAI' as const,    blurb: 'Advanced reasoning' },
+    { key: 'claude-sonnet-4-6',          label: 'Claude Sonnet 4.6', provider: 'Anthropic' as const, blurb: 'Balanced quality and speed' },
+    { key: 'claude-opus-4-8',            label: 'Claude Opus 4.8',   provider: 'Anthropic' as const, blurb: 'Most capable Claude model' },
+    { key: 'claude-haiku-4-5-20251001',  label: 'Claude Haiku 4.5',  provider: 'Anthropic' as const, blurb: 'Fastest Claude model' },
 ];
 
 export const PLUGINS = [
