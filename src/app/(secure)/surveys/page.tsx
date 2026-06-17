@@ -244,6 +244,151 @@ export default function SurveysPage() {
             </div>
           </div>
 
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Calculator className="h-4 w-4" />
+                Population Size Calculator
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+                <div>
+                  <TooltipProvider delayDuration={200}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <p className="text-xs text-muted-foreground mb-1 cursor-help underline decoration-dotted decoration-muted-foreground/50 w-fit">Population (N)</p>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-[220px] text-xs">
+                        The total size of the group you want to draw conclusions about (e.g. 500,000 registered voters in your city). Leave blank or very large to ignore the finite-population correction.
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                  <Input value={populationSize} onChange={(e) => setPopulationSize(e.target.value)} inputMode="numeric" />
+                </div>
+                <div>
+                  <TooltipProvider delayDuration={200}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <p className="text-xs text-muted-foreground mb-1 cursor-help underline decoration-dotted decoration-muted-foreground/50 w-fit">Confidence</p>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-[220px] text-xs">
+                        How certain you want to be that your results reflect the true population. 95% is the research standard — it means if you ran the survey 100 times, 95 of those results would contain the true value. Lower confidence = smaller required sample.
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                  <select
+                    className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                    value={confidenceLevel}
+                    onChange={(e) => setConfidenceLevel(e.target.value as '99' | '95' | '90' | '85' | '80' | '75' | '70' | '65' | '60' | '55' | '50')}
+                  >
+                    <option value="99">99%</option>
+                    <option value="95">95%</option>
+                    <option value="90">90%</option>
+                    <option value="85">85%</option>
+                    <option value="80">80%</option>
+                    <option value="75">75%</option>
+                    <option value="70">70%</option>
+                    <option value="65">65%</option>
+                    <option value="60">60%</option>
+                    <option value="55">55%</option>
+                    <option value="50">50%</option>
+                  </select>
+                </div>
+                <div>
+                  <TooltipProvider delayDuration={200}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <p className="text-xs text-muted-foreground mb-1 cursor-help underline decoration-dotted decoration-muted-foreground/50 w-fit">Margin of error (%)</p>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-[220px] text-xs">
+                        How much your result can differ from the true population value (±). A 3% MOE at 95% confidence means your finding of, say, 52% support could be anywhere from 49%–55% in reality. Smaller MOE = larger required sample.
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                  <Input value={marginOfError} onChange={(e) => setMarginOfError(e.target.value)} inputMode="decimal" />
+                </div>
+                <div>
+                  <TooltipProvider delayDuration={200}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <p className="text-xs text-muted-foreground mb-1 cursor-help underline decoration-dotted decoration-muted-foreground/50 w-fit">Expected support p (%)</p>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-[220px] text-xs">
+                        Your best estimate of the true proportion in the population (e.g. 40% if you expect 40% to answer &quot;yes&quot;). 50% is the most conservative — it produces the largest sample size. If you already have a prior estimate, enter it here to reduce the required sample.
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                  <Input value={estimatedProportion} onChange={(e) => setEstimatedProportion(e.target.value)} inputMode="decimal" />
+                </div>
+                <div>
+                  <TooltipProvider delayDuration={200}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <p className="text-xs text-muted-foreground mb-1 cursor-help underline decoration-dotted decoration-muted-foreground/50 w-fit">Design effect</p>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-[220px] text-xs">
+                        A multiplier for non-simple-random sampling. Use 1 for a standard online survey. Use 1.5–2.5 if you&apos;re sampling clusters (e.g. households in chosen neighborhoods) — responses within a cluster tend to be similar, reducing the effective information per respondent and requiring a larger sample.
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                  <Input value={designEffect} onChange={(e) => setDesignEffect(e.target.value)} inputMode="decimal" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="rounded-md border border-border p-3">
+                  <p className="text-xs text-muted-foreground">Recommended sample (large population)</p>
+                  <p className="text-xl font-semibold">{stats.nInfinite.toLocaleString()}</p>
+                </div>
+                <div className="rounded-md border border-border p-3">
+                  <p className="text-xs text-muted-foreground">Recommended sample (finite population)</p>
+                  <p className="text-xl font-semibold">{stats.nFinite ? stats.nFinite.toLocaleString() : '—'}</p>
+                </div>
+              </div>
+
+              <details className="rounded-md border border-border p-3">
+                <summary className="cursor-pointer text-sm font-medium flex items-center gap-2">
+                  <Sigma className="h-4 w-4 inline" />
+                  Advanced statistical tools
+                </summary>
+                <div className="mt-3 space-y-4">
+                  <div className="space-y-2">
+                    <p className="text-xs text-muted-foreground">Standard deviation (comma or space separated values)</p>
+                    <Input
+                      value={stdDevInput}
+                      onChange={(e) => setStdDevInput(e.target.value)}
+                      placeholder="e.g. 42, 38, 51, 47, 44"
+                    />
+                    <p className="text-sm">
+                      n = <span className="font-medium">{stats.count}</span>
+                      {' · '}mean = <span className="font-medium">{stats.mean ?? '—'}</span>
+                      {' · '}sample SD = <span className="font-medium">{stats.sampleStdDev ?? '—'}</span>
+                    </p>
+                  </div>
+
+                  <div className="space-y-2 pt-2 border-t border-border">
+                    <p className="text-xs text-muted-foreground">Margin of error / confidence interval from sample size</p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">Observed support (%)</p>
+                        <Input value={ciProportion} onChange={(e) => setCiProportion(e.target.value)} inputMode="decimal" />
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">Sample size (n)</p>
+                        <Input value={ciSampleSize} onChange={(e) => setCiSampleSize(e.target.value)} inputMode="numeric" />
+                      </div>
+                    </div>
+                    <p className="text-sm">
+                      MOE ≈ <span className="font-medium">±{stats.moeFromNPercent}%</span>
+                      {' · '}CI ≈ <span className="font-medium">{stats.ciLowPercent}% to {stats.ciHighPercent}%</span>
+                    </p>
+                  </div>
+                </div>
+              </details>
+            </CardContent>
+          </Card>
+
           {loading ? <p className="text-muted-foreground text-sm">Loading surveys...</p> : null}
           {error ? <p className="text-sm text-destructive">{error}</p> : null}
           {testMessage ? (
