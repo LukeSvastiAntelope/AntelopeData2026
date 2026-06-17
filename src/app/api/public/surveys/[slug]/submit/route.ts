@@ -3,6 +3,9 @@ import { SurveyRepo } from "@/app/utils/database/survey-repo";
 import { DigitalTwinService } from "@/app/utils/services/digital-twin-service";
 import { EmailService } from "@/app/utils/services/email-service";
 
+export const runtime = 'nodejs';
+export const maxDuration = 30;
+
 // Helper function to ensure digital twin is stored in Pinecone with retry logic
 async function ensureDigitalTwinInPinecone(agentToken: string, body: any, survey: any, maxRetries: number = 3) {
     let lastError: Error | null = null;
@@ -153,8 +156,14 @@ export async function POST(
             userAgent
         );
 
-        // Generate digital twin persona and store in Pinecone with retry logic
-        await ensureDigitalTwinInPinecone(result.agentToken, body, survey as any);
+        // Generate digital twin persona and store in Pinecone — FIRE-AND-FORGET.
+        // This is optional enrichment (Pinecone may be unconfigured) and must never
+        // block or fail the submission. Awaiting it previously caused serverless
+        // timeouts (it retries with 2s/4s/8s backoff), surfacing as
+        // "Failed to submit survey" even though the response was already saved.
+        void ensureDigitalTwinInPinecone(result.agentToken, body, survey as any).catch((e) => {
+            console.error('[submit] digital twin storage failed (non-blocking):', e instanceof Error ? e.message : e);
+        });
 
         // Fire-and-forget enrichment: aggregate all answers across this twin and regenerate persona/capabilities
         (async () => {
