@@ -16,18 +16,18 @@ import {
 const CreatePage = () => {
   const predictionTypes = [
     {
-      title: "AI Survey Builder",
-      description: "Use AI to generate surveys from a simple description",
+      title: "AI Survey Builder/Template",
+      description: "Start from a political template or use AI to generate survey questions",
       icon: Lightbulb,
-      href: "/create/survey/ai",
+      href: "/create/survey",
       color: "bg-purple-500/10 text-purple-600 dark:text-purple-400",
-      examples: ["Describe your survey needs", "AI creates questions", "Edit and refine results"]
+      examples: ["Pre-built political templates", "AI-generated questions", "Edit and refine before publishing"]
     },
     {
       title: "Manual Survey",
       description: "Create surveys that turn respondents into digital twin agents",
       icon: Users,
-      href: "/create/survey",
+      href: "/create/survey?mode=manual",
       color: "bg-pink-500/10 text-pink-600 dark:text-pink-400",
       examples: ["Market research surveys", "Opinion polls", "Customer feedback forms"]
     },
@@ -118,7 +118,7 @@ const CreatePage = () => {
               <h3 className="text-lg font-semibold">Need Help Choosing?</h3>
             </div>
             <p className="text-muted-foreground mb-4">
-              Use <strong>AI Survey Builder</strong> for quick generation from descriptions, or <strong>Manual Survey</strong> for complete control over questions and structure.
+              Use <strong>AI Survey Builder/Template</strong> for templates and AI generation, or <strong>Manual Survey</strong> for complete control over questions and structure.
             </p>
             <div className="flex flex-wrap justify-center gap-2">
               <Button variant="outline" size="sm" asChild>

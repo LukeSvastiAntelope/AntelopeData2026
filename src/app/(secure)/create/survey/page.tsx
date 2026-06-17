@@ -1,7 +1,7 @@
 'use client'
-// Touch: force Vercel rebuild to verify "Create with AI" section deploys (2026-06-16)
 
-import { useState } from 'react'
+import { useState, useEffect, useRef, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -29,7 +29,8 @@ import {
   Info,
   Sparkles,
   Loader2,
-  CheckCircle2
+  CheckCircle2,
+  Lightbulb
 } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from 'next/navigation'
@@ -41,7 +42,7 @@ import {
   getPrivacyNotice,
   getRecommendedAnonymityLevel 
 } from '@/app/utils/anonymity-config'
-import { POLITICAL_SURVEY_TEMPLATES, SurveyTemplate } from '@/app/utils/political-survey-templates'
+import { POLITICAL_SURVEY_TEMPLATES, SurveyTemplate, getTemplateById } from '@/app/utils/political-survey-templates'
 import { getAllModels } from '@/app/utils/models'
 
 interface SurveyQuestion {
@@ -77,7 +78,23 @@ function templateAnonymityToSurveyLevel(
   return recommended
 }
 
-const CreateSurveyPage = () => {
+const DEFAULT_AI_SURVEY_MODEL =
+  process.env.NODE_ENV === 'production' ? 'gpt-4o-mini' : 'gpt-4o'
+
+const AI_EXAMPLE_PROMPTS = [
+  'Create a voter sentiment poll with approval ratings and top issues',
+  'Build a candidate comparison survey with head-to-head matchups',
+  'Design a message testing survey for healthcare policy framing',
+  'Make a district pulse check on local infrastructure priorities',
+  'Create an event reaction survey after a candidate debate',
+  'Build a survey about education funding and school choice',
+]
+
+const CreateSurveyPageInner = () => {
+  const searchParams = useSearchParams()
+  const isManualMode = searchParams.get('mode') === 'manual'
+  const templatePromptApplied = useRef(false)
+
   const router = useRouter()
   const [survey, setSurvey] = useState<Survey>({
     title: '',
@@ -90,27 +107,63 @@ const CreateSurveyPage = () => {
   })
   const [isLoading, setIsLoading] = useState(false)
   const [showPreview, setShowPreview] = useState(false)
-  const [showTemplates, setShowTemplates] = useState(true)
+  const [showTemplates, setShowTemplates] = useState(!isManualMode)
 
   // AI generate from prompt
   const [aiPrompt, setAiPrompt] = useState('')
-  const [aiModel, setAiModel] = useState('gpt-4o-mini')
+  const [aiModel, setAiModel] = useState(DEFAULT_AI_SURVEY_MODEL)
   const [aiGenerating, setAiGenerating] = useState(false)
   const [aiError, setAiError] = useState<string | null>(null)
   const [aiSuccess, setAiSuccess] = useState(false)
 
+  useEffect(() => {
+    const savedModel = localStorage.getItem('ai-survey-selected-model')
+    if (savedModel) setAiModel(savedModel)
+  }, [])
+
+  useEffect(() => {
+    if (templatePromptApplied.current) return
+    const templateId = searchParams.get('templateId')
+    if (!templateId) return
+    const t = getTemplateById(templateId)
+    if (!t) return
+    templatePromptApplied.current = true
+    setShowTemplates(true)
+    setAiPrompt(
+      `Create a political survey inspired by the "${t.title}" template (${t.category}). ${t.description} ` +
+        `Target roughly ${t.questions.length} substantive questions with similar themes; improve wording for clarity where helpful.`
+    )
+  }, [searchParams])
+
+  const handleAiModelChange = (model: string) => {
+    setAiModel(model)
+    localStorage.setItem('ai-survey-selected-model', model)
+  }
+
   const handleAiGenerate = async () => {
     if (!aiPrompt.trim()) return
+    if (aiPrompt.trim().length < 10) {
+      setAiError('Please provide a more detailed description (at least 10 characters).')
+      return
+    }
     setAiGenerating(true)
     setAiError(null)
     setAiSuccess(false)
     try {
+      const controller = new AbortController()
+      const isSlowModel = aiModel.includes('gpt-5') || aiModel.includes('o1') || aiModel.includes('o3') || aiModel.includes('o4')
+      const timeoutMs = isSlowModel ? 300_000 : 120_000
+      const timeoutId = window.setTimeout(() => {
+        controller.abort(new Error(`Request timeout after ${timeoutMs / 1000} seconds`))
+      }, timeoutMs)
       const res = await fetch('/api/ai/generate-survey', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({ prompt: aiPrompt.trim(), model: aiModel, mode: 'standard' }),
+        signal: controller.signal,
       })
+      window.clearTimeout(timeoutId)
       const data = await res.json()
       if (!res.ok || !data.status) throw new Error(data.message || data.error || 'Generation failed')
       const generated = data.survey || data
@@ -137,8 +190,13 @@ const CreateSurveyPage = () => {
     }
   }
 
-  const aiSurveyUrlForTemplate = (template: SurveyTemplate) =>
-    `/create/survey/ai?templateId=${encodeURIComponent(template.id)}`
+  const applyTemplateToAiPrompt = (template: SurveyTemplate) => {
+    setShowTemplates(true)
+    setAiPrompt(
+      `Create a political survey inspired by the "${template.title}" template (${template.category}). ${template.description} ` +
+        `Target roughly ${template.questions.length} substantive questions with similar themes; improve wording for clarity where helpful.`
+    )
+  }
 
   const loadTemplate = (template: SurveyTemplate) => {
     const questions: SurveyQuestion[] = template.questions.map((q, idx) => ({
@@ -294,7 +352,9 @@ const CreateSurveyPage = () => {
                   Back
                 </Link>
               </Button>
-              <h1 className="text-base font-medium text-card-foreground">Create Survey</h1>
+              <h1 className="text-base font-medium text-card-foreground">
+                {isManualMode ? 'Manual Survey' : 'AI Survey Builder/Template'}
+              </h1>
             </div>
             <div className="flex items-center gap-2">
               <Button variant="outline" size="sm" onClick={() => setShowPreview(!showPreview)}>
@@ -315,7 +375,7 @@ const CreateSurveyPage = () => {
           {!showPreview ? (
             <>
               {/* Political Survey Templates */}
-              {showTemplates && survey.questions.length === 0 && (
+              {!isManualMode && showTemplates && survey.questions.length === 0 && (
                 <Card className="mb-6">
                   <CardHeader>
                     <div className="flex items-center justify-between">
@@ -351,8 +411,8 @@ const CreateSurveyPage = () => {
                             <Button type="button" size="sm" className="w-full" onClick={() => loadTemplate(template)}>
                               Use template
                             </Button>
-                            <Button type="button" size="sm" variant="outline" className="w-full" asChild>
-                              <Link href={aiSurveyUrlForTemplate(template)}>Create survey with AI</Link>
+                            <Button type="button" size="sm" variant="outline" className="w-full" onClick={() => applyTemplateToAiPrompt(template)}>
+                              Create survey with AI
                             </Button>
                           </div>
                         </div>
@@ -360,6 +420,95 @@ const CreateSurveyPage = () => {
                     </div>
                   </CardContent>
                 </Card>
+              )}
+
+              {!isManualMode && (
+              <Card className="mb-6 border-primary/40">
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <Sparkles className="h-4 w-4 text-primary" />
+                    Create with AI
+                  </CardTitle>
+                  <CardDescription>
+                    Describe your survey and AI will generate questions. Pick a template above to pre-fill the prompt, or write your own.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>What is this survey about?</Label>
+                    <Textarea
+                      value={aiPrompt}
+                      onChange={e => setAiPrompt(e.target.value)}
+                      placeholder='e.g. "10 questions about voter satisfaction with local infrastructure — roads, parks, public transit. Mix of rating scales, yes/no, and one open-ended question."'
+                      className="min-h-[100px]"
+                    />
+                  </div>
+                  <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-end">
+                    <div className="flex-1 space-y-2">
+                      <Label>AI Model</Label>
+                      <Select value={aiModel} onValueChange={handleAiModelChange}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="max-h-72">
+                          {getAllModels().map(m => (
+                            <SelectItem key={m.id} value={m.id}>
+                              <span>{m.name}</span>
+                              <span className="ml-2 text-xs text-muted-foreground">{m.provider}</span>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <Button
+                      onClick={handleAiGenerate}
+                      disabled={aiGenerating || !aiPrompt.trim()}
+                      className="shrink-0"
+                    >
+                      {aiGenerating
+                        ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Generating…</>
+                        : <><Sparkles className="h-4 w-4 mr-2" />Generate Questions</>}
+                    </Button>
+                  </div>
+                  <div>
+                    <Label className="text-sm text-muted-foreground">Example prompts</Label>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2">
+                      {AI_EXAMPLE_PROMPTS.map((example, index) => (
+                        <Button
+                          key={index}
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="justify-start text-left h-auto p-2 text-xs"
+                          onClick={() => setAiPrompt(example)}
+                        >
+                          <Lightbulb className="h-3 w-3 mr-2 flex-shrink-0" />
+                          <span className="truncate">{example}</span>
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                  <Alert className="border-blue-200 bg-blue-50/50 dark:border-blue-900 dark:bg-blue-950/20">
+                    <Info className="h-4 w-4 text-blue-600" />
+                    <AlertDescription className="text-sm text-blue-900 dark:text-blue-100">
+                      Be specific: mention question count, topics, and question types (rating scales, multiple choice, open-ended).
+                    </AlertDescription>
+                  </Alert>
+                  {aiError && (
+                    <Alert variant="destructive">
+                      <AlertDescription>{aiError}</AlertDescription>
+                    </Alert>
+                  )}
+                  {aiSuccess && (
+                    <Alert className="border-green-500 bg-green-50 dark:bg-green-950/20">
+                      <CheckCircle2 className="h-4 w-4 text-green-600" />
+                      <AlertDescription className="text-green-700 dark:text-green-400">
+                        Questions generated and added below. Review and save when ready.
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                </CardContent>
+              </Card>
               )}
 
               {/* Survey Settings */}
@@ -626,71 +775,6 @@ const CreateSurveyPage = () => {
                       </div>
                     )}
                   </div>
-                </CardContent>
-              </Card>
-
-              {/* Create with AI */}
-              <Card className="border-primary/40">
-                <CardHeader className="pb-3">
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <Sparkles className="h-4 w-4 text-primary" />
-                    Create with AI
-                  </CardTitle>
-                  <CardDescription>
-                    Describe your survey and AI will generate the questions. Questions are appended to any you've already added.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <Label>What is this survey about?</Label>
-                    <Textarea
-                      value={aiPrompt}
-                      onChange={e => setAiPrompt(e.target.value)}
-                      placeholder='e.g. "10 questions about voter satisfaction with local infrastructure — roads, parks, public transit. Mix of rating scales, yes/no, and one open-ended question."'
-                      className="min-h-[90px]"
-                    />
-                  </div>
-                  <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-end">
-                    <div className="flex-1 space-y-2">
-                      <Label>AI Model</Label>
-                      <Select value={aiModel} onValueChange={setAiModel}>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent className="max-h-72">
-                          {getAllModels().map(m => (
-                            <SelectItem key={m.id} value={m.id}>
-                              <span>{m.name}</span>
-                              <span className="ml-2 text-xs text-muted-foreground">{m.provider}</span>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <Button
-                      onClick={handleAiGenerate}
-                      disabled={aiGenerating || !aiPrompt.trim()}
-                      className="shrink-0"
-                    >
-                      {aiGenerating
-                        ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Generating…</>
-                        : <><Sparkles className="h-4 w-4 mr-2" />Generate Questions</>}
-                    </Button>
-                  </div>
-
-                  {aiError && (
-                    <Alert variant="destructive">
-                      <AlertDescription>{aiError}</AlertDescription>
-                    </Alert>
-                  )}
-                  {aiSuccess && (
-                    <Alert className="border-green-500 bg-green-50 dark:bg-green-950/20">
-                      <CheckCircle2 className="h-4 w-4 text-green-600" />
-                      <AlertDescription className="text-green-700 dark:text-green-400">
-                        Questions generated and added below. Review and save when ready.
-                      </AlertDescription>
-                    </Alert>
-                  )}
                 </CardContent>
               </Card>
 
@@ -998,4 +1082,16 @@ const CreateSurveyPage = () => {
   )
 }
 
-export default CreateSurveyPage 
+export default function CreateSurveyPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-[40vh] items-center justify-center p-6 text-sm text-muted-foreground">
+          Loading survey builder…
+        </div>
+      }
+    >
+      <CreateSurveyPageInner />
+    </Suspense>
+  )
+} 
