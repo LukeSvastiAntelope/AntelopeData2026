@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Plus, Upload, Search, ArrowUpDown, Calculator, Sigma, Sparkles, MoreHorizontal, FlaskConical, Eraser, Copy, Share2, Radio, BarChart2, Pencil } from 'lucide-react'
+import { Plus, Upload, Search, ArrowUpDown, Calculator, Sigma, MoreHorizontal, FlaskConical, Eraser, Copy, Share2, Radio, BarChart2, Pencil } from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -275,7 +275,7 @@ export default function SurveysPage() {
               <Link href="/surveys/import"><Upload className="h-4 w-4 mr-1" />Import</Link>
             </Button>
             <Button size="sm" asChild>
-              <Link href="/create/survey"><Plus className="h-4 w-4 mr-1" />Create Survey</Link>
+              <Link href="/create"><Plus className="h-4 w-4 mr-1" />Create Survey</Link>
             </Button>
           </div>
         </div>
@@ -291,13 +291,6 @@ export default function SurveysPage() {
                   <TabsTrigger value="featured">Featured ({counts.featured})</TabsTrigger>
                 </TabsList>
               </Tabs>
-              <Link
-                href="/create/survey/ai"
-                className="inline-flex h-9 items-center justify-center gap-1.5 whitespace-nowrap rounded-md bg-background px-3 text-sm font-medium text-foreground shadow-sm ring-offset-background transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-              >
-                <Sparkles className="h-4 w-4 shrink-0 text-primary" />
-                AI create survey
-              </Link>
             </div>
             <div className="relative w-full md:w-80">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
