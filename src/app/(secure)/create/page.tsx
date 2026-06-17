@@ -21,7 +21,8 @@ const CreatePage = () => {
       icon: Lightbulb,
       href: "/create/survey/ai",
       color: "bg-purple-500/10 text-purple-600 dark:text-purple-400",
-      examples: ["Describe your survey needs", "AI creates questions", "Edit and refine results"]
+      examples: ["Describe your survey needs", "AI creates questions", "Edit and refine results"],
+      comingSoon: false
     },
     {
       title: "Manual Survey",
@@ -29,7 +30,8 @@ const CreatePage = () => {
       icon: Users,
       href: "/create/survey",
       color: "bg-pink-500/10 text-pink-600 dark:text-pink-400",
-      examples: ["Market research surveys", "Opinion polls", "Customer feedback forms"]
+      examples: ["Market research surveys", "Opinion polls", "Customer feedback forms"],
+      comingSoon: true
     },
     {
       title: "Quiz Survey",
@@ -37,7 +39,8 @@ const CreatePage = () => {
       icon: Users,
       href: "/create/survey/quiz",
       color: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
-      examples: ["Knowledge checks", "Onboarding assessments", "Training certification"]
+      examples: ["Knowledge checks", "Onboarding assessments", "Training certification"],
+      comingSoon: true
     },
     {
       title: "Qualitative Survey",
@@ -45,7 +48,8 @@ const CreatePage = () => {
       icon: MessageCircle,
       href: "/create/survey/qualitative",
       color: "bg-blue-500/10 text-blue-600 dark:text-blue-400",
-      examples: ["User research interviews", "Exploratory discovery", "Open-ended insights"]
+      examples: ["User research interviews", "Exploratory discovery", "Open-ended insights"],
+      comingSoon: true
     }
   ]
 
@@ -75,13 +79,28 @@ const CreatePage = () => {
           {/* Survey Type Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
             {predictionTypes.map((type) => (
-              <Card key={type.href} className="group hover:shadow-lg transition-all duration-200 border-2 hover:border-primary/20">
+              <Card
+                key={type.href}
+                aria-disabled={type.comingSoon || undefined}
+                className={
+                  type.comingSoon
+                    ? "relative border-2 opacity-70"
+                    : "group hover:shadow-lg transition-all duration-200 border-2 hover:border-primary/20"
+                }
+              >
+                {type.comingSoon && (
+                  <span className="absolute right-4 top-4 z-10 rounded-full border border-border bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">
+                    Coming soon
+                  </span>
+                )}
                 <CardHeader className="pb-4">
                   <div className="flex items-start justify-between">
                     <div className={`p-3 rounded-lg ${type.color} mb-3`}>
                       <type.icon className="h-6 w-6" />
                     </div>
-                    <ArrowRight className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors" />
+                    {!type.comingSoon && (
+                      <ArrowRight className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors" />
+                    )}
                   </div>
                   <CardTitle className="text-xl">{type.title}</CardTitle>
                   <CardDescription className="text-base">
@@ -100,12 +119,18 @@ const CreatePage = () => {
                       ))}
                     </ul>
                   </div>
-                  <Button asChild className="w-full group-hover:bg-primary group-hover:text-primary-foreground">
-                    <Link href={type.href} className="flex items-center justify-center gap-2">
-                      Create {type.title}
-                      <ArrowRight className="h-4 w-4" />
-                    </Link>
-                  </Button>
+                  {type.comingSoon ? (
+                    <Button disabled variant="secondary" className="w-full cursor-not-allowed">
+                      Coming Soon
+                    </Button>
+                  ) : (
+                    <Button asChild className="w-full group-hover:bg-primary group-hover:text-primary-foreground">
+                      <Link href={type.href} className="flex items-center justify-center gap-2">
+                        Create {type.title}
+                        <ArrowRight className="h-4 w-4" />
+                      </Link>
+                    </Button>
+                  )}
                 </CardContent>
               </Card>
             ))}
@@ -118,7 +143,7 @@ const CreatePage = () => {
               <h3 className="text-lg font-semibold">Need Help Choosing?</h3>
             </div>
             <p className="text-muted-foreground mb-4">
-              Use <strong>AI Survey Builder</strong> for quick generation from descriptions, or <strong>Manual Survey</strong> for complete control over questions and structure.
+              Use the <strong>AI Survey Builder</strong> to generate a survey from a simple description. More survey types are coming soon.
             </p>
             <div className="flex flex-wrap justify-center gap-2">
               <Button variant="outline" size="sm" asChild>
