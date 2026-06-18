@@ -48,7 +48,7 @@ import {
   getPrivacyNotice,
   getRecommendedAnonymityLevel 
 } from '@/app/utils/anonymity-config'
-import { getTemplateById } from '@/app/utils/political-survey-templates'
+import { getTemplateById, POLITICAL_SURVEY_TEMPLATES, type SurveyTemplate } from '@/app/utils/political-survey-templates'
 import { toast } from '@/components/ui/sonner'
 
 interface GeneratedQuestion {
@@ -70,6 +70,11 @@ interface GeneratedSurvey {
 // Default to the recommended curated model (latest GPT/Claude shortlist).
 const DEFAULT_AI_SURVEY_MODEL =
   SURVEY_MODELS.find((m) => m.recommended)?.key || SURVEY_MODELS[0].key
+
+// Build the AI description prompt for a "Use template" click.
+const buildTemplatePrompt = (t: SurveyTemplate): string =>
+  `Create a political survey inspired by the "${t.title}" template (${t.category}). ${t.description} ` +
+  `Target roughly ${t.questions.length} substantive questions with similar themes; improve wording for clarity where helpful.`
 
 const AISurveyBuilderPageInner = () => {
   const router = useRouter()
@@ -126,7 +131,7 @@ const AISurveyBuilderPageInner = () => {
     }
   }, []);
 
-  // Prefill prompt when opened from a template card on /create/survey
+  // Prefill prompt when opened from a template card (deep link ?templateId=...)
   useEffect(() => {
     if (templatePromptApplied.current) return
     const templateId = searchParams.get('templateId')
@@ -134,11 +139,23 @@ const AISurveyBuilderPageInner = () => {
     const t = getTemplateById(templateId)
     if (!t) return
     templatePromptApplied.current = true
-    setPrompt(
-      `Create a political survey inspired by the "${t.title}" template (${t.category}). ${t.description} ` +
-        `Target roughly ${t.questions.length} substantive questions with similar themes; improve wording for clarity where helpful.`
-    )
+    setPrompt(buildTemplatePrompt(t))
   }, [searchParams])
+
+  // "Use template" click: fill the description box with the template prompt,
+  // then bring the user to the box to review and generate.
+  const applyTemplate = (t: SurveyTemplate) => {
+    setPrompt(buildTemplatePrompt(t))
+    setError(null)
+    requestAnimationFrame(() => {
+      const el = document.getElementById('prompt') as HTMLTextAreaElement | null
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        el.focus()
+      }
+    })
+    toast.success(`Loaded the "${t.title}" template — review and generate.`)
+  }
   
   // Save model preference when it changes
   const handleModelChange = (model: string) => {
@@ -765,6 +782,37 @@ const AISurveyBuilderPageInner = () => {
               ))}
             </div>
           </div>
+
+          {/* Start from a Template */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Wand2 className="h-5 w-5 text-primary" />
+                Start from a Template
+              </CardTitle>
+              <CardDescription>
+                Pick a pre-built political survey template to pre-fill the prompt below — then review and generate. Or describe your own survey from scratch.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {POLITICAL_SURVEY_TEMPLATES.map((t) => (
+                  <div key={t.id} className="flex flex-col rounded-lg border border-border p-4 transition hover:border-primary/40 hover:shadow-sm">
+                    <div className="flex items-center gap-2">
+                      <Badge variant="secondary" className="capitalize">{t.category}</Badge>
+                      <span className="text-xs text-muted-foreground">{t.estimatedTime}</span>
+                    </div>
+                    <h3 className="mt-2 font-semibold leading-tight">{t.title}</h3>
+                    <p className="mt-1 flex-1 text-sm text-muted-foreground">{t.description}</p>
+                    <p className="mt-3 text-xs font-medium text-muted-foreground">{t.questions.length} questions</p>
+                    <Button type="button" className="mt-3 w-full" onClick={() => applyTemplate(t)}>
+                      Use template
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
 
           {/* Prompt Input — primary action */}
           <Card className="border-2 shadow-sm">
