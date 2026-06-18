@@ -163,7 +163,12 @@ export const SurveyRepo = {
             let surveyResult: ResultSetHeader;
             const anonymityLevel = data.anonymityLevel || 'full';
             const demographicsRequired = data.demographicsRequired !== false; // Default to true
-            
+
+            // Private-link password: only when the survey is private and a password was provided.
+            const accessPasswordHash = (data.isPublic === false && typeof data.accessPassword === 'string' && data.accessPassword.trim().length > 0)
+                ? bcrypt.hashSync(data.accessPassword.trim(), 10)
+                : null;
+
             const organizationId = data.organizationId || null;
 
             if (hasSourceTracking) {
@@ -171,15 +176,15 @@ export const SurveyRepo = {
                 const sourceMetadata = data.sourceMetadata ? JSON.stringify(data.sourceMetadata) : null;
                 
                 [surveyResult] = await connection.execute<ResultSetHeader>(
-                    `INSERT INTO surveys (title, description, slug, created_by, is_public, anonymity_level, demographics_required, status, start_at, end_at, source, source_metadata, organization_id) 
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                    [data.title, data.description, slug, createdBy, data.isPublic, anonymityLevel, demographicsRequired, status, startAt, endAt, source, sourceMetadata, organizationId]
+                    `INSERT INTO surveys (title, description, slug, created_by, is_public, access_password, anonymity_level, demographics_required, status, start_at, end_at, source, source_metadata, organization_id)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                    [data.title, data.description, slug, createdBy, data.isPublic, accessPasswordHash, anonymityLevel, demographicsRequired, status, startAt, endAt, source, sourceMetadata, organizationId]
                 );
             } else {
                 [surveyResult] = await connection.execute<ResultSetHeader>(
-                    `INSERT INTO surveys (title, description, slug, created_by, is_public, anonymity_level, demographics_required, status, start_at, end_at, organization_id) 
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                    [data.title, data.description, slug, createdBy, data.isPublic, anonymityLevel, demographicsRequired, status, startAt, endAt, organizationId]
+                    `INSERT INTO surveys (title, description, slug, created_by, is_public, access_password, anonymity_level, demographics_required, status, start_at, end_at, organization_id)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                    [data.title, data.description, slug, createdBy, data.isPublic, accessPasswordHash, anonymityLevel, demographicsRequired, status, startAt, endAt, organizationId]
                 );
             }
             
