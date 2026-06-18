@@ -299,7 +299,7 @@ const SurveyResultsPage = () => {
                       </div>
                       <div className="flex items-center gap-1">
                         <Brain className="h-4 w-4" />
-                        {summary.survey.response_count} Digital Twins
+                        {summary.survey.response_count} Voter Profiles
                       </div>
                       {summary.survey.is_public && (
                         <div className="flex items-center gap-1 text-green-600">

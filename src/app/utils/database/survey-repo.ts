@@ -1,5 +1,6 @@
 import { openSql as getMySQLConnection } from "./db";
 import { RowDataPacket, ResultSetHeader } from 'mysql2/promise';
+import bcrypt from 'bcryptjs';
 import { 
     SurveyDB, 
     SurveyQuestionDB, 
@@ -1050,10 +1051,23 @@ export const SurveyRepo = {
                 slug = `${baseSlug}-${uniqueId}`;
             }
             
+            // Resolve private-link password update:
+            // - public survey -> clear any password
+            // - private + new password provided -> hash and set
+            // - private + no new password -> leave the existing one unchanged
+            let passwordClause = '';
+            const passwordParams: any[] = [];
+            if (data.isPublic) {
+                passwordClause = ', access_password = NULL';
+            } else if (typeof data.accessPassword === 'string' && data.accessPassword.trim().length > 0) {
+                passwordClause = ', access_password = ?';
+                passwordParams.push(bcrypt.hashSync(data.accessPassword.trim(), 10));
+            }
+
             // Update survey
             await connection.execute(
-                `UPDATE surveys SET title = ?, description = ?, slug = ?, is_public = ? WHERE id = ?`,
-                [data.title, data.description, slug, data.isPublic, surveyId]
+                `UPDATE surveys SET title = ?, description = ?, slug = ?, is_public = ?${passwordClause} WHERE id = ?`,
+                [data.title, data.description, slug, data.isPublic, ...passwordParams, surveyId]
             );
             
             // Delete existing questions

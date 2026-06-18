@@ -239,7 +239,7 @@ export function SurveyRespondentsTable({ data, surveyId }: SurveyRespondentsTabl
               <DropdownMenuItem
                 onClick={() => router.push(`/digital-twins/${response.agentToken}`)}
               >
-                View digital twin
+                View voter profile
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

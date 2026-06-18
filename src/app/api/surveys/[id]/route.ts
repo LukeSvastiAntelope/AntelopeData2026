@@ -28,9 +28,11 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
             }, { status: 404 });
         }
 
-        return NextResponse.json({ 
-            status: true, 
-            survey 
+        // Never expose the password hash to the client; surface a boolean instead.
+        const { access_password, ...safeSurvey } = survey as any;
+        return NextResponse.json({
+            status: true,
+            survey: { ...safeSurvey, has_access_password: Boolean(access_password) }
         });
 
     } catch (error) {

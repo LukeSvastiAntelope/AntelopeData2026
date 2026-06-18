@@ -26,7 +26,7 @@ const CreatePage = () => {
     },
     {
       title: "Manual Survey",
-      description: "Create surveys that turn respondents into digital twin agents",
+      description: "Create surveys that turn respondents into voter profile agents",
       icon: Users,
       href: "/create/survey",
       color: "bg-pink-500/10 text-pink-600 dark:text-pink-400",
@@ -72,7 +72,7 @@ const CreatePage = () => {
           <div className="mb-6">
             <h2 className="text-3xl font-bold mb-2">Choose Survey Type</h2>
             <p className="text-muted-foreground text-base max-w-3xl">
-              Create surveys to build digital twin agents from real responses. Choose AI-powered generation or manual creation.
+              Create surveys to build voter profile agents from real responses. Choose AI-powered generation or manual creation.
             </p>
           </div>
 

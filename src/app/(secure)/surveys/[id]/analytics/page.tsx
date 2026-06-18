@@ -211,7 +211,7 @@ const SurveyAnalyticsPage = () => {
                   </Badge>
                   <div className="flex items-center gap-1">
                     <Brain className="h-4 w-4" />
-                    {responses.length} Digital Twins Created
+                    {responses.length} Voter Profiles Created
                   </div>
                   <div className="flex items-center gap-3">
                     <div className="flex items-center gap-2">
@@ -246,7 +246,7 @@ const SurveyAnalyticsPage = () => {
               <CardHeader>
                 <CardTitle>Survey Responses</CardTitle>
                 <CardDescription>
-                  Click on a response to view details and interact with their digital twin
+                  Click on a response to view details and interact with their voter profile
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -281,7 +281,7 @@ const SurveyAnalyticsPage = () => {
                             </p>
                             <Badge variant="outline" className="mt-1">
                               <Brain className="h-3 w-3 mr-1" />
-                              Digital Twin
+                              Voter Profile
                             </Badge>
                           </div>
                         </div>
@@ -304,16 +304,16 @@ const SurveyAnalyticsPage = () => {
               </CardContent>
             </Card>
 
-            {/* Response Details & Digital Twin Interaction */}
+            {/* Response Details & Voter Profile Interaction */}
             {selectedResponse && (
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Brain className="h-5 w-5" />
-                    Digital Twin: {selectedResponse.demographics.name}
+                    Voter Profile: {selectedResponse.demographics.name}
                   </CardTitle>
                   <CardDescription>
-                    Interact with this respondent&apos;s digital twin
+                    Interact with this respondent&apos;s voter profile
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -339,7 +339,7 @@ const SurveyAnalyticsPage = () => {
 
                   {/* Agent Token */}
                   <div className="bg-muted/50 p-3 rounded-lg">
-                    <Label className="text-xs font-medium text-muted-foreground">Digital Twin Token:</Label>
+                    <Label className="text-xs font-medium text-muted-foreground">Voter Profile Token:</Label>
                     <div className="flex items-center gap-2 mt-1">
                       <code className="text-xs font-mono flex-1 truncate">
                         {selectedResponse.agentToken}
@@ -360,7 +360,7 @@ const SurveyAnalyticsPage = () => {
 
                   {/* Query Interface */}
                   <div className="space-y-3">
-                    <Label htmlFor="question">Ask this digital twin a question:</Label>
+                    <Label htmlFor="question">Ask this voter profile a question:</Label>
                     <Textarea
                       id="question"
                       placeholder="e.g., 'What do you think about remote work?', 'How do you feel about climate change?'"

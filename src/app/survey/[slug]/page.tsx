@@ -17,7 +17,8 @@ import {
   AlertCircle,
   Brain,
   Loader2,
-  Shield
+  Shield,
+  Lock
 } from "lucide-react"
 import { useParams } from 'next/navigation'
 import { ResponderInfoModal } from '@/components/ResponderInfoModal'
@@ -82,6 +83,13 @@ const SurveyPage = () => {
   // Progressive disclosure step: 'demographics' | 'questions'
   const [currentStep, setCurrentStep] = useState<'demographics' | 'questions'>('demographics')
   const [demographicsCompleted, setDemographicsCompleted] = useState(false)
+
+  // Private-link password gate
+  const [needsPassword, setNeedsPassword] = useState(false)
+  const [passwordVerified, setPasswordVerified] = useState(false)
+  const [passwordInput, setPasswordInput] = useState('')
+  const [passwordError, setPasswordError] = useState<string | null>(null)
+  const [verifyingPassword, setVerifyingPassword] = useState(false)
   
   const [demographics, setDemographics] = useState<Demographics>({
     name: '',
@@ -136,6 +144,10 @@ const SurveyPage = () => {
           }
           
           setSurvey(data.survey)
+          // Gate private surveys behind the link password.
+          if (data.survey?.requires_password) {
+            setNeedsPassword(true)
+          }
           setIsQualitative(Boolean(data.survey?.source_metadata?.type === 'qualitative'))
           // Initialize answers array
           if (data.survey && data.survey.questions) {
@@ -182,6 +194,30 @@ const SurveyPage = () => {
     }
   }, [slug])
 
+  const verifyPassword = async (e?: React.FormEvent) => {
+    e?.preventDefault()
+    if (!passwordInput.trim()) return
+    setVerifyingPassword(true)
+    setPasswordError(null)
+    try {
+      const res = await fetch(`/api/public/surveys/${slug}/verify-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: passwordInput }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (res.ok && data.ok) {
+        setPasswordVerified(true)
+      } else {
+        setPasswordError('Incorrect password. Please try again.')
+      }
+    } catch {
+      setPasswordError('Could not verify the password. Please try again.')
+    } finally {
+      setVerifyingPassword(false)
+    }
+  }
+
   const updateAnswer = (questionId: number, value: string | string[]) => {
     setAnswers(prev => prev.map(answer => 
       answer.questionId === questionId ? { ...answer, value } : answer
@@ -196,7 +232,7 @@ const SurveyPage = () => {
   }
 
   const handleExistingTwinFound = (existingDemographics: any) => {
-    // Pre-fill all the demographics from the existing digital twin
+    // Pre-fill all the demographics from the existing voter profile
     setDemographics(prev => ({
       ...prev,
       ...existingDemographics
@@ -517,6 +553,38 @@ const SurveyPage = () => {
     )
   }
 
+  // Private-link password gate — shown before any survey content.
+  if (needsPassword && !passwordVerified) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <Card className="w-full max-w-md">
+          <CardContent className="pt-6">
+            <div className="text-center mb-5">
+              <Lock className="h-10 w-10 text-primary mx-auto mb-3" />
+              <h2 className="text-xl font-semibold">{survey?.title || 'Private survey'}</h2>
+              <p className="text-sm text-muted-foreground mt-1">
+                This survey is private. Enter the password to continue.
+              </p>
+            </div>
+            <form onSubmit={verifyPassword} className="space-y-3">
+              <Input
+                type="password"
+                autoFocus
+                value={passwordInput}
+                onChange={(e) => { setPasswordInput(e.target.value); setPasswordError(null) }}
+                placeholder="Survey password"
+              />
+              {passwordError && <p className="text-sm text-destructive">{passwordError}</p>}
+              <Button type="submit" className="w-full" disabled={verifyingPassword || !passwordInput.trim()}>
+                {verifyingPassword ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Checking…</> : 'Continue'}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 max-w-4xl pb-28">
@@ -593,7 +661,7 @@ const SurveyPage = () => {
             <CardDescription>
               {survey.anonymity_level === 'semi_anonymous'
                 ? 'This survey collects general demographic information without personal identifiers.'
-                : 'This information helps create a more accurate digital twin'
+                : 'This information helps create a more accurate voter profile'
               }
             </CardDescription>
           </CardHeader>
@@ -643,7 +711,7 @@ const SurveyPage = () => {
             )}
 
             {/* Optional Personal Information */}
-            {(shouldShowField('location') || shouldShowField('occupation') || shouldShowField('education') || shouldShowField('income')) && (
+            {(shouldShowField('location') || shouldShowField('gender') || shouldShowField('ethnicity') || shouldShowField('occupation') || shouldShowField('education') || shouldShowField('income')) && (
               <div>
                 <h4 className="font-medium mb-3 text-sm text-muted-foreground">Personal Information (Optional)</h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -656,6 +724,44 @@ const SurveyPage = () => {
                         value={demographics.location}
                         onChange={(e) => updateDemographics('location', e.target.value)}
                       />
+                    </div>
+                  )}
+                  {shouldShowField('gender') && (
+                    <div>
+                      <Label htmlFor="gender">Gender / Sex</Label>
+                      <select
+                        id="gender"
+                        value={demographics.gender}
+                        onChange={(e) => updateDemographics('gender', e.target.value)}
+                        className="w-full px-3 py-2 border border-input bg-background rounded-md"
+                      >
+                        <option value="">Prefer not to say</option>
+                        <option value="female">Female</option>
+                        <option value="male">Male</option>
+                        <option value="non-binary">Non-binary</option>
+                        <option value="other">Other / Self-describe</option>
+                      </select>
+                    </div>
+                  )}
+                  {shouldShowField('ethnicity') && (
+                    <div>
+                      <Label htmlFor="ethnicity">Race / Ethnicity</Label>
+                      <select
+                        id="ethnicity"
+                        value={demographics.ethnicity}
+                        onChange={(e) => updateDemographics('ethnicity', e.target.value)}
+                        className="w-full px-3 py-2 border border-input bg-background rounded-md"
+                      >
+                        <option value="">Prefer not to say</option>
+                        <option value="white">White</option>
+                        <option value="black">Black or African American</option>
+                        <option value="hispanic">Hispanic or Latino</option>
+                        <option value="asian">Asian</option>
+                        <option value="native-american">Native American or Alaska Native</option>
+                        <option value="pacific-islander">Native Hawaiian or Pacific Islander</option>
+                        <option value="multiracial">Two or more races</option>
+                        <option value="other">Other</option>
+                      </select>
                     </div>
                   )}
                   {shouldShowField('occupation') && (
@@ -959,7 +1065,7 @@ const SurveyPage = () => {
                     {submitting ? (
                       <>
                         <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Creating Digital Twin...
+                        Creating Voter Profile...
                       </>
                     ) : (
                       <>
@@ -969,7 +1075,7 @@ const SurveyPage = () => {
                     )}
                   </Button>
                   <p className="text-sm text-muted-foreground mt-4">
-                    By submitting, you agree to have your responses used to create a digital twin for research purposes.
+                    By submitting, you agree to have your responses used to create a voter profile for research purposes.
                   </p>
                 </div>
               </CardContent>

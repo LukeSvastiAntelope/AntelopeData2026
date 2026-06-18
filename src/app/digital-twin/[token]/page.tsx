@@ -68,12 +68,12 @@ export default function DigitalTwinDashboard() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Fetch digital twin data
+        // Fetch voter profile data
         const twinRes = await fetch(`/api/digital-twin/${token}`)
         const twinJson = await twinRes.json()
         
         if (!twinJson.status) {
-          setError(twinJson.message || 'Digital Twin not found')
+          setError(twinJson.message || 'Voter Profile not found')
           return
         }
         
@@ -94,7 +94,7 @@ export default function DigitalTwinDashboard() {
         }
 
       } catch (err) {
-        setError('Failed to load Digital Twin data')
+        setError('Failed to load Voter Profile data')
       } finally {
         setLoading(false)
       }
@@ -153,7 +153,7 @@ export default function DigitalTwinDashboard() {
         <Card className="w-full max-w-md">
           <CardContent className="pt-6 text-center">
             <AlertCircle className="h-10 w-10 text-destructive mx-auto mb-4" />
-            <h2 className="text-xl font-semibold mb-2">{error || 'Digital Twin not found'}</h2>
+            <h2 className="text-xl font-semibold mb-2">{error || 'Voter Profile not found'}</h2>
           </CardContent>
         </Card>
       </div>
@@ -266,7 +266,7 @@ export default function DigitalTwinDashboard() {
                     <div className="text-center py-10">
                       <FileText className="h-8 w-8 text-muted-foreground mx-auto mb-3" />
                       <p className="text-sm text-muted-foreground">No surveys completed yet</p>
-                      <p className="text-xs text-muted-foreground mt-1">Complete surveys to enhance your digital twin</p>
+                      <p className="text-xs text-muted-foreground mt-1">Complete surveys to enhance your voter profile</p>
                     </div>
                   ) : (
                     <div className="space-y-3">
@@ -298,7 +298,7 @@ export default function DigitalTwinDashboard() {
                         <div key={survey.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors">
                           <div className="flex-1">
                             <h4 className="font-medium text-sm">{survey.title}</h4>
-                            <p className="text-xs text-muted-foreground">Contribute to research and enhance your digital twin</p>
+                            <p className="text-xs text-muted-foreground">Contribute to research and enhance your voter profile</p>
                           </div>
                           <Button size="sm" variant="outline" className="ml-3" onClick={() => handleTakeSurvey(survey.slug)}>
                             <ArrowRight className="w-3 h-3 mr-1" />
@@ -317,7 +317,7 @@ export default function DigitalTwinDashboard() {
           <Card className="mt-6 bg-muted/20">
             <CardContent className="p-4">
               <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Digital Twin ID:</span>
+                <span className="text-muted-foreground">Voter Profile ID:</span>
                 <Badge variant="secondary" className="font-mono text-xs">{twin.agent_token.slice(0, 8)}...{twin.agent_token.slice(-8)}</Badge>
               </div>
             </CardContent>
