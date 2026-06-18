@@ -956,13 +956,6 @@ const EditSurveyPage = () => {
                 </p>
               </div>
 
-              <Alert>
-                <Info className="h-4 w-4" />
-                <AlertDescription>
-                  {getPrivacyNotice(anonymityLevel)}
-                </AlertDescription>
-              </Alert>
-
               {title && description && (
                 <div className="bg-blue-50 dark:bg-blue-950/20 p-3 rounded-lg">
                   <div className="flex items-start gap-2">
