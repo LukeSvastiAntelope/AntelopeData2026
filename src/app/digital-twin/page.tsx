@@ -51,7 +51,7 @@ export default function DigitalTwinLoginPage() {
         router.push(`/digital-twin/${json.agentToken}`)
       } else {
         setStatus('error')
-        setErrorMsg(json.message || 'No Digital Twin found for this email')
+        setErrorMsg(json.message || 'No Voter Profile found for this email')
       }
     } catch (e) {
       setStatus('error')
@@ -69,7 +69,7 @@ export default function DigitalTwinLoginPage() {
         <Card className="border-white/20 bg-white/60 dark:bg-white/5 backdrop-blur-xl">
           <CardHeader className="text-center">
             <CardTitle className="flex items-center justify-center gap-2 text-xl">
-              <Mail className="h-5 w-5" /> Access your Digital Twin
+              <Mail className="h-5 w-5" /> Access your Voter Profile
             </CardTitle>
             <CardDescription>Enter the email you used for the survey to get a secure link.</CardDescription>
           </CardHeader>

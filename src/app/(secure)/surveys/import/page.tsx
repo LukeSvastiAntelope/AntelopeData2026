@@ -552,7 +552,7 @@ const SurveyImportPage = () => {
     }
     
     if (createDigitalTwins && demographicColumns.length === 0) {
-      errors.push('Digital twin creation requires at least one demographic field')
+      errors.push('Voter profile creation requires at least one demographic field')
     }
     
     const duplicateNames = surveyColumns
@@ -740,14 +740,14 @@ const SurveyImportPage = () => {
                 <ul className="text-sm text-blue-700 dark:text-blue-300 space-y-1">
                   <li>• CSV files with headers in the first row</li>
                   <li>• Excel files (.xlsx, .xls) using the first sheet</li>
-                  <li>• Demographic fields (age, gender, location) for digital twin creation</li>
+                  <li>• Demographic fields (age, gender, location) for voter profile creation</li>
                   <li>• Survey responses in subsequent rows</li>
                 </ul>
               ) : (
                 <ul className="text-sm text-blue-700 dark:text-blue-300 space-y-1">
                   <li>• Requires API access token from the platform</li>
                   <li>• Automatically detects question types and demographics</li>
-                  <li>• Imports all responses and creates digital twins</li>
+                  <li>• Imports all responses and creates voter profiles</li>
                   <li>• Preserves original survey structure and metadata</li>
                 </ul>
               )}
@@ -808,7 +808,7 @@ const SurveyImportPage = () => {
                     checked={createDigitalTwins}
                     onCheckedChange={setCreateDigitalTwins}
                   />
-                  <Label htmlFor="digital-twins">Create digital twins from demographic data</Label>
+                  <Label htmlFor="digital-twins">Create voter profiles from demographic data</Label>
                 </div>
               </CardContent>
             </Card>
@@ -1267,7 +1267,7 @@ const SurveyImportPage = () => {
                     <div className="text-2xl font-bold text-purple-600">
                       {createDigitalTwins ? preview.totalRows : 0}
                     </div>
-                    <div className="text-sm text-muted-foreground">Digital Twins</div>
+                    <div className="text-sm text-muted-foreground">Voter Profiles</div>
                   </div>
                 </div>
               </CardContent>

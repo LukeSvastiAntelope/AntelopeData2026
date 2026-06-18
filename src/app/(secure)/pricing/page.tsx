@@ -106,7 +106,7 @@ export default function PricingPage() {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                       </svg>
                     </div>
-                    <p className="text-muted-foreground">Synthetic personas and digital twins</p>
+                    <p className="text-muted-foreground">Synthetic personas and voter profiles</p>
                   </div>
                   <div className="flex items-start gap-3">
                     <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">

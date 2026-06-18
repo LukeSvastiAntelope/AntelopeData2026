@@ -183,10 +183,10 @@ export const ResponderInfoModal = ({
                 <div className="mt-2 p-3 bg-blue-50 dark:bg-blue-950/20 rounded-md border border-blue-200 dark:border-blue-800">
                   <div className="flex items-center gap-2 text-blue-800 dark:text-blue-200">
                     <CheckCircle className="h-4 w-4" />
-                    <span className="text-sm font-medium">Digital Twin Found!</span>
+                    <span className="text-sm font-medium">Voter Profile Found!</span>
                   </div>
                   <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
-                    We found your existing digital twin and pre-filled your information. You can modify it if needed.
+                    We found your existing voter profile and pre-filled your information. You can modify it if needed.
                   </p>
                 </div>
               )}

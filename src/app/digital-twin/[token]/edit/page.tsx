@@ -43,13 +43,13 @@ export default function EditDigitalTwinPage() {
         const json = await res.json()
         
         if (!json.status) {
-          setError(json.message || 'Digital Twin not found')
+          setError(json.message || 'Voter Profile not found')
         } else {
           setTwin(json.twin)
           setDemographics(json.twin.baseProfile?.demographics || {})
         }
       } catch (err) {
-        setError('Failed to load Digital Twin data')
+        setError('Failed to load Voter Profile data')
       } finally {
         setLoading(false)
       }
@@ -128,7 +128,7 @@ export default function EditDigitalTwinPage() {
               <ArrowLeft className="w-4 h-4 mr-2" />
               Back to Dashboard
             </Button>
-            <h1 className="text-base font-medium text-card-foreground">Edit Digital Twin Profile</h1>
+            <h1 className="text-base font-medium text-card-foreground">Edit Voter Profile Profile</h1>
           </div>
         </div>
 
@@ -175,7 +175,7 @@ export default function EditDigitalTwinPage() {
                 Personal Information
               </CardTitle>
               <CardDescription>
-                Update your demographic information to improve your digital twin accuracy
+                Update your demographic information to improve your voter profile accuracy
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">

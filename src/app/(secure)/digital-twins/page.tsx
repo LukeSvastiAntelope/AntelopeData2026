@@ -104,7 +104,7 @@ const DigitalTwinsPage = () => {
     return { ageData, locationData, politicalData }
   }, [allTwins])
 
-  // Load all digital twins on component mount
+  // Load all voter profiles on component mount
   useEffect(() => {
     loadAllTwins()
   }, [])
@@ -126,7 +126,7 @@ const DigitalTwinsPage = () => {
         setAllTwins(data.results)
       }
     } catch (error) {
-      console.error('Error loading digital twins:', error)
+      console.error('Error loading voter profiles:', error)
     } finally {
       setLoading(false)
     }

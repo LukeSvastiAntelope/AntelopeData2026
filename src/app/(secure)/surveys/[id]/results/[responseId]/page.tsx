@@ -123,8 +123,8 @@ const ResponderDetailPage = () => {
         <div className="p-6 space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2"><Brain className="h-5 w-5"/>Digital Twin</CardTitle>
-              <CardDescription>Interact with this respondent&apos;s digital twin</CardDescription>
+              <CardTitle className="flex items-center gap-2"><Brain className="h-5 w-5"/>Voter Profile</CardTitle>
+              <CardDescription>Interact with this respondent&apos;s voter profile</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-2 gap-3 text-sm">

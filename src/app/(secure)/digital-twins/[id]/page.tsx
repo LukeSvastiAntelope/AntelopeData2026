@@ -87,10 +87,10 @@ export default function DigitalTwinDetailPage() {
       // Find the specific twin by ID (assuming ID is the agentToken)
       const foundTwin = twinData.results.find((t: any) => t.agentToken === twinId);
       if (!foundTwin) {
-        throw new Error('Digital twin not found');
+        throw new Error('Voter profile not found');
       }
 
-      // Get all surveys this digital twin has participated in
+      // Get all surveys this voter profile has participated in
       const surveysResponse = await fetch(`/api/digital-twin/${foundTwin.agentToken}/responses`);
       const surveysData = await surveysResponse.json();
       
@@ -121,7 +121,7 @@ export default function DigitalTwinDetailPage() {
         surveys = [{
           id: matchingSurvey?.id || 0,
           title: foundTwin.surveyTitle,
-          description: matchingSurvey?.description || `Survey response that created this digital twin`,
+          description: matchingSurvey?.description || `Survey response that created this voter profile`,
           status: 'completed',
           created_at: foundTwin.createdAt,
           response_count: 1,
@@ -136,7 +136,7 @@ export default function DigitalTwinDetailPage() {
       
       setTwin(twinDetail);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load digital twin');
+      setError(err instanceof Error ? err.message : 'Failed to load voter profile');
     } finally {
       setLoading(false);
     }
@@ -201,7 +201,7 @@ export default function DigitalTwinDetailPage() {
             <Card className="max-w-md">
               <CardContent className="pt-6">
                 <p className="text-center text-muted-foreground mb-4">
-                  {error || 'Digital twin not found'}
+                  {error || 'Voter profile not found'}
                 </p>
                 <Button onClick={() => router.push('/digital-twins')} className="w-full">
                   <ArrowLeft className="mr-2 h-4 w-4" />
@@ -252,7 +252,7 @@ export default function DigitalTwinDetailPage() {
                     {twinName}
                   </CardTitle>
                   <p className="text-muted-foreground">
-                    Digital twin created from survey: {twin.surveyTitle}
+                    Voter profile created from survey: {twin.surveyTitle}
                   </p>
                   <div className="flex items-center gap-4 text-sm text-muted-foreground">
                     <div className="flex items-center gap-1">

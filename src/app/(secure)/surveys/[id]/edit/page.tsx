@@ -86,6 +86,8 @@ const EditSurveyPage = () => {
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [isPublic, setIsPublic] = useState(true)
+  const [accessPassword, setAccessPassword] = useState('')
+  const [hasAccessPassword, setHasAccessPassword] = useState(false)
   const [anonymityLevel, setAnonymityLevel] = useState<AnonymityLevel>('full')
   const [demographicsRequired, setDemographicsRequired] = useState(true)
   const [questions, setQuestions] = useState<SurveyQuestion[]>([])
@@ -270,6 +272,7 @@ const EditSurveyPage = () => {
         setTitle(surveyData.title)
         setDescription(surveyData.description || '')
         setIsPublic(surveyData.is_public)
+        setHasAccessPassword(Boolean((surveyData as any).has_access_password ?? (surveyData as any).access_password))
         setAnonymityLevel(surveyData.anonymity_level || 'full')
         setDemographicsRequired(surveyData.demographics_required !== false)
         setQuestions(surveyData.questions || [])
@@ -493,6 +496,7 @@ const EditSurveyPage = () => {
           title,
           description,
           isPublic,
+          accessPassword: isPublic ? null : (accessPassword || undefined),
           anonymityLevel,
           demographicsRequired,
           startAt: startAt || null,
@@ -563,6 +567,7 @@ const EditSurveyPage = () => {
           title,
           description,
           isPublic,
+          accessPassword: isPublic ? null : (accessPassword || undefined),
           anonymityLevel,
           demographicsRequired,
           startAt: startAt || null,
@@ -797,25 +802,47 @@ const EditSurveyPage = () => {
                 />
               </div>
 
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="isPublic"
-                  checked={isPublic}
-                  onCheckedChange={(checked) => setIsPublic(checked as boolean)}
-                />
-                <Label htmlFor="isPublic">Make this survey publicly accessible</Label>
+              {/* Public vs private link */}
+              <div className="rounded-lg border border-border p-3 space-y-3">
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="isPublic"
+                    checked={isPublic}
+                    onCheckedChange={(checked) => setIsPublic(checked as boolean)}
+                  />
+                  <Label htmlFor="isPublic" className="cursor-pointer">
+                    {isPublic ? 'Public link — anyone with the link can respond' : 'Private link — password required to respond'}
+                  </Label>
+                </div>
+                {!isPublic && (
+                  <div className="pl-6">
+                    <Label htmlFor="accessPassword">Link password</Label>
+                    <Input
+                      id="accessPassword"
+                      type="text"
+                      value={accessPassword}
+                      onChange={(e) => setAccessPassword(e.target.value)}
+                      placeholder={hasAccessPassword ? 'Password set — type to change it' : 'Set a password respondents must enter'}
+                      className="mt-1 max-w-sm"
+                    />
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Respondents must enter this password before they can take the survey.
+                      {hasAccessPassword ? ' Leave blank to keep the current password.' : ''}
+                    </p>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
 
-          {/* Phase 2: Digital Twin Deployment */}
+          {/* Phase 2: Voter Profile Deployment */}
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
                   <CardTitle className="flex items-center gap-2">
                     <Rocket className="h-5 w-5" />
-                    Deploy Digital Twins (Preview)
+                    Deploy Voter Profiles (Preview)
                   </CardTitle>
                   <CardDescription>Use twins as synthetic responders with a readiness threshold</CardDescription>
                 </div>
@@ -899,7 +926,7 @@ const EditSurveyPage = () => {
                       <div className="space-y-1">
                         <div className="font-medium">Full Demographics</div>
                         <div className="text-xs text-muted-foreground">
-                          Collect name, email, and complete demographic profile
+                          Name, email, age, location, occupation, education, income, political leanings, gender, race, and interests (each field can be skipped)
                         </div>
                       </div>
                     </SelectItem>
@@ -907,7 +934,7 @@ const EditSurveyPage = () => {
                       <div className="space-y-1">
                         <div className="font-medium">Semi-Anonymous</div>
                         <div className="text-xs text-muted-foreground">
-                          Collect demographics without personal identification
+                          Just age, location, gender, and race — no names, emails, or addresses
                         </div>
                       </div>
                     </SelectItem>
@@ -915,7 +942,7 @@ const EditSurveyPage = () => {
                       <div className="space-y-1">
                         <div className="font-medium">Anonymous</div>
                         <div className="text-xs text-muted-foreground">
-                          Minimal data collection for complete privacy
+                          Collects no demographic information at all
                         </div>
                       </div>
                     </SelectItem>
@@ -923,6 +950,9 @@ const EditSurveyPage = () => {
                 </Select>
                 <p className="text-sm text-muted-foreground mt-2">
                   {getAnonymityLevelDescription(anonymityLevel)}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  This only controls the &quot;About You&quot; profile step. You can still ask any demographic question inside the survey itself.
                 </p>
               </div>
 
@@ -953,7 +983,7 @@ const EditSurveyPage = () => {
                 <div>
                   <Label htmlFor="demographicsRequired">Require Demographics</Label>
                   <p className="text-sm text-muted-foreground">
-                    Force respondents to complete demographics before survey questions
+                    Ask for the profile before the questions. Respondents can still skip individual fields or answer &quot;N/A&quot;.
                   </p>
                 </div>
                 <Checkbox

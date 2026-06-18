@@ -149,7 +149,7 @@ export default function SurveyTwinCohortPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Users className="h-5 w-5" />
-                All Digital Twins
+                All Voter Profiles
               </CardTitle>
               <CardDescription>Review your entire twin pool, then refine with filters and threshold</CardDescription>
             </CardHeader>
@@ -214,7 +214,7 @@ export default function SurveyTwinCohortPage() {
                 <Settings className="h-5 w-5" />
                 Cohort Filters
               </CardTitle>
-              <CardDescription>Define which digital twins are eligible for this survey</CardDescription>
+              <CardDescription>Define which voter profiles are eligible for this survey</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">

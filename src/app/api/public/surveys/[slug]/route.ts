@@ -12,10 +12,17 @@ export async function GET(
         // Auto-activate any scheduled surveys that should be active now
         await SurveyRepo.autoActivateScheduled();
         
+        // Strip the password hash before sending to the public; expose only a boolean.
+        const sanitize = (s: any) => {
+            if (!s) return s;
+            const { access_password, ...rest } = s;
+            return { ...rest, requires_password: Boolean(access_password) };
+        };
+
         const survey = await SurveyRepo.getSurveyBySlug(slug);
-        
+
         if (survey) {
-            return NextResponse.json({ status: true, survey });
+            return NextResponse.json({ status: true, survey: sanitize(survey) });
         }
 
         // Not active – check if survey exists but is inactive
@@ -23,10 +30,10 @@ export async function GET(
         if (existsAny) {
             // Allow preview of draft and scheduled surveys
             if ((existsAny as any).status === 'draft' || (existsAny as any).status === 'scheduled') {
-                return NextResponse.json({ 
-                    status: true, 
-                    survey: existsAny,
-                    preview: true 
+                return NextResponse.json({
+                    status: true,
+                    survey: sanitize(existsAny),
+                    preview: true
                 });
             }
             

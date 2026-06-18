@@ -6,21 +6,21 @@ export const ANONYMITY_CONFIGURATIONS: Record<AnonymityLevel, AnonymityConfigura
   full: {
     level: 'full',
     fieldsToCollect: [
-      'name', 'email', 'age', 'location', 'occupation', 'education', 
-      'income', 'politicalViews', 'interests', 'socialMedia'
+      'name', 'email', 'age', 'location', 'occupation', 'education',
+      'income', 'politicalViews', 'gender', 'ethnicity', 'interests', 'socialMedia'
     ],
     fieldsToExclude: [],
     description: 'Full demographic profile with personal identification',
-    privacyNote: 'Your personal information including name and email will be collected and stored. This enables the creation of detailed digital twins for research purposes.'
+    privacyNote: 'Your personal information, including name and email, will be collected and stored. Every field is optional — you can skip anything you prefer not to answer.'
   },
   semi_anonymous: {
     level: 'semi_anonymous',
     fieldsToCollect: [
-      'age', 'location', 'occupation', 'education', 'politicalViews', 'interests'
+      'age', 'location', 'gender', 'ethnicity'
     ],
-    fieldsToExclude: ['name', 'email', 'socialMedia'],
-    description: 'Partial demographic profile without personal identification',
-    privacyNote: 'No personally identifiable information (name, email) will be collected. Only general demographic and preference data will be stored.'
+    fieldsToExclude: ['name', 'email', 'occupation', 'education', 'income', 'politicalViews', 'interests', 'socialMedia'],
+    description: 'Just age, location, gender, and race — no names, emails, or addresses',
+    privacyNote: 'No names, emails, or addresses are collected — only age, location, gender, and race. Every field is optional.'
   },
   anonymous: {
     level: 'anonymous',
@@ -36,19 +36,19 @@ export const ANONYMITY_CONFIGURATIONS: Record<AnonymityLevel, AnonymityConfigura
 export const DEMOGRAPHICS_FORM_CONFIGS: Record<AnonymityLevel, DemographicsFormConfig> = {
   full: {
     anonymityLevel: 'full',
-    requiredFields: ['name', 'email', 'age'],
-    optionalFields: ['location', 'occupation', 'education', 'income', 'politicalViews', 'interests', 'socialMedia'],
+    requiredFields: [],
+    optionalFields: ['name', 'email', 'age', 'location', 'occupation', 'education', 'income', 'politicalViews', 'gender', 'ethnicity', 'interests', 'socialMedia'],
     excludedFields: [],
-    privacyNotice: 'We collect comprehensive demographic information to create detailed digital twins for research purposes. Your data helps improve our understanding of diverse perspectives.',
-    consentText: 'I consent to providing my personal information for research purposes and understand it will be used to create a digital twin representation.'
+    privacyNotice: 'We collect demographic information to build a voter profile for research. Every field is optional — skip anything you prefer not to share or answer "N/A".',
+    consentText: 'I consent to providing my information for research purposes and understand it will be used to build a voter profile.'
   },
   semi_anonymous: {
     anonymityLevel: 'semi_anonymous',
-    requiredFields: ['age'],
-    optionalFields: ['location', 'occupation', 'education', 'politicalViews', 'interests'],
-    excludedFields: ['name', 'email', 'socialMedia'],
-    privacyNotice: 'We collect general demographic information without personal identifiers. This allows for meaningful analysis while protecting your privacy.',
-    consentText: 'I consent to providing demographic information without personal identifiers for research purposes.'
+    requiredFields: [],
+    optionalFields: ['age', 'location', 'gender', 'ethnicity'],
+    excludedFields: ['name', 'email', 'occupation', 'education', 'income', 'politicalViews', 'interests', 'socialMedia'],
+    privacyNotice: 'We collect only age, location, gender, and race — no names, emails, or addresses. Every field is optional.',
+    consentText: 'I consent to providing general demographic information without personal identifiers for research purposes.'
   },
   anonymous: {
     anonymityLevel: 'anonymous',

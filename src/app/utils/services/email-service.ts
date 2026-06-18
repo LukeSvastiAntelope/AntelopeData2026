@@ -45,7 +45,7 @@ export class EmailService {
       <div style="background: white; border: 1px solid #e9ecef; border-radius: 6px; padding: 15px; margin: 10px 0;">
         <h4 style="margin: 0 0 8px 0; color: #212529; font-size: 15px;">${survey.title}</h4>
         <p style="margin: 0 0 12px 0; color: #6c757d; font-size: 13px;">
-          Share your perspective and enhance your digital twin
+          Share your perspective and enhance your voter profile
         </p>
         <a href="${BASE_URL}/survey/${survey.slug}" 
            style="display: inline-block; background: #007bff; color: white; padding: 8px 16px; 
@@ -59,7 +59,7 @@ export class EmailService {
       <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
         <h3 style="color: #212529; margin: 0 0 15px 0; font-size: 16px;">📋 More Surveys Available</h3>
         <p style="color: #6c757d; margin: 0 0 15px 0; font-size: 14px;">
-          Continue building your digital twin by participating in these surveys:
+          Continue building your voter profile by participating in these surveys:
         </p>
         ${surveyItems}
         ${surveys.length >= 5 ? `
@@ -75,7 +75,7 @@ export class EmailService {
   }
 
   /**
-   * Send survey completion confirmation with Digital Twin link for NEW users via SendGrid REST API.
+   * Send survey completion confirmation with Voter Profile link for NEW users via SendGrid REST API.
    * No external SDK required – uses native fetch.
    */
   static async sendSurveyConfirmation(
@@ -101,7 +101,7 @@ export class EmailService {
     const htmlContent = `
       <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; background: white;">
         <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px 20px; text-align: center;">
-          <h1 style="color: white; margin: 0; font-size: 24px; font-weight: 600;">🎉 Your Digital Twin is Ready!</h1>
+          <h1 style="color: white; margin: 0; font-size: 24px; font-weight: 600;">🎉 Your Voter Profile is Ready!</h1>
         </div>
         
         <div style="padding: 30px 20px;">
@@ -110,13 +110,13 @@ export class EmailService {
           </p>
           
           <p style="color: #212529; font-size: 16px; line-height: 1.5; margin: 0 0 20px 0;">
-            Thank you for completing our survey! We've analyzed your responses and created a Digital Twin that captures your unique perspectives and values.
+            Thank you for completing our survey! We've analyzed your responses and created a Voter Profile that captures your unique perspectives and values.
           </p>
 
           <div style="background: #e3f2fd; border-left: 4px solid #2196f3; padding: 20px; margin: 20px 0; border-radius: 4px;">
-            <h3 style="color: #1976d2; margin: 0 0 10px 0; font-size: 16px;">🧠 What's Your Digital Twin?</h3>
+            <h3 style="color: #1976d2; margin: 0 0 10px 0; font-size: 16px;">🧠 What's Your Voter Profile?</h3>
             <p style="color: #424242; margin: 0; font-size: 14px; line-height: 1.5;">
-              Your Digital Twin is an AI representation of your thoughts, preferences, and opinions. It can answer questions, provide insights, and help researchers understand diverse perspectives while keeping your identity private.
+              Your Voter Profile is an AI representation of your thoughts, preferences, and opinions. It can answer questions, provide insights, and help researchers understand diverse perspectives while keeping your identity private.
             </p>
           </div>
 
@@ -124,7 +124,7 @@ export class EmailService {
             <a href="${twinUrl}" 
                style="display: inline-block; background: #28a745; color: white; padding: 15px 30px; 
                       text-decoration: none; border-radius: 6px; font-size: 16px; font-weight: 600;">
-              🔗 View Your Digital Twin
+              🔗 View Your Voter Profile
             </a>
           </div>
 
@@ -133,7 +133,7 @@ export class EmailService {
           <div style="background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 6px; padding: 20px; margin: 20px 0;">
             <h3 style="color: #856404; margin: 0 0 10px 0; font-size: 16px;">✨ Make It Even Better</h3>
             <p style="color: #856404; margin: 0 0 10px 0; font-size: 14px;">
-              Your Digital Twin becomes more accurate and insightful as you:
+              Your Voter Profile becomes more accurate and insightful as you:
             </p>
             <ul style="color: #856404; margin: 0; padding-left: 20px; font-size: 14px;">
               <li>Complete more surveys</li>
@@ -143,7 +143,7 @@ export class EmailService {
           </div>
 
           <p style="color: #6c757d; font-size: 14px; line-height: 1.5; margin: 20px 0 0 0;">
-            You can review your Digital Twin, add more details, or delete it at any time. Your privacy and control are our top priorities.
+            You can review your Voter Profile, add more details, or delete it at any time. Your privacy and control are our top priorities.
           </p>
 
           <p style="color: #6c757d; font-size: 14px; line-height: 1.5; margin: 20px 0 0 0;">
@@ -158,7 +158,7 @@ export class EmailService {
         <div style="background: #f8f9fa; padding: 20px; text-align: center; border-top: 1px solid #e9ecef;">
           <p style="color: #6c757d; font-size: 12px; margin: 0;">
             This email was sent because you completed a survey on Antelope. 
-            <a href="${twinUrl}" style="color: #007bff;">Manage your Digital Twin</a>
+            <a href="${twinUrl}" style="color: #007bff;">Manage your Voter Profile</a>
           </p>
         </div>
       </div>
@@ -168,7 +168,7 @@ export class EmailService {
       personalizations: [
         {
           to: [{ email: toEmail, name: toName || undefined }],
-          subject: 'Your Digital Twin is Ready! 🎉',
+          subject: 'Your Voter Profile is Ready! 🎉',
         },
       ],
       from: {
@@ -211,7 +211,7 @@ export class EmailService {
   }
 
   /**
-   * Send survey completion confirmation for RETURNING users who already have a Digital Twin.
+   * Send survey completion confirmation for RETURNING users who already have a Voter Profile.
    */
   static async sendSurveyConfirmationReturning(
     toEmail: string,
@@ -236,7 +236,7 @@ export class EmailService {
     const htmlContent = `
       <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; background: white;">
         <div style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); padding: 30px 20px; text-align: center;">
-          <h1 style="color: white; margin: 0; font-size: 24px; font-weight: 600;">🔄 Digital Twin Updated!</h1>
+          <h1 style="color: white; margin: 0; font-size: 24px; font-weight: 600;">🔄 Voter Profile Updated!</h1>
         </div>
         
         <div style="padding: 30px 20px;">
@@ -245,13 +245,13 @@ export class EmailService {
           </p>
           
           <p style="color: #212529; font-size: 16px; line-height: 1.5; margin: 0 0 20px 0;">
-            Thank you for completing another survey! We've updated your Digital Twin with your latest responses, creating an even richer representation of your perspectives and opinions.
+            Thank you for completing another survey! We've updated your Voter Profile with your latest responses, creating an even richer representation of your perspectives and opinions.
           </p>
 
           <div style="background: #e8f5e8; border-left: 4px solid #28a745; padding: 20px; margin: 20px 0; border-radius: 4px;">
-            <h3 style="color: #155724; margin: 0 0 10px 0; font-size: 16px;">📈 Your Digital Twin is Growing</h3>
+            <h3 style="color: #155724; margin: 0 0 10px 0; font-size: 16px;">📈 Your Voter Profile is Growing</h3>
             <p style="color: #155724; margin: 0; font-size: 14px; line-height: 1.5;">
-              With each survey you complete, your Digital Twin becomes more sophisticated and accurate. It now includes insights from multiple surveys, providing a comprehensive view of your unique perspective.
+              With each survey you complete, your Voter Profile becomes more sophisticated and accurate. It now includes insights from multiple surveys, providing a comprehensive view of your unique perspective.
             </p>
           </div>
 
@@ -259,7 +259,7 @@ export class EmailService {
             <a href="${twinUrl}" 
                style="display: inline-block; background: #17a2b8; color: white; padding: 15px 30px; 
                       text-decoration: none; border-radius: 6px; font-size: 16px; font-weight: 600;">
-              🔗 View Your Updated Digital Twin
+              🔗 View Your Updated Voter Profile
             </a>
           </div>
 
@@ -268,12 +268,12 @@ export class EmailService {
           <div style="background: #d1ecf1; border: 1px solid #bee5eb; border-radius: 6px; padding: 20px; margin: 20px 0;">
             <h3 style="color: #0c5460; margin: 0 0 10px 0; font-size: 16px;">🎯 Keep Building Your Profile</h3>
             <p style="color: #0c5460; margin: 0; font-size: 14px; line-height: 1.5;">
-              Your Digital Twin is becoming more valuable with each interaction. Consider updating your profile information and exploring more surveys to unlock deeper insights about your perspectives.
+              Your Voter Profile is becoming more valuable with each interaction. Consider updating your profile information and exploring more surveys to unlock deeper insights about your perspectives.
             </p>
           </div>
 
           <p style="color: #6c757d; font-size: 14px; line-height: 1.5; margin: 20px 0 0 0;">
-            You can review your updated profile, see all your survey responses, and manage your Digital Twin settings at any time.
+            You can review your updated profile, see all your survey responses, and manage your Voter Profile settings at any time.
           </p>
 
           <p style="color: #6c757d; font-size: 14px; line-height: 1.5; margin: 20px 0 0 0;">
@@ -288,7 +288,7 @@ export class EmailService {
         <div style="background: #f8f9fa; padding: 20px; text-align: center; border-top: 1px solid #e9ecef;">
           <p style="color: #6c757d; font-size: 12px; margin: 0;">
             This email was sent because you completed a survey on Antelope. 
-            <a href="${twinUrl}" style="color: #007bff;">Manage your Digital Twin</a>
+            <a href="${twinUrl}" style="color: #007bff;">Manage your Voter Profile</a>
           </p>
         </div>
       </div>
@@ -298,7 +298,7 @@ export class EmailService {
       personalizations: [
         {
           to: [{ email: toEmail, name: toName || undefined }],
-          subject: 'Your Digital Twin Has Been Updated! 🔄',
+          subject: 'Your Voter Profile Has Been Updated! 🔄',
         },
       ],
       from: {
@@ -341,7 +341,7 @@ export class EmailService {
   }
 
   /**
-   * Send magic login link for Digital Twin access via SendGrid REST API.
+   * Send magic login link for Voter Profile access via SendGrid REST API.
    */
   static async sendTwinLoginLink(
     toEmail: string,
@@ -352,8 +352,8 @@ export class EmailService {
 
     const htmlContent = `
       <p>Hi ${toName || 'there'},</p>
-      <p>You requested access to your Digital Twin profile on Antelope. Click the link below to securely access your profile:</p>
-      <p><a href="${twinUrl}" target="_blank" rel="noopener noreferrer">Open Your Digital Twin</a></p>
+      <p>You requested access to your Voter Profile profile on Antelope. Click the link below to securely access your profile:</p>
+      <p><a href="${twinUrl}" target="_blank" rel="noopener noreferrer">Open Your Voter Profile</a></p>
       <p>This link will sign you in automatically. If you did not request this email, you can safely ignore it.</p>
       <p>— The Antelope Team</p>
     `
@@ -362,7 +362,7 @@ export class EmailService {
       personalizations: [
         {
           to: [{ email: toEmail, name: toName || undefined }],
-          subject: 'Your secure link to Antelope Digital Twin',
+          subject: 'Your secure link to Antelope Voter Profile',
         },
       ],
       from: {

@@ -9,12 +9,12 @@ import { Mail } from "lucide-react"
 // Mock data - replace with actual data fetching
 const featuredPost: BlogPost = {
   id: "1",
-  title: "Digital Twins: Transform Survey Data Into Intelligent AI Agents",
-  excerpt: "Discover how Antelope's digital twin technology creates AI-powered personas from survey responses. Each respondent becomes a queryable agent that preserves their unique perspectives, values, and decision-making patterns—enabling unprecedented insights without re-surveying your audience.",
+  title: "Voter Profiles: Transform Survey Data Into Intelligent AI Agents",
+  excerpt: "Discover how Antelope's voter profile technology creates AI-powered personas from survey responses. Each respondent becomes a queryable agent that preserves their unique perspectives, values, and decision-making patterns—enabling unprecedented insights without re-surveying your audience.",
   content: "",
   date: "21 Nov 2024",
   readTime: "6 min",
-  tags: ["Digital Twins", "AI Analytics"],
+  tags: ["Voter Profiles", "AI Analytics"],
   author: { name: "admin" }
 }
 
@@ -51,12 +51,12 @@ const weeklyPosts: BlogPost[] = [
   },
   {
     id: "5",
-    title: "Survey Response Prediction: How Digital Twins Answer New Questions",
-    excerpt: "What if you could predict how your respondents would answer new survey questions without asking them again? Antelope's digital twins use AI to generate accurate predictions based on each person's unique profile, saving time and reducing survey fatigue while maintaining data quality.",
+    title: "Survey Response Prediction: How Voter Profiles Answer New Questions",
+    excerpt: "What if you could predict how your respondents would answer new survey questions without asking them again? Antelope's voter profiles use AI to generate accurate predictions based on each person's unique profile, saving time and reducing survey fatigue while maintaining data quality.",
     content: "",
     date: "08 Nov 2024",
     readTime: "5 min",
-    tags: ["Predictive Analytics", "Digital Twins"],
+    tags: ["Predictive Analytics", "Voter Profiles"],
     author: { name: "admin" }
   },
   {
@@ -71,8 +71,8 @@ const weeklyPosts: BlogPost[] = [
   },
   {
     id: "7",
-    title: "Multi-Source Intelligence: Combine Survey Data with Digital Twins and Web Research",
-    excerpt: "Go beyond traditional survey analysis. Antelope integrates your survey responses with digital twin predictions and real-time web research to provide context-rich insights. See how your data compares to broader trends and get a complete picture of your audience's perspectives.",
+    title: "Multi-Source Intelligence: Combine Survey Data with Voter Profiles and Web Research",
+    excerpt: "Go beyond traditional survey analysis. Antelope integrates your survey responses with voter profile predictions and real-time web research to provide context-rich insights. See how your data compares to broader trends and get a complete picture of your audience's perspectives.",
     content: "",
     date: "01 Nov 2024",
     readTime: "6 min",

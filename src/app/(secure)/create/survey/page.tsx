@@ -552,10 +552,10 @@ const CreateSurveyPage = () => {
                   <div className="bg-blue-50 dark:bg-blue-950/20 p-4 rounded-lg">
                     <div className="flex items-center gap-2 mb-2">
                       <Brain className="h-4 w-4 text-blue-600" />
-                      <span className="text-sm font-medium text-blue-900 dark:text-blue-100">Digital Twin Generation</span>
+                      <span className="text-sm font-medium text-blue-900 dark:text-blue-100">Voter Profile Generation</span>
                     </div>
                     <p className="text-xs text-blue-700 dark:text-blue-300">
-                      Each survey response will automatically create a digital twin agent that can be queried for insights. 
+                      Each survey response will automatically create a voter profile agent that can be queried for insights. 
                       These agents will have the same capabilities as betting agents in the future.
                     </p>
                   </div>
@@ -709,7 +709,7 @@ const CreateSurveyPage = () => {
                     </Button>
                   </div>
                   <CardDescription>
-                    Create questions that will help build detailed digital twin profiles
+                    Create questions that will help build detailed voter profile profiles
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
