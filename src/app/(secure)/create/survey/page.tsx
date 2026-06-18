@@ -59,6 +59,7 @@ interface Survey {
   title: string
   description: string
   isPublic: boolean
+  accessPassword?: string
   anonymityLevel: AnonymityLevel
   demographicsRequired: boolean
   questions: SurveyQuestion[]
@@ -472,7 +473,7 @@ const CreateSurveyPage = () => {
                             <div className="space-y-1">
                               <div className="font-medium">Full Demographics</div>
                               <div className="text-xs text-muted-foreground">
-                                Collect name, email, and complete demographic profile
+                                Name, email, age, location, occupation, education, income, political leanings, gender, race, and interests (each field can be skipped)
                               </div>
                             </div>
                           </SelectItem>
@@ -480,7 +481,7 @@ const CreateSurveyPage = () => {
                             <div className="space-y-1">
                               <div className="font-medium">Semi-Anonymous</div>
                               <div className="text-xs text-muted-foreground">
-                                Collect demographics without personal identification
+                                Just age, location, gender, and race — no names, emails, or addresses
                               </div>
                             </div>
                           </SelectItem>
@@ -488,7 +489,7 @@ const CreateSurveyPage = () => {
                             <div className="space-y-1">
                               <div className="font-medium">Anonymous</div>
                               <div className="text-xs text-muted-foreground">
-                                Minimal data collection for complete privacy
+                                Collects no demographic information at all
                               </div>
                             </div>
                           </SelectItem>
@@ -496,6 +497,9 @@ const CreateSurveyPage = () => {
                       </Select>
                       <p className="text-sm text-muted-foreground mt-2">
                         {getAnonymityLevelDescription(survey.anonymityLevel)}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        This only controls the &quot;About You&quot; profile step. You can still ask any demographic question inside the survey itself.
                       </p>
                     </div>
 
@@ -526,7 +530,7 @@ const CreateSurveyPage = () => {
                       <div>
                         <Label htmlFor="demographicsRequired">Require Demographics</Label>
                         <p className="text-sm text-muted-foreground">
-                          Force respondents to complete demographics before survey questions
+                          Ask for the profile before the questions. Respondents can still skip individual fields or answer &quot;N/A&quot;.
                         </p>
                       </div>
                       <Switch
@@ -538,16 +542,38 @@ const CreateSurveyPage = () => {
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <Label htmlFor="public">Public Survey</Label>
-                      <p className="text-sm text-muted-foreground">Allow anyone with the link to respond</p>
+                  <div className="rounded-lg border border-border p-3 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <Label htmlFor="public">{survey.isPublic ? 'Public link' : 'Private link'}</Label>
+                        <p className="text-sm text-muted-foreground">
+                          {survey.isPublic
+                            ? 'Anyone with the link can respond.'
+                            : 'Only people with the link and the password can respond — good for an internal group, organization, or a specific research wave.'}
+                        </p>
+                      </div>
+                      <Switch
+                        id="public"
+                        checked={survey.isPublic}
+                        onCheckedChange={(checked) => setSurvey(prev => ({ ...prev, isPublic: checked }))}
+                      />
                     </div>
-                    <Switch
-                      id="public"
-                      checked={survey.isPublic}
-                      onCheckedChange={(checked) => setSurvey(prev => ({ ...prev, isPublic: checked }))}
-                    />
+                    {!survey.isPublic && (
+                      <div>
+                        <Label htmlFor="accessPassword">Link password</Label>
+                        <Input
+                          id="accessPassword"
+                          type="text"
+                          value={survey.accessPassword || ''}
+                          onChange={(e) => setSurvey(prev => ({ ...prev, accessPassword: e.target.value }))}
+                          placeholder="Set a password respondents must enter"
+                          className="mt-1 max-w-sm"
+                        />
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Respondents must enter this password before they can take the survey.
+                        </p>
+                      </div>
+                    )}
                   </div>
                   <div className="bg-blue-50 dark:bg-blue-950/20 p-4 rounded-lg">
                     <div className="flex items-center gap-2 mb-2">
@@ -555,8 +581,7 @@ const CreateSurveyPage = () => {
                       <span className="text-sm font-medium text-blue-900 dark:text-blue-100">Voter Profile Generation</span>
                     </div>
                     <p className="text-xs text-blue-700 dark:text-blue-300">
-                      Each survey response will automatically create a voter profile agent that can be queried for insights. 
-                      These agents will have the same capabilities as betting agents in the future.
+                      Each response is turned into a voter profile you can query for insights — without re-surveying anyone.
                     </p>
                   </div>
 
