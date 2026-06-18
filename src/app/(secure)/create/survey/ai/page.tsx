@@ -923,6 +923,139 @@ const AISurveyBuilderPageInner = () => {
             </CardContent>
           </Card>
 
+          {/* Privacy & Anonymity — configured upfront, before generating */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Shield className="h-5 w-5 text-primary" />
+                Privacy &amp; Anonymity
+              </CardTitle>
+              <CardDescription>
+                Choose what to collect and who can respond. These settings apply to the survey you generate below.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label htmlFor="anonymityLevel">Anonymity Level</Label>
+                <Select
+                  value={anonymityLevel}
+                  onValueChange={(value: AnonymityLevel) => setAnonymityLevel(value)}
+                >
+                  <SelectTrigger className="mt-1">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="full">
+                      <div className="space-y-1">
+                        <div className="font-medium">Full Demographics</div>
+                        <div className="text-xs text-muted-foreground">
+                          Name, email, age, location, occupation, education, income, political leanings, gender, race, and interests (each field can be skipped)
+                        </div>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="semi_anonymous">
+                      <div className="space-y-1">
+                        <div className="font-medium">Semi-Anonymous</div>
+                        <div className="text-xs text-muted-foreground">
+                          Just age, location, gender, and race — no names, emails, or addresses
+                        </div>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="anonymous">
+                      <div className="space-y-1">
+                        <div className="font-medium">Anonymous</div>
+                        <div className="text-xs text-muted-foreground">
+                          Collects no demographic information at all
+                        </div>
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-sm text-muted-foreground mt-2">
+                  {getAnonymityLevelDescription(anonymityLevel)}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  This only controls the &quot;About You&quot; profile step. You can still ask any demographic question inside the survey itself.
+                </p>
+              </div>
+
+              <Alert>
+                <Info className="h-4 w-4" />
+                <AlertDescription>
+                  {getPrivacyNotice(anonymityLevel)}
+                </AlertDescription>
+              </Alert>
+
+              {prompt.trim().length > 20 && (
+                <div className="bg-blue-50 dark:bg-blue-950/20 p-3 rounded-lg">
+                  <div className="flex items-start gap-2">
+                    <Brain className="h-4 w-4 text-blue-600 mt-0.5" />
+                    <div className="text-xs text-blue-700 dark:text-blue-300">
+                      <p className="font-medium mb-1">AI Recommendation</p>
+                      <p>
+                        Based on your description, we recommend the <strong>
+                          {getRecommendedAnonymityLevel(prompt, '')}
+                        </strong> anonymity level.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label htmlFor="demographicsRequired">Require Demographics</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Ask for the profile before the questions. Respondents can still skip individual fields or answer &quot;N/A&quot;.
+                  </p>
+                </div>
+                <Checkbox
+                  id="demographicsRequired"
+                  checked={demographicsRequired}
+                  onCheckedChange={(checked) => setDemographicsRequired(checked as boolean)}
+                  disabled={anonymityLevel === 'anonymous'}
+                />
+              </div>
+
+              {/* Public vs private link */}
+              <div className="rounded-lg border border-border p-3 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label htmlFor="isPublic" className="cursor-pointer">
+                      {isPublic ? 'Public link — anyone with the link can respond' : 'Private link — password required to respond'}
+                    </Label>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {isPublic
+                        ? 'Anyone with the link can take the survey.'
+                        : 'Only people with the link and the password can respond — good for an internal group, organization, or a specific research wave.'}
+                    </p>
+                  </div>
+                  <Checkbox
+                    id="isPublic"
+                    checked={isPublic}
+                    onCheckedChange={(checked) => setIsPublic(checked as boolean)}
+                  />
+                </div>
+                {!isPublic && (
+                  <div>
+                    <Label htmlFor="accessPassword">Link password</Label>
+                    <Input
+                      id="accessPassword"
+                      type="text"
+                      value={accessPassword}
+                      onChange={(e) => setAccessPassword(e.target.value)}
+                      placeholder="Set a password respondents must enter"
+                      className="mt-1 max-w-sm"
+                    />
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Respondents must enter this password before they can take the survey.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Advanced setup (cover + presentation) — collapsed by default */}
           <details className="group rounded-lg border border-border bg-card">
             <summary className="flex cursor-pointer list-none items-center justify-between px-5 py-3 text-sm font-medium text-card-foreground [&::-webkit-details-marker]:hidden">
@@ -1060,132 +1193,6 @@ const AISurveyBuilderPageInner = () => {
                     />
                   </div>
 
-                  {/* Anonymity Level Section */}
-                  <div className="border-t pt-4 space-y-4">
-                    <div className="flex items-center gap-2">
-                      <Shield className="h-4 w-4 text-primary" />
-                      <Label className="text-sm font-medium">Privacy & Anonymity</Label>
-                    </div>
-                    
-                    <div>
-                      <Label htmlFor="anonymityLevel">Anonymity Level</Label>
-                      <Select
-                        value={anonymityLevel}
-                        onValueChange={(value: AnonymityLevel) => setAnonymityLevel(value)}
-                      >
-                        <SelectTrigger className="mt-1">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="full">
-                            <div className="space-y-1">
-                              <div className="font-medium">Full Demographics</div>
-                              <div className="text-xs text-muted-foreground">
-                                Name, email, age, location, occupation, education, income, political leanings, gender, race, and interests (each field can be skipped)
-                              </div>
-                            </div>
-                          </SelectItem>
-                          <SelectItem value="semi_anonymous">
-                            <div className="space-y-1">
-                              <div className="font-medium">Semi-Anonymous</div>
-                              <div className="text-xs text-muted-foreground">
-                                Just age, location, gender, and race — no names, emails, or addresses
-                              </div>
-                            </div>
-                          </SelectItem>
-                          <SelectItem value="anonymous">
-                            <div className="space-y-1">
-                              <div className="font-medium">Anonymous</div>
-                              <div className="text-xs text-muted-foreground">
-                                Collects no demographic information at all
-                              </div>
-                            </div>
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <p className="text-sm text-muted-foreground mt-2">
-                        {getAnonymityLevelDescription(anonymityLevel)}
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        This only controls the &quot;About You&quot; profile step. You can still ask any demographic question inside the survey itself.
-                      </p>
-                    </div>
-
-                    <Alert>
-                      <Info className="h-4 w-4" />
-                      <AlertDescription>
-                        {getPrivacyNotice(anonymityLevel)}
-                      </AlertDescription>
-                    </Alert>
-
-                    {editableTitle && editableDescription && (
-                      <div className="bg-blue-50 dark:bg-blue-950/20 p-3 rounded-lg">
-                        <div className="flex items-start gap-2">
-                          <Brain className="h-4 w-4 text-blue-600 mt-0.5" />
-                          <div className="text-xs text-blue-700 dark:text-blue-300">
-                            <p className="font-medium mb-1">AI Recommendation</p>
-                            <p>
-                              Based on your survey content, we recommend: <strong>
-                                {getRecommendedAnonymityLevel(editableTitle, editableDescription)}
-                              </strong> anonymity level.
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <Label htmlFor="demographicsRequired">Require Demographics</Label>
-                        <p className="text-sm text-muted-foreground">
-                          Ask for the profile before the questions. Respondents can still skip individual fields or answer &quot;N/A&quot;.
-                        </p>
-                      </div>
-                      <Checkbox
-                        id="demographicsRequired"
-                        checked={demographicsRequired}
-                        onCheckedChange={(checked) => setDemographicsRequired(checked as boolean)}
-                        disabled={anonymityLevel === 'anonymous'}
-                      />
-                    </div>
-
-                    {/* Public vs private link */}
-                    <div className="rounded-lg border border-border p-3 space-y-3">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <Label htmlFor="isPublic" className="cursor-pointer">
-                            {isPublic ? 'Public link — anyone with the link can respond' : 'Private link — password required to respond'}
-                          </Label>
-                          <p className="text-xs text-muted-foreground mt-0.5">
-                            {isPublic
-                              ? 'Anyone with the link can take the survey.'
-                              : 'Only people with the link and the password can respond — good for an internal group, organization, or a specific research wave.'}
-                          </p>
-                        </div>
-                        <Checkbox
-                          id="isPublic"
-                          checked={isPublic}
-                          onCheckedChange={(checked) => setIsPublic(checked as boolean)}
-                        />
-                      </div>
-                      {!isPublic && (
-                        <div>
-                          <Label htmlFor="accessPassword">Link password</Label>
-                          <Input
-                            id="accessPassword"
-                            type="text"
-                            value={accessPassword}
-                            onChange={(e) => setAccessPassword(e.target.value)}
-                            placeholder="Set a password respondents must enter"
-                            className="mt-1 max-w-sm"
-                          />
-                          <p className="mt-1 text-xs text-muted-foreground">
-                            Respondents must enter this password before they can take the survey.
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
 
                   {generatedSurvey.purpose && (
                     <div className="p-3 bg-muted rounded-lg">
