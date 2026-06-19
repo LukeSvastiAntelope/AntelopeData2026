@@ -105,12 +105,21 @@ export async function POST(
     try {
         const { slug } = await params;
         
-        // Get survey first to validate it exists and is published
-        const survey = await SurveyRepo.getSurveyBySlug(slug);
-        
+        // Get the survey. Active/published surveys accept responses normally.
+        // Also accept draft/scheduled surveys so creators can preview and test
+        // their own survey via its link before publishing. Reject only surveys
+        // that are explicitly closed/archived/stopped.
+        let survey: any = await SurveyRepo.getSurveyBySlug(slug);
         if (!survey) {
-            return NextResponse.json({ 
-                error: 'Survey not found or not published' 
+            const anySurvey: any = await SurveyRepo.getSurveyBySlugAny(slug);
+            if (anySurvey && (anySurvey.status === 'draft' || anySurvey.status === 'scheduled')) {
+                survey = anySurvey;
+            }
+        }
+
+        if (!survey) {
+            return NextResponse.json({
+                error: 'This survey is not accepting responses right now.'
             }, { status: 404 });
         }
 
