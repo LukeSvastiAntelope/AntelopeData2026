@@ -373,3 +373,55 @@ pre{
   max-width: 100% !important;
   overflow-x: hidden !important;
 }
+
+/* ──────────────────────────────────────────────────────────────────
+   PDF export of the AI Analytics report.
+   When SurveyAnalyticsDashboard triggers window.print(), it adds the
+   `printing-report` class to <body>. We then hide all app chrome and
+   isolate #ai-analytics-report so the browser's "Save as PDF" captures
+   only the report (charts/SVGs and oklch colors render natively).
+   ────────────────────────────────────────────────────────────────── */
+/* During PDF prep, reveal all forceMount'd tab panels on screen for one frame
+   so Recharts can measure & render every chart before window.print() fires. */
+body.preparing-print #ai-analytics-report .print-tab[hidden],
+body.preparing-print #ai-analytics-report .print-tab {
+  display: block !important;
+}
+
+@media print {
+  body.printing-report * {
+    visibility: hidden !important;
+  }
+  body.printing-report #ai-analytics-report,
+  body.printing-report #ai-analytics-report * {
+    visibility: visible !important;
+  }
+  body.printing-report #ai-analytics-report {
+    position: absolute !important;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+  }
+  /* Buttons / interactive chrome inside the report should not print */
+  body.printing-report #ai-analytics-report .no-print,
+  body.printing-report #ai-analytics-report [role="tablist"] {
+    display: none !important;
+  }
+  /* Reveal every tab panel (forceMount keeps inactive ones in the DOM with the
+     `hidden` attribute) so Insights + Visualizations + Performance all print. */
+  body.printing-report #ai-analytics-report .print-tab[hidden],
+  body.printing-report #ai-analytics-report .print-tab {
+    display: block !important;
+  }
+  /* Avoid awkward page breaks inside cards */
+  body.printing-report #ai-analytics-report .break-inside-avoid,
+  body.printing-report #ai-analytics-report [data-slot="card"] {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  @page {
+    margin: 1.5cm;
+  }
+}

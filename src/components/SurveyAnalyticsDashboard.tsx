@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area, ScatterChart, Scatter, LineChart, Line } from 'recharts'
-import { TrendingUp, Users, BarChart3, PieChart as PieChartIcon, Activity, Info, Loader2, Brain, Lightbulb, Target, AlertTriangle, CheckCircle, Clock, Zap } from 'lucide-react'
+import { TrendingUp, Users, BarChart3, PieChart as PieChartIcon, Activity, Info, Loader2, Brain, Lightbulb, Target, AlertTriangle, CheckCircle, Clock, Zap, Download } from 'lucide-react'
 
 interface SurveyAnalyticsDashboardProps {
   surveyId: number
@@ -143,9 +143,9 @@ export function SurveyAnalyticsDashboard({ surveyId, className }: SurveyAnalytic
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          analysisModel: 'o3-mini',
+          analysisModel: 'gpt-4o',
           queryModel: 'gpt-4o-mini',
-          insightModel: 'deepseek-chat',
+          insightModel: 'gpt-4o',
           visualizationModel: 'gpt-4o',
           maxCharts: 8,
           includeRawData: true,
@@ -170,6 +170,34 @@ export function SurveyAnalyticsDashboard({ surveyId, className }: SurveyAnalytic
     } finally {
       setGenerating(false)
     }
+  }
+
+  // Export the rendered report to PDF via the browser's print dialog ("Save as
+  // PDF"). Unlike html2canvas, native print renders Recharts SVGs and the app's
+  // oklch() theme colors correctly, and needs no extra dependencies. A scoped
+  // print stylesheet (globals.css) hides the app chrome and isolates the report.
+  const handleExportPdf = () => {
+    if (typeof window === 'undefined') return
+    const body = document.body
+    const cleanup = () => {
+      body.classList.remove('printing-report', 'preparing-print')
+      window.removeEventListener('afterprint', cleanup)
+    }
+    window.addEventListener('afterprint', cleanup)
+    // Reveal all (forceMount'd) tab panels on screen first so Recharts'
+    // ResizeObserver can measure and render the SVGs that were display:none in
+    // inactive tabs — otherwise the charts print as empty boxes.
+    body.classList.add('preparing-print')
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        window.setTimeout(() => {
+          body.classList.add('printing-report')
+          window.print()
+          // Fallback in case afterprint never fires (some browsers)
+          window.setTimeout(cleanup, 1000)
+        }, 400)
+      })
+    })
   }
 
   if (loading) {
@@ -278,7 +306,7 @@ export function SurveyAnalyticsDashboard({ surveyId, className }: SurveyAnalytic
   }
 
   return (
-    <div className={`space-y-8 ${className}`}>
+    <div id="ai-analytics-report" className={`space-y-8 ${className}`}>
       {/* AI Analytics Header */}
       <Card>
         <CardHeader>
@@ -292,19 +320,29 @@ export function SurveyAnalyticsDashboard({ surveyId, className }: SurveyAnalytic
                 {aiAnalytics.dashboard?.description || 'Intelligent insights powered by AI'}
               </CardDescription>
             </div>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={generateAIAnalytics}
-              disabled={generating}
-            >
-              {generating ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Zap className="h-4 w-4" />
-              )}
-              Regenerate
-            </Button>
+            <div className="flex items-center gap-2 no-print">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleExportPdf}
+              >
+                <Download className="h-4 w-4" />
+                Export PDF
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={generateAIAnalytics}
+                disabled={generating}
+              >
+                {generating ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Zap className="h-4 w-4" />
+                )}
+                Regenerate
+              </Button>
+            </div>
           </div>
         </CardHeader>
       </Card>
@@ -384,15 +422,17 @@ export function SurveyAnalyticsDashboard({ surveyId, className }: SurveyAnalytic
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="insights" className="space-y-6">
+        {/* forceMount keeps every panel in the DOM so PDF export (print) can
+            reveal all sections at once via the `printing-report` print CSS. */}
+        <TabsContent value="insights" className="space-y-6 print-tab" forceMount>
           <InsightsSection insights={aiAnalytics.insights} analysis={aiAnalytics.analysis} />
         </TabsContent>
 
-        <TabsContent value="visualizations" className="space-y-6">
+        <TabsContent value="visualizations" className="space-y-6 print-tab" forceMount>
           <VisualizationsSection dashboard={aiAnalytics.dashboard} />
         </TabsContent>
 
-        <TabsContent value="performance" className="space-y-6">
+        <TabsContent value="performance" className="space-y-6 print-tab" forceMount>
           <PerformanceSection
             performance={aiAnalytics.performance}
             metadata={aiAnalytics.metadata}
