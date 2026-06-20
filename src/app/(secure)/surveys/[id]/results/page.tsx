@@ -39,6 +39,7 @@ import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { SurveyAnalyticsDashboard } from '@/components/SurveyAnalyticsDashboard'
 import { SurveyRespondentsTablePaginated } from '@/components/SurveyRespondentsTablePaginated'
+import SurveyQuestionCharts from '@/components/SurveyQuestionCharts'
 import { ViewQuestionsDialog } from '@/components/ViewQuestionsDialog'
 
 
@@ -553,6 +554,11 @@ const SurveyResultsPage = () => {
                       </CardContent>
                     </Card>
                   </div>
+
+                  {/* Per-question statistics with multiple graph types */}
+                  {(summary?.survey.response_count || 0) > 0 && (
+                    <SurveyQuestionCharts surveyId={parseInt(surveyId)} />
+                  )}
 
                   {/* Survey Responses Table */}
                   <div className="space-y-4">
