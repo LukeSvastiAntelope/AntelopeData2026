@@ -156,10 +156,11 @@ export default function CohortChatPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [activeMessages, isLoading]);
 
-  useEffect(() => {
-    setShowConversationTypeDialog(true);
-  }, []);
-  
+  // Note: the Choose Conversation Type dialog is intentionally NOT opened on
+  // mount. The analytics home shows the onboarding/welcome screen by default
+  // (rendered when no survey is selected); the dialog is opened when the user
+  // selects a survey (see handleSurveyChange) or starts a new conversation.
+
   // Poll for report status updates
   useEffect(() => {
     const activeReports = messages.filter(
@@ -418,26 +419,16 @@ export default function CohortChatPage() {
     setFilterRules([]);
     setNewCohortName('');
     
-    // Switch to the appropriate conversation for this survey
+    // When the user selects a survey, prompt them to choose the conversation
+    // type (Cohort Chat vs general/news). Picking a type then creates the
+    // conversation with this survey's context (see handleConversationTypeSelect
+    // -> createNewConversation, which reads selectedSurveyId).
     if (surveyId) {
-      // Find conversations for this survey
-      const surveyConversations = conversations.filter(c => c.surveyId === surveyId);
-      
-      if (surveyConversations.length > 0) {
-        // Switch to the most recent conversation for this survey
-        const mostRecentConversation = surveyConversations[0]; // conversations are sorted by date
-        switchConversation(mostRecentConversation.id);
-      } else {
-        // No conversations for this survey, create a new one
-        createNewConversation();
-      }
+      setShowConversationTypeDialog(true);
     } else {
-      // No survey selected, switch to most recent conversation overall or create new
-      if (conversations.length > 0) {
-        switchConversation(conversations[0].id);
-      } else {
-        createNewConversation();
-      }
+      // Survey deselected: fall back to the onboarding screen (no active survey).
+      // Clearing the conversation id lets the welcome screen render again.
+      setCurrentConversationId(null);
     }
   };
 

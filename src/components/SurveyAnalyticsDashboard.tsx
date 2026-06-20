@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area, ScatterChart, Scatter, LineChart, Line } from 'recharts'
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, PieChart, Pie, Cell, AreaChart, Area, ScatterChart, Scatter, LineChart, Line } from 'recharts'
 import { TrendingUp, Users, BarChart3, PieChart as PieChartIcon, Activity, Info, Loader2, Brain, Lightbulb, Target, AlertTriangle, CheckCircle, Clock, Zap, Download } from 'lucide-react'
 
 interface SurveyAnalyticsDashboardProps {
@@ -186,16 +186,22 @@ export function SurveyAnalyticsDashboard({ surveyId, className }: SurveyAnalytic
     window.addEventListener('afterprint', cleanup)
     // Reveal all (forceMount'd) tab panels on screen first so Recharts'
     // ResizeObserver can measure and render the SVGs that were display:none in
-    // inactive tabs — otherwise the charts print as empty boxes.
+    // inactive tabs — otherwise the charts print as empty boxes. We also fire
+    // resize events to force every ResponsiveContainer to remeasure now that
+    // its panel is visible.
     body.classList.add('preparing-print')
+    const fireResize = () => window.dispatchEvent(new Event('resize'))
     window.requestAnimationFrame(() => {
       window.requestAnimationFrame(() => {
+        fireResize()
+        window.setTimeout(fireResize, 150)
         window.setTimeout(() => {
+          fireResize()
           body.classList.add('printing-report')
           window.print()
           // Fallback in case afterprint never fires (some browsers)
           window.setTimeout(cleanup, 1000)
-        }, 400)
+        }, 500)
       })
     })
   }
@@ -423,16 +429,18 @@ export function SurveyAnalyticsDashboard({ surveyId, className }: SurveyAnalytic
         </TabsList>
 
         {/* forceMount keeps every panel in the DOM so PDF export (print) can
-            reveal all sections at once via the `printing-report` print CSS. */}
-        <TabsContent value="insights" className="space-y-6 print-tab" forceMount>
+            reveal all sections at once via the print CSS. In normal view,
+            data-[state=inactive]:hidden restores proper tab switching (without
+            it, forceMount leaves all panels visible & stacked). */}
+        <TabsContent value="insights" className="space-y-6 print-tab data-[state=inactive]:hidden" forceMount>
           <InsightsSection insights={aiAnalytics.insights} analysis={aiAnalytics.analysis} />
         </TabsContent>
 
-        <TabsContent value="visualizations" className="space-y-6 print-tab" forceMount>
+        <TabsContent value="visualizations" className="space-y-6 print-tab data-[state=inactive]:hidden" forceMount>
           <VisualizationsSection dashboard={aiAnalytics.dashboard} />
         </TabsContent>
 
-        <TabsContent value="performance" className="space-y-6 print-tab" forceMount>
+        <TabsContent value="performance" className="space-y-6 print-tab data-[state=inactive]:hidden" forceMount>
           <PerformanceSection
             performance={aiAnalytics.performance}
             metadata={aiAnalytics.metadata}
@@ -625,6 +633,35 @@ function VisualizationsSection({ dashboard }: { dashboard?: any }) {
   )
 }
 
+// Measures its own width with a ResizeObserver and passes an explicit pixel
+// width to recharts. ResponsiveContainer measures 0 inside these tab/grid
+// cards (especially when the panel mounts while display:none), leaving charts
+// blank — explicit width renders reliably and works for the PDF export too.
+function MeasuredChart({ height = 300, children }: { height?: number; children: (width: number) => React.ReactElement }) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [width, setWidth] = useState(0)
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    let timer = 0
+    // Poll until the element is actually laid out with a non-zero width. The
+    // panel mounts while display:none (forceMount, inactive tab) so clientWidth
+    // starts at 0, and ResizeObserver does not reliably fire on the
+    // display:none -> block transition — so we keep polling (via setTimeout,
+    // which fires in every environment) until the panel becomes visible.
+    const measure = () => {
+      const w = el.clientWidth
+      if (w > 0) setWidth(w)
+      else timer = window.setTimeout(measure, 100)
+    }
+    measure()
+    const ro = new ResizeObserver(() => { const w = el.clientWidth; if (w > 0) setWidth(w) })
+    ro.observe(el)
+    return () => { window.clearTimeout(timer); ro.disconnect() }
+  }, [])
+  return <div ref={ref} className="w-full" style={{ height }}>{width > 0 ? children(width) : null}</div>
+}
+
 // Chart Card Component
 function ChartCard({ chart }: { chart: any }) {
   const renderChart = () => {
@@ -639,25 +676,28 @@ function ChartCard({ chart }: { chart: any }) {
     switch (chart.type) {
       case 'bar':
         return (
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={chart.data}>
+          <MeasuredChart height={300}>
+            {(w) => (
+            <BarChart width={w} height={300} data={chart.data}>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
               <XAxis dataKey={chart.chartConfig?.xAxis?.key || 'category'} className="text-xs" />
               <YAxis className="text-xs" />
                   <ChartTooltip content={<ChartTooltipContent />} />
-                  <Bar 
-                dataKey={chart.chartConfig?.yAxis?.key || 'value'} 
+                  <Bar
+                dataKey={chart.chartConfig?.yAxis?.key || 'value'}
                     fill={CHART_COLORS.primary}
                     radius={[4, 4, 0, 0]}
                   />
                 </BarChart>
-              </ResponsiveContainer>
+            )}
+              </MeasuredChart>
         )
       
       case 'pie':
         return (
-          <ResponsiveContainer width="100%" height={300}>
-                <PieChart>
+          <MeasuredChart height={300}>
+            {(w) => (
+                <PieChart width={w} height={300}>
                   <Pie
                 data={chart.data}
                 dataKey={chart.chartConfig?.yAxis?.key || 'value'}
@@ -673,33 +713,36 @@ function ChartCard({ chart }: { chart: any }) {
                   </Pie>
                   <ChartTooltip content={<ChartTooltipContent />} />
                 </PieChart>
-              </ResponsiveContainer>
+            )}
+              </MeasuredChart>
         )
 
       case 'scatter':
         return (
-          <ResponsiveContainer width="100%" height={300}>
-            <ScatterChart data={chart.data}>
+          <MeasuredChart height={300}>
+            {(w) => (
+            <ScatterChart width={w} height={300} data={chart.data}>
               <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-              <XAxis 
-                dataKey={chart.chartConfig?.xAxis?.key || 'x'} 
+              <XAxis
+                dataKey={chart.chartConfig?.xAxis?.key || 'x'}
                 type="number"
                 className="text-xs"
                 name={chart.chartConfig?.xAxis?.label || 'X Axis'}
               />
-              <YAxis 
-                dataKey={chart.chartConfig?.yAxis?.key || 'y'} 
+              <YAxis
+                dataKey={chart.chartConfig?.yAxis?.key || 'y'}
                 type="number"
                 className="text-xs"
                 name={chart.chartConfig?.yAxis?.label || 'Y Axis'}
               />
               <ChartTooltip content={<ChartTooltipContent />} />
-              <Scatter 
-                dataKey={chart.chartConfig?.yAxis?.key || 'y'} 
+              <Scatter
+                dataKey={chart.chartConfig?.yAxis?.key || 'y'}
                 fill={CHART_COLORS.primary}
               />
             </ScatterChart>
-          </ResponsiveContainer>
+            )}
+          </MeasuredChart>
         )
 
       case 'heatmap':
@@ -798,40 +841,44 @@ function ChartCard({ chart }: { chart: any }) {
 
       case 'line':
         return (
-          <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={chart.data}>
+          <MeasuredChart height={300}>
+            {(w) => (
+            <LineChart width={w} height={300} data={chart.data}>
               <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
               <XAxis dataKey={chart.chartConfig?.xAxis?.key || 'category'} className="text-xs" />
               <YAxis className="text-xs" />
               <ChartTooltip content={<ChartTooltipContent />} />
-              <Line 
+              <Line
                 type="monotone"
-                dataKey={chart.chartConfig?.yAxis?.key || 'value'} 
+                dataKey={chart.chartConfig?.yAxis?.key || 'value'}
                 stroke={CHART_COLORS.primary}
                 strokeWidth={2}
                 dot={{ fill: CHART_COLORS.primary, strokeWidth: 2, r: 4 }}
               />
             </LineChart>
-          </ResponsiveContainer>
+            )}
+          </MeasuredChart>
         )
 
       case 'area':
         return (
-          <ResponsiveContainer width="100%" height={300}>
-            <AreaChart data={chart.data}>
+          <MeasuredChart height={300}>
+            {(w) => (
+            <AreaChart width={w} height={300} data={chart.data}>
               <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
               <XAxis dataKey={chart.chartConfig?.xAxis?.key || 'category'} className="text-xs" />
               <YAxis className="text-xs" />
               <ChartTooltip content={<ChartTooltipContent />} />
-              <Area 
+              <Area
                 type="monotone"
-                dataKey={chart.chartConfig?.yAxis?.key || 'value'} 
+                dataKey={chart.chartConfig?.yAxis?.key || 'value'}
                 stroke={CHART_COLORS.primary}
                 fill={CHART_COLORS.primary}
                 fillOpacity={0.3}
               />
             </AreaChart>
-          </ResponsiveContainer>
+            )}
+          </MeasuredChart>
         )
       
       default:
