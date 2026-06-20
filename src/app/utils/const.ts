@@ -190,13 +190,6 @@ export const GPT_MODELS = [
         type: "anthropic",
         model: "claude-haiku-4-5-20251001"
     },
-    // Legacy Claude models (kept for backwards compatibility)
-    {
-        key: "claude-3-5-sonnet-latest",
-        label: "Claude 3.5 Sonnet",
-        type: "anthropic",
-        model: "claude-3-5-sonnet-latest"
-    },
 ];
 
 /**
