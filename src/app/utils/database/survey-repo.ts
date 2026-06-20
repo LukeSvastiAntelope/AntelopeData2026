@@ -547,6 +547,17 @@ export const SurveyRepo = {
 
         const safeCount = Math.min(100, Math.max(1, Math.floor(count)));
 
+        // Pools for realistic, randomized synthetic demographics.
+        const pick = (arr: string[]) => arr[Math.floor(Math.random() * arr.length)];
+        const SYN_LOCATIONS = ['Austin, TX', 'Denver, CO', 'Chicago, IL', 'Phoenix, AZ', 'Atlanta, GA', 'Seattle, WA', 'Miami, FL', 'Columbus, OH', 'Charlotte, NC', 'Portland, OR'];
+        const SYN_EDUCATION = ['High school', 'Some college', "Bachelor's degree", "Master's degree", 'Doctorate'];
+        // 'gender' is a generated varchar(10) column — keep values <= 10 chars.
+        const SYN_GENDER = ['Male', 'Female', 'Non-binary', 'Other'];
+        const SYN_INCOME = ['<$30k', '$30k-$60k', '$60k-$100k', '$100k-$150k', '>$150k'];
+        const SYN_OCCUPATION = ['Service', 'Technology', 'Education', 'Healthcare', 'Finance', 'Retired', 'Student', 'Government'];
+        const SYN_POLITICAL = ['Democrat', 'Republican', 'Independent', 'Other'];
+        const SYN_ETHNICITY = ['White', 'Black or African American', 'Hispanic or Latino', 'Asian', 'Two or more races', 'Other'];
+
         for (let i = 0; i < safeCount; i++) {
             const token = `${Date.now()}-${i}-${Math.random().toString(36).slice(2, 11)}`;
             const answers = questionRows.map((q: RowDataPacket) => ({
@@ -554,19 +565,28 @@ export const SurveyRepo = {
                 value: randomSyntheticAnswer({ type: q.type, options: q.options }),
             }));
 
+            const ageNum = 18 + Math.floor(Math.random() * 52);
             let demographics: Record<string, string> = {};
             if (anonymityLevel === 'full') {
                 demographics = {
                     name: `Synthetic Respondent ${i + 1}`,
                     email: `synthetic-${surveyId}-${token}@example.invalid`,
-                    age: String(18 + Math.floor(Math.random() * 52)),
-                    location: ['Austin, TX', 'Denver, CO', 'Chicago, IL'][i % 3],
+                    age: String(ageNum),
+                    location: pick(SYN_LOCATIONS),
+                    education: pick(SYN_EDUCATION),
+                    occupation: pick(SYN_OCCUPATION),
+                    gender: pick(SYN_GENDER),
+                    income: pick(SYN_INCOME),
+                    ethnicity: pick(SYN_ETHNICITY),
+                    political: pick(SYN_POLITICAL),
+                    politicalViews: pick(SYN_POLITICAL),
                 };
             } else if (anonymityLevel === 'semi_anonymous') {
                 demographics = {
-                    age: String(21 + Math.floor(Math.random() * 45)),
-                    location: 'Metro region',
-                    occupation: ['Service', 'Tech', 'Education', 'Healthcare'][i % 4],
+                    age: String(ageNum),
+                    location: pick(SYN_LOCATIONS),
+                    gender: pick(SYN_GENDER),
+                    ethnicity: pick(SYN_ETHNICITY),
                 };
             }
 
