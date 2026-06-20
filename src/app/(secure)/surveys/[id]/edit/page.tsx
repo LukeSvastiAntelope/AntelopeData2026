@@ -835,34 +835,35 @@ const EditSurveyPage = () => {
             </CardContent>
           </Card>
 
-          {/* Phase 2: Voter Profile Deployment */}
-          <Card>
+          {/* Phase 2: Voter Profile Deployment — not available yet */}
+          <Card className="opacity-60">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
                   <CardTitle className="flex items-center gap-2">
                     <Rocket className="h-5 w-5" />
                     Deploy Voter Profiles (Preview)
+                    <Badge variant="secondary" className="ml-1">Coming soon</Badge>
                   </CardTitle>
-                  <CardDescription>Use twins as synthetic responders with a readiness threshold</CardDescription>
+                  <CardDescription>Use voter profiles as synthetic responders with a readiness threshold. This feature isn&apos;t available yet.</CardDescription>
                 </div>
                 <div className="flex gap-2">
-                  <Button variant="outline" onClick={handlePreviewTwins} disabled={loadingPreview}>
+                  <Button variant="outline" disabled title="Coming soon">
                     <ListChecks className="h-4 w-4 mr-2" />
-                    {loadingPreview ? 'Loading...' : 'Preview Matches'}
+                    Preview Matches
                   </Button>
-                  <Button onClick={handleDeployTwins} disabled={deploying || previewMatches.length === 0}>
+                  <Button disabled title="Coming soon">
                     <Rocket className="h-4 w-4 mr-2" />
-                    {deploying ? 'Deploying...' : 'Deploy (Dry-run)'}
+                    Deploy (Dry-run)
                   </Button>
                 </div>
               </div>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-4 pointer-events-none select-none">
               <div>
                 <Label>Readiness Threshold: {Math.round(threshold * 100)}%</Label>
-                <input type="range" min="0" max="1" step="0.05" value={threshold} onChange={(e)=>setThreshold(Number(e.target.value))} className="w-full" />
-                <p className="text-xs text-muted-foreground mt-1">Only twins with readiness above this value are eligible.</p>
+                <input type="range" min="0" max="1" step="0.05" value={threshold} disabled readOnly className="w-full" />
+                <p className="text-xs text-muted-foreground mt-1">Only voter profiles with readiness above this value are eligible.</p>
               </div>
 
               {previewMatches.length > 0 ? (

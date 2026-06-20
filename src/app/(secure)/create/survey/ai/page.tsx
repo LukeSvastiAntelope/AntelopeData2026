@@ -105,6 +105,7 @@ const AISurveyBuilderPageInner = () => {
   const [demographicsRequired, setDemographicsRequired] = useState(true)
   const [isPublic, setIsPublic] = useState(true)
   const [accessPassword, setAccessPassword] = useState('')
+  const [templatesCollapsed, setTemplatesCollapsed] = useState(false)
 
   // Scheduling state
   const [startAt, setStartAt] = useState('')
@@ -790,14 +791,29 @@ const AISurveyBuilderPageInner = () => {
           {/* Start from a Template */}
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Wand2 className="h-5 w-5 text-primary" />
-                Start from a Template
-              </CardTitle>
-              <CardDescription>
-                Pick a pre-built political survey template to pre-fill the prompt below — then review and generate. Or describe your own survey from scratch.
-              </CardDescription>
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <Wand2 className="h-5 w-5 text-primary" />
+                    Start from a Template
+                  </CardTitle>
+                  <CardDescription className="mt-1.5">
+                    Pick a pre-built political survey template to pre-fill the prompt below — then review and generate. Or describe your own survey from scratch.
+                  </CardDescription>
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="shrink-0 gap-1 text-muted-foreground"
+                  onClick={() => setTemplatesCollapsed((v) => !v)}
+                  aria-expanded={!templatesCollapsed}
+                >
+                  {templatesCollapsed ? <><ChevronDown className="h-4 w-4" /> Show</> : <><ChevronUp className="h-4 w-4" /> Hide</>}
+                </Button>
+              </div>
             </CardHeader>
+            {!templatesCollapsed && (
             <CardContent>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {POLITICAL_SURVEY_TEMPLATES.map((t) => (
@@ -816,6 +832,7 @@ const AISurveyBuilderPageInner = () => {
                 ))}
               </div>
             </CardContent>
+            )}
           </Card>
 
           {/* Privacy & Anonymity — configured upfront, before generating */}

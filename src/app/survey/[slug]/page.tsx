@@ -22,7 +22,7 @@ import {
 } from "lucide-react"
 import { useParams } from 'next/navigation'
 import { ResponderInfoModal } from '@/components/ResponderInfoModal'
-import { DEMOGRAPHICS_FORM_CONFIGS, shouldCollectField } from '@/app/utils/anonymity-config'
+import { ANONYMITY_CONFIGURATIONS, DEMOGRAPHICS_FORM_CONFIGS, shouldCollectField } from '@/app/utils/anonymity-config'
 import { AnonymityLevel } from '@/app/utils/interface'
 
 interface SurveyQuestion {
@@ -354,32 +354,40 @@ const SurveyPage = () => {
     }
   }
 
+  // Fields the respondent MUST fill. Normally taken from the anonymity config
+  // (most are optional). When the creator turns on "Require Demographics" for a
+  // FULL-demographics survey, every collected field becomes mandatory.
+  const getRequiredFields = (): string[] => {
+    if (!survey) return []
+    if ((survey as any).demographics_required && survey.anonymity_level === 'full') {
+      return ANONYMITY_CONFIGURATIONS['full'].fieldsToCollect.filter((f) => f !== 'socialMedia')
+    }
+    return DEMOGRAPHICS_FORM_CONFIGS[survey.anonymity_level].requiredFields
+  }
+
+  const FIELD_LABELS: Record<string, string> = {
+    name: 'Name', email: 'Email', age: 'Age', location: 'Location',
+    occupation: 'Occupation', education: 'Education level', income: 'Income range',
+    politicalViews: 'Political views', gender: 'Gender', ethnicity: 'Race / ethnicity',
+    interests: 'Interests',
+  }
+
   const validateDemographics = () => {
     if (!survey) return false
-    
-    const formConfig = DEMOGRAPHICS_FORM_CONFIGS[survey.anonymity_level]
-    
-    // Check required fields based on anonymity level
-    for (const field of formConfig.requiredFields) {
-      if (field === 'name' && !demographics.name.trim()) {
-        setError('Name is required')
+
+    for (const field of getRequiredFields()) {
+      if (field === 'socialMedia') continue
+      const val = (demographics as any)[field]
+      if (typeof val !== 'string' || !val.trim()) {
+        setError(`${FIELD_LABELS[field] || field} is required`)
         return false
       }
       if (field === 'email') {
-        if (!demographics.email.trim()) {
-          setError('Email is required')
-          return false
-        }
-        // Basic email validation
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
         if (!emailRegex.test(demographics.email)) {
           setError('Please enter a valid email address')
           return false
         }
-      }
-      if (field === 'age' && !demographics.age.trim()) {
-        setError('Age is required')
-        return false
       }
     }
 
@@ -421,11 +429,10 @@ const SurveyPage = () => {
     return shouldCollectField(field, survey.anonymity_level)
   }
 
-  // Helper function to check if a field is required based on anonymity level
+  // Helper function to check if a field is required (see getRequiredFields)
   const isFieldRequired = (field: string) => {
     if (!survey) return false
-    const formConfig = DEMOGRAPHICS_FORM_CONFIGS[survey.anonymity_level]
-    return formConfig.requiredFields.includes(field)
+    return getRequiredFields().includes(field)
   }
 
   if (loading) {
