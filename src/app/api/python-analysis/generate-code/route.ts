@@ -29,16 +29,12 @@ interface CodeGenerationResponse {
 
 // Model routing logic based on analysis type and complexity
 function selectModel(analysisType: string, complexity: string, dataSize: number): string {
+  // Only OpenAI is configured in this deployment, so route everything to
+  // available GPT models (o3-mini / deepseek-coder would 401 with no key).
   if (analysisType === 'quick-query' || dataSize < 1000) {
     return 'gpt-4o-mini';
   }
-  if (analysisType === 'statistical') {
-    return 'o3-mini'; // Best for statistical reasoning
-  }
-  if (analysisType === 'exploratory' && complexity === 'complex') {
-    return 'deepseek-coder'; // Best for complex data transformations
-  }
-  return 'gpt-4o'; // Default for code generation
+  return 'gpt-4o';
 }
 
 // Determine analysis type from query
