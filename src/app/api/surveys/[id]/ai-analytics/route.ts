@@ -31,22 +31,22 @@ export async function GET(
         responseCount: status.responseCount,
         availableModels: {
           analysis: getAllModels().filter(m => 
-            ['claude-3-5-sonnet-latest', 'gpt-4o', 'o1', 'gemini-2.0-flash'].includes(m.id)
+            ['gpt-4o', 'gpt-4o', 'o1', 'gemini-2.0-flash'].includes(m.id)
           ),
           queries: getAllModels().filter(m => 
-            ['gpt-4o-mini', 'claude-3-5-haiku-latest', 'deepseek-chat'].includes(m.id)
+            ['gpt-4o-mini', 'gpt-4o-mini', 'deepseek-chat'].includes(m.id)
           ),
           insights: getAllModels().filter(m => 
-            ['claude-3-5-sonnet-latest', 'gpt-4o', 'o1'].includes(m.id)
+            ['gpt-4o', 'gpt-4o', 'o1'].includes(m.id)
           ),
           visualization: getAllModels().filter(m => 
-            ['gpt-4o', 'claude-3-5-sonnet-latest', 'gemini-2.0-flash'].includes(m.id)
+            ['gpt-4o', 'gpt-4o', 'gemini-2.0-flash'].includes(m.id)
           )
         },
         recommendedModels: {
-          analysis: 'claude-3-5-sonnet-latest',
+          analysis: 'gpt-4o',
           queries: 'gpt-4o-mini', 
-          insights: 'claude-3-5-sonnet-latest',
+          insights: 'gpt-4o',
           visualization: 'gpt-4o'
         },
         minimumResponses: 10,
@@ -128,9 +128,9 @@ export async function POST(
     // Extract configuration from request body
     const config: AIAnalyticsConfig = {
       // Model selection
-      analysisModel: body.analysisModel || 'claude-3-5-sonnet-latest',
+      analysisModel: body.analysisModel || 'gpt-4o',
       queryModel: body.queryModel || 'gpt-4o-mini',
-      insightModel: body.insightModel || 'claude-3-5-sonnet-latest',
+      insightModel: body.insightModel || 'gpt-4o',
       visualizationModel: body.visualizationModel || 'gpt-4o',
       
       // Force regeneration options

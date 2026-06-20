@@ -148,9 +148,9 @@ export class AIAnalyticsOrchestrator {
       },
       metadata: {
         modelsUsed: {
-          analysis: config.analysisModel || 'claude-3-5-sonnet-latest',
+          analysis: config.analysisModel || 'gpt-4o',
           queries: config.queryModel || 'gpt-4o-mini',
-          insights: config.insightModel || 'claude-3-5-sonnet-latest',
+          insights: config.insightModel || 'gpt-4o',
           visualization: config.visualizationModel || 'gpt-4o'
         },
         generatedAt: new Date().toISOString(),
