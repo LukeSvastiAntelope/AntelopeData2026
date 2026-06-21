@@ -81,9 +81,17 @@ export async function routeToAnalysisEngine(params: AnalysisRouterParams) {
     // - If thematic analysis OR has text question types OR has genuine narrative text → Use QUALITATIVE engine (with citations)
     // - Otherwise → Use QUANTITATIVE engine (with charts)
     
-    const shouldUseQualitative = (queryIntent.analysisType === 'thematic' && !isCsvSource) ||
-                                ((hasTextQuestions && !looksCategorical) && !isCsvSource) ||
-                                 (hasNarrativeTextResponses && !isCsvSource);
+    // The qualitative engine only works on TEXT. If the matched questions are
+    // all rating/choice (no text questions and no narrative responses), routing
+    // here returns "0 meaningful text responses" -> "No data available". So
+    // qualitative requires that some text actually exists, even for 'thematic'
+    // intent; otherwise fall through to the quantitative (charts) engine.
+    const hasAnyText = hasTextQuestions || hasNarrativeTextResponses;
+    const shouldUseQualitative = !isCsvSource && hasAnyText && (
+      queryIntent.analysisType === 'thematic' ||
+      (hasTextQuestions && !looksCategorical) ||
+      hasNarrativeTextResponses
+    );
     
     console.log(`🎯 [ROUTER] FINAL DECISION: shouldUseQualitative = ${shouldUseQualitative}`);
     console.log(`🎯 [ROUTER] Breakdown: thematic=${queryIntent.analysisType === 'thematic'}, textQuestions=${hasTextQuestions}, narrative=${hasNarrativeTextResponses}, categorical=${looksCategorical}, csv=${isCsvSource}`);

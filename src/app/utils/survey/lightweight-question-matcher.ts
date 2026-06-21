@@ -639,24 +639,56 @@ export class LightweightQuestionMatcher {
   ): Promise<{ matches: QuestionMatch[], topicsFound: string[] }> {
     
     const scoredQuestions = await this.scoreQuestionsWithEnhancedLLM(
-      questions, 
-      userQuery, 
+      questions,
+      userQuery,
       false
     );
-    
-    const relevantQuestions = scoredQuestions
+
+    let relevantQuestions = scoredQuestions
       .filter(match => match.relevanceScore >= 60)
       .sort((a, b) => b.relevanceScore - a.relevanceScore)
       .slice(0, maxQuestions);
-    
+
+    // Fallback: the LLM scorer sometimes returns an empty/low-confidence set for
+    // perfectly answerable queries (e.g. "housing affordability"), which surfaces
+    // as "No data available". Use deterministic word-overlap matching so an
+    // obvious query still resolves to its question.
+    if (relevantQuestions.length === 0) {
+      relevantQuestions = this.keywordOverlapMatches(questions, userQuery, maxQuestions);
+    }
+
     const topicsFound = [...new Set(relevantQuestions.map(q => q.topicCategory).filter(Boolean))];
-    
+
     return {
       matches: relevantQuestions,
       topicsFound
     };
   }
-  
+
+  /**
+   * Deterministic word-overlap matcher used as a safety net when the LLM scorer
+   * returns nothing. Scores each question by the fraction of significant query
+   * words it contains.
+   */
+  private keywordOverlapMatches(questions: any[], userQuery: string, maxQuestions: number): QuestionMatch[] {
+    const stop = new Set(['the','a','an','of','to','in','for','and','or','is','are','do','does','you','your','with','how','what','which','give','me','show','chart','pie','bar','graph','about','people','as','on','this','that','their','they','can','please','want','need','see','get','distribution','ratio','breakdown','many','much']);
+    const qWords = Array.from(new Set((userQuery.toLowerCase().match(/[a-z]{3,}/g) || []).filter((w) => !stop.has(w))));
+    if (qWords.length === 0) return [];
+    const scored = questions.map((q) => {
+      const text = (q.prompt || '').toLowerCase();
+      let overlap = 0;
+      for (const w of qWords) if (text.includes(w)) overlap++;
+      const relevanceScore = Math.round((overlap / qWords.length) * 100);
+      return {
+        question: { id: q.id, prompt: q.prompt, type: q.type, question_order: q.question_order } as SimpleQuestion,
+        relevanceScore,
+        reasoning: `Keyword overlap (${overlap}/${qWords.length} terms matched)`,
+      } as QuestionMatch;
+    }).filter((m) => m.relevanceScore > 0)
+      .sort((a, b) => b.relevanceScore - a.relevanceScore);
+    return scored.slice(0, maxQuestions);
+  }
+
   /**
    * Generate reasoning based on strategy used
    */

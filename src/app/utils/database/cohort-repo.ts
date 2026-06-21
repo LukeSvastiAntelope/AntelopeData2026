@@ -35,6 +35,26 @@ export const CohortRepo = {
   },
 
   /**
+   * Fetch a single cohort by id, scoped to ones the user may see (their own or
+   * public). Returns null if not found / not permitted.
+   */
+  getById: async (id: number, userId: number | null) => {
+    const db = await getMySQLConnection();
+    const [rows] = await db.execute<RowDataPacket[]>(
+      `SELECT * FROM cohorts WHERE id = ? AND (visibility = 'public' OR created_by = ?) LIMIT 1`,
+      [id, userId]
+    );
+    if (!rows.length) return null;
+    const row: any = rows[0];
+    return {
+      ...row,
+      survey_id: row.survey_id,
+      surveyId: row.survey_id,
+      filter_json: typeof row.filter_json === 'string' ? JSON.parse(row.filter_json) : row.filter_json,
+    } as any;
+  },
+
+  /**
    * Create a new cohort. Returns inserted ID.
    */
   createCohort: async (input: { name: string; description?: string; filter: CohortFilterRule[]; visibility: 'private'|'org'|'public'; createdBy: number; surveyId?: number; }) => {

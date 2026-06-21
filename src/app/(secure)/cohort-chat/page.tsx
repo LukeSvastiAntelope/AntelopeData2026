@@ -559,8 +559,12 @@ FORMATTING REQUIREMENTS:
 
     const isEventStream = res.headers.get('content-type')?.includes('text/event-stream');
 
-    // Handle non-streaming JSON responses only when we explicitly requested them *and* the server did not return SSE
-    if (streamingMode === 'off' && !isEventStream) {
+    // Handle non-streaming JSON responses whenever the server did NOT return an
+    // SSE stream — regardless of the requested streamingMode. The survey
+    // analysis path returns plain JSON even when streaming was requested; gating
+    // on streamingMode here left an empty bubble (and dropped dataCards) for any
+    // mode other than 'off'.
+    if (!isEventStream) {
       // Non-streaming response (expects JSON { content: string })
       const json = await res.json();
       
