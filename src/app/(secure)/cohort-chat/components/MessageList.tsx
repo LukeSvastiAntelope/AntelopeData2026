@@ -75,6 +75,33 @@ function uniqueSourceLogos(sources: ParsedSource[]): SourceLogo[] {
   return logos.slice(0, 12);
 }
 
+// Python-interpreter-style trace of how a result was computed. Shown live
+// (expanded) while the analysis runs, and as a collapsible block afterward.
+function InterpreterTrace({ steps, live = false }: { steps: string[]; live?: boolean }) {
+  const [open, setOpen] = useState(live);
+  const block = (
+    <pre className="mt-1 rounded-md border bg-muted/60 p-2 text-[11px] leading-relaxed font-mono text-muted-foreground overflow-x-auto whitespace-pre-wrap">
+      {steps.map((step, i) => (
+        <div key={i}>
+          <span className="text-primary/70">&gt;&gt;&gt;</span> {step}
+        </div>
+      ))}
+    </pre>
+  );
+  if (live) return block;
+  return (
+    <div className="mt-2">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+      >
+        <span>🐍</span> {open ? 'Hide' : 'Show'} analysis steps
+      </button>
+      {open && block}
+    </div>
+  );
+}
+
 function AgentMessageBody({ message }: { message: ChatMessage }) {
   const [showSourceDetails, setShowSourceDetails] = useState(false);
   const rawContent = typeof message.content === 'string' ? message.content : '';
@@ -90,20 +117,21 @@ function AgentMessageBody({ message }: { message: ChatMessage }) {
           <div className="space-y-2">
             <div className="flex items-center gap-2">
               <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
-              <span className="text-sm text-muted-foreground">Thinking...</span>
+              <span className="text-sm text-muted-foreground">
+                {message.thinkingSteps && message.thinkingSteps.length > 0 ? 'Running analysis…' : 'Thinking…'}
+              </span>
             </div>
             {message.thinkingSteps && message.thinkingSteps.length > 0 && (
-              <ul className="space-y-1">
-                {message.thinkingSteps.slice(-3).map((step, sIdx) => (
-                  <li key={sIdx} className="text-xs text-muted-foreground">
-                    • {step}
-                  </li>
-                ))}
-              </ul>
+              <InterpreterTrace steps={message.thinkingSteps} live />
             )}
           </div>
         ) : (
-          <MarkdownWithCitations text={mainContent} citations={message.citations} isUpload={message.isUpload} />
+          <>
+            <MarkdownWithCitations text={mainContent} citations={message.citations} isUpload={message.isUpload} />
+            {message.thinkingSteps && message.thinkingSteps.length > 0 && (
+              <InterpreterTrace steps={message.thinkingSteps} />
+            )}
+          </>
         )}
 
         {message.dataCards && <DataCards dataCards={message.dataCards} />}

@@ -594,6 +594,7 @@ FORMATTING REQUIREMENTS:
           (last as any).citations = processed.citations;
           (last as any).chartSpec = processed.chartSpec;
           (last as any).dataCards = json.dataCards || processed.dataCards;
+          (last as any).thinkingSteps = json.thinkingSteps || (last as any).thinkingSteps;
           updated[updated.length - 1] = last;
         } else {
           updated.push({
@@ -601,7 +602,8 @@ FORMATTING REQUIREMENTS:
             content: processed.content,
             citations: processed.citations,
             chartSpec: processed.chartSpec,
-            dataCards: json.dataCards || processed.dataCards
+            dataCards: json.dataCards || processed.dataCards,
+            thinkingSteps: json.thinkingSteps
           } as any);
         }
         return updated;
@@ -781,8 +783,16 @@ FORMATTING REQUIREMENTS:
     });
     const data = await res.json();
     if (data.status) {
-      const newCohort = { id: data.id, name: newCohortName, filter: filterRules, visibility: 'private', description: '', createdBy: 1, createdAt: '', updatedAt: '' } as any;
+      // IMPORTANT: include surveyId/survey_id so the CohortPanel dropdown filter
+      // (c.surveyId === selectedSurveyId) keeps showing this cohort. Without it
+      // the freshly-created cohort would vanish from the list.
+      const newCohort = { id: data.id, name: newCohortName, filter: filterRules, visibility: 'private', description: '', createdBy: 1, surveyId: selectedSurveyId, survey_id: selectedSurveyId, createdAt: '', updatedAt: '' } as any;
       setCohorts([...cohorts, newCohort]);
+      // Re-sync from the server so the list reflects canonical fields.
+      fetch('/api/cohorts')
+        .then((r) => r.json())
+        .then((d) => { if (d.cohorts) setCohorts(d.cohorts); })
+        .catch(() => {});
       // Auto-select the newly created cohort
       setSelectedCohortId(data.id);
       // Close the creator and reset form
@@ -1629,17 +1639,23 @@ FORMATTING REQUIREMENTS:
                               });
                               const data = await res.json();
                               if (data.status) {
-                                const newCohort = { 
-                                  id: data.id, 
-                                  name, 
-                                  filter: cohortFilterRules, 
-                                  visibility: 'private', 
-                                  description: '', 
-                                  createdBy: 1, 
-                                  createdAt: '', 
-                                  updatedAt: '' 
+                                const newCohort = {
+                                  id: data.id,
+                                  name,
+                                  filter: cohortFilterRules,
+                                  visibility: 'private',
+                                  description: '',
+                                  createdBy: 1,
+                                  surveyId: selectedSurveyId,
+                                  survey_id: selectedSurveyId,
+                                  createdAt: '',
+                                  updatedAt: ''
                                 } as any;
                                 setCohorts([...cohorts, newCohort]);
+                                fetch('/api/cohorts')
+                                  .then((r) => r.json())
+                                  .then((d) => { if (d.cohorts) setCohorts(d.cohorts); })
+                                  .catch(() => {});
                                 setSelectedCohortId(data.id);
                                 setShowCohortCreator(false);
                                 setNewCohortName('');

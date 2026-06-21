@@ -462,6 +462,32 @@ export async function respondFromGeneralWebOnly(params: GeneralWebCopilotParams)
     .filter(Boolean)
     .join("\n\n");
 
+  // First try a LIVE web search (OpenAI search-preview) so general/news mode
+  // pulls real, current political/news/clerk/ballot information and cites it.
+  try {
+    const { webSearchAnswer, withSourcesSection } = await import("../../../utils/services/web-search");
+    const searchSystem = [
+      baseSystem,
+      "",
+      "You have live web access. Search the web for the most current, factual",
+      "information relevant to the question — political news coverage, ballot",
+      "news, county clerk records, election administration, polling, results.",
+      "Prioritize reputable sources. ALWAYS ground claims in the sources you find",
+      "and cite them inline. Do not fabricate figures.",
+    ].join("\n");
+    const search = await webSearchAnswer({ question: userPrompt, systemContext: searchSystem });
+    const searched = (search.content || "").trim();
+    if (searched) {
+      return deliverCopilotContent(withSourcesSection(searched, search.citations), stream);
+    }
+    // empty → fall through to the non-search LLM below
+  } catch (searchErr) {
+    console.warn(
+      "⚠️ Live web search failed, falling back to base LLM:",
+      searchErr instanceof Error ? searchErr.message : searchErr
+    );
+  }
+
   try {
     const result = await createCompletion({
       model: selectedModel,
