@@ -16,18 +16,27 @@ export interface QuantitativeAnalysisParams {
   temperature: number;
 }
 
+// Pick the chart type from the user's request. Defaults to horizontal bars,
+// but honors explicit asks like "give me a pie chart" / "as a pie" / "donut".
+function preferredChartType(question: string): 'pie' | 'horizontal_bar' {
+  const q = (question || '').toLowerCase();
+  if (/\bpie\b|pie\s*chart|\bdonut\b|doughnut/.test(q)) return 'pie';
+  return 'horizontal_bar';
+}
+
 export async function generateQuantitativeAnalysis(params: QuantitativeAnalysisParams) {
   const { factSheet, question, queryIntent, surveyMeta, stream, model, temperature } = params;
-  
+
   console.log(`📊 [QUANTITATIVE] Starting statistical analysis for ${factSheet.analysis_results.analysis_count} questions`);
-  
+
   // Generate AI analysis from the structured data
   const aiAnalysis = await generateAIAnalysis(factSheet.analysis_results, question, surveyMeta);
-  
-  // Create data cards for visualization  
+
+  // Create data cards for visualization — honor a requested chart type.
+  const chartType = preferredChartType(question);
   const dataCards = factSheet.analysis_results.results.map((result: any, index: number) => ({
     title: result.title,
-    chart_type: 'horizontal_bar',
+    chart_type: chartType,
     data: (result.data || []).map((item: any) => ({
       label: item.answer_value,
       value: parseFloat(item.percentage)
@@ -38,7 +47,21 @@ export async function generateQuantitativeAnalysis(params: QuantitativeAnalysisP
   }));
   
   console.log(`📊 [QUANTITATIVE] Created ${dataCards.length} data cards for visualization`);
-  
+
+  // Build a python-interpreter-style trace of how the result was computed, so
+  // the chat can show the user the analysis steps (not just the final answer).
+  const qCount = factSheet.analysis_results.analysis_count;
+  const respondents = surveyMeta.total_respondents;
+  const qFields = (factSheet.analysis_results.results || [])
+    .map((r: any) => `"${(r.title || '').slice(0, 40)}"`).slice(0, 4).join(', ');
+  const interpreterSteps = [
+    `import pandas as pd`,
+    `df = load_responses(survey="${(surveyMeta.title || '').slice(0, 40)}")  # ${respondents} respondents`,
+    `questions = match_questions(query)  # matched ${qCount} relevant question(s)${qFields ? `: ${qFields}` : ''}`,
+    `dist = df.groupby(answer).size() / len(df) * 100  # frequency distribution`,
+    `render(dist, kind="${chartType === 'pie' ? 'pie' : 'bar'}")  # building ${dataCards.length} chart(s)`,
+  ];
+
   // Generate structured response content
   let responseContent = `# Survey Analysis: ${surveyMeta.title}\n\n`;
   responseContent += `## 🧠 Analysis & Insights\n\n`;
@@ -47,12 +70,13 @@ export async function generateQuantitativeAnalysis(params: QuantitativeAnalysisP
   responseContent += `📊 **Analysis based on ${factSheet.analysis_results.analysis_count} relevant questions from ${surveyMeta.total_respondents} survey respondents.**\n\n`;
   
   if (stream) {
-    return createStreamingResponse(responseContent, dataCards, surveyMeta);
+    return createStreamingResponse(responseContent, dataCards, surveyMeta, interpreterSteps);
   } else {
     return NextResponse.json({
       status: true,
       content: responseContent,
       dataCards: dataCards,
+      thinkingSteps: interpreterSteps,
       factSheet: factSheet
     });
   }
@@ -143,16 +167,25 @@ Do not repeat the exact percentages already shown above - instead interpret what
   }
 }
 
-function createStreamingResponse(content: string, dataCards: any[], surveyMeta: any) {
+function createStreamingResponse(content: string, dataCards: any[], surveyMeta: any, steps: string[] = []) {
   const encoder = new TextEncoder();
-  
+  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
   const stream = new ReadableStream({
-    start(controller) {
+    async start(controller) {
       try {
+        // Emit the computation trace first (python-interpreter style) so the
+        // user sees step-by-step how the result was derived. Paced so the
+        // steps are visible during the "thinking" phase.
+        for (const step of steps) {
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'progress', step })}\n\n`));
+          await sleep(320);
+        }
+
         // Send content as SSE format
         const contentChunk = JSON.stringify({ content });
         controller.enqueue(encoder.encode(`data: ${contentChunk}\n\n`));
-        
+
         // Add data cards for visualization
         if (dataCards.length > 0) {
           const dataCardsContent = '\n```data-cards\n' + JSON.stringify(dataCards, null, 2) + '\n```\n';
