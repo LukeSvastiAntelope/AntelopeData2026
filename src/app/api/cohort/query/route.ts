@@ -884,8 +884,7 @@ export async function POST(req: NextRequest) {
     // Resolve cohort filter
     let filterRules: CohortFilterRule[] = [];
     if (cohort?.id) {
-      const cohorts = await CohortRepo.listVisibleCohorts(null, "admin"); // we need dedicated repo method to getById; quick workaround
-      const found = cohorts.find((c) => c.id === cohort.id);
+      const found = await CohortRepo.getById(cohort.id, numericUserId);
       if (!found) {
         return NextResponse.json({ status: false, message: "Cohort not found" }, { status: 404 });
       }
