@@ -1478,6 +1478,7 @@ FORMATTING REQUIREMENTS:
                   isNewsMode
                 />
               ) : !selectedSurveyId ? (
+                <div className="flex-1 min-h-0 overflow-y-auto">
                 <OnboardingEmptyState
                   onTryDemo={handleTryDemo}
                   onCreateSurvey={handleCreateSurvey}
@@ -1499,6 +1500,7 @@ FORMATTING REQUIREMENTS:
                   onSurveySelect={handleOnboardingSurveySelect}
                   onUploadClick={handleUploadClick}
                 />
+                </div>
               ) : (
                 // 🚨 FIX: Always show active chat when survey is selected, regardless of message count
                 <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'chat' | 'stats')} className="flex flex-col flex-1 min-h-0 min-w-0">
@@ -1568,7 +1570,7 @@ FORMATTING REQUIREMENTS:
                     )}
                   </TabsContent>
                   
-                  <TabsContent value="stats" className="flex-1 mt-0">
+                  <TabsContent value="stats" className="flex flex-col flex-1 min-h-0 mt-0">
                     {selectedSurveyId && (
                       <SurveyStatsView surveyId={selectedSurveyId} />
                     )}
