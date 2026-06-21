@@ -219,15 +219,8 @@ export default function CohortChatPage() {
         console.log('Survey titles:', data.surveys?.map((s: any) => s.title) || []);
         if (data.surveys) {
           setSurveys(data.surveys);
-          // Check for saved survey preference
-          const savedSurveyId = localStorage.getItem('cohort-chat-selected-survey');
-          if (savedSurveyId && savedSurveyId !== 'null') {
-            const surveyId = Number(savedSurveyId);
-            // Only set if the survey still exists
-            if (data.surveys.find((s: any) => s.id === surveyId)) {
-              setSelectedSurveyId(surveyId);
-            }
-          }
+          // Do NOT restore a saved survey on mount — the analytics home always
+          // opens on the onboarding/welcome screen until the user picks a survey.
         }
       })
       .catch(error => {
@@ -301,11 +294,11 @@ export default function CohortChatPage() {
       setTemperature(Number(savedTemperature));
     }
     
-    const savedSurveyId = localStorage.getItem('cohort-chat-selected-survey');
-    if (savedSurveyId && savedSurveyId !== 'null') {
-      setSelectedSurveyId(Number(savedSurveyId));
-    }
-    
+    // Intentionally do NOT restore the previously selected survey on mount.
+    // The analytics home must always open on the onboarding/welcome screen
+    // (which renders when no survey is selected). The user picks a survey each
+    // visit, which then triggers the Choose Conversation Type dialog.
+
     const savedStreamingMode = localStorage.getItem('cohort-chat-streaming-mode');
     if (savedStreamingMode && ['off','smart','buffered','instant'].includes(savedStreamingMode)) {
       setStreamingMode(savedStreamingMode as 'off' | 'smart' | 'buffered' | 'instant');
@@ -966,46 +959,11 @@ FORMATTING REQUIREMENTS:
         });
         
         setConversations(data.conversations || []);
-        
-        // If no current conversation, ask user which mode to start with.
-        if (!currentConversationId && data.conversations.length === 0) {
-          console.log('🆕 No conversations found, opening conversation type chooser');
-          setShowConversationTypeDialog(true);
-        } else if (!currentConversationId && data.conversations.length > 0) {
-          // Load the most recent conversation
-          const mostRecent = data.conversations[0];
-          console.log('🔄 Loading most recent conversation:', mostRecent.id, 'type:', mostRecent.type);
-          setCurrentConversationId(mostRecent.id);
-          const mostRecentType = (mostRecent.type || 'chat') as 'chat' | 'news' | 'code';
-          setCurrentConversationType(mostRecentType);
-          setCopilotMode(mostRecentType === 'news' ? 'news' : 'survey');
-          
-          // Load messages into the appropriate state based on conversation type
-          if (mostRecent.type === 'code') {
-            console.log('💾 LOADING CODE CONVERSATION with', mostRecent.messages?.length || 0, 'messages');
-            setCodeMessages(mostRecent.messages || []);
-            setMessages([]); // Clear chat messages
-            setPythonEnvironmentInitialized(true); // Ensure environment is ready
-          } else {
-            console.log('💬 LOADING CHAT CONVERSATION with', mostRecent.messages?.length || 0, 'messages');
-            setMessages(mostRecent.messages || []);
-            setCodeMessages([]); // Clear code messages
-          }
-          
-          // Set survey context from the loaded conversation.
-          if (mostRecentType === 'news') {
-            setSelectedSurveyId(null);
-            setSelectedCohortId(null);
-          } else if (!selectedSurveyId && mostRecent.surveyId) {
-            setSelectedSurveyId(mostRecent.surveyId);
-            localStorage.setItem('cohort-chat-selected-survey', String(mostRecent.surveyId));
-          }
-          
-          // Set cohort context from the loaded conversation if not already set
-          if (!selectedCohortId && mostRecent.cohortId) {
-            setSelectedCohortId(mostRecent.cohortId);
-          }
-        }
+
+        // Do NOT auto-activate a conversation or open the conversation-type
+        // dialog on mount. The analytics home always opens on the
+        // onboarding/welcome screen; past conversations stay available in the
+        // right-hand panel for the user to resume manually.
       } else {
         console.log('❌ Failed to load conversations:', response.status, response.statusText);
       }
