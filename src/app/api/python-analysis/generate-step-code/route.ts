@@ -75,6 +75,9 @@ STATISTICAL OPERATIONS SAFETY:
 
 VISUALIZATION REQUIREMENTS:
 - ALWAYS include matplotlib visualizations when analyzing data
+- BEFORE plotting, ALWAYS print() the exact data being plotted (the counts, the
+  crosstab, the computed series) so every charted number is visible in the text
+  output and can be verified. A chart alone (with no printed numbers) is not enough.
 
 PROFESSIONAL STYLING (Neutral Theme):
 - Import and use seaborn for modern aesthetics: import seaborn as sns; sns.set_style("whitegrid")
@@ -110,14 +113,39 @@ STEP CONTEXT:
 - Main Question: ${request.context.question}
 
 DATASET INFO:
-- Columns: ${request.context.dataset_info.columns.length} total
-- Available columns: ${request.context.dataset_info.columns.slice(0, 20).join(', ')}${request.context.dataset_info.columns.length > 20 ? '...' : ''}
+- Columns (${request.context.dataset_info.columns.length} total): ${request.context.dataset_info.columns.join(', ')}
+
+SURVEY DATA STRUCTURE — read carefully:
+- Each row in df is ONE real survey respondent. Columns named Q1, Q2, ... map to
+  survey questions (see codebook below); demo_* columns are demographics.
+- SINGLE-CHOICE questions store the chosen option as a plain text label
+  (e.g. df['Q7'] == 'White or European American'). Match on the EXACT label from
+  the codebook options.
+- MULTIPLE-CHOICE ("select all that apply") questions are encoded TWO ways:
+  (1) the original Qn column is a comma-joined string of the selected options, and
+  (2) one binary 0/1 INDICATOR column per option (see "indicatorColumns" in the
+  codebook), e.g. Q1_Vanilla == 1 means the respondent selected Vanilla.
+  -> For membership, counts, cross-tabs, chi-square, or regression on a
+  multiple-choice question, ALWAYS use the 0/1 indicator columns. NEVER run
+  value_counts() on the raw multi-select column (it buckets each combination).
+- For the RELATIONSHIP between two questions, build pd.crosstab(...) and run
+  scipy.stats.chi2_contingency on it; print the contingency table, chi2, p-value,
+  dof, and Cramér's V (V = sqrt(chi2 / (n * (min(r,c)-1)))). For race x a flavor,
+  crosstab race (Q7) against the flavor indicator (e.g. Q1_Vanilla).
+
+ANTI-HALLUCINATION RULES (mandatory):
+- Every number you report MUST come from code executed on df. NEVER invent,
+  estimate, assume, or round-from-memory any count, percentage, or statistic.
+- Always PRINT the raw computed objects (the crosstab, the value counts, the
+  chi2 result) so the numbers are visible and verifiable.
+- If a filter yields 0 rows or a column is missing, print that fact — do not
+  fabricate a plausible-looking result.
 
 ${request.context.dataset_info.codebook_mappings ? `
-**CODEBOOK MAPPINGS AVAILABLE:**
+**CODEBOOK (column -> question, type, options, and multi-select indicator columns):**
 ${JSON.stringify(request.context.dataset_info.codebook_mappings, null, 2)}
 
-**CRITICAL**: Use the exact variable names and value labels from the codebook above. When analyzing survey questions, extract the question text and value meanings from the codebook mappings.
+**CRITICAL**: Use the exact column names and value labels from this codebook. To map the user's natural-language question to variables, read each question's text and pick the matching column(s).
 ` : 'No codebook mappings available - working with raw column names only.'}
 
 PREVIOUS CONTEXT:

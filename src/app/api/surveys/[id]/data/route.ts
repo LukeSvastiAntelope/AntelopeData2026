@@ -83,61 +83,94 @@ export async function GET(
       }
     });
 
-    // Convert to array and ensure all questions have values (even if null)
+    // Make a pandas/CSV-safe column suffix from an option label.
+    const safe = (s: any) => String(s).replace(/[^A-Za-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 40) || 'opt';
+
+    // Per-question metadata (parse options once; detect multi-select).
+    const qMeta = questionRows.map((q: any) => {
+      let opts: string[] | null = null;
+      try { opts = q.options ? (typeof q.options === 'string' ? JSON.parse(q.options) : q.options) : null; } catch { opts = null; }
+      const isMulti = String(q.type || '').toLowerCase().includes('multiple');
+      return { col: `Q${q.question_order}`, type: q.type, prompt: q.prompt, options: opts, isMulti };
+    });
+
+    // Parse a possibly JSON-array-encoded answer into a clean string[] of labels.
+    const parseMulti = (val: any): string[] => {
+      if (val === null || val === undefined) return [];
+      if (Array.isArray(val)) return val.map((x) => String(x));
+      const s = String(val).trim();
+      if (s.startsWith('[')) {
+        try { const a = JSON.parse(s); return Array.isArray(a) ? a.map((x) => String(x)) : (s ? [s] : []); } catch { return s ? [s] : []; }
+      }
+      return s ? [s] : [];
+    };
+
+    // Convert to array. Multiple-choice ("select all") answers are stored as
+    // JSON-array strings; we parse them into a readable comma-joined value AND
+    // emit a binary 0/1 indicator column per option (e.g. Q1_Vanilla) so the
+    // analysis agent can compute correct cross-tabs / chi-square / regression
+    // instead of treating the whole array string as one category.
     const data = Array.from(responses.values()).map(response => {
       const row: any = {
         response_id: response.response_id,
         submitted_at: response.submitted_at
       };
-      
-      // Add demographics if available
+
       if (response.demographics) {
         try {
-          const demo = typeof response.demographics === 'string' 
-            ? JSON.parse(response.demographics) 
+          const demo = typeof response.demographics === 'string'
+            ? JSON.parse(response.demographics)
             : response.demographics;
-          Object.keys(demo).forEach(key => {
-            row[`demo_${key}`] = demo[key];
-          });
+          Object.keys(demo).forEach(key => { row[`demo_${key}`] = demo[key]; });
         } catch (e) {
           console.warn('Could not parse demographics:', e);
         }
       }
-      
-      // Add all question columns
-      questionRows.forEach((q: any) => {
-        const colName = `Q${q.question_order}`;
-        row[colName] = response.answers[colName] || null;
+
+      qMeta.forEach((q: any) => {
+        const raw = response.answers[q.col];
+        if (q.isMulti) {
+          const selected = parseMulti(raw);
+          row[q.col] = selected.length ? selected.join(', ') : null;
+          const optionList: string[] = Array.isArray(q.options) && q.options.length ? q.options : [...new Set(selected)];
+          optionList.forEach((opt) => { row[`${q.col}_${safe(opt)}`] = selected.includes(opt) ? 1 : 0; });
+        } else {
+          row[q.col] = raw ?? null;
+        }
       });
-      
+
       return row;
     });
-    
+
     console.log('🔍 Data API Debug - Final data transformation:', {
       responseMapSize: responses.size,
       finalDataLength: data.length,
-      firstRow: data[0],
       sampleAnswers: data[0] ? Object.keys(data[0]).filter(k => k.startsWith('Q')) : []
     });
 
     // Create column metadata for Python
     const columns = ['response_id', 'submitted_at'];
-    
-    // Add demographic columns
     const sampleDemo = data[0] ? Object.keys(data[0]).filter(k => k.startsWith('demo_')) : [];
     columns.push(...sampleDemo);
-    
-    // Add question columns
-    questionRows.forEach((q: any) => {
-      columns.push(`Q${q.question_order}`);
+    qMeta.forEach((q: any) => {
+      columns.push(q.col);
+      if (q.isMulti && Array.isArray(q.options)) {
+        q.options.forEach((opt: string) => columns.push(`${q.col}_${safe(opt)}`));
+      }
     });
 
-    // Create question mapping for codebook
-    const questionMapping = questionRows.map((q: any) => ({
-      column: `Q${q.question_order}`,
+    // Enriched codebook: question text, type, options, and (for multi-select)
+    // the exact 0/1 indicator column for each option.
+    const questionMapping = qMeta.map((q: any) => ({
+      column: q.col,
       question: q.prompt,
       type: q.type,
-      options: q.options ? (typeof q.options === 'string' ? JSON.parse(q.options) : q.options) : null
+      multiSelect: q.isMulti,
+      options: q.options,
+      ...(q.isMulti && Array.isArray(q.options) ? {
+        encoding: 'multi-select (select all that apply): the original column is a comma-joined string of selected options; for membership/cross-tab/regression use the per-option binary 0/1 indicator columns listed in indicatorColumns.',
+        indicatorColumns: Object.fromEntries(q.options.map((opt: string) => [opt, `${q.col}_${safe(opt)}`])),
+      } : {}),
     }));
 
     return NextResponse.json({
