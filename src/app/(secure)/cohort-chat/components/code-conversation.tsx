@@ -555,14 +555,14 @@ Ready for intelligent survey analysis!`,
     const shouldUseAutonomousAnalysis = trimmed.length >= 3 && !isGreetingOnly;
 
     if (shouldUseAutonomousAnalysis) {
-      // Check if this dataset has a surveyId (database survey) and use smart analysis
-      if ((currentDataset as any).surveyId && !((currentDataset as any).isTargeted)) {
-        console.log('🧠 Using smart analysis for survey question');
-        return handleSmartAnalysis(content);
-      } else {
-        console.log('🤖 Using traditional autonomous analysis');
-        return handleAutonomousAnalysis(content);
-      }
+      // Always analyze the FULL dataset. The previous "smart/targeted" path
+      // used a separate LLM to pre-select a subset of question columns, which
+      // frequently dropped the columns the user actually meant (e.g. race/flavor)
+      // and also discarded the question `type`. Surveys here are small, so we
+      // keep every column + the full codebook in context and let the agent map
+      // the natural-language question to the right variables itself.
+      console.log('🤖 Using full-dataset autonomous analysis');
+      return handleAutonomousAnalysis(content);
     }
 
     // Add user message for non-autonomous analysis

@@ -27,47 +27,35 @@ export async function POST(req: NextRequest) {
 
     const request: InsightExtractionRequest = await req.json();
     
-    const systemPrompt = `You are an expert data analyst. Extract key insights from analysis step outputs.
+    const systemPrompt = `You extract insights from a Python analysis step's PRINTED OUTPUT.
 
 MAIN QUESTION: ${request.context.question}
+STEP: ${request.step.type} — ${request.step.description}
 
-STEP CONTEXT:
-- Step Type: ${request.step.type}
-- Description: ${request.step.description}
+ABSOLUTE GROUNDING RULES (most important):
+- Use ONLY numbers, labels, and facts that LITERALLY appear in the STEP OUTPUT below.
+- Every count, percentage, coefficient, p-value, or statistic you mention MUST be
+  copied verbatim from the output. Do NOT invent, estimate, round from memory,
+  infer, or "fill in" any number. If it is not printed, you may not state it.
+- If the output has NO quantitative results (e.g. it only produced a chart, or
+  says "no text output", or is empty), return an EMPTY insights array (or a single
+  insight that describes what the step did, with NO numbers). Never fabricate
+  statistics to look helpful.
+- Do not contradict the output. If the output prints "Public transit  4", the
+  insight must say 4 — never 5, 7, or 8.
 
-EXISTING FINDINGS:
-${request.context.key_findings.length > 0 ? 
-  request.context.key_findings.map((finding, i) => `${i + 1}. ${finding}`).join('\n') :
-  'No previous findings yet.'
-}
+${request.context.dataset_info?.codebook_mappings ? `When naming variables, use the human-readable survey question/option labels from the codebook rather than raw column names.` : ''}
 
-${request.context.dataset_info?.codebook_mappings ? `
-**CODEBOOK CONTEXT:**
-This dataset has a codebook with question text and value labels. When extracting insights, reference the actual survey questions rather than just variable names.
-` : ''}
+TASK: Extract 1-3 specific insights that are DIRECTLY supported by numbers/facts in the output and help answer the main question.`;
 
-TASK: Extract 1-3 specific, actionable insights from the step output that help answer the main question.
-
-INSIGHT CRITERIA:
-- Be specific and evidence-based
-- Focus on what the data actually shows
-- Relate directly to the main question
-- Avoid generic statements
-- Include quantitative details when available`;
-
-    const userPrompt = `Extract insights from this analysis output:
-
-STEP OUTPUT:
+    const userPrompt = `STEP OUTPUT (your only source of truth — quote its numbers exactly):
+"""
 ${request.output}
+"""
 
-Return insights as a JSON array:
-{
-  "insights": [
-    "Specific insight 1 with evidence",
-    "Specific insight 2 with evidence", 
-    "Specific insight 3 with evidence"
-  ]
-}`;
+Return JSON only:
+{ "insights": ["insight grounded in the output above", "..."] }
+If the output contains no usable numbers, return: { "insights": [] }`;
 
     const completion = await createCompletion({
       model: 'gpt-4o-mini', // Fast model for insight extraction

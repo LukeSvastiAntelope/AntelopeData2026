@@ -48,10 +48,19 @@ ANALYSIS CONTEXT:
 - Codebook available: ${request.datasetInfo.codebook_mappings ? 'YES - Question text and value labels available' : 'NO - Raw data only'}
 
 ${request.datasetInfo.codebook_mappings ? `
-**CODEBOOK CONTEXT:**
+**CODEBOOK (column -> question text, type, options, multi-select indicator columns):**
 ${JSON.stringify(request.datasetInfo.codebook_mappings, null, 2)}
 
-**IMPORTANT**: The analysis should leverage the question text and value labels from the codebook to provide meaningful, human-readable results.
+**VARIABLE MAPPING (critical):** Map the user's everyday wording to the right
+columns using each question's TEXT. Examples: "race"/"ethnicity" -> the
+racial/ethnic-background question; "flavor"/"flavors" -> the flavor question;
+"healthier options"/"health" -> the healthier-attributes question; "price"/"spend"
+-> the spending question. Name the exact columns to use in your step descriptions.
+For multiple-choice questions use the 0/1 indicator columns (see indicatorColumns)
+for cross-tabs/chi-square/regression. When the user compares which of two things a
+variable relates to more (e.g. "is race more related to flavor or to healthier
+options"), plan to run BOTH relationships (race x flavor AND race x healthier) and
+compare their effect sizes (chi-square / Cramér's V).
 ` : ''}
 
 STEP TYPES:
