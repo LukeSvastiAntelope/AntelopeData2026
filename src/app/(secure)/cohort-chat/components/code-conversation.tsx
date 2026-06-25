@@ -545,50 +545,14 @@ Ready for intelligent survey analysis!`,
   const handleSendMessage = async (content: string) => {
     if (!currentDataset) return;
 
-    const lowerContent = content.toLowerCase();
-    
-    // Route most questions to autonomous analysis (same logic as python-analysis)
-    const shouldUseAutonomousAnalysis = 
-      // Explicit analysis terms
-      lowerContent.includes('correlation') || 
-      lowerContent.includes('relationship') ||
-      lowerContent.includes('analysis') ||
-      lowerContent.includes('compare') ||
-      lowerContent.includes('pattern') ||
-      lowerContent.includes('vs') ||
-      lowerContent.includes('versus') ||
-      lowerContent.includes('opinion') ||
-      lowerContent.includes('breakdown') ||
-      lowerContent.includes('demographic') ||
-      lowerContent.includes('difference') ||
-      lowerContent.includes('differences') ||
-      lowerContent.includes('between') ||
-      lowerContent.includes('how') ||
-      lowerContent.includes('look at') ||
-      lowerContent.includes('feel about') ||
-      lowerContent.includes('think about') ||
-      // Survey-specific terms
-      lowerContent.includes('questions') ||
-      lowerContent.includes('variables') ||
-      lowerContent.includes('columns') ||
-      lowerContent.includes('survey') ||
-      lowerContent.includes('responses') ||
-      // Data exploration terms
-      lowerContent.includes('find') ||
-      lowerContent.includes('identify') ||
-      lowerContent.includes('explore') ||
-      lowerContent.includes('describe') ||
-      lowerContent.includes('summarize') ||
-      // Statistical terms
-      lowerContent.includes('statistics') ||
-      lowerContent.includes('distribution') ||
-      lowerContent.includes('frequency') ||
-      lowerContent.includes('count') ||
-      lowerContent.includes('plot') ||
-      lowerContent.includes('chart') ||
-      lowerContent.includes('graph') ||
-      // For datasets with many columns/rows, most questions should be autonomous
-      (currentDataset && (currentDataset.shape[1] > 20 || currentDataset.shape[0] > 1000));
+    const trimmed = content.trim();
+
+    // Default to running a real analysis for ANY substantive question (including
+    // open-ended ones like "give me some general insights"). Only pure
+    // greetings/acknowledgements fall through to guidance. The previous keyword
+    // allowlist missed most natural questions and returned a canned reply.
+    const isGreetingOnly = /^(hi|hello|hey|yo|thanks|thank you|ty|ok|okay|kk|cool|nice|great|got it|sounds good|help)\b[!.?\s]*$/i.test(trimmed);
+    const shouldUseAutonomousAnalysis = trimmed.length >= 3 && !isGreetingOnly;
 
     if (shouldUseAutonomousAnalysis) {
       // Check if this dataset has a surveyId (database survey) and use smart analysis
