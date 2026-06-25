@@ -56,7 +56,7 @@ export function BreadcrumbNavigation({
   const getConversationDisplayTitle = (conversation: Conversation) => {
     const baseTitle = conversation.title || 'New Conversation';
     const typeIcon =
-      conversation.type === 'code' ? '🧪 ' :
+      conversation.type === 'code' ? '💬 ' :
       conversation.type === 'news' ? '📰 ' :
       '💬 ';
     return typeIcon + baseTitle;
@@ -66,7 +66,7 @@ export function BreadcrumbNavigation({
   const getConversationDropdownTitle = (conversation: Conversation) => {
     const title = conversation.title || 'New Conversation';
     const typeIcon =
-      conversation.type === 'code' ? '🧪 ' :
+      conversation.type === 'code' ? '💬 ' :
       conversation.type === 'news' ? '📰 ' :
       '💬 ';
     const fullTitle = typeIcon + title;
@@ -130,7 +130,7 @@ export function BreadcrumbNavigation({
                                   <button className="text-sm font-medium text-foreground hover:text-primary transition-colors whitespace-nowrap">
                       {currentConversation ? getConversationDisplayTitle(currentConversation) :
                        (currentConversationType === 'code'
-                         ? '🧪 Legacy Code Conversation'
+                         ? '💬 New Cohort Chat'
                          : currentConversationType === 'news'
                            ? '📰 New general/news'
                            : '💬 New Cohort Chat')}

@@ -1517,8 +1517,8 @@ FORMATTING REQUIREMENTS:
                       <TabsTrigger value="chat" className="gap-2">
                         {currentConversationType === 'code' ? (
                           <>
-                            <Code2 className="h-4 w-4" />
-                            Legacy Code
+                            <MessageCircle className="h-4 w-4" />
+                            Cohort Chat
                           </>
                         ) : currentConversationType === 'news' ? (
                           <>
