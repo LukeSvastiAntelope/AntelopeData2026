@@ -70,7 +70,23 @@ export function useSaveConversation({
       return { ...m, content, metadata: meta } as any;
     });
 
-    const firstUser = processedMessages.find((m: any) => m.role === 'user' || m.type === 'user');
+    // Safety net: code conversations can carry many base64 chart images and
+    // grow into multiple MB. If the payload is too large to reliably persist,
+    // drop the heavy image data (keeping all text/code/steps/insights) so the
+    // conversation history still saves instead of silently failing.
+    const MAX_SAVE_BYTES = 2_500_000;
+    let safeMessages: any[] = processedMessages;
+    try {
+      if (JSON.stringify(processedMessages).length > MAX_SAVE_BYTES) {
+        safeMessages = processedMessages.map((m: any) =>
+          typeof m.content === 'string' && m.content.startsWith('data:image/')
+            ? { ...m, content: '📊 [Chart generated — re-run the analysis to view it]', metadata: { ...(m.metadata || {}), recipeType: 'plot', plotStripped: true } }
+            : m
+        );
+      }
+    } catch { /* fall back to original */ }
+
+    const firstUser = safeMessages.find((m: any) => m.role === 'user' || m.type === 'user');
     const finalTitle = title || (firstUser ? firstUser.content.slice(0, 40) + (firstUser.content.length > 40 ? '...' : '') : 'New Conversation');
 
     try {
