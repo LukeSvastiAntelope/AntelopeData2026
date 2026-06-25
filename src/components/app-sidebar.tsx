@@ -186,8 +186,15 @@ export function AppSidebar({ className, collapsible = "offcanvas", ...props }: S
           </Link>
         </div>
         <div className="px-4">
-          <Link 
-            href="/cohort-chat/chat" 
+          <Link
+            href="/cohort-chat/chat"
+            onClick={() => {
+              // If already on the analytics page, this same-route click won't
+              // remount it — fire an event so it resets to the home screen.
+              if (typeof window !== 'undefined') {
+                window.dispatchEvent(new CustomEvent('antelope:analytics-home'));
+              }
+            }}
             className="flex items-center gap-2 w-full px-4 py-2 text-sm font-medium rounded-md bg-foreground text-background border border-border hover:bg-foreground/90 transition-colors"
           >
             <MessageCircle className="h-4 w-4 group-data-[collapsible=offcanvas]:hidden text-background" />

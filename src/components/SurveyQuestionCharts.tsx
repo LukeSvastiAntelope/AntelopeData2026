@@ -329,13 +329,12 @@ export default function SurveyQuestionCharts({ surveyId }: SurveyQuestionChartsP
           </p>
         </div>
       </div>
-      {/* Scrollable grid of per-question charts */}
-      <div className="max-h-[1400px] overflow-y-auto pr-1">
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          {stats.map((stat, i) => (
-            <QuestionChartCard key={stat.question.id} stat={stat} index={i} />
-          ))}
-        </div>
+      {/* Per-question charts grid — flows naturally so the parent (page or
+          Stats scroll area) handles scrolling; no nested scrollbar. */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        {stats.map((stat, i) => (
+          <QuestionChartCard key={stat.question.id} stat={stat} index={i} />
+        ))}
       </div>
     </div>
   )

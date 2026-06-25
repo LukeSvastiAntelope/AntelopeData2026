@@ -321,6 +321,23 @@ export default function CohortChatPage() {
     }
   }, [currentConversationId, conversations]);
 
+  // Reset to the analytics home (onboarding) when "Analytics" is clicked in the
+  // sidebar — even when already on this page (same-route nav doesn't remount).
+  useEffect(() => {
+    const goHome = () => {
+      setSelectedSurveyId(null);
+      setSelectedCohortId(null);
+      setCurrentConversationId(null);
+      setCopilotMode('survey');
+      setCurrentConversationType('chat');
+      setMessages([]);
+      setCodeMessages([]);
+      setShowConversationTypeDialog(false);
+    };
+    window.addEventListener('antelope:analytics-home', goHome);
+    return () => window.removeEventListener('antelope:analytics-home', goHome);
+  }, []);
+
   const { saveConversation } = useSaveConversation({
     currentConversationType,
     selectedSurveyId,
