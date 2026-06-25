@@ -112,6 +112,7 @@ export default function CohortChatPage() {
   const [sources, setSources] = useState<{survey: boolean; twins: boolean; web: boolean}>({survey: true, twins: true, web: true});
   const [activeTab, setActiveTab] = useState<'chat' | 'stats'>('chat');
   const [copilotMode, setCopilotMode] = useState<'survey' | 'news'>('survey');
+  const [deepResearchMode, setDeepResearchMode] = useState(false);
   const [showConversationTypeDialog, setShowConversationTypeDialog] = useState(false);
   const [currentConversationType, setCurrentConversationType] = useState<ConversationKind>('chat');
   const [pythonEnvironmentInitialized, setPythonEnvironmentInitialized] = useState(false);
@@ -495,6 +496,7 @@ FORMATTING REQUIREMENTS:
         : sources,
       systemPrompt: enhancedSystemPrompt,
       recentMessages: recentConversationMessages,
+      deepResearch: newsOnlyMode && deepResearchMode,
     };
 
     // Only include surveyId in Survey Copilot mode
@@ -1480,6 +1482,8 @@ FORMATTING REQUIREMENTS:
                   onSelectNewsCopilot={activateNewsCopilot}
                   onUploadClick={handleUploadClick}
                   isNewsMode
+                  deepResearch={deepResearchMode}
+                  onToggleDeepResearch={() => setDeepResearchMode((v) => !v)}
                 />
               ) : !selectedSurveyId ? (
                 <div className="flex-1 min-h-0 overflow-y-auto">

@@ -22,6 +22,8 @@ type ChatViewProps = {
   onSelectNewsCopilot: () => void;
   onUploadClick: () => void;
   isNewsMode?: boolean;
+  deepResearch?: boolean;
+  onToggleDeepResearch?: () => void;
 };
 
 export default function ChatView(props: ChatViewProps) {
@@ -41,6 +43,8 @@ export default function ChatView(props: ChatViewProps) {
     onSelectNewsCopilot,
     onUploadClick,
     isNewsMode,
+    deepResearch,
+    onToggleDeepResearch,
   } = props;
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -68,6 +72,8 @@ export default function ChatView(props: ChatViewProps) {
         onUploadClick={onUploadClick}
         containerRef={containerRef}
         isNewsMode={isNewsMode}
+        deepResearch={deepResearch}
+        onToggleDeepResearch={onToggleDeepResearch}
       />
     </div>
   );
