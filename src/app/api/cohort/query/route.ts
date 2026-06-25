@@ -586,6 +586,46 @@ export async function POST(req: NextRequest) {
 
     const body = (await req.json()) as CohortQueryPayload;
     const { cohort, question, recentMessages, topK = 1000, surveyId: initialSurveyId, model = 'gpt-4o', temperature = 0.0, sources, systemPrompt, stream = true, responseMode: requestedResponseMode } = body;
+    const deepResearchRequested = Boolean((body as any).deepResearch);
+
+    // Deep Research mode runs early and self-contained (decompose -> parallel web
+    // search -> cited synthesis), skipping all the campaign-news preprocessing
+    // (which is slow and depends on an unconfigured SerpAPI key).
+    if (deepResearchRequested && question) {
+      const { deepResearch } = await import('../../../utils/services/web-search');
+      const sysCtx = [
+        'You are a rigorous research analyst. Prioritise factual, current, reputable sources and cite everything.',
+        systemPrompt ? `\n${systemPrompt}` : '',
+      ].join(' ');
+      if (stream) {
+        const encoder = new TextEncoder();
+        const rs = new ReadableStream({
+          async start(controller) {
+            try {
+              const result = await deepResearch({
+                question,
+                systemContext: sysCtx,
+                onStep: (step) => controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'progress', step })}\n\n`)),
+              });
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content: result.content })}\n\n`));
+              controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+            } catch (e) {
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content: `⚠️ Deep research failed: ${e instanceof Error ? e.message : 'error'}` })}\n\n`));
+              controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+            } finally {
+              controller.close();
+            }
+          },
+        });
+        return new NextResponse(rs, {
+          headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'Connection': 'keep-alive', 'X-Source': 'deep-research' },
+        });
+      }
+      const steps: string[] = [];
+      const result = await deepResearch({ question, systemContext: sysCtx, onStep: (s) => steps.push(s) });
+      return NextResponse.json({ status: true, content: result.content, thinkingSteps: steps });
+    }
+
     let surveyId = initialSurveyId; // Allow reassignment for auto-selection
     const featureFlags = {
       adaptiveModes: envFlag('NEWS_ADAPTIVE_MODES', true),

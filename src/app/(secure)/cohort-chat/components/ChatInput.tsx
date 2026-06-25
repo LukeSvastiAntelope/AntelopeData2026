@@ -1,7 +1,7 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Plus, Upload, Send, BarChart3, X, Newspaper } from 'lucide-react';
+import { Plus, Upload, Send, BarChart3, X, Newspaper, Microscope } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Survey } from '../types';
 
@@ -20,6 +20,8 @@ interface ChatInputProps {
   onUploadClick: () => void;
   containerRef?: React.RefObject<HTMLElement>;
   isNewsMode?: boolean;
+  deepResearch?: boolean;
+  onToggleDeepResearch?: () => void;
 }
 
 export function ChatInput({
@@ -36,15 +38,38 @@ export function ChatInput({
   onSelectNewsCopilot,
   onUploadClick,
   containerRef,
-  isNewsMode
+  isNewsMode,
+  deepResearch,
+  onToggleDeepResearch
 }: ChatInputProps) {
   return (
     <div className="w-full z-40 px-4 pt-2 pb-3 bg-card flex-shrink-0">
+      {isNewsMode && onToggleDeepResearch && (
+        <div className="mb-2 flex items-center gap-2">
+          <button
+            type="button"
+            onClick={onToggleDeepResearch}
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors",
+              deepResearch
+                ? "border-primary bg-primary text-primary-foreground"
+                : "border-border bg-background text-muted-foreground hover:text-foreground hover:border-primary/50"
+            )}
+            title="Deep Research: break the topic into sub-questions, search multiple sources, and synthesize a cited report"
+          >
+            <Microscope className="h-3.5 w-3.5" />
+            Deep Research{deepResearch ? ' · ON' : ''}
+          </button>
+          {deepResearch && (
+            <span className="text-[11px] text-muted-foreground">Multi-source web research with citations — takes a bit longer.</span>
+          )}
+        </div>
+      )}
       <div className="relative">
         <div className="relative">
-          <Textarea 
+          <Textarea
             className={cn("min-h-[80px] pr-12 resize-none shadow-lg border", isNewsMode ? "pl-4" : "pl-12")}
-            placeholder={isNewsMode ? "Ask about district/state news…" : "Ask the cohort…"} 
+            placeholder={isNewsMode ? (deepResearch ? "Research a topic in depth — e.g. 'NJ-07 race dynamics and key issues'…" : "Ask about district/state news…") : "Ask the cohort…"}
             value={input} 
             onChange={e => setInput(e.target.value)} 
             onKeyDown={onKeyDown}
