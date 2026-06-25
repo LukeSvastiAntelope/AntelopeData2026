@@ -1102,54 +1102,44 @@ FORMATTING REQUIREMENTS:
       // Set loading state to prevent saves during switching
       console.log('🔒 SETTING LOADING STATE during conversation switch');
       setIsLoading(true);
-      
-      setCurrentConversationId(conversationId);
+
       const conversationType = (conversation.type || 'chat') as 'chat' | 'news' | 'code';
-      setCurrentConversationType(conversationType);
-      setCopilotMode(conversationType === 'news' ? 'news' : 'survey');
-      
-      // Lazy-load messages from API to avoid heavy initial payloads
+
+      // IMPORTANT: load the messages BEFORE switching currentConversationId.
+      // The CodeConversation component is keyed by surveyId+conversationId, so
+      // changing the id remounts it. If we change the id first (with empty
+      // codeMessages), the remounted component sees 0 messages and overwrites
+      // them with a fresh welcome message — wiping the restored history. By
+      // populating codeMessages first, the remount preserves the history.
+      let loadedMessages: any[] = [];
       try {
         const res = await fetch(`/api/conversations/${conversationId}`);
         if (res.ok) {
           const data = await res.json();
-          const loadedMessages = data.conversation?.messages || [];
-      if (conversation.type === 'code') {
-            console.log('💾 LOADED CODE CONVERSATION with', loadedMessages.length, 'messages');
-            setCodeMessages(loadedMessages);
-            setMessages([]);
-          } else {
-            console.log('💬 LOADED CHAT CONVERSATION with', loadedMessages.length, 'messages');
-            setMessages(loadedMessages);
-            setCodeMessages([]);
-          }
+          loadedMessages = data.conversation?.messages || [];
+          console.log(`💾 LOADED ${conversationType.toUpperCase()} CONVERSATION with`, loadedMessages.length, 'messages');
         } else {
           console.warn('Failed to load conversation messages, falling back to in-memory');
-          if (conversation.type === 'code') {
-        setCodeMessages(conversation.messages || []);
-            setMessages([]);
-      } else {
-        setMessages(conversation.messages || []);
-            setCodeMessages([]);
-          }
+          loadedMessages = conversation.messages || [];
         }
       } catch (e) {
         console.warn('Error loading conversation messages, fallback to in-memory', e);
-        if (conversation.type === 'code') {
-          setCodeMessages(conversation.messages || []);
-          setMessages([]);
-        } else {
-          setMessages(conversation.messages || []);
-          setCodeMessages([]);
-        }
+        loadedMessages = conversation.messages || [];
       }
-      
-      // If switching to a code conversation, ensure environment is initialized
-      if ((conversation.type || 'chat') === 'code') {
+
+      if (conversationType === 'code') {
+        setCodeMessages(loadedMessages);
+        setMessages([]);
         setPythonEnvironmentInitialized(true);
+      } else {
+        setMessages(loadedMessages);
+        setCodeMessages([]);
       }
-      
-      // Keep survey/cohort context aligned with the active conversation mode.
+
+      // Align survey/cohort context, then flip the active conversation id LAST
+      // (all batched into one render with the messages already in place).
+      setCurrentConversationType(conversationType);
+      setCopilotMode(conversationType === 'news' ? 'news' : 'survey');
       if (conversationType === 'news') {
         setSelectedSurveyId(null);
         setSelectedCohortId(null);
@@ -1158,11 +1148,10 @@ FORMATTING REQUIREMENTS:
         setSelectedSurveyId(conversation.surveyId);
         localStorage.setItem('cohort-chat-selected-survey', String(conversation.surveyId));
       }
-      // If conversation has no surveyId, preserve current selection
-      
       if (conversation.cohortId !== selectedCohortId) {
         setSelectedCohortId(conversation.cohortId || null);
       }
+      setCurrentConversationId(conversationId);
       
       // Clear loading state after state has settled - use longer timeout for better reliability
       setTimeout(() => {
