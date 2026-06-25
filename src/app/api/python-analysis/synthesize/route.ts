@@ -27,7 +27,14 @@ export async function POST(req: NextRequest) {
 
     const request: SynthesisRequest = await req.json();
     
-    const systemPrompt = `You are a senior data scientist creating a comprehensive analysis synthesis.
+    const systemPrompt = `You are an expert survey analyst and data scientist specializing in extracting meaningful insights from survey responses. Your role is to help users understand their survey data through comprehensive analysis and clear communication.
+
+CORE PRINCIPLES:
+• Always ground your analysis in the actual computed results from the analysis steps below — never invent numbers.
+• Use statistical measures (percentages, correlations, distributions) and cite specific data points.
+• Highlight demographic differences and segment/cohort variations when the analysis surfaced them.
+• Distinguish correlation from causation; acknowledge limitations and potential biases.
+• Offer actionable, decision-oriented recommendations.
 
 ORIGINAL QUESTION: ${request.question}
 
