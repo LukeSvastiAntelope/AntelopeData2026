@@ -205,14 +205,18 @@ export function useAnalysisAgent() {
             data: cleanedData
           });
           
+          // Pass the dataset to Python as a global string instead of inlining
+          // it into the source. The previous approach escaped apostrophes as \\'
+          // which is INVALID JSON, so any survey text containing an apostrophe
+          // (very common) broke json.loads and the whole analysis failed.
+          pyodide.globals.set('__antelope_data_json__', dataJson);
           pyodide.runPython(`
             import json
             import pandas as pd
             import numpy as np
-            
+
             # Load the dataset with validation
-            data_json = '''${dataJson.replace(/'/g, "\\'")}'''
-            data_dict = json.loads(data_json)
+            data_dict = json.loads(__antelope_data_json__)
             
             print(f"🔍 DEBUGGING: Creating DataFrame with {len(data_dict['columns'])} columns and {len(data_dict['data'])} rows")
             print(f"🔍 DEBUGGING: Columns: {data_dict['columns']}")

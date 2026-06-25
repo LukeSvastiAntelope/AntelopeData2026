@@ -60,7 +60,7 @@ const CodeConversation = dynamic(() =>
 );
 
 type ConversationKind = 'chat' | 'news' | 'code';
-type SelectableConversationKind = 'chat' | 'news';
+type SelectableConversationKind = 'chat' | 'news' | 'code';
 
 function createTraceId() {
   return `chat_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
