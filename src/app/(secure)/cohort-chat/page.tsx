@@ -1539,7 +1539,7 @@ FORMATTING REQUIREMENTS:
                     </TabsList>
                   </div>
                   
-                  <TabsContent value="chat" className="flex flex-col flex-1 mt-0 min-h-0 min-w-0">
+                  <TabsContent value="chat" className="flex flex-col flex-1 mt-0 min-h-0 min-w-0 data-[state=inactive]:hidden">
                     {currentConversationType === 'code' ? (
                       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
                         <CodeConversation 
@@ -1578,7 +1578,7 @@ FORMATTING REQUIREMENTS:
                     )}
                   </TabsContent>
                   
-                  <TabsContent value="stats" className="flex flex-col flex-1 min-h-0 mt-0">
+                  <TabsContent value="stats" className="flex flex-col flex-1 min-h-0 mt-0 data-[state=inactive]:hidden">
                     {selectedSurveyId && (
                       <SurveyStatsView surveyId={selectedSurveyId} />
                     )}

@@ -462,7 +462,7 @@ export function ConversationView({ messages, isLoading, messagesEndRef, onQuickA
   };
 
   return (
-    <ScrollArea className="flex-1 min-h-0" style={{ minHeight: 'calc(100vh - 200px)' }}>
+    <ScrollArea className="flex-1 min-h-0">
       <div className="space-y-1">
         {messages.map((message, index) => renderMessage(message, index))}
         
