@@ -58,13 +58,17 @@ Return JSON only:
 If the output contains no usable numbers, return: { "insights": [] }`;
 
     const completion = await createCompletion({
-      model: 'gpt-4o-mini', // Fast model for insight extraction
+      // gpt-4o (not mini): this step converts executed output into stated claims —
+      // it is THE place hallucinations enter. The stronger model adheres to the
+      // strict "only numbers literally in the output" grounding rules far more
+      // reliably than mini. temp 0 for deterministic, faithful extraction.
+      model: 'gpt-4o',
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt }
       ],
-      temperature: 0.1,
-      maxTokens: 400
+      temperature: 0,
+      maxTokens: 500
     });
 
     let responseText = completion.content?.trim() || '';
@@ -80,7 +84,7 @@ If the output contains no usable numbers, return: { "insights": [] }`;
       const result = JSON.parse(responseText);
       return NextResponse.json({
         insights: result.insights || [],
-        model: 'gpt-4o-mini'
+        model: 'gpt-4o'
       });
     } catch (parseError) {
       console.warn('Failed to parse insights JSON, using fallback extraction');
