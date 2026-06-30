@@ -379,13 +379,19 @@ Return concise, executable Python code (10-20 lines max).`;
     }
 
     const completion = await createCompletion({
-      model: 'gpt-4o-mini', // Fast model for focused code generation
+      // gpt-4o (not mini): the step code is the core reasoning — it must reliably
+      // map natural-language questions to the right columns, use the 0/1 indicator
+      // columns for multi-select, and compute crosstab/chi-square correctly and
+      // CONSISTENTLY. gpt-4o-mini intermittently ignored these rules (e.g. ran
+      // value_counts on the raw multi-select string), which produced wildly
+      // varying counts run-to-run. temp 0 for maximum determinism.
+      model: 'gpt-4o',
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt }
       ],
-      temperature: 0.2,
-      maxTokens: 800
+      temperature: 0,
+      maxTokens: 1200
     });
 
     let code = completion.content?.trim() || '';
@@ -407,7 +413,7 @@ Return concise, executable Python code (10-20 lines max).`;
 
     return NextResponse.json({
       code,
-      model: 'gpt-4o-mini',
+      model: 'gpt-4o',
       step_id: request.step.id
     });
 

@@ -6,14 +6,13 @@ export const runtime = 'nodejs';
 export const maxDuration = 120;
 
 /**
- * POST /api/surveys/[id]/sms
+ * POST /api/surveys/[id]/whatsapp
  *
- * Send SMS survey invitations via Twilio (API-key or auth-token auth).
- * Falls back to returning the formatted message for manual send when Twilio
- * is not configured.
+ * Send WhatsApp survey invitations via Twilio. Same shape as the SMS route but
+ * delivered over the WhatsApp channel (TWILIO_WHATSAPP_FROM sender).
  *
  * Body:
- *  - phoneNumbers: string[]  (E.164 format, e.g. ["+15551234567"])
+ *  - phoneNumbers: string[]  (E.164, e.g. ["+15551234567"])
  *  - message?: string        (custom template, {{link}} -> survey URL)
  *  - mode?: "default" | "canvass"
  */
@@ -79,14 +78,13 @@ export async function POST(
     const formattedMessage = messageTemplate.replace(/\{\{link\}\}/g, surveyUrl);
 
     const status = getTwilioStatus();
-    if (!status.smsConfigured) {
-      // Graceful fallback: return the message for manual sending.
+    if (!status.whatsappConfigured) {
       return NextResponse.json({
         status: true,
         sent: false,
-        reason: status.authConfigured ? 'no_sms_sender' : 'twilio_not_configured',
+        reason: status.authConfigured ? 'no_whatsapp_sender' : 'twilio_not_configured',
         message: status.authConfigured
-          ? 'Twilio is connected but no SMS sender number is set. Buy a number and set TWILIO_PHONE_NUMBER.'
+          ? 'Twilio is connected but no WhatsApp sender is set. Enable a WhatsApp sender (or use the sandbox) and set TWILIO_WHATSAPP_FROM.'
           : 'Twilio is not configured. Copy the message below and send it manually.',
         formattedMessage,
         surveyUrl,
@@ -95,7 +93,7 @@ export async function POST(
     }
 
     const { results, summary } = await sendMessages({
-      channel: 'sms',
+      channel: 'whatsapp',
       to: numbers,
       body: formattedMessage,
     });
@@ -109,9 +107,9 @@ export async function POST(
       formattedMessage,
     });
   } catch (error) {
-    console.error('SMS send error:', error);
+    console.error('WhatsApp send error:', error);
     return NextResponse.json(
-      { status: false, message: error instanceof Error ? error.message : 'Failed to send SMS' },
+      { status: false, message: error instanceof Error ? error.message : 'Failed to send WhatsApp' },
       { status: 500 }
     );
   }

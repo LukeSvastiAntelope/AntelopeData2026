@@ -63,12 +63,12 @@ REQUIREMENTS:
 Return ONLY the fixed Python code, no explanations.`;
 
     const completion = await createCompletion({
-      model: 'gpt-4o-mini', // Fast model for quick fixes
+      model: 'gpt-4o', // Strong model: a correct fix keeps the run grounded in real output rather than failing into fabrication
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt }
       ],
-      temperature: 0.1,
+      temperature: 0,
       maxTokens: 800
     });
 
@@ -83,7 +83,7 @@ Return ONLY the fixed Python code, no explanations.`;
 
     return NextResponse.json({
       fixedCode,
-      model: 'gpt-4o-mini'
+      model: 'gpt-4o'
     });
 
   } catch (error) {
