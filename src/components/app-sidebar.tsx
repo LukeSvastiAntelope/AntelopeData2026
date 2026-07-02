@@ -41,6 +41,8 @@ import {
   Mail,
   DollarSign,
   Settings,
+  ScrollText,
+  ShieldCheck,
 } from "lucide-react"
 import LogoText from "@/components/logo-text"; // Added import
 import LogoIcon from "@/components/logo-icon"; // Added import
@@ -161,6 +163,20 @@ export function AppSidebar({ className, collapsible = "offcanvas", ...props }: S
     }
   ]
 
+  // Legal section - accessible both logged in and logged out
+  const legalNavItems = [
+    {
+      title: "Terms & Conditions",
+      href: "/companypolicy/termsandconditions",
+      icon: ScrollText
+    },
+    {
+      title: "Privacy Policy",
+      href: "/companypolicy/privacypolicy",
+      icon: ShieldCheck
+    }
+  ]
+
   return (
     <Sidebar 
       className={className} 
@@ -272,8 +288,31 @@ export function AppSidebar({ className, collapsible = "offcanvas", ...props }: S
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
+        {/* Legal Section */}
+        <SidebarGroup className="px-4">
+          <SidebarGroupLabel>Legal</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {legalNavItems.map((item) => (
+                <SidebarMenuItem key={item.href}>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={pathname === item.href}
+                    tooltip={item.title}
+                  >
+                    <Link href={item.href} className="flex items-center gap-2 px-4 py-2 text-sidebar-foreground">
+                      <item.icon className="h-4 w-4 text-sidebar-foreground group-data-[collapsible=offcanvas]:hidden" />
+                      <span className="text-sidebar-foreground">{item.title}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
       </SidebarContent>
-      
+
       <SidebarFooter className="py-4 mt-auto">
         <SidebarSeparator className="mx-8" />
         <SidebarMenu className="px-4 pt-4">
