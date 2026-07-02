@@ -31,6 +31,8 @@ import {
   BookOpen as BookOpenIcon,
   Mail as MailIcon,
   DollarSign as DollarSignIcon,
+  ScrollText as ScrollTextIcon,
+  ShieldCheck as ShieldCheckIcon,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
@@ -116,6 +118,20 @@ export function PublicAppSidebar({ className, collapsible = "offcanvas", ...prop
       title: "Community",
       href: "https://t.me/+F5F2ah0bBzU0ZDAx",
       icon: UsersIcon
+    }
+  ]
+
+  // Legal section - accessible to everyone
+  const legalNavItems = [
+    {
+      title: "Terms & Conditions",
+      href: "/companypolicy/termsandconditions",
+      icon: ScrollTextIcon
+    },
+    {
+      title: "Privacy Policy",
+      href: "/companypolicy/privacypolicy",
+      icon: ShieldCheckIcon
     }
   ]
 
@@ -223,8 +239,31 @@ export function PublicAppSidebar({ className, collapsible = "offcanvas", ...prop
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
+        {/* Legal Section - Accessible to everyone */}
+        <SidebarGroup className="px-4">
+          <SidebarGroupLabel>Legal</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {legalNavItems.map((item) => (
+                <SidebarMenuItem key={item.href}>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={pathname === item.href}
+                    tooltip={item.title}
+                  >
+                    <Link href={item.href} className="flex items-center gap-2 px-4 py-2 text-sidebar-foreground">
+                      <item.icon className="h-4 w-4 text-sidebar-foreground group-data-[collapsible=offcanvas]:hidden" />
+                      <span className="text-sidebar-foreground">{item.title}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
       </SidebarContent>
-      
+
       <SidebarFooter className="py-4 mt-auto">
         <SidebarSeparator className="mx-8" />
         <div className="px-8 pt-4 flex flex-col gap-2">
