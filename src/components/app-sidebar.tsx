@@ -117,6 +117,11 @@ export function AppSidebar({ className, collapsible = "offcanvas", ...props }: S
       title: "Team",
       href: "/team",
       icon: Building2
+    },
+    {
+      title: "Pricing",
+      href: "/pricing",
+      icon: DollarSign
     }
   ]
 
@@ -131,11 +136,6 @@ export function AppSidebar({ className, collapsible = "offcanvas", ...props }: S
 
   // Resources section - accessible both logged in and logged out
   const resourceNavItems = [
-    {
-      title: "Pricing",
-      href: "/pricing",
-      icon: DollarSign
-    },
     {
       title: "Blog",
       href: "/blog",
