@@ -123,19 +123,34 @@ export function CodeConversation({
 
   // Load survey data when component mounts (only once)
   const [hasLoadedData, setHasLoadedData] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  // Turn a failed /data response into a human-readable reason.
+  const readLoadError = async (res: Response): Promise<string> => {
+    try {
+      const j = await res.clone().json();
+      if (j?.error) {
+        if (/no responses/i.test(j.error)) return 'This survey has no responses yet, so there is nothing to analyze.';
+        return String(j.error);
+      }
+    } catch { /* not JSON */ }
+    if (res.status === 401) return 'Your session expired. Please refresh and sign in again.';
+    if (res.status === 404) return 'Survey not found (or it has no responses yet).';
+    return `Failed to load survey data (${res.status} ${res.statusText}).`;
+  };
 
   const loadSurveyDataSilently = useCallback(async () => {
     if (!surveyId || !pyodide) return;
 
     try {
       console.log('🔄 Starting silent survey data load for surveyId:', surveyId);
-      
+
       const res = await fetch(`/api/surveys/${surveyId}/data`, { credentials: 'include' });
-      
+
       if (!res.ok) {
-        throw new Error(`Failed to load survey data: ${res.status} ${res.statusText}`);
+        throw new Error(await readLoadError(res));
       }
-      
+
       const surveyData = await res.json();
 
       // Convert to CSV format for analysis
@@ -156,9 +171,14 @@ export function CodeConversation({
         (dataset as any).surveyId = surveyId;
         dataset.codebookMappings = surveyData.questionMapping || [];
         console.log('✅ Dataset loaded silently for existing conversation');
+        setLoadError(null);
+      } else {
+        throw new Error('Failed to process survey data into a dataset.');
       }
     } catch (err: any) {
+      // Do NOT swallow — otherwise the load screen spins forever.
       console.error('❌ Silent data load error:', err);
+      setLoadError(err?.message || 'Failed to load survey data.');
     }
   }, [surveyId, pyodide, loadDataset]);
 
@@ -171,11 +191,10 @@ export function CodeConversation({
       
       const res = await fetch(`/api/surveys/${surveyId}/data`, { credentials: 'include' });
       console.log('📡 API Response status:', res.status, res.statusText);
-      
+
       if (!res.ok) {
-        const errorText = await res.text();
-        console.error('❌ API Error response:', errorText);
-        throw new Error(`Failed to load survey data: ${res.status} ${res.statusText}`);
+        console.error('❌ API Error response:', res.status, res.statusText);
+        throw new Error(await readLoadError(res));
       }
       
       const surveyData = await res.json();
@@ -275,17 +294,22 @@ Ready for intelligent survey analysis!`,
         timestamp: new Date()
       };
       onMessagesChange([welcome]);
+      setLoadError(null);
     } catch (err: any) {
       console.error('❌ Data load error:', err);
-      console.error('❌ Error stack:', err.stack);
-      onMessagesChange([{ 
-        id: `err-${Date.now()}`, 
-        type: 'error', 
-        content: `❌ ${err.message || 'Unknown error'}`, 
-        timestamp: new Date() 
-      }]);
+      console.error('❌ Error stack:', err?.stack);
+      // Surface via the dedicated error screen (with Retry) rather than a
+      // hidden message behind the loading spinner.
+      setLoadError(err?.message || 'Failed to load survey data.');
     }
   }, [surveyId, pyodide, loadDataset, surveyTitle]);
+
+  // Retry a failed load: clear the error + messages and let the effect re-run.
+  const handleRetryLoad = useCallback(() => {
+    setLoadError(null);
+    setHasLoadedData(false);
+    onMessagesChange([]);
+  }, [onMessagesChange]);
 
   useEffect(() => {
     // Always ensure we have dataset loaded when we have surveyId and pyodide
@@ -817,6 +841,18 @@ Error: ${err.message}
           <div className="bg-destructive/10 text-destructive p-6 rounded-lg max-w-md text-center">
             <h2 className="font-semibold mb-2">Python Environment Error</h2>
             <p>{pyodideError}</p>
+          </div>
+        </div>
+      ) : loadError && !currentDataset ? (
+        <div className="flex-1 flex items-center justify-center">
+          <div className="max-w-md text-center space-y-4">
+            <h2 className="text-lg font-semibold">Couldn&apos;t load survey data</h2>
+            <p className="text-sm text-muted-foreground">{loadError}</p>
+            <div className="flex items-center justify-center gap-2">
+              <Button onClick={handleRetryLoad}>Retry</Button>
+              <Button variant="outline" onClick={() => window.location.reload()}>Reload page</Button>
+            </div>
+            <p className="text-xs text-muted-foreground">Survey ID: {surveyId}</p>
           </div>
         </div>
       ) : !currentDataset || pyodideLoading || !environmentInitialized ? (
