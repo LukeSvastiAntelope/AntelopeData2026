@@ -45,6 +45,7 @@ const publicRoutes = [
     // '/api/cohort/query',      // (was public during v1 testing; now requires auth)
     '/api/public/surveys', // List surveys
     '/api/public/district-brief', // Public district snapshot for campaign action kit
+    '/api/optin', // Public SMS follow-up opt-in recording (reached from /optin page)
 ]
 
 // Use an edge-safe config to create an auth middleware wrapper.

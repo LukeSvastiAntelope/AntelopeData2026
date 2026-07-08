@@ -36,7 +36,9 @@ import {
   Maximize2,
   Sparkles,
   Loader2,
-  RefreshCw
+  RefreshCw,
+  Phone,
+  ExternalLink
 } from "lucide-react"
 import { AnonymityLevel } from '@/app/utils/interface'
 import { 
@@ -90,6 +92,18 @@ const EditSurveyPage = () => {
   const [hasAccessPassword, setHasAccessPassword] = useState(false)
   const [anonymityLevel, setAnonymityLevel] = useState<AnonymityLevel>('full')
   const [demographicsRequired, setDemographicsRequired] = useState(true)
+  // Opt-in follow-up (ask for phone number on the /optin landing page)
+  const [collectPhoneOptIn, setCollectPhoneOptIn] = useState(false)
+  const [optInCopied, setOptInCopied] = useState(false)
+  // Persist the opt-in preference locally (full backend wiring to distribution: later).
+  useEffect(() => {
+    if (!surveyId) return
+    if (localStorage.getItem(`survey-optin-${surveyId}`) === '1') setCollectPhoneOptIn(true)
+  }, [surveyId])
+  useEffect(() => {
+    if (!surveyId) return
+    localStorage.setItem(`survey-optin-${surveyId}`, collectPhoneOptIn ? '1' : '0')
+  }, [surveyId, collectPhoneOptIn])
   const [questions, setQuestions] = useState<SurveyQuestion[]>([])
   const [startAt, setStartAt] = useState('')
   const [endAt, setEndAt] = useState('')
@@ -995,6 +1009,69 @@ const EditSurveyPage = () => {
                     <strong>Published Survey:</strong> Privacy settings can only be made more restrictive to protect existing respondents.
                   </AlertDescription>
                 </Alert>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Opt-In Landing Page */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Phone className="h-5 w-5" />
+                Opt-In Page
+              </CardTitle>
+              <CardDescription>
+                A public landing page that greets respondents, lets them optionally sign up for text
+                follow-ups, then sends them into the survey. Distribute this link instead of the raw survey
+                link to collect SMS opt-ins.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label htmlFor="collectPhoneOptIn">Ask for a telephone number for future follow-up</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Shows an optional mobile-number + consent step on the opt-in page. Respondents can always
+                    skip it (&quot;No thanks — just take me to the survey&quot;).
+                  </p>
+                </div>
+                <Checkbox
+                  id="collectPhoneOptIn"
+                  checked={collectPhoneOptIn}
+                  onCheckedChange={(checked) => setCollectPhoneOptIn(checked as boolean)}
+                />
+              </div>
+
+              {survey?.slug && (
+                <div className="rounded-lg bg-muted/50 p-3 space-y-3">
+                  <div className="text-xs text-muted-foreground break-all">
+                    {typeof window !== 'undefined' ? window.location.origin : 'https://antelopedata.org'}
+                    /optin?survey={survey.slug}
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Button variant="outline" size="sm" asChild>
+                      <a href={`/optin?survey=${survey.slug}`} target="_blank" rel="noopener noreferrer">
+                        <ExternalLink className="h-4 w-4 mr-2" />
+                        Open Opt-In Page
+                      </a>
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={async () => {
+                        try {
+                          const url = `${window.location.origin}/optin?survey=${survey.slug}`
+                          await navigator.clipboard.writeText(url)
+                          setOptInCopied(true)
+                          setTimeout(() => setOptInCopied(false), 2000)
+                        } catch { /* ignore */ }
+                      }}
+                    >
+                      <Copy className="h-4 w-4 mr-2" />
+                      {optInCopied ? 'Copied!' : 'Copy Opt-In Link'}
+                    </Button>
+                  </div>
+                </div>
               )}
             </CardContent>
           </Card>
