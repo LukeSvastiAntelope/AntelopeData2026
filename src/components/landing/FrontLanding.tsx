@@ -315,6 +315,20 @@ export default function FrontLanding() {
       <div className="mx-auto rounded-lg bg-card text-card-foreground shadow-lg">
         {/* Main content — site-wide header now provided by PublicLayout/PublicTopNav */}
         <div className="py-16">
+          {/* Demo Video — top of page */}
+          <section className="max-w-4xl mx-auto px-4 mb-12">
+            <video
+              className="w-full rounded-lg border border-border shadow-lg"
+              controls
+              preload="metadata"
+              poster="/videos/antelope-demo-poster.jpg"
+            >
+              <source src="/videos/antelope-demo.mp4" type="video/mp4" />
+              Your browser does not support embedded video.{' '}
+              <a href="/videos/antelope-demo.mp4">Download the demo video</a>.
+            </video>
+          </section>
+
           {/* Hero Section */}
           <section className="relative w-full py-10 md:py-16 rounded-lg flex items-start justify-center">
             <div className="relative z-10 flex flex-col items-center text-center max-w-3xl px-4 gap-y-6">
@@ -542,34 +556,6 @@ export default function FrontLanding() {
                   </p>
                 </div>
               </div>
-            </div>
-          </section>
-
-          <section className="py-16">
-            <div className="max-w-5xl mx-auto">
-              <Card className="relative overflow-hidden border-2 border-border shadow-xl">
-                <div className="absolute top-0 left-0 right-0 h-1 bg-foreground" />
-                <CardContent className="p-6 sm:p-12 text-center space-y-6">
-                  <h2 className="text-4xl font-bold text-card-foreground">
-                    See Antelope in action
-                  </h2>
-                  <p className="text-lg text-muted-foreground max-w-3xl mx-auto leading-relaxed">
-                    Watch how Antelope can automate your survey data workflow—from importing responses to generating insights through AI-powered chat and advanced analytics.
-                  </p>
-                  <div className="pt-4">
-                    <video
-                      className="w-full rounded-lg border border-border shadow-lg"
-                      controls
-                      preload="metadata"
-                      poster="/videos/antelope-demo-poster.jpg"
-                    >
-                      <source src="/videos/antelope-demo.mp4" type="video/mp4" />
-                      Your browser does not support embedded video.{' '}
-                      <a href="/videos/antelope-demo.mp4">Download the demo video</a>.
-                    </video>
-                  </div>
-                </CardContent>
-              </Card>
             </div>
           </section>
         </div>
