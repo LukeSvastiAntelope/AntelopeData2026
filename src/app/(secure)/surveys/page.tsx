@@ -603,23 +603,12 @@ export default function SurveysPage() {
 
                                   <DropdownMenuSeparator />
 
-                                  {/* Share — copy public link */}
-                                  <DropdownMenuItem
-                                    className="flex items-center gap-2 cursor-pointer"
-                                    onSelect={() => {
-                                      const slug = survey.slug
-                                      const url = slug
-                                        ? `${window.location.origin}/survey/${slug}`
-                                        : `${window.location.origin}/survey/${survey.id}`
-                                      navigator.clipboard.writeText(url).then(() => {
-                                        setTestMessage('Survey link copied to clipboard.')
-                                      }).catch(() => {
-                                        setTestMessage('Could not copy link.')
-                                      })
-                                    }}
-                                  >
-                                    <Share2 className="h-4 w-4" />
-                                    Share
+                                  {/* Share — go to the share/distribute page (Link tab) */}
+                                  <DropdownMenuItem asChild>
+                                    <Link href={`/surveys/${survey.id}/distribute`} className="flex items-center gap-2 cursor-pointer">
+                                      <Share2 className="h-4 w-4" />
+                                      Share
+                                    </Link>
                                   </DropdownMenuItem>
 
                                   {/* Distribute — channels page */}
