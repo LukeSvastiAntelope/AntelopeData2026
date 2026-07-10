@@ -46,6 +46,7 @@ const publicRoutes = [
     '/api/public/surveys', // List surveys
     '/api/public/district-brief', // Public district snapshot for campaign action kit
     '/api/optin', // Public SMS follow-up opt-in recording (reached from /optin page)
+    '/api/contact', // Public contact form (works logged out; has its own rate limiting)
 ]
 
 // Use an edge-safe config to create an auth middleware wrapper.
@@ -141,13 +142,11 @@ export default auth((req) => {
         '/voter-file',
         '/dashboard',
         '/fundraising',
-        '/blog',
-        '/clients',
         '/compliance',
         '/volunteer-staff',
-        '/about',
-        '/pricing',
-        '/contact',
+        // NOTE: '/blog', '/clients', '/about', '/pricing', '/contact' were moved
+        // out of the (secure) route group to the public site — they are real
+        // marketing pages and must be reachable without a session.
     ];
     if (protectedPages.some(page => path.startsWith(page))) {
         if (!session) {
@@ -176,13 +175,8 @@ export const config = {
         '/channels/:path*',
         '/dashboard/:path*',
         '/fundraising/:path*',
-        '/blog/:path*',
-        '/clients/:path*',
         '/compliance/:path*',
         '/volunteer-staff/:path*',
-        '/about/:path*',
-        '/pricing/:path*',
-        '/contact/:path*',
         '/logout'
     ],
 };

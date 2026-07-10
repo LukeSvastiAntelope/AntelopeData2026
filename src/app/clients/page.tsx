@@ -2,11 +2,13 @@
 
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { PublicLayout } from "@/app/components/PublicLayout"
 import Link from "next/link"
 import { Users, Building2, Sparkles } from "lucide-react"
 
 export default function ClientsPage() {
   return (
+    <PublicLayout>
     <div className="min-h-screen bg-background">
       <div className="max-w-5xl mx-auto px-4 md:px-8 py-16">
         {/* Header */}
@@ -67,5 +69,6 @@ export default function ClientsPage() {
         </div>
       </div>
     </div>
+    </PublicLayout>
   )
 }

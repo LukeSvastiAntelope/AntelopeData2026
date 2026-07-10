@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { Mail, MapPin, Phone, Send } from "lucide-react"
+import { PublicLayout } from "@/app/components/PublicLayout"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -53,6 +54,7 @@ export default function ContactPage() {
   }
 
   return (
+    <PublicLayout>
     <div className="min-h-screen bg-background">
       <div className="max-w-7xl mx-auto px-4 md:px-8 py-16">
         <div className="grid md:grid-cols-2 gap-12 items-start">
@@ -161,5 +163,6 @@ export default function ContactPage() {
         </div>
       </div>
     </div>
+    </PublicLayout>
   )
 }

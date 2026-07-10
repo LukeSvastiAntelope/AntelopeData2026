@@ -6,6 +6,7 @@ import Link from "next/link"
 import { Calendar, Clock, ArrowLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { PublicLayout } from "@/app/components/PublicLayout"
 
 export default function BlogPostPage() {
   const params = useParams()
@@ -30,6 +31,7 @@ Additionally, remote work has taught me to be more self-disciplined and proactiv
   }
 
   return (
+    <PublicLayout>
     <div className="min-h-screen bg-background">
       <div className="max-w-4xl mx-auto px-4 md:px-8 py-12">
         {/* Back Button */}
@@ -88,5 +90,6 @@ Additionally, remote work has taught me to be more self-disciplined and proactiv
         </article>
       </div>
     </div>
+    </PublicLayout>
   )
 }
