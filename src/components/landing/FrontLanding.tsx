@@ -1,7 +1,6 @@
 ﻿"use client"
 
 import { Button } from "@/components/ui/button"
-import { SidebarTrigger } from "@/components/ui/sidebar"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
@@ -10,7 +9,6 @@ import { Rocket, FileText, MessageSquareText, PhoneCall, Loader2, Bot, Sparkles,
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
 import Link from "next/link"
-import LogoText from "@/components/logo-text"
 import toast from "react-hot-toast"
 
 type ChatMsg = { role: 'user' | 'assistant'; content: string }
@@ -315,34 +313,7 @@ export default function FrontLanding() {
       `}</style>
     <div className="flex-1 p-2 w-full bg-background font-['Montserrat']">
       <div className="mx-auto rounded-lg bg-card text-card-foreground shadow-lg">
-        {/* Header */}
-        <div className="px-6 py-4">
-          {/* Top nav row (must be ABOVE logo) */}
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <SidebarTrigger className="-ml-0.5 h-5 w-5 text-muted-foreground hover:text-foreground" />
-            </div>
-
-            <Link href="/auth/login" className="text-sm font-semibold text-primary hover:underline shrink-0">
-              Login
-            </Link>
-          </div>
-
-          {/* Logo row (explicitly below nav) */}
-          <div className="mt-4 flex items-center justify-center">
-            <Link href="/" className="flex items-center">
-              <LogoText
-                className="text-zinc-900 dark:text-zinc-100"
-                width={140}
-                height={34}
-              />
-            </Link>
-          </div>
-        </div>
-
-        <div className="border-b border-border" />
-
-        {/* Main content */}
+        {/* Main content — site-wide header now provided by PublicLayout/PublicTopNav */}
         <div className="py-16">
           {/* Hero Section */}
           <section className="relative w-full py-10 md:py-16 rounded-lg flex items-start justify-center">
@@ -578,21 +549,24 @@ export default function FrontLanding() {
             <div className="max-w-5xl mx-auto">
               <Card className="relative overflow-hidden border-2 border-border shadow-xl">
                 <div className="absolute top-0 left-0 right-0 h-1 bg-foreground" />
-                <CardContent className="p-12 text-center space-y-6">
+                <CardContent className="p-6 sm:p-12 text-center space-y-6">
                   <h2 className="text-4xl font-bold text-card-foreground">
                     See Antelope in action
                   </h2>
                   <p className="text-lg text-muted-foreground max-w-3xl mx-auto leading-relaxed">
                     Watch how Antelope can automate your survey data workflow—from importing responses to generating insights through AI-powered chat and advanced analytics.
                   </p>
-                  <div className="flex items-center justify-center gap-4 pt-4">
-                    <Button
-                      size="lg"
-                      className="px-8 py-6 text-lg font-medium bg-primary hover:bg-primary/90"
-                      onClick={() => window.open('https://www.youtube.com/watch?v=Dgr7KQ__i1k', '_blank')}
+                  <div className="pt-4">
+                    <video
+                      className="w-full rounded-lg border border-border shadow-lg"
+                      controls
+                      preload="metadata"
+                      poster="/videos/antelope-demo-poster.jpg"
                     >
-                      Watch Demo
-                    </Button>
+                      <source src="/videos/antelope-demo.mp4" type="video/mp4" />
+                      Your browser does not support embedded video.{' '}
+                      <a href="/videos/antelope-demo.mp4">Download the demo video</a>.
+                    </video>
                   </div>
                 </CardContent>
               </Card>

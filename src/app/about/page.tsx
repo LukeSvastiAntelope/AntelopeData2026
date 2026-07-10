@@ -1,16 +1,15 @@
 "use client";
 
-import { SidebarTrigger } from "@/components/ui/sidebar"
+import { PublicLayout } from "@/app/components/PublicLayout"
 
 export default function AboutPage() {
   return (
+    <PublicLayout>
     <div className="flex-1 p-2 w-full bg-background">
       <div className="mx-auto rounded-lg bg-card text-card-foreground shadow-lg">
         {/* Header */}
         <div className="px-6 py-4">
           <div className="flex items-center">
-            <SidebarTrigger className="-ml-0.5 h-5 w-5 text-muted-foreground hover:text-foreground" />
-            <div className="h-4 border-l border-border mx-4" />
             <h1 className="text-base font-medium text-card-foreground">About</h1>
           </div>
         </div>
@@ -20,7 +19,7 @@ export default function AboutPage() {
         <div className="p-6">
           {/* Introduction */}
           <div className="text-left space-y-2 flex">
-            <div className="flex-col mb-4">  
+            <div className="flex-col mb-4">
               <h2 className="text-2xl font-bold">About Antelope Politico</h2>
               <p className="text-muted-foreground text-base max-w-2xl mx-auto">
                 Antelope Politico is an AI-powered political survey and campaign intelligence platform. We transform your polling responses into synthetic voter profiles you can query, test messages against, and analyze through natural conversation — giving campaigns faster, deeper insights at a fraction of traditional polling costs.
@@ -28,7 +27,7 @@ export default function AboutPage() {
             </div>
           </div>
 
-          <h2 className="text-xl font-semibold mt-8 mb-4 text-foreground">Why Antelope Politico?</h2>
+          <h2 id="why-antelope" className="text-xl font-semibold mt-8 mb-4 text-foreground scroll-mt-24">Why Antelope Politico?</h2>
           <p className="text-muted-foreground leading-relaxed">
             Traditional polling gives you a snapshot — a static set of numbers that&apos;s already aging by the time it reaches your desk. 
             Antelope Politico transforms that data into a living, queryable model of your electorate. Every survey response 
@@ -113,5 +112,6 @@ export default function AboutPage() {
         </div>
       </div>
     </div>
+    </PublicLayout>
   );
 }

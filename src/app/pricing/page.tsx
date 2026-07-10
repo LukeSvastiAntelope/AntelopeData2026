@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { PublicLayout } from "@/app/components/PublicLayout"
 import { PricingCard } from "@/components/pricing/pricing-card"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -61,6 +62,7 @@ export default function PricingPage() {
   // Beta Message Component
   if (!SHOW_FULL_PRICING) {
     return (
+      <PublicLayout>
       <div className="min-h-screen bg-background">
         <div className="max-w-4xl mx-auto px-4 md:px-8 py-16">
           <div className="text-center mb-12">
@@ -143,11 +145,13 @@ export default function PricingPage() {
           </div>
         </div>
       </div>
+      </PublicLayout>
     )
   }
 
   // Full Pricing Page
   return (
+    <PublicLayout>
     <div className="min-h-screen bg-background">
       <div className="max-w-7xl mx-auto px-4 md:px-8 py-16">
         {/* Header */}
@@ -202,5 +206,6 @@ export default function PricingPage() {
         </div>
       </div>
     </div>
+    </PublicLayout>
   )
 }

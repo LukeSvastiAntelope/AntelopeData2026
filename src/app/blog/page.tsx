@@ -1,5 +1,6 @@
 "use client"
 
+import { PublicLayout } from "@/app/components/PublicLayout"
 import { BlogCard } from "@/components/blog/blog-card"
 import { BlogPost } from "@/types/blog"
 import { Input } from "@/components/ui/input"
@@ -83,6 +84,7 @@ const weeklyPosts: BlogPost[] = [
 
 export default function BlogPage() {
   return (
+    <PublicLayout>
     <div className="min-h-screen bg-background">
       {/* Hero Section */}
       <section className="py-16 px-4 md:px-8 lg:px-16 border-b border-border">
@@ -171,5 +173,6 @@ export default function BlogPage() {
         </div>
       </section>
     </div>
+    </PublicLayout>
   )
 }
