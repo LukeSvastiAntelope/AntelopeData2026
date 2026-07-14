@@ -13,6 +13,8 @@ export default function ChannelsPage() {
   const [tgUsername, setTgUsername] = useState<string | null>(null)
   const [smsConnected, setSmsConnected] = useState<boolean | null>(null)
   const [smsPhone, setSmsPhone] = useState<string | null>(null)
+  const [emailConnected, setEmailConnected] = useState<boolean | null>(null)
+  const [emailFrom, setEmailFrom] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -43,8 +45,22 @@ export default function ChannelsPage() {
       }
     }
 
+    const loadEmail = async () => {
+      try {
+        const res = await fetch('/api/channels/email/credentials', { credentials: 'include' })
+        const data = await res.json().catch(() => ({}))
+        if (!cancelled && data?.status) {
+          setEmailConnected(Boolean(data.connected))
+          setEmailFrom(data.fromEmail || null)
+        }
+      } catch {
+        if (!cancelled) setEmailConnected(false)
+      }
+    }
+
     loadTelegram()
     loadSms()
+    loadEmail()
     return () => { cancelled = true }
   }, [])
 
@@ -142,16 +158,29 @@ export default function ChannelsPage() {
               </CardContent>
             </Card>
 
-            {/* Email */}
+            {/* Email / Mailchimp */}
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium flex items-center gap-2">
-                  <Mail className="h-4 w-4" /> Email
+                  <Mail className="h-4 w-4" /> Email (Mailchimp)
                 </CardTitle>
-                <Badge variant="secondary">Coming soon</Badge>
+                <Badge variant={emailConnected ? 'default' : 'secondary'}>
+                  {emailConnected === null ? '…' : emailConnected ? 'Connected' : 'Not set up'}
+                </Badge>
               </CardHeader>
-              <CardContent>
-                <Button size="sm" variant="outline" disabled>Coming soon</Button>
+              <CardContent className="space-y-2">
+                {emailConnected ? (
+                  <>
+                    {emailFrom && <p className="text-xs text-muted-foreground">From: {emailFrom}</p>}
+                    <Button size="sm" variant="ghost" asChild>
+                      <Link href="/channels/new?provider=email">Reconfigure</Link>
+                    </Button>
+                  </>
+                ) : (
+                  <Button size="sm" asChild>
+                    <Link href="/channels/new?provider=email">Connect Mailchimp</Link>
+                  </Button>
+                )}
               </CardContent>
             </Card>
 

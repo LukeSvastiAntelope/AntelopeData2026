@@ -25,6 +25,7 @@ import {
   Upload,
   FileSpreadsheet,
   X,
+  Mail,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -83,6 +84,42 @@ function extractNumbers(rows: any[][]): string[] {
         const num = normalize(s)
         if (num) out.add(num)
       }
+    }
+  }
+  return Array.from(out)
+}
+
+// -----------------------------------------------------------------------
+// Email extraction from spreadsheets (xlsx / csv)
+// -----------------------------------------------------------------------
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+/** Parse an uploaded spreadsheet into a deduped list of email addresses. */
+function extractEmails(rows: any[][]): string[] {
+  if (!rows.length) return []
+  const out = new Set<string>()
+
+  const header = (rows[0] || []).map((c) => String(c ?? '').toLowerCase().trim())
+  const emailCol = header.findIndex((h) => /e-?mail/.test(h))
+
+  if (emailCol >= 0) {
+    for (let i = 1; i < rows.length; i++) {
+      const row = rows[i] || []
+      const val = row[emailCol]
+      if (val == null) continue
+      const s = String(val).trim()
+      if (EMAIL_RE.test(s)) out.add(s.toLowerCase())
+    }
+    if (out.size) return Array.from(out)
+  }
+
+  // No usable header — scan every cell for email-like values.
+  for (const row of rows) {
+    for (const cell of row || []) {
+      if (cell == null) continue
+      const s = String(cell).trim()
+      if (EMAIL_RE.test(s)) out.add(s.toLowerCase())
     }
   }
   return Array.from(out)
@@ -375,6 +412,312 @@ function MessagingPanel({ surveyId, channel, ready, senderFrom }: MessagingPanel
 }
 
 // -----------------------------------------------------------------------
+// Email panel (Mailchimp)
+// -----------------------------------------------------------------------
+
+interface EmailPanelProps {
+  surveyId: string
+  surveyTitle: string
+  ready: boolean | null
+  senderFrom: string | null
+}
+
+function EmailPanel({ surveyId, surveyTitle, ready, senderFrom }: EmailPanelProps) {
+  const [emailInput, setEmailInput] = useState('')
+  const [subject, setSubject] = useState('')
+  const [message, setMessage] = useState('')
+  const [mode, setMode] = useState<'default' | 'canvass'>('default')
+  const [sending, setSending] = useState(false)
+  const [uploadedFile, setUploadedFile] = useState<string | null>(null)
+  const [uploadedCount, setUploadedCount] = useState(0)
+  const [result, setResult] = useState<{
+    sent: boolean
+    formattedMessage?: string
+    message?: string
+    summary?: { total: number; sent: number; failed: number }
+    campaignId?: string
+  } | null>(null)
+  const fileRef = useRef<HTMLInputElement>(null)
+
+  const parseEmails = useCallback(
+    () =>
+      emailInput
+        .split(/[\n,;]+/)
+        .map((n) => n.trim())
+        .filter(Boolean),
+    [emailInput]
+  )
+
+  const handleFile = useCallback(async (file: File) => {
+    try {
+      const buf = await file.arrayBuffer()
+      const wb = XLSX.read(buf, { type: 'array' })
+      const sheet = wb.Sheets[wb.SheetNames[0]]
+      const rows = XLSX.utils.sheet_to_json<any[]>(sheet, { header: 1, blankrows: false })
+      const emails = extractEmails(rows as any[][])
+      if (!emails.length) {
+        toast.error('No email addresses found. Include a column named "email".')
+        return
+      }
+      setEmailInput((prev) => {
+        const existing = prev.split(/[\n,;]+/).map((n) => n.trim()).filter(Boolean)
+        const merged = Array.from(new Set([...existing, ...emails]))
+        return merged.join('\n')
+      })
+      setUploadedFile(file.name)
+      setUploadedCount(emails.length)
+      toast.success(`${emails.length} emails loaded from ${file.name}`)
+    } catch (err) {
+      console.error(err)
+      toast.error('Could not read the file. Use .xlsx, .xls or .csv')
+    }
+  }, [])
+
+  const handleSend = useCallback(async () => {
+    const emails = parseEmails()
+    if (emails.length === 0) {
+      toast.error('Enter at least one email address')
+      return
+    }
+
+    setSending(true)
+    setResult(null)
+    try {
+      const res = await fetch(`/api/surveys/${surveyId}/email`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ emails, subject: subject || undefined, message: message || undefined, mode }),
+      })
+      const data = await res.json()
+      if (data.status) {
+        setResult({
+          sent: data.sent,
+          formattedMessage: data.formattedMessage,
+          message: data.message,
+          summary: data.summary,
+          campaignId: data.campaignId,
+        })
+        if (data.sent) {
+          toast.success(`Sent to ${data.summary.sent} recipient${data.summary.sent === 1 ? '' : 's'} via Mailchimp`)
+        }
+      } else {
+        toast.error(data.message || 'Email failed')
+      }
+    } catch {
+      toast.error('Email request failed')
+    } finally {
+      setSending(false)
+    }
+  }, [surveyId, subject, message, mode, parseEmails])
+
+  const copyMessage = useCallback(async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text)
+      toast.success('Message copied')
+    } catch {
+      toast.error('Failed to copy')
+    }
+  }, [])
+
+  const typedCount = parseEmails().length
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <CardTitle>Email Distribution</CardTitle>
+            <CardDescription>Send survey invitations via Mailchimp</CardDescription>
+          </div>
+          {ready === true ? (
+            <Badge className="bg-green-100 text-green-700 hover:bg-green-100">
+              <Check className="h-3 w-3 mr-1" /> Connected{senderFrom ? ` · ${senderFrom}` : ''}
+            </Badge>
+          ) : ready === false ? (
+            <Badge variant="secondary" className="text-amber-700 bg-amber-100 hover:bg-amber-100">
+              Not connected
+            </Badge>
+          ) : null}
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {ready === false && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+            Mailchimp isn&apos;t connected yet.{' '}
+            <a href="/channels/new?provider=email" className="underline font-medium">
+              Connect your Mailchimp account
+            </a>{' '}
+            to send mass survey invites — or copy the message below and send manually.
+          </div>
+        )}
+
+        {/* Emails */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <Label>
+              Email Addresses{' '}
+              <span className="text-muted-foreground font-normal">(one per line or comma-separated)</span>
+            </Label>
+            <span className="text-xs text-muted-foreground">{typedCount} email{typedCount === 1 ? '' : 's'}</span>
+          </div>
+          <Textarea
+            placeholder={'voter1@example.com\nvoter2@example.com'}
+            value={emailInput}
+            onChange={(e) => setEmailInput(e.target.value)}
+            className="font-mono text-sm min-h-[100px]"
+          />
+        </div>
+
+        {/* Bulk upload */}
+        <div className="space-y-2">
+          <Label className="flex items-center gap-2">
+            <FileSpreadsheet className="h-4 w-4" />
+            Bulk upload (Excel / CSV)
+          </Label>
+          <input
+            ref={fileRef}
+            type="file"
+            accept=".xlsx,.xls,.csv"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0]
+              if (f) handleFile(f)
+              e.target.value = ''
+            }}
+          />
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button type="button" variant="outline" size="sm" onClick={() => fileRef.current?.click()}>
+              <Upload className="h-4 w-4 mr-2" />
+              Upload spreadsheet
+            </Button>
+            {uploadedFile && (
+              <span className="text-xs text-muted-foreground flex items-center gap-1">
+                <FileSpreadsheet className="h-3 w-3" />
+                {uploadedFile} — {uploadedCount} emails
+                <button
+                  type="button"
+                  onClick={() => {
+                    setUploadedFile(null)
+                    setUploadedCount(0)
+                  }}
+                  className="ml-1 hover:text-foreground"
+                  aria-label="clear"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Include a column named <code>email</code>. Addresses are appended to the list above so you can also
+            add individuals by hand.
+          </p>
+        </div>
+
+        {/* Subject */}
+        <div className="space-y-2">
+          <Label>
+            Subject <span className="text-muted-foreground font-normal">(optional)</span>
+          </Label>
+          <Input
+            placeholder={`You're invited: ${surveyTitle || 'our survey'}`}
+            value={subject}
+            onChange={(e) => setSubject(e.target.value)}
+            className="text-sm"
+          />
+        </div>
+
+        {/* Message */}
+        <div className="space-y-2">
+          <Label>
+            Custom Message{' '}
+            <span className="text-muted-foreground font-normal">
+              (optional — use {'{{link}}'} for survey URL)
+            </span>
+          </Label>
+          <Textarea
+            placeholder="Leave blank for default message"
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            className="text-sm"
+          />
+        </div>
+
+        {/* Mode */}
+        <div className="flex gap-2">
+          <Button
+            variant={mode === 'default' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setMode('default')}
+          >
+            Standard
+          </Button>
+          <Button
+            variant={mode === 'canvass' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setMode('canvass')}
+          >
+            <Smartphone className="h-4 w-4 mr-1" />
+            Canvass Mode
+          </Button>
+        </div>
+
+        <Button onClick={handleSend} disabled={sending}>
+          {sending ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              Sending...
+            </>
+          ) : (
+            <>
+              <Mail className="h-4 w-4 mr-2" />
+              Send Email
+            </>
+          )}
+        </Button>
+
+        {/* Result */}
+        {result && (
+          <div className="border rounded-lg p-4 space-y-2">
+            {result.sent ? (
+              <div className="text-sm">
+                <p className="font-medium text-green-600">
+                  {result.summary?.sent} added to campaign, {result.summary?.failed} failed
+                </p>
+                {result.campaignId && (
+                  <p className="text-xs text-muted-foreground mt-1">Mailchimp campaign sent — delivery may take a few minutes.</p>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-amber-600">
+                  {result.message || 'Email not sent — manual send required'}
+                </p>
+                {result.formattedMessage && (
+                  <>
+                    <div className="p-3 bg-muted rounded-lg">
+                      <p className="text-sm font-mono whitespace-pre-wrap">{result.formattedMessage}</p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => copyMessage(result.formattedMessage || '')}
+                    >
+                      <Copy className="h-3 w-3 mr-1" />
+                      Copy Message
+                    </Button>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
+// -----------------------------------------------------------------------
 // Page
 // -----------------------------------------------------------------------
 
@@ -395,8 +738,10 @@ export default function DistributePage() {
   // Messaging readiness
   const [smsReady, setSmsReady] = useState<boolean | null>(null)
   const [whatsappReady, setWhatsappReady] = useState<boolean | null>(null)
+  const [emailReady, setEmailReady] = useState<boolean | null>(null)
   const [smsFrom, setSmsFrom] = useState<string | null>(null)
   const [whatsappFrom, setWhatsappFrom] = useState<string | null>(null)
+  const [emailFrom, setEmailFrom] = useState<string | null>(null)
 
   const baseUrl = typeof window !== 'undefined' ? window.location.origin : ''
   const surveyUrl = surveySlug ? `${baseUrl}/survey/${surveySlug}` : ''
@@ -431,8 +776,10 @@ export default function DistributePage() {
         if (d.status) {
           setSmsReady(!!d.smsConfigured)
           setWhatsappReady(!!d.whatsappConfigured)
+          setEmailReady(!!d.emailConfigured)
           setSmsFrom(d.smsFrom || null)
           setWhatsappFrom(d.whatsappFrom || null)
+          setEmailFrom(d.emailFrom || null)
         }
       })
       .catch(() => {})
@@ -506,7 +853,7 @@ export default function DistributePage() {
 
       <div className="flex-1 p-6 max-w-5xl mx-auto w-full space-y-6">
         <Tabs defaultValue="link">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="link" className="flex items-center gap-1">
               <Link2 className="h-4 w-4" /> Link
             </TabsTrigger>
@@ -521,6 +868,9 @@ export default function DistributePage() {
             </TabsTrigger>
             <TabsTrigger value="whatsapp" className="flex items-center gap-1">
               <Smartphone className="h-4 w-4" /> WhatsApp
+            </TabsTrigger>
+            <TabsTrigger value="email" className="flex items-center gap-1">
+              <Mail className="h-4 w-4" /> Email
             </TabsTrigger>
           </TabsList>
 
@@ -666,6 +1016,16 @@ export default function DistributePage() {
               channel="whatsapp"
               ready={whatsappReady}
               senderFrom={whatsappFrom}
+            />
+          </TabsContent>
+
+          {/* ---- EMAIL ---- */}
+          <TabsContent value="email" className="space-y-4">
+            <EmailPanel
+              surveyId={surveyId}
+              surveyTitle={surveyTitle}
+              ready={emailReady}
+              senderFrom={emailFrom}
             />
           </TabsContent>
         </Tabs>

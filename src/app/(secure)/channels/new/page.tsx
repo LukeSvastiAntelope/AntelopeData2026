@@ -21,7 +21,10 @@ export default function NewChannelWizardPage() {
   const [step, setStep] = useState<number>(1)
 
   const [botToken, setBotToken] = useState('')
-  const [emailProvider, setEmailProvider] = useState<'sendgrid' | 'smtp' | ''>('')
+  const [mcApiKey, setMcApiKey] = useState('')
+  const [mcFromName, setMcFromName] = useState('')
+  const [mcFromEmail, setMcFromEmail] = useState('')
+  const [mcListId, setMcListId] = useState('')
   const [twilioSid, setTwilioSid] = useState('')
   const [twilioAuth, setTwilioAuth] = useState('')
   const [twilioPhone, setTwilioPhone] = useState('')
@@ -35,13 +38,13 @@ export default function NewChannelWizardPage() {
     if (step === 2) {
       switch (provider) {
         case 'telegram': return botToken.length > 0
-        case 'email': return emailProvider !== ''
+        case 'email': return mcApiKey.length > 0 && mcFromEmail.length > 0 && mcFromName.length > 0
         case 'sms': return twilioSid.length > 0 && twilioAuth.length > 0 && twilioPhone.length > 0
         default: return true
       }
     }
     return true
-  }, [step, provider, botToken, emailProvider, twilioSid, twilioAuth, twilioPhone])
+  }, [step, provider, botToken, mcApiKey, mcFromEmail, mcFromName, twilioSid, twilioAuth, twilioPhone])
 
   const next = async () => {
     if (!canContinue) return
@@ -68,7 +71,20 @@ export default function NewChannelWizardPage() {
           if (!res.ok || !data.status) throw new Error(data.message || 'Failed to save SMS credentials')
           toast.success('Twilio SMS connected')
         } else if (provider === 'email') {
-          toast.success('Email channel saved (stub)')
+          const res = await fetch('/api/channels/email/credentials', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({
+              apiKey: mcApiKey,
+              fromEmail: mcFromEmail,
+              fromName: mcFromName,
+              listId: mcListId || undefined,
+            }),
+          })
+          const data = await res.json()
+          if (!res.ok || !data.status) throw new Error(data.message || 'Failed to save Mailchimp credentials')
+          toast.success(`Mailchimp connected${data.accountName ? ` (${data.accountName})` : ''}`)
         }
         setStep(3)
       } catch (e: any) {
@@ -162,21 +178,36 @@ export default function NewChannelWizardPage() {
                 </div>
               )}
 
-              {/* Step 2 — Email */}
+              {/* Step 2 — Email (Mailchimp) */}
               {step === 2 && provider === 'email' && (
                 <div className="grid gap-4">
-                  <div className="space-y-2">
-                    <Label>Email Provider</Label>
-                    <Select value={emailProvider} onValueChange={(v) => setEmailProvider(v as any)}>
-                      <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="sendgrid">SendGrid</SelectItem>
-                        <SelectItem value="smtp">SMTP</SelectItem>
-                      </SelectContent>
-                    </Select>
+                  <div className="rounded-md border border-border p-3 text-xs bg-muted space-y-1">
+                    <p className="font-medium">Where to find your API key:</p>
+                    <p>1. Log in at <a href="https://admin.mailchimp.com" target="_blank" rel="noopener noreferrer" className="underline">admin.mailchimp.com</a></p>
+                    <p>2. Click your profile → <strong>Profile</strong> → <strong>Extras</strong> → <strong>API keys</strong>.</p>
+                    <p>3. Create a key and paste it below — the data center (e.g. us14) is read automatically from the key.</p>
                   </div>
-                  <div className="rounded-md border p-3 text-xs bg-muted">We'll ask for credentials based on your pick in the next step.</div>
-                  <Button onClick={next} disabled={!canContinue}>Continue</Button>
+                  <div className="space-y-2">
+                    <Label>Mailchimp API Key</Label>
+                    <Input type="password" value={mcApiKey} onChange={e => setMcApiKey(e.target.value)} placeholder="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx-us14" />
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <Label>From Name</Label>
+                      <Input value={mcFromName} onChange={e => setMcFromName(e.target.value)} placeholder="Antelope Campaign" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>From / Reply-to Email</Label>
+                      <Input type="email" value={mcFromEmail} onChange={e => setMcFromEmail(e.target.value)} placeholder="campaign@yourdomain.org" />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>
+                      Audience / List ID <span className="text-muted-foreground font-normal">(optional)</span>
+                    </Label>
+                    <Input value={mcListId} onChange={e => setMcListId(e.target.value)} placeholder="Leave blank to use your first Mailchimp audience" />
+                  </div>
+                  <Button onClick={next} disabled={!canContinue}>Connect Mailchimp</Button>
                 </div>
               )}
 
@@ -198,6 +229,12 @@ export default function NewChannelWizardPage() {
                     <div className="rounded-md border border-border p-3 bg-muted text-xs space-y-1">
                       <p className="font-medium">Next step: create contact lists</p>
                       <p>Go to <strong>Channels → SMS → Contact Lists</strong> to upload a spreadsheet of phone numbers, filter by age, district, etc., and save as named lists you can blast surveys to.</p>
+                    </div>
+                  )}
+                  {provider === 'email' && (
+                    <div className="rounded-md border border-border p-3 bg-muted text-xs space-y-1">
+                      <p className="font-medium">Next step: send survey invites</p>
+                      <p>Open any survey → <strong>Distribute → Email</strong> to paste addresses or upload a spreadsheet, then send a Mailchimp campaign with the survey link.</p>
                     </div>
                   )}
                   <Button asChild variant="outline">
