@@ -953,13 +953,13 @@ export default function DashboardPage() {
                             <Button
                               size="sm"
                               variant="outline"
-                              className="w-full h-7 text-[10px] mt-1"
+                              className="w-full h-auto min-h-7 py-1.5 px-2 mt-1 whitespace-normal text-center text-[10px] leading-snug"
                               onClick={() => {
                                 window.location.href = `/cohort-chat?openConversation=${encodeURIComponent(districtDeepConversationId)}`
                               }}
                             >
-                              <Newspaper className="h-3 w-3 mr-1" />
-                              View full cited report in general/news
+                              <Newspaper className="h-3 w-3 mr-1 shrink-0" />
+                              <span>View full cited report in general/news</span>
                             </Button>
                           ) : null}
                         </div>
