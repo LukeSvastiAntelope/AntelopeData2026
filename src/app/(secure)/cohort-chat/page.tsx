@@ -139,6 +139,7 @@ export default function CohortChatPage() {
   const streamAbortRef = useRef<AbortController | null>(null);
   const switchingConversationRef = useRef(false);
   const lastSavedSignatureRef = useRef<Map<string, string>>(new Map());
+  const openedFromQueryParamRef = useRef(false);
 
   // Derived view state boundaries
   const isCodeConversation = currentConversationType === 'code';
@@ -310,6 +311,23 @@ export default function CohortChatPage() {
   useEffect(() => {
     loadConversations();
   }, []);
+
+  // Deep-link support: /cohort-chat?openConversation=<id> jumps straight into a
+  // specific conversation (used by the district-intel "Generate deeper report"
+  // action to land on the cited general/news report it just created).
+  useEffect(() => {
+    if (openedFromQueryParamRef.current) return;
+    if (typeof window === 'undefined') return;
+    if (conversations.length === 0) return;
+    const openId = new URLSearchParams(window.location.search).get('openConversation');
+    if (!openId) return;
+    openedFromQueryParamRef.current = true;
+    if (conversations.some(c => c.id === openId)) {
+      switchConversation(openId);
+    } else {
+      console.warn('openConversation id not found in loaded conversations:', openId);
+    }
+  }, [conversations]);
 
   // Auto-expand surveys that contain the current conversation
   useEffect(() => {

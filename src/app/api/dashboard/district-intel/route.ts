@@ -2,8 +2,33 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { getConnection } from '@/app/utils/database/db'
 import OpenAI from 'openai'
+import { deepResearch } from '@/app/utils/services/web-search'
 
 type SourceStatus = 'ok' | 'partial' | 'unavailable'
+
+const ABBREV_TO_STATE_NAME: Record<string, string> = {
+  AL: 'Alabama', AK: 'Alaska', AZ: 'Arizona', AR: 'Arkansas', CA: 'California',
+  CO: 'Colorado', CT: 'Connecticut', DE: 'Delaware', DC: 'District of Columbia',
+  FL: 'Florida', GA: 'Georgia', HI: 'Hawaii', ID: 'Idaho', IL: 'Illinois',
+  IN: 'Indiana', IA: 'Iowa', KS: 'Kansas', KY: 'Kentucky', LA: 'Louisiana',
+  ME: 'Maine', MD: 'Maryland', MA: 'Massachusetts', MI: 'Michigan', MN: 'Minnesota',
+  MS: 'Mississippi', MO: 'Missouri', MT: 'Montana', NE: 'Nebraska', NV: 'Nevada',
+  NH: 'New Hampshire', NJ: 'New Jersey', NM: 'New Mexico', NY: 'New York',
+  NC: 'North Carolina', ND: 'North Dakota', OH: 'Ohio', OK: 'Oklahoma',
+  OR: 'Oregon', PA: 'Pennsylvania', RI: 'Rhode Island', SC: 'South Carolina',
+  SD: 'South Dakota', TN: 'Tennessee', TX: 'Texas', UT: 'Utah', VT: 'Vermont',
+  VA: 'Virginia', WA: 'Washington', WV: 'West Virginia', WI: 'Wisconsin', WY: 'Wyoming',
+}
+
+function ordinal(n: number): string {
+  const s = ['th', 'st', 'nd', 'rd']
+  const v = n % 100
+  return `${n}${s[(v - 20) % 10] || s[v] || s[0]}`
+}
+
+function createConversationId(districtCode: string): string {
+  return `district-${districtCode.toLowerCase()}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+}
 
 async function safeJson(url: string, init?: RequestInit) {
   try {
@@ -150,10 +175,62 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json()
-    const districtCode = String(body?.districtCode || '')
-    const base = await getBaseDistrictIntel(districtCode)
+    const districtCode = String(body?.districtCode || '').trim().toUpperCase()
+    if (!districtCode) {
+      return NextResponse.json({ status: false, message: 'districtCode is required' }, { status: 400 })
+    }
+
+    let base = await getBaseDistrictIntel(districtCode)
+    let dbRecordFound = true
     if ('error' in base) {
-      return NextResponse.json({ status: false, message: base.error }, { status: base.status })
+      // The district may not be in our internal database yet (e.g. the Cook PVI
+      // refresh hasn't been run for it) even though the user selected a real
+      // district on the map. Fall back to what the client already knows from
+      // the map click (state, district number) so the deep web-research report
+      // can still be generated for whatever district was actually selected.
+      const clientState = String(body?.state || '').trim().toUpperCase()
+      const clientDistrictNumber = Number(body?.districtNumber || 0)
+      if (!clientState) {
+        return NextResponse.json({ status: false, message: base.error }, { status: base.status })
+      }
+      dbRecordFound = false
+      base = {
+        status: true,
+        district: {
+          districtCode,
+          state: clientState,
+          districtNumber: clientDistrictNumber,
+          pvi: null,
+          pviNumeric: 0,
+          margin2024: 0,
+          incumbentName: null,
+          incumbentParty: null,
+          demographics: {
+            totalPopulation: null,
+            medianHouseholdIncome: null,
+            bachelorsOrHigherPct: null,
+            medianAge: null,
+          },
+        },
+        external: {
+          censusStatus: 'unavailable',
+          fecStatus: 'unavailable',
+          openStatesStatus: 'unavailable',
+          ballotpediaStatus: 'unavailable',
+          mitElectionLabStatus: 'unavailable',
+          censusPreview: null,
+          fecPreview: null,
+          openStatesPreview: null,
+        },
+        intelligence: {
+          narrative: `${districtCode}: no internal database record yet for this district — relying entirely on live web research for this report.`,
+          recommendedNextSteps: [
+            'Open district in chat to run scenario strategy and messaging tests.',
+            'Compare fundraising and turnout proxies vs adjacent districts.',
+            'Build a voter-contact geofence plan around high-priority precincts.',
+          ],
+        },
+      }
     }
 
     const client = getOpenAIClient()
@@ -170,44 +247,117 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    const prompt = `
-You are a senior US campaign strategist and analyst.
-Use the provided district intelligence JSON to produce a concise strategic memo.
+    const stateName = ABBREV_TO_STATE_NAME[base.district.state] || base.district.state
+    const districtLabel = base.district.districtNumber
+      ? `${stateName}'s ${ordinal(base.district.districtNumber)} Congressional District (${base.district.districtCode})`
+      : `${stateName} (${base.district.districtCode})`
 
-Return STRICT JSON with keys:
-title (string),
-executiveSummary (string, 3-5 sentences),
-strategicAngles (array of 4 short bullet strings),
-riskFlags (array of 3 short bullet strings),
-messageTestingIdeas (array of 4 short bullet strings),
-caveats (array of 2 short bullet strings).
+    // Preferred election-data sources, per campaign-team guidance. The
+    // underlying search-preview model performs a real web search, so
+    // "site:" hints reliably bias it toward these domains.
+    const preferredSources = [
+      { name: 'MIT Election Lab', domain: 'electionlab.mit.edu' },
+      { name: 'OpenElectionData.net', domain: 'openelectiondata.net' },
+      { name: 'Daily Kos Elections / The Downballot data guide', domain: 'dailykos.com' },
+      { name: `${stateName} official election results`, domain: base.district.state === 'NJ' ? 'nj.gov' : '' },
+    ].filter((s) => s.domain)
 
-District intelligence JSON:
-${JSON.stringify(base)}
-`
+    const sourceList = preferredSources.map((s) => `${s.name} (site:${s.domain})`).join('; ')
 
-    const completion = await client.chat.completions.create({
-      model: 'gpt-4o-mini',
-      temperature: 0.3,
-      messages: [
-        { role: 'system', content: 'You return only valid JSON. No markdown.' },
-        { role: 'user', content: prompt },
-      ],
-    })
+    const researchQuestion = `Produce a comprehensive, cited campaign-intelligence report on ${districtLabel}. Cover: current competitiveness and partisan lean, ` +
+      `2024 (and prior cycle) election results and margins, the incumbent, historical results and redistricting context, and key demographic/political factors ` +
+      `that shape the race. Prioritize and directly cite these sources wherever they have relevant data: ${sourceList}. Where a number comes from one of these ` +
+      `sources, name the source next to the figure.`
 
-    const text = completion.choices?.[0]?.message?.content?.trim() || '{}'
+    const systemContext = `You are a senior US congressional campaign strategist and elections analyst producing a rigorous, source-grounded report. ` +
+      `Known baseline facts for this district from Antelope's internal database (treat as authoritative; reconcile any web data against these) — ` +
+      `Cook PVI: ${base.district.pvi || 'N/A'}, 2024 margin: ${base.district.margin2024?.toFixed?.(1) ?? base.district.margin2024}, ` +
+      `incumbent: ${base.district.incumbentName || 'Unknown'} (${base.district.incumbentParty || 'N/A'}), ` +
+      `population: ${base.district.demographics?.totalPopulation ?? 'N/A'}, median household income: ${base.district.demographics?.medianHouseholdIncome ?? 'N/A'}. ` +
+      `Preferred/primary sources for election data in this domain: MIT Election Lab (electionlab.mit.edu, academic election-returns data), ` +
+      `OpenElectionData.net (community open elections data), Daily Kos Elections' "Downballot" data guide (dailykos.com / thedownballot.com, ` +
+      `district-level historical results and PVI methodology), and official state election results (nj.gov, NJ Division of Elections) when the ` +
+      `district is in New Jersey.`
+
+    let deepResult: { content: string; citations: { title: string; url: string }[] } = { content: '', citations: [] }
+    try {
+      deepResult = await deepResearch({ question: researchQuestion, systemContext })
+    } catch (error) {
+      console.error('district-intel deepResearch error:', error)
+    }
+
+    // Ground the compact panel summary strictly in the researched report (falls
+    // back to the base facts if the research call failed for any reason).
     let parsed: any
     try {
+      if (!deepResult.content) throw new Error('no deep research content')
+      const summaryPrompt = `Summarize the campaign-intelligence report below into STRICT JSON with keys:
+title (string), executiveSummary (string, 3-5 sentences), strategicAngles (array of 4 short bullet strings),
+riskFlags (array of 3 short bullet strings), messageTestingIdeas (array of 4 short bullet strings), caveats (array of 2 short bullet strings).
+Use ONLY information present in the report below — do not invent facts or sources.
+
+REPORT:
+${deepResult.content}`
+      const completion = await client.chat.completions.create({
+        model: 'gpt-4o-mini',
+        temperature: 0.2,
+        messages: [
+          { role: 'system', content: 'You return only valid JSON. No markdown.' },
+          { role: 'user', content: summaryPrompt },
+        ],
+      })
+      const text = completion.choices?.[0]?.message?.content?.trim() || '{}'
       parsed = JSON.parse(text)
     } catch {
       parsed = {
         title: `${base.district.districtCode} strategic memo`,
         executiveSummary: base.intelligence.narrative,
         strategicAngles: base.intelligence.recommendedNextSteps,
-        riskFlags: ['Model output parse failed; using fallback framing.'],
+        riskFlags: deepResult.content ? ['Summary step failed; see full report for details.'] : ['Web research unavailable; showing internal database facts only.'],
         messageTestingIdeas: ['Test economy and affordability framing by age cohort.'],
-        caveats: ['LLM output malformed; fallback injected.'],
+        caveats: deepResult.content ? ['Auto-summary may omit nuance — read the full cited report.'] : ['Deep research call failed; this is a fallback summary.'],
       }
+    }
+
+    // Persist the full cited report as a "general/news" conversation so it's
+    // immediately reachable from Cohort Chat's general/news section.
+    let conversationId: string | null = null
+    if (deepResult.content) {
+      try {
+        conversationId = createConversationId(base.district.districtCode)
+        const title = `📰 ${base.district.districtCode} Deep District Report`
+        const messages = [
+          { role: 'user', content: `Generate a deep intelligence report for ${districtLabel} using MIT Election Lab, OpenElectionData, Daily Kos Elections, and official state election results.` },
+          { role: 'agent', content: deepResult.content },
+        ]
+        const db = await getConnection()
+        try {
+          await db.execute(
+            `INSERT INTO chat_conversations (id, user_id, title, messages, survey_id, cohort_id, type)
+             VALUES (?, ?, ?, ?, NULL, NULL, 'news')`,
+            [conversationId, session.user.id, title, JSON.stringify(messages)]
+          )
+        } catch (error: any) {
+          // Backward-compatible fallback if the DB enum hasn't been migrated to include 'news' yet.
+          const errMsg = String(error?.message || '')
+          if (/(Data truncated|Incorrect|enum|type)/i.test(errMsg)) {
+            await db.execute(
+              `INSERT INTO chat_conversations (id, user_id, title, messages, survey_id, cohort_id, type)
+               VALUES (?, ?, ?, ?, NULL, NULL, 'chat')`,
+              [conversationId, session.user.id, title, JSON.stringify(messages)]
+            )
+          } else {
+            throw error
+          }
+        }
+      } catch (error) {
+        console.error('district-intel conversation save error:', error)
+        conversationId = null
+      }
+    }
+
+    if (!dbRecordFound && Array.isArray(parsed.caveats)) {
+      parsed.caveats = [...parsed.caveats, 'No internal database record for this district — figures are sourced entirely from live web research.']
     }
 
     return NextResponse.json({
@@ -215,6 +365,9 @@ ${JSON.stringify(base)}
       llmEnabled: true,
       report: parsed,
       base,
+      dbRecordFound,
+      deepResearch: deepResult.content ? { content: deepResult.content, citationCount: deepResult.citations.length } : null,
+      conversationId,
     })
   } catch (error) {
     console.error('district-intel POST error:', error)
