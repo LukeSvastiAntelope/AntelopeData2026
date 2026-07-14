@@ -71,7 +71,7 @@ export default function PricingPage() {
               Beta Testing Phase
             </div>
             <h1 className="text-4xl md:text-5xl font-bold mb-6">
-              Antelope is in Experimental Phase
+              Free Access During Our Beta
             </h1>
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
               We're excited to have you on board! Antelope will be completely free for the next 6 months as we work together to perfect the platform during our beta testing period.
