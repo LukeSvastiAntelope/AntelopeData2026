@@ -205,6 +205,7 @@ export default function DashboardPage() {
   const [districtIntelLoading, setDistrictIntelLoading] = useState(false)
   const [districtDeepReport, setDistrictDeepReport] = useState<DistrictDeepReport | null>(null)
   const [districtDeepLoading, setDistrictDeepLoading] = useState(false)
+  const [districtDeepConversationId, setDistrictDeepConversationId] = useState<string | null>(null)
 
   const fetchAutomations = useCallback(async () => {
     try {
@@ -371,6 +372,7 @@ export default function DashboardPage() {
   const loadDistrictIntel = useCallback(async (districtCode: string) => {
     setDistrictIntelLoading(true)
     setDistrictDeepReport(null)
+    setDistrictDeepConversationId(null)
     try {
       const res = await fetch(`/api/dashboard/district-intel?districtCode=${encodeURIComponent(districtCode)}`)
       const data = await res.json()
@@ -389,11 +391,16 @@ export default function DashboardPage() {
   const generateDeepDistrictReport = useCallback(async () => {
     if (!selectedDistrict) return
     setDistrictDeepLoading(true)
+    setDistrictDeepConversationId(null)
     try {
       const res = await fetch('/api/dashboard/district-intel', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ districtCode: selectedDistrict.districtCode }),
+        body: JSON.stringify({
+          districtCode: selectedDistrict.districtCode,
+          state: selectedDistrict.state,
+          districtNumber: selectedDistrict.districtNumber,
+        }),
       })
       const data = await res.json()
       if (!res.ok || !data?.status) {
@@ -402,7 +409,12 @@ export default function DashboardPage() {
       }
       if (data?.report) {
         setDistrictDeepReport(data.report)
-        toast.success('Deep report generated.')
+        if (data.conversationId) {
+          setDistrictDeepConversationId(data.conversationId)
+          toast.success('Deep report generated — cited sources saved to general/news.')
+        } else {
+          toast.success('Deep report generated.')
+        }
       }
     } catch {
       toast.error('Failed to generate deep report')
@@ -936,6 +948,19 @@ export default function DashboardPage() {
                                 ))}
                               </ul>
                             </div>
+                          ) : null}
+                          {districtDeepConversationId ? (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="w-full h-7 text-[10px] mt-1"
+                              onClick={() => {
+                                window.location.href = `/cohort-chat?openConversation=${encodeURIComponent(districtDeepConversationId)}`
+                              }}
+                            >
+                              <Newspaper className="h-3 w-3 mr-1" />
+                              View full cited report in general/news
+                            </Button>
                           ) : null}
                         </div>
                       ) : null}
