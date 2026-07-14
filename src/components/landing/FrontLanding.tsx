@@ -315,20 +315,6 @@ export default function FrontLanding() {
       <div className="mx-auto rounded-lg bg-card text-card-foreground shadow-lg">
         {/* Main content — site-wide header now provided by PublicLayout/PublicTopNav */}
         <div className="py-16">
-          {/* Demo Video — top of page */}
-          <section className="max-w-4xl mx-auto px-4 mb-12">
-            <video
-              className="w-full rounded-lg border border-border shadow-lg"
-              controls
-              preload="metadata"
-              poster="/videos/antelope-demo-poster.jpg"
-            >
-              <source src="/videos/antelope-demo.mp4" type="video/mp4" />
-              Your browser does not support embedded video.{' '}
-              <a href="/videos/antelope-demo.mp4">Download the demo video</a>.
-            </video>
-          </section>
-
           {/* Hero Section */}
           <section className="relative w-full py-10 md:py-16 rounded-lg flex items-start justify-center">
             <div className="relative z-10 flex flex-col items-center text-center max-w-3xl px-4 gap-y-6">
@@ -444,6 +430,20 @@ export default function FrontLanding() {
               <p className="text-xs text-muted-foreground text-center mt-2">
                 Currently in beta — free and unlimited during early access.
               </p>
+
+              {/* Demo Video */}
+              <div className="w-full max-w-4xl mx-auto mt-10">
+                <video
+                  className="w-full rounded-lg border border-border shadow-lg"
+                  controls
+                  preload="metadata"
+                  poster="/videos/antelope-demo-poster.jpg"
+                >
+                  <source src="/videos/antelope-demo.mp4" type="video/mp4" />
+                  Your browser does not support embedded video.{' '}
+                  <a href="/videos/antelope-demo.mp4">Download the demo video</a>.
+                </video>
+              </div>
 
             </div>
           </section>
