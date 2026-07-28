@@ -53,6 +53,34 @@ export default function SurveysPage() {
   const [deleteLoadingId, setDeleteLoadingId] = useState<number | null>(null)
   const [testMessage, setTestMessage] = useState<string | null>(null)
 
+  // Continue a Garry's List "log in to edit" claim: login/register always land
+  // here regardless of where the user started, so pick up the pending claim
+  // (stashed in sessionStorage by /garrys-list/claim) and finish it silently.
+  useEffect(() => {
+    const raw = sessionStorage.getItem('garrys-list-claim')
+    if (!raw) return
+    let pending: { surveyId: string; token: string }
+    try {
+      pending = JSON.parse(raw)
+    } catch {
+      sessionStorage.removeItem('garrys-list-claim')
+      return
+    }
+    fetch('/api/garrys-list/claim', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ surveyId: Number(pending.surveyId), token: pending.token }),
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        sessionStorage.removeItem('garrys-list-claim')
+        if (data.status) {
+          window.location.href = `/surveys/${data.surveyId}/edit`
+        }
+      })
+      .catch(() => sessionStorage.removeItem('garrys-list-claim'))
+  }, [])
+
   const refetchSurveys = async () => {
     const res = await fetch('/api/surveys', { credentials: 'include' })
     const data = await res.json()

@@ -150,6 +150,7 @@ export async function POST(request: NextRequest) {
       embedSnippet,
       title: generated.title || title,
       previewQuestion: generated.questions[0],
+      allQuestions: generated.questions,
       breakdownsSummary: breakdowns.map((b) => BREAKDOWN_LABELS[b]),
       methodologyNote,
     });
