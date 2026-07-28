@@ -26,7 +26,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   iframe.style.maxWidth = '480px';
   iframe.style.border = '1px solid #e5e7eb';
   iframe.style.borderRadius = '8px';
-  iframe.style.minHeight = '260px';
+  iframe.style.height = '540px';
   iframe.setAttribute('loading', 'lazy');
   iframe.setAttribute('title', 'Reader survey');
   if (s && s.parentNode) { s.parentNode.insertBefore(iframe, s.nextSibling); }

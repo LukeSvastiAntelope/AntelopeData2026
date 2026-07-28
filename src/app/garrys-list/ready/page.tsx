@@ -7,7 +7,14 @@ import toast from 'react-hot-toast'
 import LogoText from '@/components/logo-text'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { CheckCircle2, Lock, Copy, KeyRound, ShieldAlert } from 'lucide-react'
+import { CheckCircle2, Lock, Copy, KeyRound, ShieldAlert, ChevronDown } from 'lucide-react'
+
+interface GeneratedQuestion {
+  id: string
+  type: string
+  prompt: string
+  options: { id: string; label: string }[]
+}
 
 interface ReadyData {
   status: boolean
@@ -18,7 +25,8 @@ interface ReadyData {
   publicUrl: string
   embedSnippet: string
   title: string
-  previewQuestion: { prompt: string; options: { id: string; label: string }[] }
+  previewQuestion: GeneratedQuestion
+  allQuestions?: GeneratedQuestion[]
   breakdownsSummary: string[]
   methodologyNote: string
 }
@@ -56,6 +64,7 @@ function CopyField({ value, label }: { value: string; label: string }) {
 export default function GarrysListReadyPage() {
   const router = useRouter()
   const [data, setData] = useState<ReadyData | null>(null)
+  const [expanded, setExpanded] = useState(false)
 
   useEffect(() => {
     const raw = sessionStorage.getItem('garrys-list-ready')
@@ -71,6 +80,10 @@ export default function GarrysListReadyPage() {
   }, [router])
 
   if (!data) return null
+
+  const remainingQuestions = data.allQuestions?.slice(1) || []
+  const remainingOpinionCount = remainingQuestions.filter((q) => q.type === 'opinion').length
+  const breakdownCount = data.breakdownsSummary?.length || 0
 
   return (
     <div className="min-h-screen bg-muted/30">
@@ -107,10 +120,38 @@ export default function GarrysListReadyPage() {
                 </span>
               ))}
             </div>
-            {data.breakdownsSummary?.length > 0 && (
-              <p className="text-xs text-muted-foreground">
-                + optional breakdowns ({data.breakdownsSummary.join(', ')})
-              </p>
+            {remainingQuestions.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setExpanded((v) => !v)}
+                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <ChevronDown className={`h-3 w-3 transition-transform ${expanded ? 'rotate-180' : ''}`} />
+                {remainingOpinionCount > 0 && `+${remainingOpinionCount} opinion question${remainingOpinionCount === 1 ? '' : 's'}`}
+                {remainingOpinionCount > 0 && breakdownCount > 0 && ', '}
+                {breakdownCount > 0 && `${breakdownCount} optional breakdown${breakdownCount === 1 ? '' : 's'} (${data.breakdownsSummary.join(', ')})`}
+              </button>
+            )}
+            {expanded && remainingQuestions.length > 0 && (
+              <div className="space-y-3 pt-2 border-t mt-2">
+                {remainingQuestions.map((q, i) => (
+                  <div key={q.id || i} className="space-y-1.5">
+                    <p className="text-sm font-medium">
+                      {q.prompt}
+                      {q.type === 'demographic' && (
+                        <span className="ml-1.5 text-xs font-normal text-muted-foreground">(optional)</span>
+                      )}
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {q.options?.map((o) => (
+                        <span key={o.id} className="text-xs px-2.5 py-1 rounded-md border bg-muted/40">
+                          {o.label}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
             )}
           </div>
 
@@ -150,7 +191,7 @@ export default function GarrysListReadyPage() {
 
           <div className="grid grid-cols-2 gap-2 pt-1">
             <Button variant="outline" asChild>
-              <Link href="/auth/register">Log in to edit ↗</Link>
+              <Link href={`/garrys-list/claim?surveyId=${data.surveyId}&token=${encodeURIComponent(data.token)}`}>Log in to edit ↗</Link>
             </Button>
             <Button asChild>
               <Link href={`/garrys-list/results?token=${encodeURIComponent(data.token)}`}>View results ↗</Link>

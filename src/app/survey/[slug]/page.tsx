@@ -10,15 +10,16 @@ import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Badge } from "@/components/ui/badge"
-import { 
-  Users, 
+import {
+  Users,
   Send,
   CheckCircle,
   AlertCircle,
   Brain,
   Loader2,
   Shield,
-  Lock
+  Lock,
+  ArrowRight
 } from "lucide-react"
 import { useParams } from 'next/navigation'
 import { ResponderInfoModal } from '@/components/ResponderInfoModal'
@@ -67,10 +68,15 @@ interface Demographics {
   income: string
 }
 
+// Digital-twin profile/token UI is sunset for now — respondents shouldn't be
+// prompted to create Antelope accounts. Flip back on when the digital-twin
+// system is properly reintroduced.
+const ENABLE_DIGITAL_TWIN_UI = false
+
 const SurveyPage = () => {
   const params = useParams()
   const slug = params.slug as string
-  
+
   const [survey, setSurvey] = useState<Survey | null>(null)
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
@@ -79,7 +85,8 @@ const SurveyPage = () => {
   const [agentToken, setAgentToken] = useState<string | null>(null)
   const [isExistingTwin, setIsExistingTwin] = useState(false)
   const [shareEmail, setShareEmail] = useState(false)
-  
+  const [otherSurveys, setOtherSurveys] = useState<{ id: number; title: string; slug: string }[]>([])
+
   // Progressive disclosure step: 'demographics' | 'questions'
   const [currentStep, setCurrentStep] = useState<'demographics' | 'questions'>('demographics')
   const [demographicsCompleted, setDemographicsCompleted] = useState(false)
@@ -316,6 +323,14 @@ const SurveyPage = () => {
         setAgentToken(result.agentToken)
         setIsExistingTwin(result.isExistingTwin || false)
         setSubmitted(true)
+        fetch('/api/public/surveys')
+          .then((r) => r.json())
+          .then((data) => {
+            if (data.status) {
+              setOtherSurveys(data.surveys.filter((s: any) => s.slug !== slug).slice(0, 4))
+            }
+          })
+          .catch(() => {})
       } else {
         const error = await response.json()
         setError(error.message || 'Failed to submit survey')
@@ -498,8 +513,8 @@ const SurveyPage = () => {
               </div>
             )}
 
-            {/* Token Display */}
-            {agentToken && (
+            {/* Token Display — sunset until the digital-twin system is properly reintroduced */}
+            {ENABLE_DIGITAL_TWIN_UI && agentToken && (
               <div className="bg-blue-50 dark:bg-blue-950/20 p-4 rounded-lg mb-6">
                 <div className="flex items-center gap-2 mb-2">
                   <Brain className="h-4 w-4 text-blue-600" />
@@ -518,8 +533,8 @@ const SurveyPage = () => {
 
             {/* Action Buttons */}
             <div className="space-y-3">
-              {/* View Profile Button */}
-              {agentToken && (
+              {/* View Profile Button — sunset alongside the token display above */}
+              {ENABLE_DIGITAL_TWIN_UI && agentToken && (
                 <Button asChild className="w-full" size="lg">
                   <a href={`/digital-twin/${agentToken}`}>
                     View My Profile
@@ -527,24 +542,25 @@ const SurveyPage = () => {
                 </Button>
               )}
 
-              {/* Create Account / Explore Surveys */}
-              {!isExistingTwin ? (
-                <div className="p-4 border rounded-lg bg-gradient-to-br from-purple-50 to-blue-50 dark:from-purple-950/20 dark:to-blue-950/20">
+              {/* Other public surveys — no account creation prompt */}
+              {otherSurveys.length > 0 && (
+                <div className="p-4 border rounded-lg bg-muted/30">
                   <p className="text-sm font-medium mb-3 text-center">
-                    Liked this survey? Explore other surveys on Antelope!
+                    Other surveys you can take
                   </p>
-                  <Button asChild className="w-full" variant="default">
-                    <a href="/auth/register">
-                      Create Account & Explore More Surveys
-                    </a>
-                  </Button>
+                  <div className="space-y-2">
+                    {otherSurveys.map((s) => (
+                      <a
+                        key={s.id}
+                        href={`/survey/${s.slug}`}
+                        className="flex items-center justify-between rounded-md border px-3 py-2 text-sm hover:bg-muted transition-colors"
+                      >
+                        <span className="truncate pr-2">{s.title}</span>
+                        <ArrowRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                      </a>
+                    ))}
+                  </div>
                 </div>
-              ) : (
-                <Button asChild className="w-full" variant="outline" size="lg">
-                  <a href="/surveys">
-                    Take Another Survey
-                  </a>
-                </Button>
               )}
             </div>
 
