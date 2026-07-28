@@ -15,6 +15,8 @@ type ChatMsg = { role: 'user' | 'assistant'; content: string }
 
 export default function FrontLanding() {
   const router = useRouter()
+  const [storyUrl, setStoryUrl] = useState('')
+  const [resultToken, setResultToken] = useState('')
   const [showUploadDialog, setShowUploadDialog] = useState(false)
   const [uploadFile, setUploadFile] = useState<File | null>(null)
   const [uploadLoading, setUploadLoading] = useState(false)
@@ -106,6 +108,30 @@ export default function FrontLanding() {
     setUploadFile(null);
     setUploadPreview(null);
     setUploadLoading(false);
+  };
+
+  const handleGarrysListSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const url = storyUrl.trim();
+    if (!url) {
+      toast.error('Paste a story URL first');
+      return;
+    }
+    if (!/^https?:\/\//i.test(url)) {
+      toast.error('Include http:// or https:// in the URL');
+      return;
+    }
+    router.push(`/garrys-list/setup?url=${encodeURIComponent(url)}`);
+  };
+
+  const handleTokenSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const token = resultToken.trim();
+    if (!token) {
+      toast.error('Enter your survey token');
+      return;
+    }
+    router.push(`/garrys-list/results?token=${encodeURIComponent(token)}`);
   };
 
   useEffect(() => {
@@ -430,6 +456,49 @@ export default function FrontLanding() {
               <p className="text-xs text-muted-foreground text-center mt-2">
                 Currently in beta — free and unlimited during early access.
               </p>
+
+              {/* Automation for Garry's List — try it free, no login required */}
+              <div className="w-full max-w-2xl mx-auto mt-10">
+                <Card className="border-2">
+                  <CardContent className="p-6 space-y-4">
+                    <div className="text-center space-y-1">
+                      <h3 className="font-semibold text-lg">Try it free — turn any story into a reader survey</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Paste a newsletter or article URL. Antelope reads it and drafts a short, neutral survey — no log in required.
+                      </p>
+                    </div>
+                    <form onSubmit={handleGarrysListSubmit} className="flex flex-col sm:flex-row gap-2">
+                      <input
+                        type="url"
+                        value={storyUrl}
+                        onChange={(e) => setStoryUrl(e.target.value)}
+                        placeholder="https://garryslist.org/posts/your-story"
+                        className="flex-1 h-11 px-4 rounded-md border border-input bg-background text-sm"
+                      />
+                      <Button type="submit" size="lg" className="whitespace-nowrap">
+                        Generate survey
+                      </Button>
+                    </form>
+                    <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                      <div className="h-px flex-1 bg-border" />
+                      <span>or</span>
+                      <div className="h-px flex-1 bg-border" />
+                    </div>
+                    <form onSubmit={handleTokenSubmit} className="flex flex-col sm:flex-row gap-2">
+                      <input
+                        type="text"
+                        value={resultToken}
+                        onChange={(e) => setResultToken(e.target.value)}
+                        placeholder="Have a token? ANT-XXXX-XXXX-XXXX-XXXX"
+                        className="flex-1 h-10 px-4 rounded-md border border-input bg-background text-sm font-mono"
+                      />
+                      <Button type="submit" variant="outline" className="whitespace-nowrap">
+                        View my results
+                      </Button>
+                    </form>
+                  </CardContent>
+                </Card>
+              </div>
 
               {/* Demo Video */}
               <div className="w-full max-w-4xl mx-auto mt-10">
