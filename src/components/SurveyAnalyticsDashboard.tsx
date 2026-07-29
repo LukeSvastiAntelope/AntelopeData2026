@@ -9,7 +9,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, PieChart, Pie, Cell, AreaChart, Area, ScatterChart, Scatter, LineChart, Line } from 'recharts'
-import { TrendingUp, Users, BarChart3, PieChart as PieChartIcon, Activity, Info, Loader2, Brain, Lightbulb, Target, AlertTriangle, CheckCircle, Clock, Zap, Download } from 'lucide-react'
+import { TrendingUp, Users, BarChart3, PieChart as PieChartIcon, Activity, Info, Loader2, Brain, Lightbulb, Target, AlertTriangle, CheckCircle, Clock, Zap, Download, FileType } from 'lucide-react'
+import { markdownReportToDocxBlob, downloadBlob } from '@/app/utils/services/markdown-to-docx'
+import toast from 'react-hot-toast'
 
 interface SurveyAnalyticsDashboardProps {
   surveyId: number
@@ -206,6 +208,65 @@ export function SurveyAnalyticsDashboard({ surveyId, className }: SurveyAnalytic
     })
   }
 
+  const handleExportDocx = async () => {
+    if (!aiAnalytics?.insights) return
+    const { insights } = aiAnalytics
+    const lines: string[] = []
+
+    lines.push('## Executive Summary', '', insights.executiveSummary || 'N/A', '')
+
+    if (insights.keyFindings?.length) {
+      lines.push('## Key Findings', '')
+      insights.keyFindings.forEach((f, i) => {
+        lines.push(`### ${i + 1}. ${f.title}`, '')
+        lines.push(f.description, '')
+        lines.push(`- **Confidence:** ${f.confidence}`)
+        lines.push(`- **Priority:** ${f.priority}`)
+        if (f.statisticalEvidence) lines.push(`- **Evidence:** ${f.statisticalEvidence}`)
+        if (f.businessImplication) lines.push(`- **Implication:** ${f.businessImplication}`)
+        lines.push('')
+      })
+    }
+
+    if (insights.recommendations?.length) {
+      lines.push('## Recommendations', '')
+      insights.recommendations.forEach((r, i) => {
+        lines.push(`### ${i + 1}. ${r.category}`, '')
+        lines.push(r.recommendation, '')
+        if (r.rationale) lines.push(`- **Rationale:** ${r.rationale}`)
+        lines.push(`- **Priority:** ${r.priority}`)
+        lines.push(`- **Timeframe:** ${r.timeframe}`)
+        lines.push('')
+      })
+    }
+
+    if (insights.dataQuality) {
+      const dq = insights.dataQuality
+      lines.push('## Data Quality', '')
+      lines.push(`- **Response rate:** ${dq.responseRate}%`)
+      lines.push(`- **Completeness:** ${dq.completeness}%`)
+      lines.push(`- **Reliability:** ${dq.reliability}`)
+      if (dq.limitations?.length) {
+        lines.push('', 'Limitations:', '')
+        dq.limitations.forEach((l) => lines.push(`- ${l}`))
+      }
+    }
+
+    try {
+      const blob = await markdownReportToDocxBlob({
+        title: aiAnalytics.dashboard?.title || 'AI Analytics Report',
+        subtitle: aiAnalytics.dashboard?.description,
+        meta: aiAnalytics.metadata?.generatedAt ? [`Generated: ${aiAnalytics.metadata.generatedAt}`] : [],
+        markdown: lines.join('\n'),
+        footer: 'Generated with Antelope',
+      })
+      downloadBlob(blob, `survey-${surveyId}-analytics.docx`)
+      toast.success('Report downloaded')
+    } catch {
+      toast.error('Failed to generate .docx')
+    }
+  }
+
   if (loading) {
     return (
       <Card className={className}>
@@ -334,6 +395,14 @@ export function SurveyAnalyticsDashboard({ surveyId, className }: SurveyAnalytic
               >
                 <Download className="h-4 w-4" />
                 Export PDF
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleExportDocx}
+              >
+                <FileType className="h-4 w-4" />
+                Export DOCX
               </Button>
               <Button
                 variant="outline"

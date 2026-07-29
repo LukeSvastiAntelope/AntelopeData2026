@@ -9,12 +9,14 @@ import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb';
-import { ArrowLeft, Download, Share2, Clock, FileText, BarChart2, Trash2 } from 'lucide-react';
+import { ArrowLeft, Download, Share2, Clock, FileText, BarChart2, Trash2, ChevronDown } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 import ChartRenderer from '@/components/ChartRenderer';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { markdownReportToDocxBlob, downloadBlob } from '@/app/utils/services/markdown-to-docx';
 
 interface Report {
   id: string;
@@ -118,6 +120,26 @@ ${report.full_content}
     URL.revokeObjectURL(url);
     
     toast.success('Report downloaded');
+  };
+
+  const handleDownloadDocx = async () => {
+    if (!report) return;
+    try {
+      const blob = await markdownReportToDocxBlob({
+        title: `${report.survey_title} — Analysis Report`,
+        subtitle: report.query,
+        meta: [
+          `Generated: ${format(new Date(report.created_at), 'PPP')}`,
+          `Type: ${report.query_type}`,
+        ],
+        markdown: report.full_content,
+        footer: `Report ID: ${report.id} · Generated with Antelope`,
+      });
+      downloadBlob(blob, `report-${report.id}.docx`);
+      toast.success('Report downloaded');
+    } catch {
+      toast.error('Failed to generate .docx');
+    }
   };
 
   const handleShare = async () => {
@@ -255,10 +277,19 @@ ${report.full_content}
                 <Share2 className="h-4 w-4 mr-2" />
                 Share
               </Button>
-              <Button variant="outline" size="sm" onClick={handleDownload}>
-                <Download className="h-4 w-4 mr-2" />
-                Download
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    <Download className="h-4 w-4 mr-2" />
+                    Download
+                    <ChevronDown className="h-3.5 w-3.5 ml-1" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={handleDownload}>Markdown (.md)</DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleDownloadDocx}>Word (.docx)</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
               <Button 
                 variant="outline" 
                 size="sm" 
