@@ -14,6 +14,7 @@ export default function TelegramSetupPage() {
   const [loading, setLoading] = useState(false)
   const [connected, setConnected] = useState<boolean>(false)
   const [webhookUrl, setWebhookUrl] = useState<string>('')
+  const [testing, setTesting] = useState(false)
 
   useEffect(() => {
     // fetch connection status
@@ -28,6 +29,23 @@ export default function TelegramSetupPage() {
       } catch {}
     })()
   }, [])
+
+  const runTest = async () => {
+    setTesting(true)
+    try {
+      const res = await fetch('/api/channels/telegram/test', { method: 'POST' })
+      const data = await res.json()
+      if (data.status) {
+        toast.success(data.message || 'Connection verified')
+      } else {
+        toast.error(data.message || 'Verification failed')
+      }
+    } catch {
+      toast.error('Verification failed')
+    } finally {
+      setTesting(false)
+    }
+  }
 
   const connect = async () => {
     if (!botToken) return
@@ -105,10 +123,14 @@ export default function TelegramSetupPage() {
                 <CardTitle>3. Channel Verification</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3 text-sm">
-                <p>Once connected, Telegram will send events to your webhook. Use the button below to send a test message and verify delivery.</p>
+                <p>Once connected, Telegram will send events to your webhook. Verify the bot token is still valid below.</p>
                 <div className="flex items-center gap-2">
-                  <Button variant="outline" disabled={!connected}>Send Test</Button>
-                  <span className="text-xs text-muted-foreground">We’ll add a lightweight test soon; for now, ensure the webhook shows “Connected”.</span>
+                  <Button variant="outline" disabled={!connected || testing} onClick={runTest}>
+                    {testing ? 'Verifying...' : 'Verify Connection'}
+                  </Button>
+                  <span className="text-xs text-muted-foreground">
+                    Telegram bots can&apos;t message you first — to fully test delivery, open your survey&apos;s Telegram link and message the bot yourself.
+                  </span>
                 </div>
               </CardContent>
             </Card>
@@ -118,7 +140,7 @@ export default function TelegramSetupPage() {
                 <CardTitle>4. Complete Setup</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3 text-sm">
-                <p>Next, enable Telegram for specific surveys under Survey → Edit → Channels. Each survey provides its own deep link and welcome text.</p>
+                <p>Next, open any survey → Distribute → Telegram tab. It auto-enables the channel and shows that survey&apos;s deep link, ready to share.</p>
               </CardContent>
             </Card>
           </div>

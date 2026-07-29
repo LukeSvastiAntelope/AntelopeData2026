@@ -26,6 +26,7 @@ import {
   FileSpreadsheet,
   X,
   Mail,
+  Send,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -718,6 +719,112 @@ function EmailPanel({ surveyId, surveyTitle, ready, senderFrom }: EmailPanelProp
 }
 
 // -----------------------------------------------------------------------
+// Telegram
+// -----------------------------------------------------------------------
+
+interface TelegramPanelProps {
+  surveyId: string
+  surveySlug: string | null
+}
+
+function TelegramPanel({ surveyId, surveySlug }: TelegramPanelProps) {
+  const [status, setStatus] = useState<'loading' | 'connected' | 'not-connected'>('loading')
+  const [botUsername, setBotUsername] = useState<string | null>(null)
+  const [copied, setCopied] = useState(false)
+
+  useEffect(() => {
+    fetch('/api/channels/telegram/status')
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.status && d.connected && d.botUsername) {
+          setBotUsername(d.botUsername)
+          setStatus('connected')
+        } else {
+          setStatus('not-connected')
+        }
+      })
+      .catch(() => setStatus('not-connected'))
+  }, [])
+
+  useEffect(() => {
+    if (status === 'connected' && surveyId) {
+      fetch(`/api/surveys/${surveyId}/channels/telegram/enable`, { method: 'POST' }).catch(() => {})
+    }
+  }, [status, surveyId])
+
+  const deepLink = botUsername && surveySlug ? `https://t.me/${botUsername}?start=survey_${surveySlug}` : ''
+
+  const copyLink = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(deepLink)
+      setCopied(true)
+      toast.success('Telegram link copied')
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      toast.error('Failed to copy')
+    }
+  }, [deepLink])
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <CardTitle>Telegram Distribution</CardTitle>
+            <CardDescription>Readers tap a link to start the survey as a private chat with your bot</CardDescription>
+          </div>
+          {status === 'connected' ? (
+            <Badge className="bg-green-100 text-green-700 hover:bg-green-100">
+              <Check className="h-3 w-3 mr-1" /> Connected · @{botUsername}
+            </Badge>
+          ) : status === 'not-connected' ? (
+            <Badge variant="secondary" className="text-amber-700 bg-amber-100 hover:bg-amber-100">
+              Not connected
+            </Badge>
+          ) : null}
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {status === 'loading' && (
+          <div className="flex items-center justify-center py-8 text-muted-foreground">
+            <Loader2 className="h-5 w-5 animate-spin" />
+          </div>
+        )}
+        {status === 'not-connected' && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+            No Telegram bot connected yet.{' '}
+            <a href="/channels/telegram/setup" className="underline font-medium">
+              Connect one
+            </a>{' '}
+            — you&apos;ll need a bot token from @BotFather on Telegram.
+          </div>
+        )}
+        {status === 'connected' && deepLink && (
+          <div className="space-y-2">
+            <Label>Survey link for Telegram</Label>
+            <div className="flex gap-2">
+              <Input readOnly value={deepLink} className="font-mono text-sm" />
+              <Button variant="outline" onClick={copyLink}>
+                {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+              </Button>
+              <Button variant="outline" asChild>
+                <a href={deepLink} target="_blank" rel="noopener noreferrer">
+                  <ExternalLink className="h-4 w-4" />
+                </a>
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Share this link anywhere — Telegram opens a chat with your bot and starts the survey. Each reader answers
+              inline, right in the chat.
+            </p>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
+// -----------------------------------------------------------------------
 // Page
 // -----------------------------------------------------------------------
 
@@ -853,7 +960,7 @@ export default function DistributePage() {
 
       <div className="flex-1 p-6 max-w-5xl mx-auto w-full space-y-6">
         <Tabs defaultValue="link">
-          <TabsList className="grid w-full grid-cols-6">
+          <TabsList className="grid w-full grid-cols-7">
             <TabsTrigger value="link" className="flex items-center gap-1">
               <Link2 className="h-4 w-4" /> Link
             </TabsTrigger>
@@ -871,6 +978,9 @@ export default function DistributePage() {
             </TabsTrigger>
             <TabsTrigger value="email" className="flex items-center gap-1">
               <Mail className="h-4 w-4" /> Email
+            </TabsTrigger>
+            <TabsTrigger value="telegram" className="flex items-center gap-1">
+              <Send className="h-4 w-4" /> Telegram
             </TabsTrigger>
           </TabsList>
 
@@ -1027,6 +1137,10 @@ export default function DistributePage() {
               ready={emailReady}
               senderFrom={emailFrom}
             />
+          </TabsContent>
+
+          <TabsContent value="telegram" className="space-y-4">
+            <TelegramPanel surveyId={surveyId} surveySlug={surveySlug} />
           </TabsContent>
         </Tabs>
       </div>
