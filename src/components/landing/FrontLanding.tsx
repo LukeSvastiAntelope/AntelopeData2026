@@ -627,6 +627,128 @@ export default function FrontLanding() {
               </div>
             </div>
           </section>
+
+          {/* 2030 Vision */}
+          <section className="mt-24 max-w-3xl mx-auto">
+            <div className="text-center mb-10">
+              <p className="text-sm font-semibold text-primary uppercase tracking-wide mb-2">Our Vision</p>
+              <h3 className="text-3xl md:text-4xl font-bold">The Field We Want by 2030</h3>
+            </div>
+
+            <div className="space-y-5 text-muted-foreground leading-relaxed text-left">
+              <p>
+                Democracy runs on a simple promise: anyone can stand for office, speak their mind, and ask their
+                neighbors to choose them. In practice, that promise has narrowed. Running for anything — a school
+                board seat, a city council, a congressional district — now takes money, a team, and access to
+                people who already know how the machine works. The further you sit from that machine, the harder
+                it gets. That&apos;s the problem we started Antelope to fix.
+              </p>
+              <p>
+                By 2030, we want a different field. One where a teacher, a nurse, a small-business owner, or a
+                first-time organizer can run a serious campaign without ten thousand dollars in software fees or a
+                roster of consultants. Where the barrier to entry is your conviction and your willingness to do the
+                work — not your bank account or your rolodex. That&apos;s the world we&apos;re building toward, and
+                here&apos;s how we get there.
+              </p>
+
+              <h4 className="text-xl font-semibold text-foreground pt-4">What actually stops people from running</h4>
+              <p>Three things.</p>
+              <p>
+                The first is cost. The tools that manage voter data, surveys, fundraising, and outreach have
+                historically been priced for institutions, not individuals. Thousands of dollars per cycle before
+                you&apos;ve knocked on a single door. That price tag is a gate, and it keeps out exactly the people
+                democracy should be inviting in.
+              </p>
+              <p>
+                The second is complexity. Even if you can afford the tools, you need people to run them. Someone
+                for the data. Someone for the messaging. Someone for compliance and finance. Someone to stitch six
+                disconnected platforms into something that functions. For an incumbent with a staff, that&apos;s
+                routine. For a challenger with a day job, it&apos;s disqualifying.
+              </p>
+              <p>
+                The third is the one nobody puts on a pricing page: anxiety. Most people who could run never do,
+                because they don&apos;t believe they can win, can&apos;t picture affording it, or quietly assume
+                their neighbors won&apos;t listen. That fear does more gatekeeping than any fee. And it&apos;s
+                worth saying plainly — even if you run and lose, even if you spend a few thousand dollars and come
+                up short, you did something rare and worthwhile. You exercised your right to stand for office.
+                That is not a failure. That is the whole point of a republic.
+              </p>
+
+              <h4 className="text-xl font-semibold text-foreground pt-4">What we automate — and why</h4>
+              <p>
+                When we talk about automation, we don&apos;t mean replacing the human part of politics. Politics is
+                about people persuading people, and it always will be. What we automate is the friction that
+                stands between a person and that conversation.
+              </p>
+              <p>
+                The operational layer first: survey design and deployment, so you can ask your district what it
+                thinks and actually hear the answer. Outreach across email, text, and social, coordinated instead
+                of scattered. Fundraising follow-ups. Volunteer coordination. Research and opposition tracking.
+                Compliance-aware record-keeping. The unglamorous, time-eating work that currently requires a
+                team — handled in the background.
+              </p>
+              <p>
+                Then the part that matters most: turning raw district data into plain answers. Who in this
+                district is likely to give? What issues move people here, street by street? Where should a
+                first-time candidate spend a limited week? Instead of staring at spreadsheets you don&apos;t have
+                time to read, you get clarity. And clarity is the antidote to the anxiety. When you can see your
+                district, your supporters, and what genuinely matters to the people around you, the fear starts to
+                lift. You stop guessing and start deciding. That shift — from anxiety to certainty — is the thing
+                we are really in the business of.
+              </p>
+
+              <h4 className="text-xl font-semibold text-foreground pt-4">Where the platform is going</h4>
+              <p>Today, the product is one person, one question, one answer. That&apos;s a starting point, not the destination.</p>
+              <p>
+                We&apos;re building toward a platform where a whole campaign works in one shared space. A
+                candidate, a campaign manager, a volunteer lead, and the automated systems running alongside
+                them — all coordinated, all handing work off to each other without anyone rekeying data or chasing
+                status updates. Research feeds strategy. Strategy feeds outreach. Outreach feeds analysis. Analysis
+                feeds the next decision. You set the direction; the platform keeps the whole operation moving as
+                one workflow instead of a pile of tools and disconnected people.
+              </p>
+              <p>
+                That is what closes the gap with incumbency. A well-funded campaign wins partly because it can
+                coordinate at scale. When coordination at scale is available to anyone for a fair price, the
+                incumbent&apos;s structural advantage shrinks — and the field opens up.
+              </p>
+
+              <h4 className="text-xl font-semibold text-foreground pt-4">From campaigns to communities</h4>
+              <p>
+                Campaigns are where we start, because that&apos;s where the pain is sharpest and the timeline is
+                real. But the same logic reaches further.
+              </p>
+              <p>
+                In 2027 and 2028, city councils, county parties, advocacy organizations, and issue-based PACs. By
+                2030, municipalities and grassroots movements — any institution whose job is to listen to a
+                community and act on what it hears. A mayor shouldn&apos;t need a consulting firm to understand
+                their own city. An advocacy group shouldn&apos;t need six vendors to run a coordinated push. The
+                work of governing well is, at bottom, the same work as campaigning well: understand the people you
+                serve, and respond to them faster and more honestly than the alternative.
+              </p>
+
+              <h4 className="text-xl font-semibold text-foreground pt-4">Why this holds</h4>
+              <p>
+                We think a lot about what makes this durable, and it isn&apos;t the code. Code can be copied. What
+                can&apos;t be copied is what accumulates when real campaigns run through the platform: a growing,
+                first-party understanding of what actually moves people — which messages land, which issues matter
+                in which neighborhoods, how communities actually decide. That understanding compounds with every
+                campaign, and it only exists because the product is used. Which means the whole thing is
+                self-reinforcing in the right way: it gets better for everyone as more people participate, and it
+                only gets better if it earns their participation by working.
+              </p>
+              <p>
+                That&apos;s the bet. Lower the barrier, expand the field, and trust the result. More people running
+                means more voices, more accountability, more competition for the privilege of representing a
+                community. That is not a threat to democracy. That is democracy, working the way it was supposed
+                to.
+              </p>
+              <p className="text-foreground font-medium">
+                We&apos;ve got a lot of building left to do. But the direction is fixed: a field where anyone can
+                run, and no one is priced or frightened out of trying.
+              </p>
+            </div>
+          </section>
         </div>
       </div>
 
