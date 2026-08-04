@@ -2,85 +2,13 @@
 
 import { PublicLayout } from "@/app/components/PublicLayout"
 import { BlogCard } from "@/components/blog/blog-card"
-import { BlogPost } from "@/types/blog"
+import { BLOG_POSTS } from "@/data/blog-posts"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Mail } from "lucide-react"
 
-// Mock data - replace with actual data fetching
-const featuredPost: BlogPost = {
-  id: "1",
-  title: "Voter Profiles: Transform Survey Data Into Intelligent AI Agents",
-  excerpt: "Discover how Antelope's voter profile technology creates AI-powered personas from survey responses. Each respondent becomes a queryable agent that preserves their unique perspectives, values, and decision-making patterns—enabling unprecedented insights without re-surveying your audience.",
-  content: "",
-  date: "21 Nov 2024",
-  readTime: "6 min",
-  tags: ["Voter Profiles", "AI Analytics"],
-  author: { name: "admin" }
-}
-
-const weeklyPosts: BlogPost[] = [
-  {
-    id: "2",
-    title: "Cohort Analysis Made Simple: Segment Your Survey Audience in Seconds",
-    excerpt: "Learn how to create powerful audience segments with Antelope's cohort builder. Filter respondents by demographics, answers, and behaviors to uncover hidden patterns in your data. No SQL required—just point, click, and discover insights that drive better decisions.",
-    content: "",
-    date: "18 Nov 2024",
-    readTime: "5 min",
-    tags: ["Cohort Analysis", "Survey Analytics"],
-    author: { name: "admin" }
-  },
-  {
-    id: "3",
-    title: "AI-Powered Survey Analytics: Get Instant Insights Without Writing Code",
-    excerpt: "Stop spending hours in spreadsheets. Antelope's AI analytics engine automatically generates charts, identifies trends, and surfaces key insights from your survey data. Ask questions in plain English and get comprehensive analysis in seconds—powered by GPT-4 and advanced visualization models.",
-    content: "",
-    date: "15 Nov 2024",
-    readTime: "5 min",
-    tags: ["AI Analytics", "Data Visualization"],
-    author: { name: "admin" }
-  },
-  {
-    id: "4",
-    title: "Chat With Your Survey Data: Natural Language Queries for Research Teams",
-    excerpt: "Imagine asking your survey data questions like you would a colleague. With Antelope's conversational analytics, you can query cohorts, explore trends, and generate reports using natural language. Perfect for researchers who want insights fast without learning complex analytics tools.",
-    content: "",
-    date: "12 Nov 2024",
-    readTime: "4 min",
-    tags: ["Conversational AI", "Research Tools"],
-    author: { name: "admin" }
-  },
-  {
-    id: "5",
-    title: "Survey Response Prediction: How Voter Profiles Answer New Questions",
-    excerpt: "What if you could predict how your respondents would answer new survey questions without asking them again? Antelope's voter profiles use AI to generate accurate predictions based on each person's unique profile, saving time and reducing survey fatigue while maintaining data quality.",
-    content: "",
-    date: "08 Nov 2024",
-    readTime: "5 min",
-    tags: ["Predictive Analytics", "Voter Profiles"],
-    author: { name: "admin" }
-  },
-  {
-    id: "6",
-    title: "From Raw Data to Rich Insights: Automated Survey Report Generation",
-    excerpt: "Transform survey responses into professional, comprehensive reports automatically. Antelope analyzes your data, identifies key themes, generates visualizations, and produces executive summaries—all without manual effort. Get publication-ready insights in minutes, not days.",
-    content: "",
-    date: "05 Nov 2024",
-    readTime: "4 min",
-    tags: ["Report Generation", "Automation"],
-    author: { name: "admin" }
-  },
-  {
-    id: "7",
-    title: "Multi-Source Intelligence: Combine Survey Data with Voter Profiles and Web Research",
-    excerpt: "Go beyond traditional survey analysis. Antelope integrates your survey responses with voter profile predictions and real-time web research to provide context-rich insights. See how your data compares to broader trends and get a complete picture of your audience's perspectives.",
-    content: "",
-    date: "01 Nov 2024",
-    readTime: "6 min",
-    tags: ["Data Integration", "Market Research"],
-    author: { name: "admin" }
-  }
-]
+const featuredPost = BLOG_POSTS[0]
+const weeklyPosts = BLOG_POSTS.slice(1)
 
 export default function BlogPage() {
   return (

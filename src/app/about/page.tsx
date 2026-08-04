@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { PublicLayout } from "@/app/components/PublicLayout"
 
 export default function AboutPage() {
@@ -18,97 +19,103 @@ export default function AboutPage() {
 
         <div className="p-6">
           {/* Introduction */}
-          <div className="text-left space-y-2 flex">
+          <div id="why-antelope" className="text-left space-y-2 flex scroll-mt-24">
             <div className="flex-col mb-4">
-              <h2 className="text-2xl font-bold">About Antelope Politico</h2>
-              <p className="text-muted-foreground text-base max-w-2xl mx-auto">
-                Antelope Politico is an AI-powered political survey and campaign intelligence platform. We transform your polling responses into synthetic voter profiles you can query, test messages against, and analyze through natural conversation — giving campaigns faster, deeper insights at a fraction of traditional polling costs.
+              <h2 className="text-2xl font-bold">About Us</h2>
+              <p className="text-muted-foreground text-base max-w-2xl leading-relaxed">
+                Antelope is a lightweight, advanced political campaign management platform designed for political
+                campaigns, strategic policy planning, local government, PACs, and other organizations that require
+                surveys and polls, analytics, geographical data overlays, and organizational tools.
               </p>
             </div>
           </div>
 
-          <h2 id="why-antelope" className="text-xl font-semibold mt-8 mb-4 text-foreground scroll-mt-24">Why Antelope Politico?</h2>
-          <p className="text-muted-foreground leading-relaxed">
-            Traditional polling gives you a snapshot — a static set of numbers that&apos;s already aging by the time it reaches your desk. 
-            Antelope Politico transforms that data into a living, queryable model of your electorate. Every survey response 
-            becomes a synthetic voter profile that you can interrogate with new questions, test campaign messages against, 
-            and segment in ways traditional crosstabs simply cannot match.
+          <h2 className="text-xl font-semibold mt-8 mb-4 text-foreground">The 4 Main Features</h2>
+          <ol className="list-decimal list-inside space-y-3 text-muted-foreground">
+            <li>Centralized geographical data overlay for data ingestion and planning (includes bot scraping and basic automations)</li>
+            <li><strong className="text-foreground">Integrated Outbound</strong> — spread your message or poll via Telegram, SMS, WhatsApp, email, and website embeddings</li>
+            <li><strong className="text-foreground">Native Survey creation</strong> — AI automated, but fully editable</li>
+            <li><strong className="text-foreground">Advanced no-code Python analytics</strong> — ask difficult questions about correlations and regressions and get the answer in seconds. Also deployable for content creation — create insightful posts and more.</li>
+          </ol>
+          <p className="text-muted-foreground leading-relaxed mt-4">
+            Our major design takeaway is to provide integrated inbound AND outbound, full advanced no-code analytics,
+            data overlay, and advanced AI features — with zero frustration, full centralization, and affordable cost.
+          </p>
+          <p className="text-muted-foreground leading-relaxed mt-4">
+            For our overall political belief system and manifesto — including why we built this and who we built it
+            for — take a look at{" "}
+            <Link href="/blog/what-we-believe" className="text-primary hover:underline font-medium">
+              our blog article
+            </Link>
+            . In short, we believe that current tools are inadequate for tomorrow&apos;s leaders because they lack
+            proper inbound. Modern political campaign tools treat surveys as an afterthought, and even when included,
+            do not integrate them with advanced analytics — leaving heavy outbound, or spam messaging, as the default
+            action of many campaigns. This is wrong.
           </p>
 
-          <h2 className="text-xl font-semibold mt-8 mb-4 text-foreground">Key Features &amp; Benefits</h2>
-          <ul className="list-disc list-inside space-y-3 text-muted-foreground">
-            <li><strong className="text-foreground">AI-Powered Poll Builder:</strong> Describe your research goal and let our AI draft professional poll questions in seconds, or import existing data from CSV, Excel, SurveyMonkey, Google Sheets, and Typeform.</li>
-            <li><strong className="text-foreground">Synthetic Voter Profiles:</strong> Every respondent is automatically transformed into a queryable voter profile that captures their political views, demographics, and reasoning patterns.</li>
-            <li><strong className="text-foreground">Campaign Chat:</strong> Ask plain-language questions about your polling data and get instant, evidence-based answers with citations to actual responses.</li>
-            <li><strong className="text-foreground">Message Testing:</strong> Test campaign messages, policy framings, and narratives against specific voter segments before spending money on advertising.</li>
-            <li><strong className="text-foreground">Voter Segmentation:</strong> Identify swing voters, persuadable segments, base supporters, and cross-pressured voters through AI-driven cohort analysis.</li>
-            <li><strong className="text-foreground">Campaign Briefings:</strong> Generate comprehensive reports with demographic breakdowns, issue analysis, and strategic recommendations ready for your team.</li>
-            <li><strong className="text-foreground">Unlimited Polls &amp; Responses:</strong> Create as many surveys as you need with no limits during the beta period.</li>
+          <h2 className="text-xl font-semibold mt-8 mb-4 text-foreground">Who Is It For?</h2>
+          <p className="text-muted-foreground leading-relaxed mb-3">Antelope is designed for:</p>
+          <ul className="list-disc list-inside space-y-2 text-muted-foreground">
+            <li>small downballot campaign teams</li>
+            <li>exploratory committees</li>
+            <li>municipal governments and corporate organizations that require smooth, fast polling</li>
+            <li>small PACs</li>
+            <li>campaign leaders and organizers looking to develop key insight quickly</li>
+            <li>and anyone needing advanced analytics, integrated outbound, and survey creation</li>
           </ul>
 
-          <h2 className="text-xl font-semibold mt-8 mb-4 text-foreground">How It Works</h2>
-          <div className="space-y-4 text-muted-foreground">
-            <div>
-              <h3 className="font-semibold text-foreground mb-2">1. Create or Import</h3>
-              <p>Use our AI builder to generate polls from your research goals, or import existing polling data from popular platforms and file formats.</p>
-            </div>
-            <div>
-              <h3 className="font-semibold text-foreground mb-2">2. Collect Responses</h3>
-              <p>Share your poll via link or embed. Each response automatically creates a synthetic voter profile with political demographics, issue positions, and reasoning patterns.</p>
-            </div>
-            <div>
-              <h3 className="font-semibold text-foreground mb-2">3. Analyze &amp; Strategize</h3>
-              <p>Ask questions about your electorate in plain language. Get instant insights, segment voters, test messages, and generate campaign briefings — all without a data science team.</p>
-            </div>
-          </div>
-
-          <h2 className="text-xl font-semibold mt-8 mb-4 text-foreground">Who It&apos;s For</h2>
+          <h2 className="text-xl font-semibold mt-8 mb-4 text-foreground">How Does It Work?</h2>
           <p className="text-muted-foreground leading-relaxed">
-            Antelope Politico is built for campaign managers, political pollsters, PACs, advocacy organizations, 
-            party committees, academic researchers, and anyone working in political strategy. Whether you&apos;re 
-            running a local race or a statewide campaign, Antelope scales to your needs.
+            Getting started is simple. Import your district&apos;s geographical and voter data into a centralized
+            map-based dashboard, where everything lives in one place. Build a survey — let the AI draft it in
+            seconds, then edit it freely — and push it out through Telegram, SMS, WhatsApp, email, or an embed on
+            your own website. As responses come in, ask questions of your data in plain English: correlations,
+            regressions, turnout patterns. The no-code Python engine returns the answer in seconds, and can turn
+            that same insight into ready-to-post content. Inbound and outbound in one loop: listen, analyze, act,
+            repeat.
           </p>
 
-          <h2 className="text-xl font-semibold mt-8 mb-4 text-foreground">Getting Started</h2>
+          <h2 className="text-xl font-semibold mt-8 mb-4 text-foreground">How Much Does It Cost?</h2>
           <p className="text-muted-foreground leading-relaxed">
-            Ready to transform your polling experience? Start by creating your first poll in the &quot;Surveys&quot; section.
-            You can build from scratch using our AI assistant, or import existing polling data. Once you have responses,
-            use the &quot;Chat&quot; feature to explore your voter data through conversation and generate campaign intelligence reports.
+            Antelope is priced to be affordable at the local level, where budgets are smallest and the need is
+            greatest. Plans start at $49/month for hyperlocal campaigns, scaling up through Local ($99), State
+            ($299), and Federal ($499) tiers as your reach grows. Non-profits are served at cost, and enterprise
+            pricing is available for larger organizations. Every price is published in full — no rounding, no
+            &quot;contact us for a quote.&quot; Pay annually and you get twelve months for the cost of ten.
+          </p>
+          <p className="mt-2">
+            <Link href="/pricing" className="text-primary hover:underline font-medium">
+              See the full pricing page →
+            </Link>
           </p>
 
-          <h2 className="text-xl font-semibold mt-12 mb-6 text-foreground">Frequently Asked Questions</h2>
-          
-          <div className="space-y-6">
-            <div>
-              <h3 className="font-semibold text-foreground mb-2">What makes Antelope different from other polling tools?</h3>
-              <p className="text-muted-foreground">Antelope creates synthetic voter profiles from each response, allowing you to query your data conversationally, test new messages against existing respondents, and get campaign-ready insights without waiting for a new poll cycle.</p>
-            </div>
-
-            <div>
-              <h3 className="font-semibold text-foreground mb-2">How do synthetic voter profiles work?</h3>
-              <p className="text-muted-foreground">Voter profiles are AI representations built from actual survey responses and demographics. They capture political views, issue priorities, and reasoning patterns, allowing you to ask new questions of your existing data at any time.</p>
-            </div>
-
-            <div>
-              <h3 className="font-semibold text-foreground mb-2">Can I import polls from other platforms?</h3>
-              <p className="text-muted-foreground">Yes. Antelope supports imports from CSV, Excel, SurveyMonkey, Google Sheets, and Typeform. Your existing polling data can be easily migrated and transformed into queryable voter profiles.</p>
-            </div>
-
-            <div>
-              <h3 className="font-semibold text-foreground mb-2">Is voter data secure?</h3>
-              <p className="text-muted-foreground">All responses are encrypted and stored securely. Antelope supports configurable anonymity levels (full identity, semi-anonymous, or fully anonymous). Synthetic profiles are AI-generated representations, not raw personal data.</p>
-            </div>
-
-            <div>
-              <h3 className="font-semibold text-foreground mb-2">How does the campaign chat work?</h3>
-              <p className="text-muted-foreground">Ask questions about your polling data in plain language — for example: &quot;What are the top concerns for independent voters?&quot; or &quot;How do suburban women respond to our healthcare message?&quot; The AI analyzes your data and provides evidence-based answers.</p>
-            </div>
-
-            <div>
-              <h3 className="font-semibold text-foreground mb-2">Can I export insights for presentations?</h3>
-              <p className="text-muted-foreground">Yes. You can export charts, summaries, campaign briefings, and raw data in various formats ready for presentations, memos, and strategy meetings.</p>
-            </div>
-          </div>
+          <h2 className="text-xl font-semibold mt-8 mb-4 text-foreground">Who Are We?</h2>
+          <p className="text-muted-foreground leading-relaxed">
+            Antelope was founded in 2026 as the result of a personal journey of discovery and entrepreneurship by
+            Luke Svasti. A graduate of Rutgers University (New Brunswick), Columbia, and Oxford, Luke has an
+            academic background in sociology, political science, and law, with policy experience at the Refugee
+            Council of Lithuania, New Jersey United Students, the United States Student Association, Oxford Pro
+            Bono Publico, and the Rutgers University Student Assembly.
+          </p>
+          <p className="text-muted-foreground leading-relaxed mt-4">
+            Luke was first inspired by his own difficulty with R and other statistical tools. As a sufferer of
+            dyscalculia, Luke always wanted a better tool for non-technical individuals and teams. Antelope began
+            its spiritual roots with Napolleon, a joint Oxford University incubator project (now defunct), before
+            becoming an independent project focusing on surveys. From there, chance encounters with old friends
+            involved with political networking and lobbying led Antelope to hone in on being the best-in-class
+            lightweight analytical tool for fast, small campaigns.
+          </p>
+          <p className="text-muted-foreground leading-relaxed mt-4">
+            For more information and our full history, take a look{" "}
+            <Link href="/blog/our-history" className="text-primary hover:underline font-medium">
+              here
+            </Link>
+            .
+          </p>
+          <p className="text-muted-foreground leading-relaxed mt-4">
+            Currently, Antelope is headed by Luke Svasti, with engineering by Abhishek Rathi and advisory design
+            input by Thomas Petersen.
+          </p>
         </div>
       </div>
     </div>
