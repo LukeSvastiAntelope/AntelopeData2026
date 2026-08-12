@@ -46,36 +46,22 @@ function getOpenAIClient() {
   return new OpenAI({ apiKey })
 }
 
-async function getBaseDistrictIntel(districtCodeRaw: string) {
-  const districtCode = districtCodeRaw.trim().toUpperCase()
-  if (!districtCode) {
-    return { error: 'districtCode is required', status: 400 as const }
-  }
+const STATE_FIPS_MAP: Record<string, string> = {
+  AL: '01', AK: '02', AZ: '04', AR: '05', CA: '06', CO: '08', CT: '09', DE: '10', DC: '11', FL: '12', GA: '13',
+  HI: '15', ID: '16', IL: '17', IN: '18', IA: '19', KS: '20', KY: '21', LA: '22', ME: '23', MD: '24', MA: '25',
+  MI: '26', MN: '27', MS: '28', MO: '29', MT: '30', NE: '31', NV: '32', NH: '33', NJ: '34', NM: '35', NY: '36',
+  NC: '37', ND: '38', OH: '39', OK: '40', OR: '41', PA: '42', RI: '44', SC: '45', SD: '46', TN: '47', TX: '48',
+  UT: '49', VT: '50', VA: '51', WA: '53', WV: '54', WI: '55', WY: '56',
+}
 
-  const db = await getConnection()
-  const [rows]: any = await db.execute(
-    `SELECT d.*, demo.total_population, demo.median_household_income, demo.bachelors_or_higher_pct, demo.median_age, demo.source_year
-     FROM political_data_districts d
-     LEFT JOIN political_data_district_demographics demo ON demo.district_code = d.district_code
-     WHERE d.district_code = ?
-     LIMIT 1`,
-    [districtCode]
-  )
-  const local = rows?.[0]
-  if (!local) {
-    return { error: 'District not found', status: 404 as const }
-  }
-
-  const stateAbbrev = String(local.state || '').toUpperCase()
-  const districtNumber = Number(local.district_number || 0)
-  const stateFipsMap: Record<string, string> = {
-    AL: '01', AK: '02', AZ: '04', AR: '05', CA: '06', CO: '08', CT: '09', DE: '10', DC: '11', FL: '12', GA: '13',
-    HI: '15', ID: '16', IL: '17', IN: '18', IA: '19', KS: '20', KY: '21', LA: '22', ME: '23', MD: '24', MA: '25',
-    MI: '26', MN: '27', MS: '28', MO: '29', MT: '30', NE: '31', NV: '32', NH: '33', NJ: '34', NM: '35', NY: '36',
-    NC: '37', ND: '38', OH: '39', OK: '40', OR: '41', PA: '42', RI: '44', SC: '45', SD: '46', TN: '47', TX: '48',
-    UT: '49', VT: '50', VA: '51', WA: '53', WV: '54', WI: '55', WY: '56',
-  }
-  const stateFips = stateFipsMap[stateAbbrev]
+// All the live external-API fetching lives here so it runs identically
+// whether or not the district exists in our internal DB — previously this
+// was only wired into the DB-found path, so with an empty
+// political_data_districts table (the common case today) every single
+// request silently skipped Census/BLS/FEC entirely and fell back to a
+// hardcoded all-"unavailable" stub.
+async function fetchExternalDistrictData(stateAbbrev: string, districtNumber: number) {
+  const stateFips = STATE_FIPS_MAP[stateAbbrev]
   const districtPadded = districtNumber ? String(districtNumber).padStart(2, '0') : ''
 
   // Census API key raises the anonymous rate limit and is required for some
@@ -164,11 +150,53 @@ async function getBaseDistrictIntel(districtCodeRaw: string) {
   // POST handler below), never as a verified/authoritative data source.
   const mitElectionLabStatus: SourceStatus = 'unavailable'
 
+  return {
+    censusStatus,
+    cbpStatus,
+    blsStatus,
+    fecStatus,
+    fecTotalsStatus,
+    openStatesStatus,
+    ballotpediaStatus,
+    mitElectionLabStatus,
+    censusPreview: Array.isArray(censusRaw) ? censusRaw.slice(0, 2) : null,
+    cbpPreview: Array.isArray(cbpRaw) ? cbpRaw.slice(0, 2) : null,
+    blsLatest,
+    fecPreview: fecRaw?.results?.slice?.(0, 3) || null,
+    fecTotals,
+    openStatesPreview: openStatesRaw?.results?.slice?.(0, 3) || null,
+  }
+}
+
+async function getBaseDistrictIntel(districtCodeRaw: string) {
+  const districtCode = districtCodeRaw.trim().toUpperCase()
+  if (!districtCode) {
+    return { error: 'districtCode is required', status: 400 as const }
+  }
+
+  const db = await getConnection()
+  const [rows]: any = await db.execute(
+    `SELECT d.*, demo.total_population, demo.median_household_income, demo.bachelors_or_higher_pct, demo.median_age, demo.source_year
+     FROM political_data_districts d
+     LEFT JOIN political_data_district_demographics demo ON demo.district_code = d.district_code
+     WHERE d.district_code = ?
+     LIMIT 1`,
+    [districtCode]
+  )
+  const local = rows?.[0]
+  if (!local) {
+    return { error: 'District not found', status: 404 as const }
+  }
+
+  const stateAbbrev = String(local.state || '').toUpperCase()
+  const districtNumber = Number(local.district_number || 0)
+  const external = await fetchExternalDistrictData(stateAbbrev, districtNumber)
+
   const summary = [
     `${districtCode} baseline: PVI ${local.cook_pvi || 'N/A'}, 2024 margin ${parseFloat(local.margin_2024 || 0).toFixed(1)}.`,
     `Incumbent: ${local.incumbent_name || 'Unknown'} (${local.incumbent_party || 'N/A'}).`,
     `Demographics: pop ${local.total_population ? Number(local.total_population).toLocaleString() : 'N/A'}, median HH income ${local.median_household_income ? `$${Number(local.median_household_income).toLocaleString()}` : 'N/A'}, median age ${local.median_age || 'N/A'}.`,
-    `Data source health -> Census ACS: ${censusStatus}, Census CBP: ${cbpStatus}, BLS: ${blsStatus}, FEC candidates: ${fecStatus}, FEC totals: ${fecTotalsStatus}, OpenStates: ${openStatesStatus}, Ballotpedia: ${ballotpediaStatus} (link-out only), MIT Election Lab: ${mitElectionLabStatus} (link-out / web-search target only, not a verified API).`,
+    `Data source health -> Census ACS: ${external.censusStatus}, Census CBP: ${external.cbpStatus}, BLS: ${external.blsStatus}, FEC candidates: ${external.fecStatus}, FEC totals: ${external.fecTotalsStatus}, OpenStates: ${external.openStatesStatus}, Ballotpedia: ${external.ballotpediaStatus} (link-out only), MIT Election Lab: ${external.mitElectionLabStatus} (link-out / web-search target only, not a verified API).`,
   ].join(' ')
 
   return {
@@ -189,22 +217,7 @@ async function getBaseDistrictIntel(districtCodeRaw: string) {
         medianAge: local.median_age ? Number(local.median_age) : null,
       },
     },
-    external: {
-      censusStatus,
-      cbpStatus,
-      blsStatus,
-      fecStatus,
-      fecTotalsStatus,
-      openStatesStatus,
-      ballotpediaStatus,
-      mitElectionLabStatus,
-      censusPreview: Array.isArray(censusRaw) ? censusRaw.slice(0, 2) : null,
-      cbpPreview: Array.isArray(cbpRaw) ? cbpRaw.slice(0, 2) : null,
-      blsLatest,
-      fecPreview: fecRaw?.results?.slice?.(0, 3) || null,
-      fecTotals,
-      openStatesPreview: openStatesRaw?.results?.slice?.(0, 3) || null,
-    },
+    external,
     intelligence: {
       narrative: summary,
       recommendedNextSteps: [
@@ -262,6 +275,12 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ status: false, message: base.error }, { status: base.status })
       }
       dbRecordFound = false
+      // No internal DB row, but we can still hit the real external APIs
+      // directly with the state/district the client already knows from the
+      // map click — this used to be hardcoded to all-"unavailable" stubs,
+      // which meant Census/BLS/FEC data never loaded for any district not
+      // already present in political_data_districts (i.e. almost every request).
+      const external = await fetchExternalDistrictData(clientState, clientDistrictNumber)
       base = {
         status: true,
         district: {
@@ -280,24 +299,9 @@ export async function POST(request: NextRequest) {
             medianAge: null,
           },
         },
-        external: {
-          censusStatus: 'unavailable',
-          cbpStatus: 'unavailable',
-          blsStatus: 'unavailable',
-          fecStatus: 'unavailable',
-          fecTotalsStatus: 'unavailable',
-          openStatesStatus: 'unavailable',
-          ballotpediaStatus: 'unavailable',
-          mitElectionLabStatus: 'unavailable',
-          censusPreview: null,
-          cbpPreview: null,
-          blsLatest: null,
-          fecPreview: null,
-          fecTotals: null,
-          openStatesPreview: null,
-        },
+        external,
         intelligence: {
-          narrative: `${districtCode}: no internal database record yet for this district — relying entirely on live web research for this report.`,
+          narrative: `${districtCode}: no internal database record yet for this district — relying on live Census/BLS/FEC data plus web research for this report. Data source health -> Census ACS: ${external.censusStatus}, Census CBP: ${external.cbpStatus}, BLS: ${external.blsStatus}, FEC candidates: ${external.fecStatus}, FEC totals: ${external.fecTotalsStatus}.`,
           recommendedNextSteps: [
             'Open district in chat to run scenario strategy and messaging tests.',
             'Compare fundraising and turnout proxies vs adjacent districts.',
