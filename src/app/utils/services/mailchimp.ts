@@ -202,3 +202,115 @@ export async function sendSurveyEmailCampaign(opts: {
     results,
   };
 }
+
+/**
+ * SMS via Mailchimp's newer "Audiences" API (shipped ~April 2026). Unlike the
+ * classic /lists/{id}/members endpoint, /audiences/{id}/contacts genuinely
+ * accepts and persists sms_channel data — confirmed by hand against the live
+ * API (the classic endpoint silently drops sms_phone_number/sms_subscription_status).
+ * SMS campaigns are a separate top-level resource (/sms-campaigns), targeted
+ * by the list's numeric web_id rather than the hex audience id.
+ *
+ * Note: a brand-new SMS-enabled list stays "inactive" for API campaign
+ * creation until the account owner sends one SMS campaign manually through
+ * the Mailchimp UI at least once — sendSurveySmsCampaign surfaces that as a
+ * clear error rather than a generic 400.
+ */
+
+export interface SmsSendResult {
+  phone: string;
+  status: 'added' | 'failed';
+  error?: string;
+}
+
+/** The list's numeric "web_id" is what /sms-campaigns expects as list_id (the hex audience id is not accepted there). */
+async function resolveNumericListId(creds: MailchimpCreds, listId: string): Promise<number> {
+  const data = await mcFetch(creds, `/lists/${listId}`);
+  if (!data?.web_id) {
+    throw new Error('Could not resolve Mailchimp list numeric ID.');
+  }
+  return data.web_id;
+}
+
+/**
+ * Send a survey-invite SMS blast to a list of phone numbers via a Mailchimp
+ * SMS campaign. Recipients are upserted as SMS-consented contacts first (a
+ * contact must exist with an active sms_channel before a campaign can reach
+ * it), then the campaign is created, given content, and sent to the whole
+ * list — Mailchimp SMS campaigns only ever reach SMS-subscribed contacts, so
+ * targeting "the whole list" is equivalent to "everyone we just added".
+ */
+export async function sendSurveySmsCampaign(opts: {
+  creds: MailchimpCreds;
+  phones: string[];
+  messageBody: string;
+  campaignTitle: string;
+}): Promise<{ campaignId: string; summary: CampaignSendSummary; results: SmsSendResult[] }> {
+  const { creds, phones, messageBody, campaignTitle } = opts;
+  const listId = await resolveListId(creds);
+  const numericListId = await resolveNumericListId(creds, listId);
+
+  // 1) Upsert each phone number as an SMS-consented contact.
+  const results: SmsSendResult[] = [];
+  const batchSize = 10;
+  for (let i = 0; i < phones.length; i += batchSize) {
+    const batch = phones.slice(i, i + batchSize);
+    const settled = await Promise.allSettled(
+      batch.map(async (phone) => {
+        await mcFetch(creds, `/audiences/${listId}/contacts`, {
+          method: 'POST',
+          body: JSON.stringify({
+            sms_channel: {
+              sms_phone: phone,
+              marketing_consent: { status: 'confirmed' },
+            },
+            update_existing: true,
+          }),
+        });
+        return phone;
+      })
+    );
+    settled.forEach((r, idx) => {
+      if (r.status === 'fulfilled') results.push({ phone: batch[idx], status: 'added' });
+      else results.push({ phone: batch[idx], status: 'failed', error: r.reason?.message || 'Unknown error' });
+    });
+  }
+
+  const addedCount = results.filter((r) => r.status === 'added').length;
+  if (addedCount === 0) {
+    throw new Error('No recipients could be added as Mailchimp SMS subscribers.');
+  }
+
+  // 2) Create the SMS campaign targeted at the whole (SMS-subscribed) list.
+  let campaign: any;
+  try {
+    campaign = await mcFetch(creds, '/sms-campaigns', {
+      method: 'POST',
+      body: JSON.stringify({ name: campaignTitle, list_id: numericListId }),
+    });
+  } catch (e: any) {
+    if (String(e?.message || '').includes('List is inactive')) {
+      throw new Error(
+        'Your Mailchimp SMS list is registered but not yet activated for API sends. Send one SMS campaign manually from Mailchimp (SMS → Create SMS) to activate it, then try again from here.'
+      );
+    }
+    throw e;
+  }
+
+  // 3) Set content and send.
+  await mcFetch(creds, `/sms-campaigns/${campaign.id}/content`, {
+    method: 'PUT',
+    body: JSON.stringify({ message_body: messageBody }),
+  });
+  await mcFetch(creds, `/sms-campaigns/${campaign.id}/actions/send`, { method: 'POST' });
+
+  return {
+    campaignId: campaign.id,
+    summary: {
+      total: phones.length,
+      added: addedCount,
+      failed: results.filter((r) => r.status === 'failed').length,
+    },
+    results,
+  };
+}

@@ -719,6 +719,301 @@ function EmailPanel({ surveyId, surveyTitle, ready, senderFrom }: EmailPanelProp
 }
 
 // -----------------------------------------------------------------------
+// SMS via Mailchimp (uses the same Mailchimp connection as the Email tab)
+// -----------------------------------------------------------------------
+
+interface MailchimpSmsPanelProps {
+  surveyId: string
+  ready: boolean | null
+  senderFrom: string | null
+}
+
+function MailchimpSmsPanel({ surveyId, ready, senderFrom }: MailchimpSmsPanelProps) {
+  const [phoneInput, setPhoneInput] = useState('')
+  const [message, setMessage] = useState('')
+  const [mode, setMode] = useState<'default' | 'canvass'>('default')
+  const [sending, setSending] = useState(false)
+  const [uploadedFile, setUploadedFile] = useState<string | null>(null)
+  const [uploadedCount, setUploadedCount] = useState(0)
+  const [result, setResult] = useState<{
+    sent: boolean
+    formattedMessage?: string
+    message?: string
+    summary?: { total: number; sent: number; failed: number }
+    campaignId?: string
+    reason?: string
+  } | null>(null)
+  const fileRef = useRef<HTMLInputElement>(null)
+
+  const parseNumbers = useCallback(
+    () =>
+      phoneInput
+        .split(/[\n,;]+/)
+        .map((n) => n.trim())
+        .filter(Boolean),
+    [phoneInput]
+  )
+
+  const handleFile = useCallback(async (file: File) => {
+    try {
+      const buf = await file.arrayBuffer()
+      const wb = XLSX.read(buf, { type: 'array' })
+      const sheet = wb.Sheets[wb.SheetNames[0]]
+      const rows = XLSX.utils.sheet_to_json<any[]>(sheet, { header: 1, blankrows: false })
+      const numbers = extractNumbers(rows as any[][])
+      if (!numbers.length) {
+        toast.error('No phone numbers found. Include a "phone" column with country code.')
+        return
+      }
+      setPhoneInput((prev) => {
+        const existing = prev.split(/[\n,;]+/).map((n) => n.trim()).filter(Boolean)
+        const merged = Array.from(new Set([...existing, ...numbers]))
+        return merged.join('\n')
+      })
+      setUploadedFile(file.name)
+      setUploadedCount(numbers.length)
+      toast.success(`${numbers.length} numbers loaded from ${file.name}`)
+    } catch (err) {
+      console.error(err)
+      toast.error('Could not read the file. Use .xlsx, .xls or .csv')
+    }
+  }, [])
+
+  const handleSend = useCallback(async () => {
+    const numbers = parseNumbers()
+    if (numbers.length === 0) {
+      toast.error('Enter at least one phone number')
+      return
+    }
+
+    setSending(true)
+    setResult(null)
+    try {
+      const res = await fetch(`/api/surveys/${surveyId}/sms-mailchimp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phoneNumbers: numbers, message: message || undefined, mode }),
+      })
+      const data = await res.json()
+      if (data.status) {
+        setResult({
+          sent: data.sent,
+          formattedMessage: data.formattedMessage,
+          message: data.message,
+          summary: data.summary,
+          campaignId: data.campaignId,
+          reason: data.reason,
+        })
+        if (data.sent) {
+          toast.success(`Sent to ${data.summary.sent} recipient${data.summary.sent === 1 ? '' : 's'} via Mailchimp SMS`)
+        }
+      } else {
+        toast.error(data.message || 'SMS failed')
+      }
+    } catch {
+      toast.error('SMS request failed')
+    } finally {
+      setSending(false)
+    }
+  }, [surveyId, message, mode, parseNumbers])
+
+  const copyMessage = useCallback(async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text)
+      toast.success('Message copied')
+    } catch {
+      toast.error('Failed to copy')
+    }
+  }, [])
+
+  const typedCount = parseNumbers().length
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <CardTitle>SMS Distribution (Mailchimp)</CardTitle>
+            <CardDescription>Send survey invitations via Mailchimp SMS campaigns</CardDescription>
+          </div>
+          {ready === true ? (
+            <Badge className="bg-green-100 text-green-700 hover:bg-green-100">
+              <Check className="h-3 w-3 mr-1" /> Connected{senderFrom ? ` · ${senderFrom}` : ''}
+            </Badge>
+          ) : ready === false ? (
+            <Badge variant="secondary" className="text-amber-700 bg-amber-100 hover:bg-amber-100">
+              Not connected
+            </Badge>
+          ) : null}
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {ready === false && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+            Mailchimp isn&apos;t connected yet.{' '}
+            <a href="/channels/new?provider=email" className="underline font-medium">
+              Connect your Mailchimp account
+            </a>{' '}
+            (the same connection is used for Email and SMS) — or copy the message below and send manually.
+          </div>
+        )}
+
+        {/* Phone numbers */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <Label>
+              Phone Numbers{' '}
+              <span className="text-muted-foreground font-normal">
+                (one per line or comma-separated, with country code)
+              </span>
+            </Label>
+            <span className="text-xs text-muted-foreground">{typedCount} number{typedCount === 1 ? '' : 's'}</span>
+          </div>
+          <Textarea
+            placeholder={'+15551234567\n+447911123456'}
+            value={phoneInput}
+            onChange={(e) => setPhoneInput(e.target.value)}
+            className="font-mono text-sm min-h-[100px]"
+          />
+        </div>
+
+        {/* Bulk upload */}
+        <div className="space-y-2">
+          <Label className="flex items-center gap-2">
+            <FileSpreadsheet className="h-4 w-4" />
+            Bulk upload (Excel / CSV)
+          </Label>
+          <input
+            ref={fileRef}
+            type="file"
+            accept=".xlsx,.xls,.csv"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0]
+              if (f) handleFile(f)
+              e.target.value = ''
+            }}
+          />
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button type="button" variant="outline" size="sm" onClick={() => fileRef.current?.click()}>
+              <Upload className="h-4 w-4 mr-2" />
+              Upload spreadsheet
+            </Button>
+            {uploadedFile && (
+              <span className="text-xs text-muted-foreground flex items-center gap-1">
+                <FileSpreadsheet className="h-3 w-3" />
+                {uploadedFile} — {uploadedCount} numbers
+                <button
+                  type="button"
+                  onClick={() => {
+                    setUploadedFile(null)
+                    setUploadedCount(0)
+                  }}
+                  className="ml-1 hover:text-foreground"
+                  aria-label="clear"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Include a column named <code>phone</code>. Numbers are appended to the list above so you can also add
+            individuals by hand.
+          </p>
+        </div>
+
+        {/* Message */}
+        <div className="space-y-2">
+          <Label>
+            Custom Message{' '}
+            <span className="text-muted-foreground font-normal">
+              (optional — use {'{{link}}'} for survey URL)
+            </span>
+          </Label>
+          <Textarea
+            placeholder="Leave blank for default message"
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            className="text-sm"
+          />
+        </div>
+
+        {/* Mode */}
+        <div className="flex gap-2">
+          <Button
+            variant={mode === 'default' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setMode('default')}
+          >
+            Standard
+          </Button>
+          <Button
+            variant={mode === 'canvass' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setMode('canvass')}
+          >
+            <Smartphone className="h-4 w-4 mr-1" />
+            Canvass Mode
+          </Button>
+        </div>
+
+        <Button onClick={handleSend} disabled={sending}>
+          {sending ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              Sending...
+            </>
+          ) : (
+            <>
+              <MessageSquare className="h-4 w-4 mr-2" />
+              Send SMS
+            </>
+          )}
+        </Button>
+
+        {/* Result */}
+        {result && (
+          <div className="border rounded-lg p-4 space-y-2">
+            {result.sent ? (
+              <div className="text-sm">
+                <p className="font-medium text-green-600">
+                  {result.summary?.sent} added to campaign, {result.summary?.failed} failed
+                </p>
+                {result.campaignId && (
+                  <p className="text-xs text-muted-foreground mt-1">Mailchimp SMS campaign sent — delivery may take a few minutes.</p>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-amber-600">
+                  {result.message || 'SMS not sent — manual send required'}
+                </p>
+                {result.formattedMessage && (
+                  <>
+                    <div className="p-3 bg-muted rounded-lg">
+                      <p className="text-sm font-mono whitespace-pre-wrap">{result.formattedMessage}</p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => copyMessage(result.formattedMessage || '')}
+                    >
+                      <Copy className="h-3 w-3 mr-1" />
+                      Copy Message
+                    </Button>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
+// -----------------------------------------------------------------------
 // Telegram
 // -----------------------------------------------------------------------
 
@@ -849,6 +1144,7 @@ export default function DistributePage() {
   const [smsFrom, setSmsFrom] = useState<string | null>(null)
   const [whatsappFrom, setWhatsappFrom] = useState<string | null>(null)
   const [emailFrom, setEmailFrom] = useState<string | null>(null)
+  const [smsProvider, setSmsProvider] = useState<'twilio' | 'mailchimp'>('mailchimp')
 
   const baseUrl = typeof window !== 'undefined' ? window.location.origin : ''
   const surveyUrl = surveySlug ? `${baseUrl}/survey/${surveySlug}` : ''
@@ -1116,7 +1412,28 @@ export default function DistributePage() {
 
           {/* ---- SMS ---- */}
           <TabsContent value="sms" className="space-y-4">
-            <MessagingPanel surveyId={surveyId} channel="sms" ready={smsReady} senderFrom={smsFrom} />
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground mr-1">Send via:</span>
+              <Button
+                variant={smsProvider === 'mailchimp' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setSmsProvider('mailchimp')}
+              >
+                Mailchimp
+              </Button>
+              <Button
+                variant={smsProvider === 'twilio' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setSmsProvider('twilio')}
+              >
+                Twilio
+              </Button>
+            </div>
+            {smsProvider === 'mailchimp' ? (
+              <MailchimpSmsPanel surveyId={surveyId} ready={emailReady} senderFrom={emailFrom} />
+            ) : (
+              <MessagingPanel surveyId={surveyId} channel="sms" ready={smsReady} senderFrom={smsFrom} />
+            )}
           </TabsContent>
 
           {/* ---- WHATSAPP ---- */}
