@@ -34,7 +34,12 @@ function decryptJson(enc: string | null): any | null {
 export const ChannelRepo = {
   upsertUserTelegramIntegration: async (userId: number, botToken: string, settings: Record<string, any>, webhookSecret?: string) => {
     const db = await getMySQLConnection()
-    const encrypted = encryptJson({ botToken })
+    // encrypted_credentials is a MySQL `json` column — it must be a valid JSON
+    // document, so the "iv:ciphertext" string from encryptJson() has to be
+    // JSON-encoded (quoted) before it's stored. mysql2 auto-decodes JSON
+    // columns back to the plain string on read, so decryptJson() needs no
+    // corresponding change.
+    const encrypted = JSON.stringify(encryptJson({ botToken }))
     const settingsJson = JSON.stringify({ ...(settings||{}), webhookSecret: webhookSecret || null })
     await db.execute(
       `INSERT INTO user_channel_integrations (user_id, provider, status, encrypted_credentials, settings)
@@ -54,8 +59,12 @@ export const ChannelRepo = {
     if (!rows[0]) return null
     const row = rows[0]
     const creds = decryptJson((row as any).encrypted_credentials)
-    let settings: any = null
-    try { settings = JSON.parse((row as any).settings || '{}') } catch {}
+    // mysql2 auto-decodes `json` columns to native objects, but tolerate a
+    // raw string too in case a row was ever written outside this helper.
+    const rawSettings = (row as any).settings
+    const settings = rawSettings && typeof rawSettings === 'object'
+      ? rawSettings
+      : (() => { try { return JSON.parse(rawSettings || '{}') } catch { return null } })()
     return { ...row, credentials: creds, settings }
   },
 
