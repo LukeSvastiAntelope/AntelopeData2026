@@ -63,7 +63,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ status: true, bot: me?.result, webhookUrl });
   } catch (error) {
     console.error('Telegram connect error:', error);
-    return NextResponse.json({ status: false, message: 'Internal error during Telegram connect' }, { status: 500 });
+    const detail = error instanceof Error ? error.message : String(error);
+    return NextResponse.json({ status: false, message: `Internal error during Telegram connect: ${detail}` }, { status: 500 });
   }
 }
 
