@@ -73,7 +73,14 @@ async function mcFetch(creds: MailchimpCreds, path: string, init?: RequestInit) 
   let json: any = null;
   try { json = text ? JSON.parse(text) : null; } catch { /* non-JSON */ }
   if (!res.ok) {
-    const detail = json?.detail || json?.title || text || res.statusText;
+    // Mailchimp's top-level `detail` is often a generic wrapper ("could not
+    // be validated, see errors array") while the actual reason lives in
+    // `errors[].message` — surface that instead when present, since callers
+    // (e.g. the "List is inactive" check below) match on the specific text.
+    const fieldDetail = Array.isArray(json?.errors) && json.errors.length
+      ? json.errors.map((e: any) => e?.message).filter(Boolean).join('; ')
+      : null;
+    const detail = fieldDetail || json?.detail || json?.title || text || res.statusText;
     throw new Error(`Mailchimp API error (${res.status}): ${detail}`);
   }
   return json;
