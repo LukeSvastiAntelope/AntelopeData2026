@@ -78,18 +78,49 @@ async function getBaseDistrictIntel(districtCodeRaw: string) {
   const stateFips = stateFipsMap[stateAbbrev]
   const districtPadded = districtNumber ? String(districtNumber).padStart(2, '0') : ''
 
+  // Census API key raises the anonymous rate limit and is required for some
+  // datasets (e.g. County Business Patterns below); ACS itself tolerates a
+  // modest amount of unauthenticated traffic, so it degrades gracefully
+  // without a key rather than going fully unavailable.
+  const censusKey = process.env.CENSUS_API_KEY
+  const censusKeyParam = censusKey ? `&key=${encodeURIComponent(censusKey)}` : ''
+
   const censusUrl =
     stateFips && districtPadded
-      ? `https://api.census.gov/data/2022/acs/acs5/profile?get=NAME,DP05_0001E,DP03_0062E&for=congressional%20district:${districtPadded}&in=state:${stateFips}`
+      ? `https://api.census.gov/data/2022/acs/acs5/profile?get=NAME,DP05_0001E,DP03_0062E,DP03_0009PE,DP02_0067PE&for=congressional%20district:${districtPadded}&in=state:${stateFips}${censusKeyParam}`
       : ''
   const censusRaw = censusUrl ? await safeJson(censusUrl) : null
   const censusStatus: SourceStatus = censusRaw ? 'ok' : 'partial'
 
+  // County Business Patterns at congressional-district geography — real
+  // local economic texture (establishment count, employment, annual
+  // payroll). Requires a Census API key (free, api.census.gov/data/key_signup.html).
+  const cbpUrl =
+    censusKey && stateFips && districtPadded
+      ? `https://api.census.gov/data/2022/cbp?get=NAME,ESTAB,EMP,PAYANN&for=congressional%20district:${districtPadded}&in=state:${stateFips}${censusKeyParam}`
+      : ''
+  const cbpRaw = cbpUrl ? await safeJson(cbpUrl) : null
+  const cbpStatus: SourceStatus = !censusKey ? 'unavailable' : cbpRaw ? 'ok' : 'partial'
+
   // OpenFEC allows DEMO_KEY for low-volume testing; set FEC_API_KEY in production.
   const fecKey = (process.env.FEC_API_KEY || 'DEMO_KEY').trim()
-  const fecUrl = `https://api.open.fec.gov/v1/candidates/search/?api_key=${encodeURIComponent(fecKey)}&office=H&state=${stateAbbrev}&district=${districtNumber}&per_page=5`
+  const fecUrl = `https://api.open.fec.gov/v1/candidates/search/?api_key=${encodeURIComponent(fecKey)}&office=H&state=${stateAbbrev}&district=${districtNumber}&per_page=5&sort=-election_years`
   const fecRaw = await safeJson(fecUrl)
   const fecStatus: SourceStatus = fecRaw ? 'ok' : 'unavailable'
+
+  // Real fundraising totals (not just candidate metadata) for the leading
+  // candidate's principal committee — genuine donor/receipts data, not an
+  // LLM guess. Best-effort: only the top result's committee is queried to
+  // keep this fast.
+  let fecTotals: any = null
+  let fecTotalsStatus: SourceStatus = 'unavailable'
+  const topCommitteeId = fecRaw?.results?.[0]?.principal_committees?.[0]?.committee_id
+  if (topCommitteeId) {
+    const totalsUrl = `https://api.open.fec.gov/v1/committee/${topCommitteeId}/totals/?api_key=${encodeURIComponent(fecKey)}&per_page=1&sort=-cycle`
+    const totalsRaw = await safeJson(totalsUrl)
+    fecTotals = totalsRaw?.results?.[0] || null
+    fecTotalsStatus = fecTotals ? 'ok' : 'unavailable'
+  }
 
   const openStatesKey = process.env.OPENSTATES_API_KEY
   const openStatesUrl = openStatesKey
@@ -98,15 +129,46 @@ async function getBaseDistrictIntel(districtCodeRaw: string) {
   const openStatesRaw = openStatesUrl ? await safeJson(openStatesUrl) : null
   const openStatesStatus: SourceStatus = openStatesRaw ? 'ok' : 'unavailable'
 
+  // BLS Local Area Unemployment Statistics — STATE-level unemployment rate
+  // (LAUS does not publish a congressional-district geography, so this is
+  // deliberately labeled state-level rather than faking district precision).
+  // Works at low volume without a key; BLS_API_KEY raises the daily limit.
+  const blsKey = process.env.BLS_API_KEY
+  let blsLatest: { period: string; year: string; value: string } | null = null
+  let blsStatus: SourceStatus = 'unavailable'
+  if (stateFips) {
+    const seriesId = `LASST${stateFips}0000000000003`
+    const currentYear = new Date().getFullYear()
+    const blsBody: any = { seriesid: [seriesId], startyear: String(currentYear - 1), endyear: String(currentYear) }
+    if (blsKey) blsBody.registrationkey = blsKey
+    try {
+      const res = await fetch('https://api.bls.gov/publicAPI/v2/timeseries/data/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(blsBody),
+      })
+      const json = res.ok ? await res.json() : null
+      const point = json?.Results?.series?.[0]?.data?.[0]
+      if (point) {
+        blsLatest = { period: point.periodName, year: point.year, value: point.value }
+        blsStatus = 'ok'
+      }
+    } catch {
+      // leave blsStatus as 'unavailable'
+    }
+  }
+
   const ballotpediaStatus: SourceStatus = 'unavailable'
-  // MIT Election Lab publishes research datasets; there is no single public REST API wired here (links only in district brief / action kit).
+  // MIT Election Lab publishes research datasets, not a live REST API — it's
+  // only usable here as a web-search target (see preferredSources in the
+  // POST handler below), never as a verified/authoritative data source.
   const mitElectionLabStatus: SourceStatus = 'unavailable'
 
   const summary = [
     `${districtCode} baseline: PVI ${local.cook_pvi || 'N/A'}, 2024 margin ${parseFloat(local.margin_2024 || 0).toFixed(1)}.`,
     `Incumbent: ${local.incumbent_name || 'Unknown'} (${local.incumbent_party || 'N/A'}).`,
     `Demographics: pop ${local.total_population ? Number(local.total_population).toLocaleString() : 'N/A'}, median HH income ${local.median_household_income ? `$${Number(local.median_household_income).toLocaleString()}` : 'N/A'}, median age ${local.median_age || 'N/A'}.`,
-    `Data source health -> Census: ${censusStatus}, FEC: ${fecStatus}, OpenStates: ${openStatesStatus}, Ballotpedia: ${ballotpediaStatus}, MIT Election Lab: ${mitElectionLabStatus} (no live API in this app—use MIT data portal for files).`,
+    `Data source health -> Census ACS: ${censusStatus}, Census CBP: ${cbpStatus}, BLS: ${blsStatus}, FEC candidates: ${fecStatus}, FEC totals: ${fecTotalsStatus}, OpenStates: ${openStatesStatus}, Ballotpedia: ${ballotpediaStatus} (link-out only), MIT Election Lab: ${mitElectionLabStatus} (link-out / web-search target only, not a verified API).`,
   ].join(' ')
 
   return {
@@ -129,12 +191,18 @@ async function getBaseDistrictIntel(districtCodeRaw: string) {
     },
     external: {
       censusStatus,
+      cbpStatus,
+      blsStatus,
       fecStatus,
+      fecTotalsStatus,
       openStatesStatus,
       ballotpediaStatus,
       mitElectionLabStatus,
       censusPreview: Array.isArray(censusRaw) ? censusRaw.slice(0, 2) : null,
+      cbpPreview: Array.isArray(cbpRaw) ? cbpRaw.slice(0, 2) : null,
+      blsLatest,
       fecPreview: fecRaw?.results?.slice?.(0, 3) || null,
+      fecTotals,
       openStatesPreview: openStatesRaw?.results?.slice?.(0, 3) || null,
     },
     intelligence: {
@@ -214,12 +282,18 @@ export async function POST(request: NextRequest) {
         },
         external: {
           censusStatus: 'unavailable',
+          cbpStatus: 'unavailable',
+          blsStatus: 'unavailable',
           fecStatus: 'unavailable',
+          fecTotalsStatus: 'unavailable',
           openStatesStatus: 'unavailable',
           ballotpediaStatus: 'unavailable',
           mitElectionLabStatus: 'unavailable',
           censusPreview: null,
+          cbpPreview: null,
+          blsLatest: null,
           fecPreview: null,
+          fecTotals: null,
           openStatesPreview: null,
         },
         intelligence: {
@@ -252,32 +326,60 @@ export async function POST(request: NextRequest) {
       ? `${stateName}'s ${ordinal(base.district.districtNumber)} Congressional District (${base.district.districtCode})`
       : `${stateName} (${base.district.districtCode})`
 
-    // Preferred election-data sources, per campaign-team guidance. The
-    // underlying search-preview model performs a real web search, so
-    // "site:" hints reliably bias it toward these domains.
+    // Web-search targets only. These are real, reputable election-data
+    // websites the model may find via live search — but unlike the
+    // Antelope-verified facts block below, nothing here is claimed as an
+    // API-backed source, so the model must not cite them as more certain
+    // than a normal web search result. MIT Election Lab is deliberately
+    // NOT framed as "authoritative" — it publishes research datasets, not
+    // a live API, and treating it that way previously produced unreliable
+    // figures the model effectively invented while attributing them to it.
     const preferredSources = [
       { name: 'MIT Election Lab', domain: 'electionlab.mit.edu' },
       { name: 'OpenElectionData.net', domain: 'openelectiondata.net' },
       { name: 'Daily Kos Elections / The Downballot data guide', domain: 'dailykos.com' },
-      { name: `${stateName} official election results`, domain: base.district.state === 'NJ' ? 'nj.gov' : '' },
+      { name: 'OpenElections (community open elections data)', domain: 'openelections.net' },
+      { name: `${stateName} official election results`, domain: base.district.state === 'NJ' ? 'nj.gov' : base.district.state === 'TX' ? 'sos.texas.gov' : '' },
     ].filter((s) => s.domain)
 
     const sourceList = preferredSources.map((s) => `${s.name} (site:${s.domain})`).join('; ')
 
     const researchQuestion = `Produce a comprehensive, cited campaign-intelligence report on ${districtLabel}. Cover: current competitiveness and partisan lean, ` +
-      `2024 (and prior cycle) election results and margins, the incumbent, historical results and redistricting context, and key demographic/political factors ` +
-      `that shape the race. Prioritize and directly cite these sources wherever they have relevant data: ${sourceList}. Where a number comes from one of these ` +
-      `sources, name the source next to the figure.`
+      `2024 (and prior cycle) election results and margins, the incumbent, historical results and redistricting context, and key demographic/economic factors ` +
+      `that shape the race. Antelope has already supplied verified baseline data below (Census, BLS, FEC) — use it directly rather than re-deriving it from ` +
+      `search, and cite it as "Antelope internal data (Census/BLS/FEC)" when you reference it. For everything else — election history, redistricting context, ` +
+      `local reporting — search the web and prioritize these sites where they have relevant data: ${sourceList}. Every figure in the report must be traceable ` +
+      `to either the Antelope-verified data below or a specific cited web source — never state a number without one of those two.`
+
+    // Antelope-verified facts: only real, API-sourced data points are
+    // included (never "N/A" placeholders), each explicitly labeled with
+    // its source so a hostile fact-check can trace every number back to
+    // where it came from — the same anti-hallucination discipline used
+    // elsewhere in this app for AI-generated survey insights.
+    const verifiedFacts: string[] = []
+    if (base.district.pvi) verifiedFacts.push(`Cook PVI: ${base.district.pvi} (Antelope internal database)`)
+    if (base.district.margin2024) verifiedFacts.push(`2024 margin: ${base.district.margin2024.toFixed(1)} (Antelope internal database)`)
+    if (base.district.incumbentName) verifiedFacts.push(`Incumbent: ${base.district.incumbentName} (${base.district.incumbentParty || 'party N/A'}) (Antelope internal database)`)
+    if (base.district.demographics?.totalPopulation) verifiedFacts.push(`Population: ${base.district.demographics.totalPopulation.toLocaleString()} (Census ACS 5-year)`)
+    if (base.district.demographics?.medianHouseholdIncome) verifiedFacts.push(`Median household income: $${base.district.demographics.medianHouseholdIncome.toLocaleString()} (Census ACS 5-year)`)
+    if (base.external.blsLatest) verifiedFacts.push(`${stateName} state unemployment rate: ${base.external.blsLatest.value}% as of ${base.external.blsLatest.period} ${base.external.blsLatest.year} (BLS LAUS — state-level, not district-level; no district-level unemployment series exists)`)
+    const cbpRow = Array.isArray(base.external.cbpPreview) ? base.external.cbpPreview[1] : null // row 0 is the header
+    if (cbpRow) {
+      const [, estab, emp, payann] = cbpRow
+      verifiedFacts.push(`Business establishments in district: ${estab}, employment: ${emp}, annual payroll: $${payann}k (Census County Business Patterns)`)
+    }
+    if (base.external.fecTotals?.receipts) {
+      const t = base.external.fecTotals
+      verifiedFacts.push(`Leading candidate committee "${t.committee_name}" total receipts: $${Number(t.receipts).toLocaleString()}${t.individual_contributions ? `, individual contributions: $${Number(t.individual_contributions).toLocaleString()}` : ''} for cycle ${t.cycle} (OpenFEC committee totals)`)
+    }
 
     const systemContext = `You are a senior US congressional campaign strategist and elections analyst producing a rigorous, source-grounded report. ` +
-      `Known baseline facts for this district from Antelope's internal database (treat as authoritative; reconcile any web data against these) — ` +
-      `Cook PVI: ${base.district.pvi || 'N/A'}, 2024 margin: ${base.district.margin2024?.toFixed?.(1) ?? base.district.margin2024}, ` +
-      `incumbent: ${base.district.incumbentName || 'Unknown'} (${base.district.incumbentParty || 'N/A'}), ` +
-      `population: ${base.district.demographics?.totalPopulation ?? 'N/A'}, median household income: ${base.district.demographics?.medianHouseholdIncome ?? 'N/A'}. ` +
-      `Preferred/primary sources for election data in this domain: MIT Election Lab (electionlab.mit.edu, academic election-returns data), ` +
-      `OpenElectionData.net (community open elections data), Daily Kos Elections' "Downballot" data guide (dailykos.com / thedownballot.com, ` +
-      `district-level historical results and PVI methodology), and official state election results (nj.gov, NJ Division of Elections) when the ` +
-      `district is in New Jersey.`
+      (verifiedFacts.length
+        ? `Antelope-verified baseline facts for this district (real API data, cite by source name as shown, do not re-derive or contradict without explicit ` +
+          `justification) — ${verifiedFacts.join('; ')}. `
+        : `No Antelope-verified baseline facts are available for this district (internal database + external APIs returned nothing) — rely entirely on ` +
+          `cited web search for every figure. `) +
+      `Never state a figure without attributing it either to the Antelope-verified data above or to a specific web source you found.`
 
     let deepResult: { content: string; citations: { title: string; url: string }[] } = { content: '', citations: [] }
     try {
@@ -327,7 +429,7 @@ ${deepResult.content}`
         conversationId = createConversationId(base.district.districtCode)
         const title = `📰 ${base.district.districtCode} Deep District Report`
         const messages = [
-          { role: 'user', content: `Generate a deep intelligence report for ${districtLabel} using MIT Election Lab, OpenElectionData, Daily Kos Elections, and official state election results.` },
+          { role: 'user', content: `Generate a deep intelligence report for ${districtLabel} using Antelope's verified Census/BLS/FEC data plus cited web research (OpenElectionData, Daily Kos Elections, OpenElections, official state election results).` },
           { role: 'agent', content: deepResult.content },
         ]
         const db = await getConnection()

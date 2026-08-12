@@ -411,7 +411,14 @@ export default function DashboardPage() {
         setDistrictDeepReport(data.report)
         if (data.conversationId) {
           setDistrictDeepConversationId(data.conversationId)
-          toast.success('Deep report generated — cited sources saved to general/news.')
+          toast.success('Deep report generated — opening cited sources in general/news…')
+          // Take the user straight to the cited report rather than requiring
+          // a second click on "View full cited report" — this is the whole
+          // point of "generate deeper report": find news from Antelope's
+          // verified data + web search, cited, in the general/news section.
+          setTimeout(() => {
+            window.location.href = `/cohort-chat?openConversation=${encodeURIComponent(data.conversationId)}`
+          }, 700)
         } else {
           toast.success('Deep report generated.')
         }
