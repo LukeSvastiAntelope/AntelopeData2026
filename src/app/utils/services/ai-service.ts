@@ -258,14 +258,12 @@ async function createAnthropicCompletion(options: AICompletionOptions): Promise<
   if (systemMessage) {
     requestParams.system = systemMessage.content;
   }
-  
-  // Add optional parameters
-  if (options.temperature !== undefined) {
-    requestParams.temperature = options.temperature;
-  }
+
+  // Omit `temperature` — the current Claude model lineup (Opus/Sonnet/Haiku)
+  // rejects it ("temperature is deprecated for this model"); defaults are fine.
 
   console.log(`Making request to ${options.model} with params:`, requestParams);
-  
+
   const completion = await client.messages.create(requestParams);
   
   console.log(`Response from ${options.model}:`, {
@@ -455,11 +453,8 @@ async function createAnthropicStreamingCompletion(options: AICompletionOptions):
   if (systemMessage) {
     requestParams.system = systemMessage.content;
   }
-  
-  // Add optional parameters
-  if (options.temperature !== undefined) {
-    requestParams.temperature = options.temperature;
-  }
+
+  // Omit `temperature` — see createAnthropicCompletion above.
 
   const stream = await client.messages.create(requestParams);
   
