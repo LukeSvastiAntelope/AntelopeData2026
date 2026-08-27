@@ -49,6 +49,11 @@ interface CohortQueryPayload {
   systemPrompt?: string;
   stream?: boolean;
   responseMode?: 'quick_update' | 'decision_support' | 'full_brief';
+  // Explicit district/state to scope news queries to — set by the client
+  // when the active news conversation is about a specific dashboard-selected
+  // district, so follow-up questions don't silently fall back to the user's
+  // default organization state and pull news from the wrong state.
+  districtScope?: { state: string; districtCode?: string | null } | null;
 }
 
 interface CampaignIdentity {
@@ -585,7 +590,7 @@ export async function POST(req: NextRequest) {
     const numericUserId = Number.isFinite(Number(userId)) ? Number(userId) : null;
 
     const body = (await req.json()) as CohortQueryPayload;
-    const { cohort, question, recentMessages, topK = 1000, surveyId: initialSurveyId, model = 'gpt-4o', temperature = 0.0, sources, systemPrompt, stream = true, responseMode: requestedResponseMode } = body;
+    const { cohort, question, recentMessages, topK = 1000, surveyId: initialSurveyId, model = 'gpt-4o', temperature = 0.0, sources, systemPrompt, stream = true, responseMode: requestedResponseMode, districtScope } = body;
     const deepResearchRequested = Boolean((body as any).deepResearch);
 
     // Deep Research mode runs early and self-contained (decompose -> parallel web
@@ -716,7 +721,7 @@ export async function POST(req: NextRequest) {
     } | null = null;
     if (webSourceEnabled && isNewsIntent(question)) {
       try {
-        liveRefreshSummary = await refreshCampaignNewsForUserScope(userId, question, { maxResults: 12 });
+        liveRefreshSummary = await refreshCampaignNewsForUserScope(userId, question, { maxResults: 12, scopeOverride: districtScope || null });
         logRoute(traceId, 'news_live_refresh', liveRefreshSummary);
       } catch (error) {
         logRoute(traceId, 'news_live_refresh_failed', {
@@ -729,6 +734,7 @@ export async function POST(req: NextRequest) {
           limit: 8,
           minItems: 3,
           timeWindow: requestedNewsTimeWindow,
+          scopeOverride: districtScope || null,
         })
       : null;
     const campaignIdentity = webSourceEnabled ? await getCampaignIdentityForUser(userId) : null;
@@ -917,6 +923,7 @@ export async function POST(req: NextRequest) {
         memoryContext,
         systemPrompt: effectiveSystemPrompt,
         newsContextSummary: buildNewsContextSummary(newsContext),
+        districtScope: districtScope || null,
         requestedNewsTimeWindow: requestedNewsTimeWindow?.label || null,
       });
     }

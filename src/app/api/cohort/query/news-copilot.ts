@@ -127,10 +127,15 @@ export async function respondFromCampaignNewsOnly(params: NewsCopilotParams) {
     "the campaign";
   const partyLabel = campaignIdentity?.party || "unknown party";
   const officeLabel = campaignIdentity?.officeType || "elected office";
+  // newsContext.scope reflects the article query's actual scope — which is
+  // the dashboard-selected district when one is active (see districtScope in
+  // route.ts) — so it must win over the user's default campaignIdentity, or
+  // the label shown to the LLM would still name the wrong district even
+  // though the underlying articles were correctly scoped.
   const districtLabel =
-    campaignIdentity?.districtCode ||
     newsContext?.scope?.districtCode ||
     newsContext?.scope?.state ||
+    campaignIdentity?.districtCode ||
     "your district";
   const requestedWindowLabel = newsContext?.retrieval?.requestedWindowLabel;
   const appliedWindowLabel = newsContext?.retrieval?.appliedWindowLabel;
@@ -367,6 +372,7 @@ interface GeneralWebCopilotParams {
   systemPrompt?: string;
   newsContextSummary?: string;
   requestedNewsTimeWindow?: string | null;
+  districtScope?: { state: string; districtCode?: string | null } | null;
 }
 
 function deliverCopilotContent(content: string, stream: boolean) {
@@ -407,6 +413,7 @@ export async function respondFromGeneralWebOnly(params: GeneralWebCopilotParams)
     systemPrompt,
     newsContextSummary,
     requestedNewsTimeWindow,
+    districtScope,
   } = params;
 
   const selectedModel = (model || process.env.GENERAL_COPILOT_MODEL || "gpt-4o").trim();
@@ -414,7 +421,13 @@ export async function respondFromGeneralWebOnly(params: GeneralWebCopilotParams)
     campaignIdentity?.candidateName ||
     campaignIdentity?.organizationName ||
     "the campaign";
+  // An explicit districtScope (a district selected on the dashboard, e.g. via
+  // a district-intel deep report) always wins over the user's default
+  // organization identity — otherwise follow-up questions about District X
+  // get answered/searched as if they were about the user's home district.
   const districtLabel =
+    districtScope?.districtCode ||
+    districtScope?.state ||
     campaignIdentity?.districtCode ||
     campaignIdentity?.state ||
     "your jurisdiction";

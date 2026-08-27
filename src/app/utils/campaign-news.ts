@@ -65,6 +65,7 @@ interface NewsContextOptions {
   limit?: number;
   minItems?: number;
   timeWindow?: NewsTimeWindowConfig | null;
+  scopeOverride?: { state: string; districtCode?: string | null } | null;
 }
 
 function toHash(value: string): string {
@@ -264,9 +265,15 @@ async function getCampaignTargetForUser(userId: string): Promise<CampaignTarget 
 export async function refreshCampaignNewsForUserScope(
   userId: string,
   question: string,
-  options: { maxResults?: number } = {}
+  options: { maxResults?: number; scopeOverride?: { state: string; districtCode?: string | null } | null } = {}
 ): Promise<CampaignNewsRefreshSummary> {
-  const target = await getCampaignTargetForUser(userId);
+  // A scopeOverride (a district explicitly selected on the dashboard, e.g. via
+  // a district-intel deep report) always wins over the user's default
+  // organization state — otherwise follow-up questions in a conversation
+  // about District X silently pull news for the user's home state instead.
+  const target = options.scopeOverride
+    ? { state: options.scopeOverride.state, districtCode: options.scopeOverride.districtCode || null, candidateName: null, organizationName: null }
+    : await getCampaignTargetForUser(userId);
   if (!target) {
     return { fetched: 0, inserted: 0, deduped: 0, query: '' };
   }
@@ -438,7 +445,13 @@ export async function getCampaignNewsContextForUser(
   userId: string,
   optionsOrLimit: number | NewsContextOptions = 5
 ): Promise<CampaignNewsContextPacket> {
-  const scope = await getUserCampaignScope(userId);
+  const options: NewsContextOptions =
+    typeof optionsOrLimit === 'number' ? { limit: optionsOrLimit } : (optionsOrLimit || {});
+  // A scopeOverride (a district explicitly selected on the dashboard) always
+  // wins over the user's default organization state — see refreshCampaignNewsForUserScope.
+  const scope = options.scopeOverride
+    ? { state: options.scopeOverride.state, districtCode: options.scopeOverride.districtCode || null }
+    : await getUserCampaignScope(userId);
   if (!scope.state) {
     return {
       scope,
@@ -450,9 +463,6 @@ export async function getCampaignNewsContextForUser(
       items: [],
     };
   }
-
-  const options: NewsContextOptions =
-    typeof optionsOrLimit === 'number' ? { limit: optionsOrLimit } : (optionsOrLimit || {});
   const safeLimit = Math.max(1, Math.min(10, Number(options.limit) || 5));
   const minimumResults = Math.max(1, Math.min(5, Number(options.minItems) || 3));
 
