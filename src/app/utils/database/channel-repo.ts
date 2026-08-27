@@ -31,6 +31,17 @@ function decryptJson(enc: string | null): any | null {
   }
 }
 
+function decodeTelegramIntegrationRow(row: RowDataPacket) {
+  const creds = decryptJson((row as any).encrypted_credentials)
+  // mysql2 auto-decodes `json` columns to native objects, but tolerate a
+  // raw string too in case a row was ever written outside this helper.
+  const rawSettings = (row as any).settings
+  const settings = rawSettings && typeof rawSettings === 'object'
+    ? rawSettings
+    : (() => { try { return JSON.parse(rawSettings || '{}') } catch { return null } })()
+  return { ...row, credentials: creds, settings }
+}
+
 export const ChannelRepo = {
   upsertUserTelegramIntegration: async (userId: number, botToken: string, settings: Record<string, any>, webhookSecret?: string) => {
     const db = await getMySQLConnection()
@@ -53,19 +64,24 @@ export const ChannelRepo = {
   getUserTelegramIntegration: async (userId: number) => {
     const db = await getMySQLConnection()
     const [rows] = await db.execute<RowDataPacket[]>(
-      `SELECT * FROM user_channel_integrations WHERE user_id = ? AND provider = 'telegram' LIMIT 1`,
+      `SELECT * FROM user_channel_integrations WHERE user_id = ? AND provider = 'telegram' AND status = 'connected' LIMIT 1`,
       [userId]
     )
+    if (rows[0]) return decodeTelegramIntegrationRow(rows[0])
+    // There is only one real Telegram bot for the whole platform (one token,
+    // one webhook, one @username) — it isn't meaningfully "per user". Fall
+    // back to whichever account connected it so every user's surveys work,
+    // not just the one that happened to run the connect flow.
+    return ChannelRepo.getPlatformTelegramIntegration()
+  },
+
+  getPlatformTelegramIntegration: async () => {
+    const db = await getMySQLConnection()
+    const [rows] = await db.execute<RowDataPacket[]>(
+      `SELECT * FROM user_channel_integrations WHERE provider = 'telegram' AND status = 'connected' ORDER BY updated_at DESC LIMIT 1`
+    )
     if (!rows[0]) return null
-    const row = rows[0]
-    const creds = decryptJson((row as any).encrypted_credentials)
-    // mysql2 auto-decodes `json` columns to native objects, but tolerate a
-    // raw string too in case a row was ever written outside this helper.
-    const rawSettings = (row as any).settings
-    const settings = rawSettings && typeof rawSettings === 'object'
-      ? rawSettings
-      : (() => { try { return JSON.parse(rawSettings || '{}') } catch { return null } })()
-    return { ...row, credentials: creds, settings }
+    return decodeTelegramIntegrationRow(rows[0])
   },
 
   enableSurveyChannel: async (surveyId: number, channel: 'telegram'|'discord'|'sms'|'whatsapp'|'email'|'web', config?: any) => {
