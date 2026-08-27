@@ -5,53 +5,6 @@ import { BlogPost } from "@/types/blog"
 // blog detail page falls back to showing their excerpt as the body.
 export const BLOG_POSTS: BlogPost[] = [
   {
-    id: "what-we-believe",
-    title: "What We Believe — Why We Made Antelope",
-    excerpt:
-      "Good leadership begins with understanding. Modern campaign technology has quietly abandoned that fact — most tools are built for outbound only, and the ones that look inward stop at a chart. Here's why we built the alternative.",
-    content: `Good leadership begins with understanding. So does good strategy, good policy, good anything. Before you can lead a room, you have to know the room. Before you can move a community, you have to listen to it. This is not a slogan. It is the first fact of politics, and it is the fact that modern campaign technology has quietly abandoned.
-
-The tools available today are decent. They are not the problem in isolation. The problem is that they do not complete the loop. Most are built for outbound only — engines for pushing a message out and measuring how far it traveled. The ones that do look inward stop at descriptive analytics: here is what happened, here is a chart, and nothing deeper. Neither half listens. Neither half closes the circle between hearing a community and acting on what you heard.
-
-The proof is in the stagnation. The field has barely innovated, and it is not only political tooling — look at general survey software and you find the same arrested development. The survey, one of the most powerful instruments we have for understanding people, has been left to rot in two useless extremes. At one end it is whimsical and weightless: the skippable ad, the throwaway poll, the thing nobody takes seriously because it was never built to be. At the other sits the academic and market-research apparatus — the eighty-question instrument, rigorous and expensive and slow. By the time the results arrive, the moment has passed. One extreme is too shallow to matter. The other is too heavy to use.
-
-## Why now
-
-We think there is a better model, and this is the moment it becomes possible.
-
-It is possible because the technology is finally here and finally cheap. Lightweight, drip-fed surveys — short, deployable in minutes, delivered in small doses rather than dumped as a wall of questions — paired with real analysis: regression, no-code Python, graphing, geographical overlays. The AI that makes this work for a non-technical person did not exist a few years ago, and it did not exist at a price a local campaign could pay. Now it does.
-
-It is necessary because politics has fractured. Factionalism has pushed the real contests down to the hyperlocal level, and in a chaotic landscape, discerning who a community actually is — what it fears, what it wants, what moves it — has become precious in a way it simply wasn't a decade ago. When national identity fragments, local understanding is the thing that still holds.
-
-And it is timely because every tool has a point where it passes from good enough to obsolete. That point is fine and hard to see from up close. A paper map got you where you were going for a very long time; it was good enough, right up until it wasn't, and the people who kept folding paper while everyone else navigated live were not wrong so much as late. We are building for the world that is arriving anyway — one where data, ingestion, and orchestration are better, where municipalities and the people in them will expect co-pilots and live intelligence as a matter of course. We may be early. We may be late. But it is far better to arrive at the party than to miss the address entirely.
-
-## What it costs to get this wrong
-
-It is worth remembering how hard it is to win a small race. There is no war chest, no staff, no consultant on retainer — usually just a person, a conviction, and not enough hours. Winning a school board or a council seat is genuinely difficult, and the tools that could help are priced for campaigns a hundred times larger.
-
-The people who choose to run are precious. Wanting to stand up and lead is a good thing — one of the better instincts a person can have — and it deserves better than what the market currently offers. We want to hand those people the right tools so that leaders can do what leaders do best. And what leaders do best is not writing code, not wrangling spreadsheets, not guessing. It is understanding people and acting on that understanding. Our job is to clear everything else out of the way.
-
-That understanding compounds. Over time, insight sharpens focus — knowing dynamically what message reaches whom, and why a given issue matters where it does. Good insight, in the hands of a good leader, flows naturally into everything downstream: message, outreach, policy, the base, the network. We'll say more about exactly how in a companion piece. For now it is enough to say that the loop, once closed, keeps paying.
-
-## What we believe
-
-We believe understanding is the honest way to win.
-
-A leader has a duty to know the room — not as a tactic, but as an obligation. To hold a base, to grasp the anxieties underneath it, to represent people you have actually taken the trouble to hear. In a fair democratic contest, the candidate who understands their community more deeply should win, and usually will. That is not a flaw in democracy. That is democracy working.
-
-Which is why we reject the model that treats citizens as inboxes. Outbound-only has trained campaigns to broadcast at people and call it engagement, reducing political communication to spam. People are not targets to be scored, mailboxes to be filled, or wallets to be opened. They are the point. A tool that forgets this is not just distasteful; it is bad at the actual job, which is representation.
-
-And we believe access should be fair. No money gatekeeping. No pricing that locks the best intelligence behind budgets only the biggest campaigns can reach. Equal access, open reach, and a level field where the deciding advantage is understanding rather than spend. Antelope does not know or care what party you belong to — the platform is built the same for everyone, because listening is neither left nor right.
-
-Tomorrow's leaders will be more data-driven and more curious about the people they serve than any before them — the natural inheritance of a generation raised where Instagram and TikTok run rampant, taught from the start to read the room before they speak.
-
-Antelope is built for that leader, and for that future.`,
-    date: "22 Jul 2026",
-    readTime: "7 min",
-    tags: ["Manifesto", "Why Antelope"],
-    author: { name: "Luke Svasti" },
-  },
-  {
     id: "our-history",
     title: "Our History",
     excerpt:
@@ -175,76 +128,6 @@ And one thing we are deliberately not building: a machine for predicting who wil
     tags: ["Workflows", "Case Studies"],
     author: { name: "Luke Svasti" },
   },
-  {
-    id: "1",
-    title: "Voter Profiles: Transform Survey Data Into Intelligent AI Agents",
-    excerpt: "Discover how Antelope's voter profile technology creates AI-powered personas from survey responses. Each respondent becomes a queryable agent that preserves their unique perspectives, values, and decision-making patterns—enabling unprecedented insights without re-surveying your audience.",
-    content: "",
-    date: "21 Nov 2024",
-    readTime: "6 min",
-    tags: ["Voter Profiles", "AI Analytics"],
-    author: { name: "admin" }
-  },
-  {
-    id: "2",
-    title: "Cohort Analysis Made Simple: Segment Your Survey Audience in Seconds",
-    excerpt: "Learn how to create powerful audience segments with Antelope's cohort builder. Filter respondents by demographics, answers, and behaviors to uncover hidden patterns in your data. No SQL required—just point, click, and discover insights that drive better decisions.",
-    content: "",
-    date: "18 Nov 2024",
-    readTime: "5 min",
-    tags: ["Cohort Analysis", "Survey Analytics"],
-    author: { name: "admin" }
-  },
-  {
-    id: "3",
-    title: "AI-Powered Survey Analytics: Get Instant Insights Without Writing Code",
-    excerpt: "Stop spending hours in spreadsheets. Antelope's AI analytics engine automatically generates charts, identifies trends, and surfaces key insights from your survey data. Ask questions in plain English and get comprehensive analysis in seconds—powered by GPT-4 and advanced visualization models.",
-    content: "",
-    date: "15 Nov 2024",
-    readTime: "5 min",
-    tags: ["AI Analytics", "Data Visualization"],
-    author: { name: "admin" }
-  },
-  {
-    id: "4",
-    title: "Chat With Your Survey Data: Natural Language Queries for Research Teams",
-    excerpt: "Imagine asking your survey data questions like you would a colleague. With Antelope's conversational analytics, you can query cohorts, explore trends, and generate reports using natural language. Perfect for researchers who want insights fast without learning complex analytics tools.",
-    content: "",
-    date: "12 Nov 2024",
-    readTime: "4 min",
-    tags: ["Conversational AI", "Research Tools"],
-    author: { name: "admin" }
-  },
-  {
-    id: "5",
-    title: "Survey Response Prediction: How Voter Profiles Answer New Questions",
-    excerpt: "What if you could predict how your respondents would answer new survey questions without asking them again? Antelope's voter profiles use AI to generate accurate predictions based on each person's unique profile, saving time and reducing survey fatigue while maintaining data quality.",
-    content: "",
-    date: "08 Nov 2024",
-    readTime: "5 min",
-    tags: ["Predictive Analytics", "Voter Profiles"],
-    author: { name: "admin" }
-  },
-  {
-    id: "6",
-    title: "From Raw Data to Rich Insights: Automated Survey Report Generation",
-    excerpt: "Transform survey responses into professional, comprehensive reports automatically. Antelope analyzes your data, identifies key themes, generates visualizations, and produces executive summaries—all without manual effort. Get publication-ready insights in minutes, not days.",
-    content: "",
-    date: "05 Nov 2024",
-    readTime: "4 min",
-    tags: ["Report Generation", "Automation"],
-    author: { name: "admin" }
-  },
-  {
-    id: "7",
-    title: "Multi-Source Intelligence: Combine Survey Data with Voter Profiles and Web Research",
-    excerpt: "Go beyond traditional survey analysis. Antelope integrates your survey responses with voter profile predictions and real-time web research to provide context-rich insights. See how your data compares to broader trends and get a complete picture of your audience's perspectives.",
-    content: "",
-    date: "01 Nov 2024",
-    readTime: "6 min",
-    tags: ["Data Integration", "Market Research"],
-    author: { name: "admin" }
-  }
 ]
 
 export function getBlogPost(id: string): BlogPost | undefined {

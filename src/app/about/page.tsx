@@ -44,7 +44,7 @@ export default function AboutPage() {
           <p className="text-muted-foreground leading-relaxed mt-4">
             For our overall political belief system and manifesto — including why we built this and who we built it
             for — take a look at{" "}
-            <Link href="/blog/what-we-believe" className="text-primary hover:underline font-medium">
+            <Link href="/blog/our-history" className="text-primary hover:underline font-medium">
               our blog article
             </Link>
             . In short, we believe that current tools are inadequate for tomorrow&apos;s leaders because they lack
