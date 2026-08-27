@@ -2,210 +2,217 @@
 
 import { useState } from "react"
 import { PublicLayout } from "@/app/components/PublicLayout"
-import { PricingCard } from "@/components/pricing/pricing-card"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
 import Link from "next/link"
-import toast from "react-hot-toast"
-import { Rocket } from "lucide-react"
+import { Check } from "lucide-react"
 
-// Toggle this flag to show/hide full pricing
-const SHOW_FULL_PRICING = false
+type BillingPeriod = "monthly" | "annual"
+
+interface Plan {
+  name: string
+  description: string
+  monthly: number
+  annual: number
+  save: number
+}
+
+const PLANS: Plan[] = [
+  {
+    name: "Hyperlocal",
+    description: "Small PACs, experimental groups, classroom & civic projects",
+    monthly: 49,
+    annual: 490,
+    save: 98,
+  },
+  {
+    name: "Local",
+    description: "Candidates and committees active in a local race",
+    monthly: 99,
+    annual: 990,
+    save: 198,
+  },
+  {
+    name: "State",
+    description: "State orgs, multi-county operations, and larger PACs",
+    monthly: 299,
+    annual: 2990,
+    save: 598,
+  },
+  {
+    name: "Federal",
+    description: "Congressional campaigns, state HQs, and federal orgs",
+    monthly: 499,
+    annual: 4990,
+    save: 998,
+  },
+]
+
+const FEATURE_ROWS: { label: string; values: [string, string, string, string] }[] = [
+  { label: "Publishable surveys/week", values: ["1", "2", "5", "Unlimited"] },
+  { label: "Outreach/week (SMS, WhatsApp, Telegram)", values: ["50", "200", "Higher", "Highest"] },
+  { label: "Analytics", values: ["Full", "Full + local", "Regional", "Federal"] },
+  { label: "District data overlay & co-pilot", values: ["—", "Yes", "Yes", "Yes"] },
+  { label: "Compliance, payments & volunteer tools", values: ["—", "Yes", "Yes", "Yes"] },
+  { label: "Priority support", values: ["—", "—", "Yes", "Yes"] },
+]
 
 export default function PricingPage() {
-  const [billingPeriod, setBillingPeriod] = useState<"monthly" | "annual">("annual")
+  const [billingPeriod, setBillingPeriod] = useState<BillingPeriod>("annual")
 
-  const handleUpgrade = (planName: string) => {
-    toast.success(`Upgrading to ${planName} plan...`)
-    // Add actual upgrade logic here
-  }
-
-  const plans = [
-    {
-      name: "Basic",
-      description: "Essential tools to manage finances, perfect for individuals and startups.",
-      price: billingPeriod === "annual" ? 0 : 0,
-      features: [
-        "1x Business account & Cards",
-        "1x Account",
-        "3d transfer or direct debit"
-      ],
-      isCurrent: false,
-      buttonText: "Current Plan"
-    },
-    {
-      name: "Pro",
-      description: "Advanced features to track and grow your finances with ease.",
-      price: billingPeriod === "annual" ? 89 : 109,
-      originalPrice: billingPeriod === "annual" ? 109 : undefined,
-      features: [
-        "3x Business account & Cards",
-        "Unlimited Accounts",
-        "500 transfer or direct debit"
-      ],
-      isPopular: true,
-      buttonText: "Upgrade to Pro"
-    },
-    {
-      name: "Enterprise",
-      description: "Comprehensive financial tools, including integrations and deep analytics.",
-      price: billingPeriod === "annual" ? 139 : 159,
-      features: [
-        "3x Business account & Cards",
-        "Unlimited Accounts",
-        "Unlimited transfer or direct debit"
-      ],
-      buttonText: "Upgrade to Premium"
-    }
-  ]
-
-  // Beta Message Component
-  if (!SHOW_FULL_PRICING) {
-    return (
-      <PublicLayout>
+  return (
+    <PublicLayout>
       <div className="min-h-screen bg-background">
-        <div className="max-w-4xl mx-auto px-4 md:px-8 py-16">
+        <div className="max-w-6xl mx-auto px-4 md:px-8 py-16">
+          {/* Header */}
           <div className="text-center mb-12">
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 text-primary font-medium text-sm mb-6">
-              <Rocket className="h-4 w-4" />
-              Beta Testing Phase
-            </div>
-            <h1 className="text-4xl md:text-5xl font-bold mb-6">
-              Free Access During Our Beta
-            </h1>
-            <p className="text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-              We're excited to have you on board! Antelope will be completely free for the next 6 months as we work together to perfect the platform during our beta testing period.
+            <h1 className="text-4xl md:text-5xl font-bold mb-4">Simple, transparent pricing</h1>
+            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+              The same published price for everyone. Start free — no card, no commitment.
             </p>
           </div>
 
-          <Card className="border-2 border-primary/20 shadow-xl">
-            <CardContent className="p-12">
-              <div className="text-center space-y-6">
-                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 mb-4">
-                  <Rocket className="h-8 w-8 text-primary" />
-                </div>
-                <h2 className="text-3xl font-bold">Free Beta Access</h2>
-                <div className="space-y-4 text-left max-w-md mx-auto">
-                  <div className="flex items-start gap-3">
-                    <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
-                      <svg className="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                    </div>
-                    <p className="text-muted-foreground">Unlimited surveys and responses</p>
+          {/* Try it free */}
+          <div className="grid sm:grid-cols-2 gap-6 mb-16">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Trial</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  The full product free for 2 weeks. Run surveys across SMS, WhatsApp, and Telegram with
+                  analytics built in. No card required.
+                </p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Free</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  Keep a live account for good. Create surveys and see your baseline analytics, and every
+                  past dataset and query stays yours — so you&apos;re ready whenever you need to run.
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Billing Toggle */}
+          <div className="flex justify-center mb-12">
+            <div className="inline-flex items-center gap-2 p-1 bg-muted rounded-lg">
+              <Button
+                variant={billingPeriod === "monthly" ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setBillingPeriod("monthly")}
+                className={billingPeriod === "monthly" ? "bg-background text-foreground shadow-sm" : ""}
+              >
+                Monthly
+              </Button>
+              <Button
+                variant={billingPeriod === "annual" ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setBillingPeriod("annual")}
+                className={billingPeriod === "annual" ? "bg-background text-foreground shadow-sm" : ""}
+              >
+                Annual — 2 months free
+              </Button>
+            </div>
+          </div>
+
+          {/* Pricing Cards */}
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+            {PLANS.map((plan) => (
+              <Card key={plan.name} className="flex flex-col">
+                <CardHeader className="pb-4">
+                  <CardTitle className="text-xl font-semibold">{plan.name}</CardTitle>
+                  <CardDescription className="text-sm mt-1">{plan.description}</CardDescription>
+                </CardHeader>
+                <CardContent className="flex-1">
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-3xl font-bold">
+                      ${billingPeriod === "annual" ? plan.annual : plan.monthly}
+                    </span>
+                    <span className="text-sm text-muted-foreground">
+                      /{billingPeriod === "annual" ? "yr" : "mo"}
+                    </span>
                   </div>
-                  <div className="flex items-start gap-3">
-                    <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
-                      <svg className="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                    </div>
-                    <p className="text-muted-foreground">Full access to AI-powered analytics</p>
-                  </div>
-                  <div className="flex items-start gap-3">
-                    <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
-                      <svg className="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                    </div>
-                    <p className="text-muted-foreground">Synthetic personas and voter profiles</p>
-                  </div>
-                  <div className="flex items-start gap-3">
-                    <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
-                      <svg className="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                    </div>
-                    <p className="text-muted-foreground">Priority support and feedback channel</p>
-                  </div>
-                  <div className="flex items-start gap-3">
-                    <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
-                      <svg className="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                    </div>
-                    <p className="text-muted-foreground">Early access to new features</p>
-                  </div>
-                </div>
-                <div className="pt-6">
-                  <div className="text-5xl font-bold mb-2">$0</div>
-                  <p className="text-muted-foreground mb-6">For the next 6 months</p>
-                  <Button size="lg" className="px-8" asChild>
-                    <Link href="/surveys">Start Using Antelope</Link>
+                  {billingPeriod === "annual" && (
+                    <Badge variant="secondary" className="mt-2">
+                      Save ${plan.save}
+                    </Badge>
+                  )}
+                </CardContent>
+                <CardFooter>
+                  <Button className="w-full" asChild>
+                    <Link href="/surveys">Get started</Link>
                   </Button>
-                </div>
-              </div>
+                </CardFooter>
+              </Card>
+            ))}
+          </div>
+
+          <p className="text-center text-sm text-muted-foreground mb-16">
+            Annual is two months free — pay for ten, get twelve. Enterprise and non-profit pricing
+            available on request.
+          </p>
+
+          {/* Feature comparison */}
+          <div className="mb-16">
+            <h2 className="text-2xl font-semibold mb-6 text-center">What each plan includes</h2>
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr className="border-b border-border">
+                    <th className="text-left py-3 pr-4 text-sm font-medium text-muted-foreground">
+                      What you get
+                    </th>
+                    {PLANS.map((plan) => (
+                      <th key={plan.name} className="text-center py-3 px-4 text-sm font-semibold">
+                        {plan.name}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {FEATURE_ROWS.map((row) => (
+                    <tr key={row.label} className="border-b border-border">
+                      <td className="py-3 pr-4 text-sm text-muted-foreground">{row.label}</td>
+                      {row.values.map((value, i) => (
+                        <td key={i} className="text-center py-3 px-4 text-sm">
+                          {value === "Yes" ? (
+                            <Check className="h-4 w-4 text-primary inline-block" />
+                          ) : (
+                            value
+                          )}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Every plan */}
+          <Card className="mb-12">
+            <CardContent className="p-8 text-center">
+              <h3 className="font-semibold mb-2">Every plan</h3>
+              <p className="text-sm text-muted-foreground max-w-2xl mx-auto">
+                Your data stays yours — full access to past datasets, queries, and survey work, always.
+                Cancel anytime with 7 days&apos; notice. Full customer support included.
+              </p>
             </CardContent>
           </Card>
 
-          <div className="mt-12 text-center">
+          <div className="text-center">
             <p className="text-sm text-muted-foreground">
               Have questions? <Link href="/contact" className="text-primary hover:underline">Contact us</Link>
             </p>
           </div>
         </div>
       </div>
-      </PublicLayout>
-    )
-  }
-
-  // Full Pricing Page
-  return (
-    <PublicLayout>
-    <div className="min-h-screen bg-background">
-      <div className="max-w-7xl mx-auto px-4 md:px-8 py-16">
-        {/* Header */}
-        <div className="text-center mb-12">
-          <h1 className="text-4xl md:text-5xl font-bold mb-4">
-            Clear and Fair Pricing for Everyone.
-          </h1>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Over 100,000 entrepreneurs have launched their businesses effortlessly with Antelope.
-          </p>
-        </div>
-
-        {/* Billing Toggle */}
-        <div className="flex justify-center mb-12">
-          <div className="inline-flex items-center gap-2 p-1 bg-muted rounded-lg">
-            <Button
-              variant={billingPeriod === "monthly" ? "default" : "ghost"}
-              size="sm"
-              onClick={() => setBillingPeriod("monthly")}
-              className={billingPeriod === "monthly" ? "bg-background text-foreground shadow-sm" : ""}
-            >
-              Monthly
-            </Button>
-            <Button
-              variant={billingPeriod === "annual" ? "default" : "ghost"}
-              size="sm"
-              onClick={() => setBillingPeriod("annual")}
-              className={billingPeriod === "annual" ? "bg-background text-foreground shadow-sm" : ""}
-            >
-              Annual
-            </Button>
-          </div>
-        </div>
-
-        {/* Pricing Cards */}
-        <div className="grid md:grid-cols-3 gap-8 mb-12">
-          {plans.map((plan) => (
-            <PricingCard
-              key={plan.name}
-              name={plan.name}
-              description={plan.description}
-              price={plan.price}
-              originalPrice={plan.originalPrice}
-              billingPeriod={billingPeriod}
-              features={plan.features}
-              isPopular={plan.isPopular}
-              isCurrent={plan.isCurrent}
-              buttonText={plan.buttonText}
-              onUpgrade={() => handleUpgrade(plan.name)}
-            />
-          ))}
-        </div>
-      </div>
-    </div>
     </PublicLayout>
   )
 }
