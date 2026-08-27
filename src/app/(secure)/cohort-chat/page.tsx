@@ -80,6 +80,22 @@ function looksLikeNewsQuestion(question: string): boolean {
   );
 }
 
+// District-intel deep reports always title their conversation
+// "📰 <CODE> Deep District Report" (e.g. "📰 MD-04 Deep District Report",
+// "📰 DC-AL Deep District Report") — parsing that back out lets follow-up
+// questions in the conversation stay scoped to the district that was
+// actually selected on the dashboard, instead of silently falling back to
+// the user's default organization state and pulling news from elsewhere.
+function parseDistrictScopeFromTitle(title: string | undefined | null): { state: string; districtCode: string } | null {
+  if (!title) return null;
+  const m = title.match(/^📰\s*([A-Za-z]{2})(-[A-Za-z0-9]+)?\s+Deep District Report/);
+  if (!m) return null;
+  return {
+    state: m[1].toUpperCase(),
+    districtCode: (m[1] + (m[2] || '')).toUpperCase(),
+  };
+}
+
 
 
 
@@ -521,6 +537,9 @@ FORMATTING REQUIREMENTS:
         role: m.role,
         content: m.content,
       }));
+    const currentConversation = conversations.find((c) => c.id === currentConversationId);
+    const districtScope = newsOnlyMode ? parseDistrictScopeFromTitle(currentConversation?.title) : null;
+
     const payload: any = {
       cohort: !newsOnlyMode && selectedCohortId ? { id: selectedCohortId } : undefined,
       question,
@@ -532,6 +551,7 @@ FORMATTING REQUIREMENTS:
       systemPrompt: enhancedSystemPrompt,
       recentMessages: recentConversationMessages,
       deepResearch: newsOnlyMode && deepResearchMode,
+      districtScope,
     };
 
     // Only include surveyId in Survey Copilot mode
