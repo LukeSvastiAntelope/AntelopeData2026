@@ -150,6 +150,7 @@ export default auth((req) => {
         '/fundraising',
         '/compliance',
         '/volunteer-staff',
+        '/agents',
         // NOTE: '/blog', '/clients', '/about', '/pricing', '/contact' were moved
         // out of the (secure) route group to the public site — they are real
         // marketing pages and must be reachable without a session.
@@ -183,6 +184,7 @@ export const config = {
         '/fundraising/:path*',
         '/compliance/:path*',
         '/volunteer-staff/:path*',
+        '/agents/:path*',
         '/logout'
     ],
 };

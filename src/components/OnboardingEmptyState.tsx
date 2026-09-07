@@ -10,7 +10,6 @@ import {
   Sparkles, 
   Users, 
   ArrowRight,
-  Play,
   FileText,
   PlusCircle,
   Database,
@@ -21,7 +20,7 @@ import {
 import { cn } from '@/lib/utils';
 
 interface OnboardingEmptyStateProps {
-  onTryDemo: () => void;
+  onLaunchConsultant: () => void;
   onCreateSurvey: () => void;
   onImportData: () => void;
   onPromptClick: (prompt: string) => void;
@@ -41,7 +40,7 @@ interface OnboardingEmptyStateProps {
 }
 
 export default function OnboardingEmptyState({
-  onTryDemo,
+  onLaunchConsultant,
   onCreateSurvey,
   onImportData,
   onPromptClick,
@@ -78,15 +77,15 @@ export default function OnboardingEmptyState({
 
   const pathways = [
     {
-      id: 'demo',
-      title: 'Try Demo Survey',
-      description: 'Explore with real Pew Research data',
-      icon: Play,
-      color: 'bg-blue-500',
-      action: onTryDemo,
-      badge: 'Instant',
-      disabled: !hasFeaturedSurvey,
-      tooltip: !hasFeaturedSurvey ? 'Demo survey not available' : undefined
+      id: 'consultant',
+      title: 'Campaign Consultant Agent',
+      description: 'Hit the ground running with a turnkey strategist for your race',
+      icon: Sparkles,
+      color: 'bg-amber-600',
+      action: onLaunchConsultant,
+      badge: 'Agentic',
+      disabled: false,
+      tooltip: undefined as string | undefined
     },
     {
       id: 'create',
@@ -148,7 +147,7 @@ export default function OnboardingEmptyState({
             </h1>
           </div>
           <p className="text-xl text-muted-foreground max-w-2xl">
-            Turn your polls into campaign intelligence. Chat with your voter data, create synthetic voter profiles, and discover insights you never knew existed.
+            Turn your polls into campaign intelligence — or launch a Campaign Consultant agent to hit the ground running before you have data.
           </p>
         </div>
 

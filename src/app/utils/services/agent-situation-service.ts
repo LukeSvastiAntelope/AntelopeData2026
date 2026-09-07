@@ -1,7 +1,7 @@
 import { openSql } from '@/app/utils/database/db';
 import { RowDataPacket } from 'mysql2/promise';
 
-export type AgentId = 'planner' | 'news' | 'campaign_manager';
+export type AgentId = 'planner' | 'news' | 'campaign_manager' | 'campaign_consultant';
 
 export interface AgentSituationSnapshot {
   summary: string;
