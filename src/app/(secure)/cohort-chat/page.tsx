@@ -1382,19 +1382,8 @@ FORMATTING REQUIREMENTS:
   };
 
   // Handlers for OnboardingEmptyState
-  const handleTryDemo = () => {
-    // Find the Pew Research survey
-    const pewSurvey = surveys.find(s => 
-      s.title.toLowerCase().includes('pew research') || 
-      s.title.toLowerCase().includes('trend wave')
-    );
-    
-    if (pewSurvey) {
-      handleSurveyChange(pewSurvey.id);
-      toast.success(`Demo loaded: ${pewSurvey.title}`);
-    } else {
-      toast.error('Demo survey not available');
-    }
+  const handleLaunchConsultant = () => {
+    window.location.href = '/agents/campaign-consultant';
   };
 
   const handleCreateSurvey = () => {
@@ -1532,7 +1521,7 @@ FORMATTING REQUIREMENTS:
               ) : !selectedSurveyId ? (
                 <div className="flex-1 min-h-0 overflow-y-auto">
                 <OnboardingEmptyState
-                  onTryDemo={handleTryDemo}
+                  onLaunchConsultant={handleLaunchConsultant}
                   onCreateSurvey={handleCreateSurvey}
                   onImportData={handleImportData}
                   onPromptClick={handlePromptClick}

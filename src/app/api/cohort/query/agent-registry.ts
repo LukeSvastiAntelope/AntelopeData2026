@@ -29,4 +29,17 @@ export const AGENT_REGISTRY: Record<AgentId, AgentRegistryEntry> = {
       'You specialize in campaign decision-making, risks, opportunities, and actionable priorities grounded in evidence.',
     allowedTools: ['read_news_agent_output', 'propose_situation_patch'],
   },
+  campaign_consultant: {
+    id: 'campaign_consultant',
+    displayName: 'Campaign Consultant Expert Agent',
+    systemPrompt:
+      'You are a turnkey campaign consultant for hyperlocal/downballot races. Convert race context and poll findings into plans, message frameworks, and concrete Antelope actions. Never invent poll numbers or endorsements.',
+    allowedTools: [
+      'read_campaign_brief',
+      'propose_baseline_survey',
+      'propose_import_data',
+      'propose_analytics_followup',
+      'propose_situation_patch',
+    ],
+  },
 };
