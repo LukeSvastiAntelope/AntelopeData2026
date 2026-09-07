@@ -1,0 +1,967 @@
+﻿"use client"
+
+import { Button } from "@/components/ui/button"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Textarea } from "@/components/ui/textarea"
+import { Card, CardContent } from "@/components/ui/card"
+import { Rocket, FileText, MessageSquareText, PhoneCall, Loader2, Bot, Sparkles, HeartHandshake, X } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { useEffect, useState } from "react"
+import Link from "next/link"
+import toast from "react-hot-toast"
+
+type ChatMsg = { role: 'user' | 'assistant'; content: string }
+
+export default function FrontLanding() {
+  const router = useRouter()
+  const [storyUrl, setStoryUrl] = useState('')
+  const [resultToken, setResultToken] = useState('')
+  const [showUploadDialog, setShowUploadDialog] = useState(false)
+  const [uploadFile, setUploadFile] = useState<File | null>(null)
+  const [uploadLoading, setUploadLoading] = useState(false)
+  const [uploadPreview, setUploadPreview] = useState<any>(null)
+  const [salesChatOpen, setSalesChatOpen] = useState(false)
+  const [pricingBotPromoMinimized, setPricingBotPromoMinimized] = useState(false)
+  const [salesTab, setSalesTab] = useState<'sales-call' | 'pricing-bot'>('sales-call')
+
+  const [pricingForm, setPricingForm] = useState({
+    positionRunningFor: '',
+    candidateName: '',
+    districtCode: '',
+    campaignWebsite: '',
+    reductionSoughtPct: 25,
+    issue: '',
+    supporterName: '',
+    convinceText: '',
+    email: '',
+  })
+  const [pricingLoading, setPricingLoading] = useState(false)
+  const [pricingResult, setPricingResult] = useState<null | {
+    quoteToken: string
+    finalPrice: number
+    listPrice: number
+    discountPct: number
+    favorabilityScore: number
+    needsHumanReview: boolean
+    rationale: string[]
+    personalityLine?: string
+    shareText?: string
+    referralLink?: string
+  }>(null)
+  const [followUpOpen, setFollowUpOpen] = useState(false)
+  const [followUpStartLoading, setFollowUpStartLoading] = useState(false)
+  const [chatSessionId, setChatSessionId] = useState<string | null>(null)
+  const [followMessages, setFollowMessages] = useState<ChatMsg[]>([])
+  const [followDraft, setFollowDraft] = useState('')
+  const [followSending, setFollowSending] = useState(false)
+  const [negotiatedQuote, setNegotiatedQuote] = useState<null | {
+    finalPrice: number
+    discountPct: number
+    favorabilityScore: number
+    listPrice: number
+  }>(null)
+  const [reviewLoading, setReviewLoading] = useState(false)
+  const [origin, setOrigin] = useState('')
+
+  const handleSignUp = () => {
+    router.push("/auth/register")
+  }
+
+  const handleFileUpload = async (file: File) => {
+    setUploadFile(file);
+    setUploadLoading(true);
+    
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    try {
+      const response = await fetch('/api/public/surveys/preview', {
+        method: 'POST',
+        body: formData,
+      });
+      
+      const result = await response.json();
+      
+      if (result.status) {
+        setUploadPreview(result.preview);
+        toast.success(`Found ${result.preview.totalRows} responses and ${result.preview.detectedDemographics?.length || 0} voter profiles!`);
+      } else {
+        toast.error(result.message || 'Failed to analyze file');
+        setShowUploadDialog(false);
+      }
+    } catch (error) {
+      console.error('Upload error:', error);
+      toast.error('Failed to upload file');
+      setShowUploadDialog(false);
+    } finally {
+      setUploadLoading(false);
+    }
+  };
+
+  const handleGetStarted = () => {
+    setShowUploadDialog(false);
+    router.push("/auth/register");
+  };
+
+  const resetUploadDialog = () => {
+    setUploadFile(null);
+    setUploadPreview(null);
+    setUploadLoading(false);
+  };
+
+  const handleGarrysListSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const url = storyUrl.trim();
+    if (!url) {
+      toast.error('Paste a story URL first');
+      return;
+    }
+    if (!/^https?:\/\//i.test(url)) {
+      toast.error('Include http:// or https:// in the URL');
+      return;
+    }
+    router.push(`/garrys-list/setup?url=${encodeURIComponent(url)}`);
+  };
+
+  const handleTokenSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const token = resultToken.trim();
+    if (!token) {
+      toast.error('Enter your survey token');
+      return;
+    }
+    router.push(`/garrys-list/results?token=${encodeURIComponent(token)}`);
+  };
+
+  useEffect(() => {
+    setOrigin(typeof window !== 'undefined' ? window.location.origin : '')
+  }, [])
+
+  const displayPrice = negotiatedQuote ?? pricingResult
+  const activeQuoteToken =
+    followUpOpen && chatSessionId ? chatSessionId : pricingResult?.quoteToken
+
+  const handlePricingQuote = async () => {
+    setPricingLoading(true)
+    setFollowUpOpen(false)
+    setChatSessionId(null)
+    setFollowMessages([])
+    setNegotiatedQuote(null)
+    try {
+      const res = await fetch('/api/pricing-bot/quote', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          campaignType: pricingForm.positionRunningFor,
+          candidateName: pricingForm.candidateName,
+          districtCode: pricingForm.districtCode,
+          campaignWebsite: pricingForm.campaignWebsite,
+          reductionSoughtPct: pricingForm.reductionSoughtPct,
+          convinceText: pricingForm.convinceText,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data?.status) {
+        toast.error(data?.message || 'Failed to generate quote.')
+        return
+      }
+      setPricingResult({
+        quoteToken: data.quote.quoteToken,
+        finalPrice: data.quote.finalPrice,
+        listPrice: data.quote.listPrice,
+        discountPct: data.quote.discountPct ?? Math.round(((data.quote.listPrice - data.quote.finalPrice) / data.quote.listPrice) * 100),
+        favorabilityScore: Number(data.quote.favorabilityScore || 0),
+        needsHumanReview: data.quote.needsHumanReview,
+        rationale: Array.isArray(data.rationale) ? data.rationale : [],
+        personalityLine: data.personalityLine,
+        shareText: data.shareText,
+        referralLink: data.referralLink,
+      })
+      toast.success('Pricing quote generated.')
+    } catch {
+      toast.error('Failed to generate quote.')
+    } finally {
+      setPricingLoading(false)
+    }
+  }
+
+  const startFollowUpNegotiation = async () => {
+    if (!pricingForm.positionRunningFor.trim() || !pricingForm.candidateName.trim()) {
+      toast.error('Position and candidate name are required to continue.')
+      return
+    }
+    setFollowUpStartLoading(true)
+    try {
+      const res = await fetch('/api/pricing-bot/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'start',
+          profile: {
+            campaignType: pricingForm.positionRunningFor,
+            candidateName: pricingForm.candidateName,
+            districtCode: pricingForm.districtCode,
+            campaignWebsite: pricingForm.campaignWebsite,
+            reductionSoughtPct: pricingForm.reductionSoughtPct,
+          },
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data?.status) {
+        toast.error(data?.message || 'Could not open follow-up chat.')
+        return
+      }
+      setChatSessionId(data.sessionId)
+      setFollowMessages((data.messages || []) as ChatMsg[])
+      setFollowUpOpen(true)
+      setNegotiatedQuote(null)
+      toast.success('Keep making your case below.')
+    } catch {
+      toast.error('Could not open follow-up chat.')
+    } finally {
+      setFollowUpStartLoading(false)
+    }
+  }
+
+  const sendFollowUpMessage = async () => {
+    const text = followDraft.trim()
+    if (!text || !chatSessionId) return
+    setFollowSending(true)
+    try {
+      const res = await fetch('/api/pricing-bot/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'message', sessionId: chatSessionId, userMessage: text }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data?.status) {
+        toast.error(data?.message || 'Send failed.')
+        return
+      }
+      setFollowMessages((data.messages || []) as ChatMsg[])
+      setNegotiatedQuote({
+        finalPrice: data.quote.finalPrice,
+        discountPct: data.quote.discountPct,
+        favorabilityScore: Number(data.cumulativeFavorabilityScore ?? data.quote.favorabilityScore ?? 0),
+        listPrice: data.quote.listPrice,
+      })
+      setPricingResult((prev) =>
+        prev
+          ? {
+              ...prev,
+              shareText: data.shareText ?? prev.shareText,
+              referralLink: data.referralLink ?? prev.referralLink,
+            }
+          : prev
+      )
+      setFollowDraft('')
+    } catch {
+      toast.error('Send failed.')
+    } finally {
+      setFollowSending(false)
+    }
+  }
+
+  const applyShareBonus = async (action: 'linkedin' | 'facebook' | 'campaign_email') => {
+    if (!activeQuoteToken) return
+    try {
+      const res = await fetch('/api/pricing-bot/share-bonus', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ quoteToken: activeQuoteToken, action }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data?.status) return
+      const fp = data.quote.finalPrice
+      const dp = data.quote.discountPct
+      if (followUpOpen && negotiatedQuote) {
+        setNegotiatedQuote((q) => (q ? { ...q, finalPrice: fp, discountPct: dp } : q))
+      } else {
+        setPricingResult((prev) => (prev ? { ...prev, finalPrice: fp, discountPct: dp } : prev))
+      }
+      toast.success('+5% share bonus applied (once).')
+    } catch {}
+  }
+
+  const handleOpenCampaignActionKit = () => {
+    if (!displayPrice) return
+    const d = pricingForm.districtCode?.trim()
+    if (!d) {
+      toast.error('Add a US House district (e.g. NJ-5) to open your district report.')
+      return
+    }
+    const params = new URLSearchParams()
+    params.set('district', d)
+    if (pricingForm.candidateName) params.set('candidate', pricingForm.candidateName)
+    if (pricingForm.positionRunningFor) params.set('position', pricingForm.positionRunningFor)
+    if (pricingForm.issue) params.set('issue', pricingForm.issue)
+    params.set('quoted', String(displayPrice.finalPrice))
+    params.set('discount', String(displayPrice.discountPct))
+    router.push(`/campaign-action-kit?${params.toString()}`)
+  }
+
+  const handleHumanReview = async () => {
+    if (!pricingResult) return
+    setReviewLoading(true)
+    try {
+      const res = await fetch('/api/pricing-bot/review', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: pricingForm.email || null,
+          pricingForm,
+          pricingResult: { ...pricingResult, ...negotiatedQuote, quoteToken: activeQuoteToken },
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data?.status) {
+        toast.error(data?.message || 'Failed to submit human review.')
+        return
+      }
+      toast.success(`Human review submitted (${data.requestId}).`)
+    } catch {
+      toast.error('Failed to submit human review.')
+    } finally {
+      setReviewLoading(false)
+    }
+  }
+
+  const openPricingBotPanel = () => {
+    setSalesChatOpen(true)
+    setSalesTab('pricing-bot')
+  }
+
+  return (
+    <>
+      <style jsx global>{`
+        @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&display=swap');
+      `}</style>
+    <div className="flex-1 p-2 w-full bg-background font-['Montserrat']">
+      <div className="mx-auto rounded-lg bg-card text-card-foreground shadow-lg">
+        {/* Main content — site-wide header now provided by PublicLayout/PublicTopNav */}
+        <div className="py-16">
+          {/* Hero Section */}
+          <section className="relative w-full py-10 md:py-16 rounded-lg flex items-start justify-center">
+            <div className="relative z-10 flex flex-col items-center text-center max-w-3xl px-4 gap-y-6">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-muted/5 border border-primary/10 text-primary font-medium text-xs">
+                <Rocket className="h-3 w-3" />
+                Unlimited polls &amp; responses
+              </div>
+              <h1 className="leading-none text-4xl sm:text-5xl lg:text-8xl font-bold tracking-tight text-card-foreground">
+                Understand Your Voters Before They Vote.
+              </h1>
+              <p className="font-medium text-2xl mb-6">
+                AI-powered polling, voter modeling, and campaign intelligence.
+              </p>
+              
+              {/* Action Buttons */}
+              <div className="flex flex-wrap items-center justify-center gap-4">
+                  <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
+                    <DialogTrigger asChild>
+                      <Button 
+                        size="lg" 
+                        variant="outline" 
+                        className="px-8 py-3 text-lg font-medium"
+                      >
+                        Import Poll Data
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-2xl">
+                      <DialogHeader>
+                        <DialogTitle>Try Antelope with Your Polling Data</DialogTitle>
+                      </DialogHeader>
+                      {!uploadPreview ? (
+                        <div className="space-y-4">
+                          <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
+                            <input
+                              type="file"
+                              accept=".csv,.xlsx,.xls"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) handleFileUpload(file);
+                              }}
+                              className="hidden"
+                              id="file-upload-demo"
+                              disabled={uploadLoading}
+                            />
+                            <label htmlFor="file-upload-demo" className="cursor-pointer">
+                              <FileText className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+                              <p className="text-lg font-medium mb-2">
+                                {uploadLoading ? 'Analyzing your polling data...' : 'Drop your poll data file here'}
+                              </p>
+                              <p className="text-sm text-gray-500">
+                                {uploadLoading ? 'Please wait while we process your data' : 'or click to browse (CSV, Excel)'}
+                              </p>
+                              <p className="text-xs text-gray-400 mt-2">Max file size: 10MB</p>
+                            </label>
+                          </div>
+                          <div className="text-center text-sm text-muted-foreground">
+                            <p>See how Antelope transforms your polling responses into queryable voter profiles</p>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                            <h3 className="font-medium text-green-800 mb-2">Poll Analysis Complete!</h3>
+                            <div className="space-y-2 text-sm">
+                              <p><strong>Survey:</strong> {uploadPreview.suggestedTitle}</p>
+                              <p><strong>Responses:</strong> {uploadPreview.totalRows || 0} voter responses</p>
+                              <p><strong>Questions:</strong> {uploadPreview.columns?.length || 0} poll questions</p>
+                              {uploadPreview.detectedDemographics && uploadPreview.detectedDemographics.length > 0 && (
+                                <p><strong>Voter Profiles:</strong> {uploadPreview.detectedDemographics.length} demographic profiles detected</p>
+                              )}
+                            </div>
+                          </div>
+                          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                            <h4 className="font-medium text-blue-800 mb-2">What you can do next:</h4>
+                            <ul className="text-sm text-blue-700 space-y-1">
+                              <li>&bull; Ask questions like &quot;What are the top voter concerns?&quot;</li>
+                              <li>&bull; Segment by demographics: &quot;Show me responses from independents aged 25-45&quot;</li>
+                              <li>&bull; Test messages: &quot;How would suburban voters react to this healthcare message?&quot;</li>
+                              <li>&bull; Generate campaign briefings and export reports</li>
+                            </ul>
+                          </div>
+                          <div className="flex gap-2 justify-end">
+                            <Button variant="outline" onClick={() => { setShowUploadDialog(false); resetUploadDialog(); }}>
+                              Try Another File
+                            </Button>
+                            <Button onClick={handleGetStarted} className="bg-primary">
+                              Sign Up to Continue
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </DialogContent>
+                  </Dialog>
+                  <span className="text-muted-foreground">or</span>
+                  <Button 
+                    size="lg" 
+                    variant="outline"
+                    className="px-8 py-3 text-lg font-medium"
+                    onClick={() => router.push("/auth/login")}
+                  >
+                    Login
+                  </Button>
+                  <span className="text-muted-foreground">or</span>
+                  <Button 
+                    size="lg" 
+                    className="px-8 py-3 text-lg font-medium"
+                    onClick={handleSignUp}
+                  >
+                    Sign Up Free
+                  </Button>
+              </div>
+
+              <p className="text-xs text-muted-foreground text-center mt-2">
+                Currently in beta — free and unlimited during early access.
+              </p>
+
+              {/* Automation for Garry's List — try it free, no login required */}
+              <div className="w-full max-w-2xl mx-auto mt-10">
+                <Card className="border-2">
+                  <CardContent className="p-6 space-y-4">
+                    <div className="text-center space-y-1">
+                      <h3 className="font-semibold text-lg">Try it free — turn any story into a reader survey</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Paste a newsletter or article URL. Antelope reads it and drafts a short, neutral survey — no log in required.
+                      </p>
+                    </div>
+                    <form onSubmit={handleGarrysListSubmit} className="flex flex-col sm:flex-row gap-2">
+                      <input
+                        type="url"
+                        value={storyUrl}
+                        onChange={(e) => setStoryUrl(e.target.value)}
+                        placeholder="https://garryslist.org/posts/your-story"
+                        className="flex-1 h-11 px-4 rounded-md border border-input bg-background text-sm"
+                      />
+                      <Button type="submit" size="lg" className="whitespace-nowrap">
+                        Generate survey
+                      </Button>
+                    </form>
+                    <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                      <div className="h-px flex-1 bg-border" />
+                      <span>or</span>
+                      <div className="h-px flex-1 bg-border" />
+                    </div>
+                    <form onSubmit={handleTokenSubmit} className="flex flex-col sm:flex-row gap-2">
+                      <input
+                        type="text"
+                        value={resultToken}
+                        onChange={(e) => setResultToken(e.target.value)}
+                        placeholder="Have a token? ANT-XXXX-XXXX-XXXX-XXXX"
+                        className="flex-1 h-10 px-4 rounded-md border border-input bg-background text-sm font-mono"
+                      />
+                      <Button type="submit" variant="outline" className="whitespace-nowrap">
+                        View my results
+                      </Button>
+                    </form>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Demo Video */}
+              <div className="w-full max-w-4xl mx-auto mt-10">
+                <video
+                  className="w-full rounded-lg border border-border shadow-lg"
+                  controls
+                  preload="metadata"
+                  poster="/videos/antelope-demo-poster.jpg"
+                >
+                  <source src="/videos/antelope-demo.mp4" type="video/mp4" />
+                  Your browser does not support embedded video.{' '}
+                  <a href="/videos/antelope-demo.mp4">Download the demo video</a>.
+                </video>
+              </div>
+
+            </div>
+          </section>
+
+          {/* Feature Grid */}
+          <section className="mt-16 max-w-6xl mx-auto">
+            <h3 className="text-4xl font-bold text-center mb-2">Campaign intelligence, simplified</h3>
+            <p className="text-muted-foreground text-center mb-12 text-lg">
+              Ask what you want to know about your voters and Antelope will answer you. No more waiting weeks for poll results.
+            </p>
+            <div className="grid gap-12 lg:grid-cols-3">
+              {/* Create or import polls */}
+              <div className="text-left space-y-6">
+                <div className="mx-auto w-full max-w-sm">
+                  <img 
+                    src="/web-01.png" 
+                    alt="Create or import polls" 
+                    className="w-full h-auto"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <h3 className="font-bold text-xl text-gray-900 dark:text-gray-100">Create or import any poll</h3>
+                  <p className="text-gray-600 dark:text-gray-300 leading-relaxed">
+                    AI-powered poll builder + import from CSV, Excel, SurveyMonkey, Google Sheets, and Typeform.
+                  </p>
+                </div>
+              </div>
+
+              {/* Chat with your electorate */}
+              <div className="text-left space-y-6">
+                <div className="mx-auto w-full max-w-sm">
+                  <img 
+                    src="/web-02.png" 
+                    alt="Chat with voter data" 
+                    className="w-full h-auto"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <h3 className="font-bold text-xl text-gray-900 dark:text-gray-100">Chat with your voter data</h3>
+                  <p className="text-gray-600 dark:text-gray-300 leading-relaxed">
+                    Ask plain-language questions about your polling data and get instant, evidence-based answers.
+                  </p>
+                </div>
+              </div>
+
+              {/* Generate campaign briefings */}
+              <div className="text-left space-y-6">
+                <div className="mx-auto w-full max-w-sm">
+                  <img 
+                    src="/web-03.png" 
+                    alt="Generate campaign briefings" 
+                    className="w-full h-auto"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <h3 className="font-bold text-xl text-gray-900 dark:text-gray-100">Generate campaign briefings</h3>
+                  <p className="text-gray-600 dark:text-gray-300 leading-relaxed">
+                    Ask for in-depth reports on any topic and share them with your campaign team.
+                  </p>
+                </div>
+              </div>
+
+              {/* AI poll creator */}
+              <div className="text-left space-y-6">
+                <div className="mx-auto w-full max-w-sm">
+                  <img 
+                    src="/web-04.png" 
+                    alt="AI poll creator" 
+                    className="w-full h-auto"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <h3 className="font-bold text-xl text-gray-900 dark:text-gray-100">AI poll creator</h3>
+                  <p className="text-gray-600 dark:text-gray-300 leading-relaxed">
+                    Describe your research question and our AI drafts a professional poll in seconds.
+                  </p>
+                </div>
+              </div>
+
+              {/* Synthetic voter profiles */}
+              <div className="text-left space-y-6">
+                <div className="mx-auto w-full max-w-sm">
+                  <img 
+                    src="/web-05.png" 
+                    alt="Synthetic voter profiles" 
+                    className="w-full h-auto"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <h3 className="font-bold text-xl text-gray-900 dark:text-gray-100">Synthetic voter profiles</h3>
+                  <p className="text-gray-600 dark:text-gray-300 leading-relaxed">
+                    Each respondent becomes a queryable voter profile — test messages and explore opinions on demand.
+                  </p>
+                </div>
+              </div>
+
+              {/* Voter segmentation */}
+              <div className="text-left space-y-6">
+                <div className="mx-auto w-full max-w-sm">
+                  <img 
+                    src="/web-06.png" 
+                    alt="Voter segmentation" 
+                    className="w-full h-auto"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <h3 className="font-bold text-xl text-gray-900 dark:text-gray-100">Voter segmentation</h3>
+                  <p className="text-gray-600 dark:text-gray-300 leading-relaxed">
+                    Identify swing voters, base supporters, and persuadable segments with AI-driven analysis.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* 2030 Vision */}
+          <section className="mt-24 max-w-3xl mx-auto">
+            <div className="text-center mb-10">
+              <p className="text-sm font-semibold text-primary uppercase tracking-wide mb-2">Our Vision</p>
+              <h3 className="text-3xl md:text-4xl font-bold">The Field We Want by 2030</h3>
+            </div>
+
+            <div className="space-y-5 text-muted-foreground leading-relaxed text-left">
+              <p>
+                Democracy runs on a simple promise: anyone can stand for office, speak their mind, and ask their
+                neighbors to choose them. In practice, that promise has narrowed. Running for anything — a school
+                board seat, a city council, a congressional district — now takes money, a team, and access to
+                people who already know how the machine works. The further you sit from that machine, the harder
+                it gets. That&apos;s the problem we started Antelope to fix.
+              </p>
+              <p>
+                By 2030, we want a different field. One where a teacher, a nurse, a small-business owner, or a
+                first-time organizer can run a serious campaign without ten thousand dollars in software fees or a
+                roster of consultants. Where the barrier to entry is your conviction and your willingness to do the
+                work — not your bank account or your rolodex. That&apos;s the world we&apos;re building toward, and
+                here&apos;s how we get there.
+              </p>
+
+              <h4 className="text-xl font-semibold text-foreground pt-4">What actually stops people from running</h4>
+              <p>Three things.</p>
+              <p>
+                The first is cost. The tools that manage voter data, surveys, fundraising, and outreach have
+                historically been priced for institutions, not individuals. Thousands of dollars per cycle before
+                you&apos;ve knocked on a single door. That price tag is a gate, and it keeps out exactly the people
+                democracy should be inviting in.
+              </p>
+              <p>
+                The second is complexity. Even if you can afford the tools, you need people to run them. Someone
+                for the data. Someone for the messaging. Someone for compliance and finance. Someone to stitch six
+                disconnected platforms into something that functions. For an incumbent with a staff, that&apos;s
+                routine. For a challenger with a day job, it&apos;s disqualifying.
+              </p>
+              <p>
+                The third is the one nobody puts on a pricing page: anxiety. Most people who could run never do,
+                because they don&apos;t believe they can win, can&apos;t picture affording it, or quietly assume
+                their neighbors won&apos;t listen. That fear does more gatekeeping than any fee. And it&apos;s
+                worth saying plainly — even if you run and lose, even if you spend a few thousand dollars and come
+                up short, you did something rare and worthwhile. You exercised your right to stand for office.
+                That is not a failure. That is the whole point of a republic.
+              </p>
+
+              <h4 className="text-xl font-semibold text-foreground pt-4">What we automate — and why</h4>
+              <p>
+                When we talk about automation, we don&apos;t mean replacing the human part of politics. Politics is
+                about people persuading people, and it always will be. What we automate is the friction that
+                stands between a person and that conversation.
+              </p>
+              <p>
+                The operational layer first: survey design and deployment, so you can ask your district what it
+                thinks and actually hear the answer. Outreach across email, text, and social, coordinated instead
+                of scattered. Fundraising follow-ups. Volunteer coordination. Research and opposition tracking.
+                Compliance-aware record-keeping. The unglamorous, time-eating work that currently requires a
+                team — handled in the background.
+              </p>
+              <p>
+                Then the part that matters most: turning raw district data into plain answers. Who in this
+                district is likely to give? What issues move people here, street by street? Where should a
+                first-time candidate spend a limited week? Instead of staring at spreadsheets you don&apos;t have
+                time to read, you get clarity. And clarity is the antidote to the anxiety. When you can see your
+                district, your supporters, and what genuinely matters to the people around you, the fear starts to
+                lift. You stop guessing and start deciding. That shift — from anxiety to certainty — is the thing
+                we are really in the business of.
+              </p>
+
+              <h4 className="text-xl font-semibold text-foreground pt-4">Where the platform is going</h4>
+              <p>Today, the product is one person, one question, one answer. That&apos;s a starting point, not the destination.</p>
+              <p>
+                We&apos;re building toward a platform where a whole campaign works in one shared space. A
+                candidate, a campaign manager, a volunteer lead, and the automated systems running alongside
+                them — all coordinated, all handing work off to each other without anyone rekeying data or chasing
+                status updates. Research feeds strategy. Strategy feeds outreach. Outreach feeds analysis. Analysis
+                feeds the next decision. You set the direction; the platform keeps the whole operation moving as
+                one workflow instead of a pile of tools and disconnected people.
+              </p>
+              <p>
+                That is what closes the gap with incumbency. A well-funded campaign wins partly because it can
+                coordinate at scale. When coordination at scale is available to anyone for a fair price, the
+                incumbent&apos;s structural advantage shrinks — and the field opens up.
+              </p>
+
+              <h4 className="text-xl font-semibold text-foreground pt-4">From campaigns to communities</h4>
+              <p>
+                Campaigns are where we start, because that&apos;s where the pain is sharpest and the timeline is
+                real. But the same logic reaches further.
+              </p>
+              <p>
+                In 2027 and 2028, city councils, county parties, advocacy organizations, and issue-based PACs. By
+                2030, municipalities and grassroots movements — any institution whose job is to listen to a
+                community and act on what it hears. A mayor shouldn&apos;t need a consulting firm to understand
+                their own city. An advocacy group shouldn&apos;t need six vendors to run a coordinated push. The
+                work of governing well is, at bottom, the same work as campaigning well: understand the people you
+                serve, and respond to them faster and more honestly than the alternative.
+              </p>
+
+              <h4 className="text-xl font-semibold text-foreground pt-4">Why this holds</h4>
+              <p>
+                We think a lot about what makes this durable, and it isn&apos;t the code. Code can be copied. What
+                can&apos;t be copied is what accumulates when real campaigns run through the platform: a growing,
+                first-party understanding of what actually moves people — which messages land, which issues matter
+                in which neighborhoods, how communities actually decide. That understanding compounds with every
+                campaign, and it only exists because the product is used. Which means the whole thing is
+                self-reinforcing in the right way: it gets better for everyone as more people participate, and it
+                only gets better if it earns their participation by working.
+              </p>
+              <p>
+                That&apos;s the bet. Lower the barrier, expand the field, and trust the result. More people running
+                means more voices, more accountability, more competition for the privilege of representing a
+                community. That is not a threat to democracy. That is democracy, working the way it was supposed
+                to.
+              </p>
+              <p className="text-foreground font-medium">
+                We&apos;ve got a lot of building left to do. But the direction is fixed: a field where anyone can
+                run, and no one is priced or frightened out of trying.
+              </p>
+            </div>
+          </section>
+        </div>
+      </div>
+
+      {/* Bottom-right sales chat (stub) */}
+      <div className="fixed bottom-4 right-4 z-50">
+        {salesChatOpen && (
+          <div className="mb-2 w-[380px] max-w-[95vw] rounded-lg border border-violet-500/50 bg-background backdrop-blur shadow-lg overflow-hidden">
+            <div className="px-3 py-2 border-b border-border/60 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <MessageSquareText className="h-4 w-4" />
+                <div className="text-sm font-medium">Antelope Help (preview)</div>
+              </div>
+              <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => setSalesChatOpen(false)}>
+                Close
+              </Button>
+            </div>
+            <div className="p-3 text-sm max-h-[min(78vh,560px)] overflow-auto">
+              <Tabs value={salesTab} onValueChange={(v) => setSalesTab(v as 'sales-call' | 'pricing-bot')}>
+                <TabsList className="grid grid-cols-2 w-full">
+                  <TabsTrigger value="sales-call">Sales Call</TabsTrigger>
+                  <TabsTrigger value="pricing-bot">Pricing Bot</TabsTrigger>
+                </TabsList>
+                <TabsContent value="sales-call" className="space-y-2 mt-3">
+                  <div className="text-muted-foreground">
+                    This widget routes messages to our team for onboarding and sales support.
+                  </div>
+                  <div className="rounded-md bg-muted/40 p-2">
+                    <div className="text-xs text-muted-foreground">Examples:</div>
+                    <ul className="text-xs mt-1 space-y-1">
+                      <li>- “Can you show me a demo for a city council race?”</li>
+                      <li>- “What does pricing look like for a small campaign?”</li>
+                      <li>- “Can we import NGP VAN data?”</li>
+                    </ul>
+                  </div>
+                </TabsContent>
+                <TabsContent value="pricing-bot" className="space-y-3 mt-3">
+                  <div className="rounded-xl border border-violet-500/40 bg-gradient-to-br from-violet-500/15 via-cyan-500/15 to-emerald-500/15 p-3 shadow-sm">
+                    <div className="flex items-center gap-2">
+                      <div className="h-10 w-10 rounded-full bg-background/70 border border-violet-400/40 flex items-center justify-center">
+                        <Bot className="h-5 w-5 text-violet-500" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold">Pricing Bot Challenge</p>
+                        <p className="text-[11px] text-muted-foreground">Start at $650/mo (first 3 months). Make your case, then keep negotiating if you want more off.</p>
+                      </div>
+                      <Sparkles className="h-5 w-5 ml-auto text-cyan-500" />
+                    </div>
+                    <div className="mt-2 rounded-md border border-violet-500/30 bg-violet-500/10 px-2 py-1.5 text-[11px] font-medium">
+                      Can you drop our price from <span className="font-bold">$650</span> toward <span className="font-bold">$99</span>? Make your case.
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 gap-3">
+                    <label className="space-y-1">
+                      <span className="text-xs font-medium text-foreground">Position running for</span>
+                      <input className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm" value={pricingForm.positionRunningFor} onChange={(e) => setPricingForm((p) => ({ ...p, positionRunningFor: e.target.value }))} placeholder="e.g. Congress, Mayor, City Council" />
+                    </label>
+                    <label className="space-y-1">
+                      <span className="text-xs font-medium text-foreground">Candidate name</span>
+                      <input className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm" value={pricingForm.candidateName} onChange={(e) => setPricingForm((p) => ({ ...p, candidateName: e.target.value }))} placeholder="Full name" />
+                    </label>
+                    <label className="space-y-1">
+                      <span className="text-xs font-medium text-foreground">US campaign district <span className="font-normal text-muted-foreground">(if applicable)</span></span>
+                      <input className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm" value={pricingForm.districtCode} onChange={(e) => setPricingForm((p) => ({ ...p, districtCode: e.target.value }))} placeholder="e.g. NJ-5" />
+                    </label>
+                    <label className="space-y-1">
+                      <span className="text-xs font-medium text-foreground">Campaign website <span className="font-normal text-muted-foreground">(optional)</span></span>
+                      <input className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm" type="url" inputMode="url" value={pricingForm.campaignWebsite} onChange={(e) => setPricingForm((p) => ({ ...p, campaignWebsite: e.target.value }))} placeholder="https://yourcampaign.com" />
+                    </label>
+                    <label className="space-y-1">
+                      <span className="text-xs font-medium text-foreground">Discount percentage sought</span>
+                      <p className="text-[11px] text-muted-foreground leading-snug">Roughly how much you want off list (0–90%). The bot treats this as a target, not a guarantee.</p>
+                      <input className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm" type="number" min={0} max={90} value={pricingForm.reductionSoughtPct} onChange={(e) => setPricingForm((p) => ({ ...p, reductionSoughtPct: Number(e.target.value || 0) }))} />
+                    </label>
+                  </div>
+                  <label className="block space-y-1">
+                    <span className="text-xs font-medium text-foreground">Make your case</span>
+                    <Textarea value={pricingForm.convinceText} onChange={(e) => setPricingForm((p) => ({ ...p, convinceText: e.target.value }))} placeholder="Convince the bot why this campaign deserves a stronger price..." rows={3} />
+                  </label>
+                  <Button onClick={handlePricingQuote} disabled={pricingLoading} className="w-full">
+                    {pricingLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Pricing...</> : 'Get pricing quote'}
+                  </Button>
+                  {pricingResult && (
+                    <div className="rounded-md border border-border/70 bg-muted/30 p-2 space-y-2">
+                      <div>
+                        <div className="flex items-center justify-between text-[10px] text-muted-foreground mb-1">
+                          <span>Cumulative favorability</span>
+                          <span>{(displayPrice?.favorabilityScore ?? pricingResult.favorabilityScore)}/100</span>
+                        </div>
+                        <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
+                          <div
+                            className="h-full bg-gradient-to-r from-amber-500 via-lime-500 to-emerald-500 transition-all"
+                            style={{ width: `${Math.max(3, displayPrice?.favorabilityScore ?? pricingResult.favorabilityScore)}%` }}
+                          />
+                        </div>
+                      </div>
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-xs text-muted-foreground">List ${pricingResult.listPrice}/mo (first 3 months)</span>
+                        <span className="text-sm font-semibold">${displayPrice?.finalPrice ?? pricingResult.finalPrice}/mo · {displayPrice?.discountPct ?? pricingResult.discountPct}% off (first 3 months)</span>
+                        {negotiatedQuote && followUpOpen ? (
+                          <span className="text-[10px] text-muted-foreground">Updated after follow-up negotiation.</span>
+                        ) : null}
+                      </div>
+                      {pricingResult.personalityLine ? <div className="text-[11px] rounded border border-violet-500/30 bg-violet-500/10 px-2 py-1">{pricingResult.personalityLine}</div> : null}
+                      {pricingResult.shareText ? <Textarea readOnly value={pricingResult.shareText} rows={2} className="text-[11px]" /> : null}
+                      {pricingResult.referralLink ? <Textarea readOnly rows={2} value={`${origin}${pricingResult.referralLink}`} className="text-[11px]" /> : null}
+                      {!followUpOpen ? (
+                        <button
+                          type="button"
+                          onClick={startFollowUpNegotiation}
+                          disabled={followUpStartLoading}
+                          className="w-full rounded-lg border border-violet-500/50 bg-violet-500/15 px-3 py-2 text-left text-xs font-medium text-foreground transition hover:bg-violet-500/25 disabled:opacity-60"
+                        >
+                          {followUpStartLoading ? (
+                            <span className="flex items-center gap-2"><Loader2 className="h-3 w-3 animate-spin" /> Opening…</span>
+                          ) : (
+                            <>Want a further discount? <span className="text-violet-600 dark:text-violet-300">Click here to keep convincing Antelope!</span></>
+                          )}
+                        </button>
+                      ) : null}
+                      {followUpOpen && followMessages.length > 0 ? (
+                        <div className="space-y-2 rounded-md border border-violet-500/30 bg-background/80 p-2">
+                          <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Keep negotiating</p>
+                          <div className="max-h-36 overflow-y-auto space-y-1.5 text-[11px]">
+                            {followMessages.map((m, i) => (
+                              <div key={i} className={`rounded px-2 py-1 ${m.role === 'user' ? 'bg-primary/15 ml-3' : 'bg-muted/80 mr-2'}`}>
+                                {m.content}
+                              </div>
+                            ))}
+                          </div>
+                          <Textarea
+                            value={followDraft}
+                            onChange={(e) => setFollowDraft(e.target.value)}
+                            placeholder="Your next argument…"
+                            rows={2}
+                            className="text-xs"
+                          />
+                          <Button size="sm" className="w-full" type="button" onClick={() => void sendFollowUpMessage()} disabled={followSending || !followDraft.trim()}>
+                            {followSending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Send'}
+                          </Button>
+                        </div>
+                      ) : null}
+                      <div className="flex gap-2">
+                        <Button size="sm" variant="outline" className="flex-1" onClick={async () => {
+                          if (pricingResult.shareText) {
+                            await navigator.clipboard.writeText(pricingResult.shareText)
+                            toast.success('Share text copied.')
+                          }
+                        }}>
+                          Copy to share
+                        </Button>
+                        <Button size="sm" variant={pricingResult.needsHumanReview ? 'default' : 'secondary'} className="flex-1" onClick={handleHumanReview} disabled={reviewLoading}>
+                          {reviewLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <HeartHandshake className="h-4 w-4 mr-1" />}
+                          Human review
+                        </Button>
+                      </div>
+                      <Button size="sm" className="w-full" onClick={handleOpenCampaignActionKit}>
+                        Build campaign action kit
+                      </Button>
+                    </div>
+                  )}
+                </TabsContent>
+              </Tabs>
+            </div>
+          </div>
+        )}
+
+        <Button onClick={() => setSalesChatOpen(v => !v)} className="rounded-full shadow-lg">
+          <PhoneCall className="h-4 w-4 mr-2" />
+          Stuck? Ask for a sales call here!
+        </Button>
+        {pricingBotPromoMinimized ? (
+          <button
+            type="button"
+            onClick={() => setPricingBotPromoMinimized(false)}
+            className="mt-2 flex items-center gap-2 rounded-full border border-violet-500/50 bg-background px-3 py-2 text-sm font-medium shadow-lg transition hover:bg-violet-500/10"
+            aria-label="Open pricing bot panel"
+          >
+            <Bot className="h-4 w-4 text-violet-500" />
+            Pricing Bot
+          </button>
+        ) : (
+          <div className="mt-2 w-[380px] max-w-[95vw] rounded-xl border border-violet-500/50 bg-background backdrop-blur shadow-lg p-4">
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex items-start gap-2">
+                <div className="h-12 w-12 rounded-full border border-violet-400/50 bg-violet-500/10 flex items-center justify-center shadow-sm">
+                  <Bot className="h-6 w-6 text-violet-500" />
+                </div>
+                <div>
+                  <p className="text-lg font-semibold leading-tight">Pricing Bot</p>
+                  <p className="text-sm text-muted-foreground mt-1 leading-snug">
+                    Opens from the corner. Make your case, then keep convincing Antelope for a deeper discount.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPricingBotPromoMinimized(true)}
+                className="rounded p-1 text-muted-foreground transition hover:bg-muted hover:text-foreground"
+                aria-label="Minimize pricing bot panel"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="mt-3 rounded-md border border-violet-500/40 bg-violet-500/20 px-3 py-2 text-sm font-medium">
+              Think you can drop us from <span className="font-bold">$650</span> to as low as <span className="font-bold">$99</span> (for the first 3 months)?
+            </div>
+            <Button size="lg" className="w-full mt-3 text-base font-semibold" onClick={openPricingBotPanel}>
+              Open Pricing Bot Challenge
+            </Button>
+          </div>
+        )}
+      </div>
+    </div>
+    </>
+  )
+}

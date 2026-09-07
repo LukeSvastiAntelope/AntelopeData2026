@@ -1,0 +1,427 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer utilities {
+  .line-clamp-1 {
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 1;
+  }
+  
+  .line-clamp-2 {
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+  
+  .line-clamp-3 {
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+  }
+}
+
+:root {
+  --radius: 0.625rem;
+
+  /* Light theme - Neutral (preset: radix-nova, base=radix, theme=neutral) */
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.58 0.22 27);
+  --destructive-foreground: oklch(0.985 0 0);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+
+  /* Chart colors - preset palette */
+  --chart-1: oklch(0.809 0.105 251.813);
+  --chart-2: oklch(0.623 0.214 259.815);
+  --chart-3: oklch(0.546 0.245 262.881);
+  --chart-4: oklch(0.488 0.243 264.376);
+  --chart-5: oklch(0.424 0.199 265.638);
+
+  /* Sidebar colors */
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
+
+  /* Custom colors (preserved for app-specific use) */
+  --gradient-primary: oklch(0.205 0 0);
+  --gradient-secondary: oklch(0.7 0.18 85);
+  --success: oklch(0.6 0.18 145);
+  --warning: oklch(0.75 0.18 85);
+  --info: oklch(0.6 0.2 250);
+
+  /* Neutral scale for charts (replaces zinc-* references) */
+  --neutral-300: oklch(0.87 0 0);
+  --neutral-400: oklch(0.71 0 0);
+  --neutral-500: oklch(0.56 0 0);
+  --neutral-600: oklch(0.45 0 0);
+  --neutral-700: oklch(0.37 0 0);
+  --neutral-800: oklch(0.27 0 0);
+}
+
+.dark {
+  /* Dark theme - Neutral (preset: radix-nova) */
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.87 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.371 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --destructive-foreground: oklch(0.985 0 0);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+
+  /* Chart colors */
+  --chart-1: oklch(0.809 0.105 251.813);
+  --chart-2: oklch(0.623 0.214 259.815);
+  --chart-3: oklch(0.546 0.245 262.881);
+  --chart-4: oklch(0.488 0.243 264.376);
+  --chart-5: oklch(0.424 0.199 265.638);
+
+  /* Sidebar colors */
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.556 0 0);
+
+  /* Custom colors */
+  --gradient-primary: oklch(0.985 0 0);
+  --gradient-secondary: oklch(0.7 0.18 85);
+  --success: oklch(0.6 0.18 145);
+  --warning: oklch(0.75 0.18 85);
+  --info: oklch(0.6 0.2 250);
+
+  /* Neutral scale for charts (lighter grays for visibility on dark bg) */
+  --neutral-300: oklch(0.4 0 0);
+  --neutral-400: oklch(0.5 0 0);
+  --neutral-500: oklch(0.6 0 0);
+  --neutral-600: oklch(0.68 0 0);
+  --neutral-700: oklch(0.76 0 0);
+  --neutral-800: oklch(0.85 0 0);
+}
+
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+
+  .dark {
+    color-scheme: dark;
+  }
+
+  * {
+    @apply border-border;
+  }
+  
+  body {
+    @apply bg-background text-foreground transition-colors duration-300;
+  }
+
+  /* Ensure text colors are properly inherited */
+  h1, h2, h3, h4, h5, h6, p, span, div {
+    @apply text-foreground;
+  }
+
+  /* Ensure card text colors */
+  .bg-card {
+    @apply text-card-foreground;
+  }
+  
+  /* Input field styling for both themes - explicit colors for dark mode visibility */
+  input[type="text"], input[type="email"], input[type="password"], textarea {
+    @apply bg-background border-input text-foreground;
+  }
+
+  /* Placeholder contrast in dark mode */
+  .dark input[type="text"]::placeholder,
+  .dark input[type="email"]::placeholder,
+  .dark input[type="password"]::placeholder,
+  .dark textarea::placeholder {
+    color: var(--muted-foreground);
+    opacity: 1;
+  }
+
+  /* Caret visibility in dark mode */
+  .dark input[type="text"],
+  .dark input[type="email"],
+  .dark input[type="password"],
+  .dark textarea {
+    caret-color: var(--foreground);
+  }
+
+  /* Override bg-transparent on form controls in dark mode - ensures visibility when components override base styles */
+  .dark textarea.bg-transparent,
+  .dark input.bg-transparent {
+    background-color: var(--background) !important;
+    color: var(--foreground);
+  }
+  .dark textarea.bg-transparent::placeholder {
+    color: var(--muted-foreground);
+  }
+  
+  input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focus, textarea:focus {
+    @apply ring-ring border-ring;
+  }
+}
+
+/* Updated gradient styles using CSS variables */
+.bg-mainGradient {
+  background: var(--background);
+}
+
+.text-gradient {
+  color: var(--gradient-primary);
+}
+
+.text-gradient-red {
+  color: var(--warning);
+}
+
+/* Enhanced custom styles */
+.empty-state {
+  height: calc(100vh - 320px);
+}
+
+.data-card-text {
+  font-size: 1.8rem;
+}
+
+/* Better scrollbar styling for both themes */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--muted);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--muted-foreground);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--ring);
+}
+
+/* Chat message animations */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slide-in-from-bottom {
+  from {
+    transform: translateY(10px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.animate-in {
+  animation-fill-mode: both;
+}
+
+.fade-in {
+  animation-name: fade-in;
+}
+
+.slide-in-from-bottom-2 {
+  animation-name: slide-in-from-bottom;
+}
+
+.duration-300 {
+  animation-duration: 300ms;
+}
+
+.duration-500 {
+  animation-duration: 500ms;
+}
+
+.duration-700 {
+  animation-duration: 700ms;
+}
+
+.delay-300 {
+  animation-delay: 300ms;
+}
+
+/* Chat message styles */
+.chat-message {
+  /* No hover effects */
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+}
+
+/* Ensure markdown content wraps properly */
+.chat-message p,
+.chat-message div,
+.chat-message span,
+.chat-message li {
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+}
+
+/* === Layout Safeguards === */
+html,body{
+  max-width:100%;
+  overflow-x:hidden; /* stop unexpected horizontal scroll */
+}
+
+/* Reserve scrollbar space to prevent layout shift when popovers/menus open */
+html{
+  scrollbar-gutter: stable both-edges;
+}
+
+/* Always allow vertical scrollbar to avoid content width jumping */
+body{
+  overflow-y: scroll;
+}
+
+/* Ensure long code blocks wrap instead of forcing scrollbars */
+pre{
+  white-space:pre-wrap; /* allow wrapping */
+  word-break:break-word; /* break long words */
+  max-width: 100%;
+  overflow-x: auto; /* fallback for extremely long lines */
+}
+
+/* Conversation view message content should never overflow */
+.conversation-message-content {
+  max-width: 100%;
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+  word-break: break-word;
+  hyphens: auto;
+}
+
+/* Ensure code and result blocks in conversations are properly constrained */
+.conversation-message-content pre,
+.conversation-message-content code {
+  max-width: 100%;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+/* Force aggressive word breaking for extremely long strings in conversation content */
+.conversation-message-content * {
+  word-break: break-all;
+  overflow-wrap: anywhere;
+}
+
+/* Special handling for stored conversation content that might have very long strings */
+.conversation-message-content .prose,
+.conversation-message-content .prose p,
+.conversation-message-content .prose div {
+  word-break: break-all;
+  overflow-wrap: anywhere;
+  max-width: 100%;
+}
+
+/* Ultra-aggressive breaking for extremely long strings like base64, correlations, etc. */
+.break-ultra-long {
+  word-break: break-all !important;
+  overflow-wrap: anywhere !important;
+  word-wrap: break-word !important;
+  hyphens: auto !important;
+  white-space: pre-wrap !important;
+  max-width: 100% !important;
+  overflow-x: hidden !important;
+}
+
+/* ──────────────────────────────────────────────────────────────────
+   PDF export of the AI Analytics report.
+   When SurveyAnalyticsDashboard triggers window.print(), it adds the
+   `printing-report` class to <body>. We then hide all app chrome and
+   isolate #ai-analytics-report so the browser's "Save as PDF" captures
+   only the report (charts/SVGs and oklch colors render natively).
+   ────────────────────────────────────────────────────────────────── */
+/* During PDF prep, reveal all forceMount'd tab panels on screen for one frame
+   so Recharts can measure & render every chart before window.print() fires. */
+body.preparing-print #ai-analytics-report .print-tab[hidden],
+body.preparing-print #ai-analytics-report .print-tab {
+  display: block !important;
+}
+
+@media print {
+  body.printing-report * {
+    visibility: hidden !important;
+  }
+  body.printing-report #ai-analytics-report,
+  body.printing-report #ai-analytics-report * {
+    visibility: visible !important;
+  }
+  body.printing-report #ai-analytics-report {
+    position: absolute !important;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+  }
+  /* Buttons / interactive chrome inside the report should not print */
+  body.printing-report #ai-analytics-report .no-print,
+  body.printing-report #ai-analytics-report [role="tablist"] {
+    display: none !important;
+  }
+  /* Reveal every tab panel (forceMount keeps inactive ones in the DOM with the
+     `hidden` attribute) so Insights + Visualizations + Performance all print. */
+  body.printing-report #ai-analytics-report .print-tab[hidden],
+  body.printing-report #ai-analytics-report .print-tab {
+    display: block !important;
+  }
+  /* Avoid awkward page breaks inside cards */
+  body.printing-report #ai-analytics-report .break-inside-avoid,
+  body.printing-report #ai-analytics-report [data-slot="card"] {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  @page {
+    margin: 1.5cm;
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "name": "Market Maker Agent",
+  "description": "AI-powered prediction market platform",
+  "version": "0.1.0",
+  "author": "Market Maker Team",
+  "keywords": ["prediction", "market", "betting", "AI", "agent"],
+  "homepage": "https://marketmaker.app",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/marketmaker/app"
+  },
+  "license": "MIT"
+} 
