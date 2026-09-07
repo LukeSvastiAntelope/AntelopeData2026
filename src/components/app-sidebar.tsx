@@ -43,6 +43,7 @@ import {
   Settings,
   ScrollText,
   ShieldCheck,
+  Bot,
 } from "lucide-react"
 import LogoText from "@/components/logo-text"; // Added import
 import LogoIcon from "@/components/logo-icon"; // Added import
@@ -77,6 +78,11 @@ export function AppSidebar({ className, collapsible = "offcanvas", ...props }: S
       title: "Surveys",
       href: "/surveys",
       icon: FileText
+    },
+    {
+      title: "Campaign Consultant",
+      href: "/agents/campaign-consultant",
+      icon: Bot
     },
     {
       title: "Voter Profiles",
