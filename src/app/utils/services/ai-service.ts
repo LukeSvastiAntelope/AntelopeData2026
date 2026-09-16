@@ -479,4 +479,283 @@ async function createAnthropicStreamingCompletion(options: AICompletionOptions):
   });
 
   return { stream: readableStream };
+}
+
+// ---------------------------------------------------------------------------
+// Tool-calling completions (Phase 2B consultant / shared agents)
+// ---------------------------------------------------------------------------
+
+export type AIToolDefinition = {
+  name: string;
+  description: string;
+  inputSchema: Record<string, unknown>;
+};
+
+export type AIToolCall = {
+  id: string;
+  name: string;
+  input: Record<string, unknown>;
+};
+
+export type AIToolResultMessage = {
+  role: 'tool';
+  toolCallId: string;
+  content: string;
+  isError?: boolean;
+};
+
+export type AIAssistantToolMessage = {
+  role: 'assistant';
+  content: string;
+  toolCalls: AIToolCall[];
+};
+
+export type AIUserTextMessage = {
+  role: 'user';
+  content: string;
+};
+
+export type AISystemMessage = {
+  role: 'system';
+  content: string;
+};
+
+export type AIToolLoopMessage =
+  | AISystemMessage
+  | AIUserTextMessage
+  | AIAssistantToolMessage
+  | AIToolResultMessage
+  | AIMessage;
+
+export interface AICompletionWithToolsOptions {
+  model: string;
+  messages: AIToolLoopMessage[];
+  tools: AIToolDefinition[];
+  maxTokens?: number;
+  toolChoice?: 'auto' | 'any' | 'none';
+}
+
+export interface AICompletionWithToolsResponse {
+  content: string;
+  toolCalls: AIToolCall[];
+  stopReason: string;
+  usage?: {
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+  };
+}
+
+/**
+ * Provider-routed completion that supports tool definitions and tool_use responses.
+ * Primary path: Anthropic. OpenAI tools supported as fallback when model is gpt-*.
+ */
+export async function createCompletionWithTools(
+  options: AICompletionWithToolsOptions
+): Promise<AICompletionWithToolsResponse> {
+  const provider = getProvider(options.model);
+  if (provider === 'anthropic') {
+    return createAnthropicCompletionWithTools(options);
+  }
+  if (provider === 'openai') {
+    return createOpenAICompletionWithTools(options);
+  }
+  const text = await createCompletion({
+    model: options.model,
+    messages: options.messages
+      .filter((m): m is AIMessage => m.role === 'system' || m.role === 'user' || m.role === 'assistant')
+      .map((m) => ({
+        role: m.role as 'system' | 'user' | 'assistant',
+        content: typeof (m as any).content === 'string' ? (m as any).content : '',
+      })),
+    maxTokens: options.maxTokens,
+  });
+  return { content: text.content, toolCalls: [], stopReason: 'end_turn', usage: text.usage };
+}
+
+async function createAnthropicCompletionWithTools(
+  options: AICompletionWithToolsOptions
+): Promise<AICompletionWithToolsResponse> {
+  const client = getAnthropicClient();
+
+  const systemParts = options.messages
+    .filter((m) => m.role === 'system')
+    .map((m) => (typeof (m as AISystemMessage).content === 'string' ? (m as AISystemMessage).content : ''))
+    .filter(Boolean);
+
+  type AnthContent = any;
+  const anthMessages: { role: 'user' | 'assistant'; content: string | AnthContent[] }[] = [];
+
+  for (const msg of options.messages) {
+    if (msg.role === 'system') continue;
+
+    if (msg.role === 'user') {
+      anthMessages.push({ role: 'user', content: (msg as AIUserTextMessage).content || '' });
+      continue;
+    }
+
+    if (msg.role === 'assistant') {
+      const assistant = msg as AIAssistantToolMessage | AIMessage;
+      const blocks: AnthContent[] = [];
+      const text = typeof assistant.content === 'string' ? assistant.content : '';
+      if (text) blocks.push({ type: 'text', text });
+      const calls = (assistant as AIAssistantToolMessage).toolCalls || [];
+      for (const call of calls) {
+        blocks.push({
+          type: 'tool_use',
+          id: call.id,
+          name: call.name,
+          input: call.input || {},
+        });
+      }
+      anthMessages.push({
+        role: 'assistant',
+        content: blocks.length ? blocks : text || '(empty)',
+      });
+      continue;
+    }
+
+    if (msg.role === 'tool') {
+      const toolMsg = msg as AIToolResultMessage;
+      const last = anthMessages[anthMessages.length - 1];
+      const resultBlock = {
+        type: 'tool_result',
+        tool_use_id: toolMsg.toolCallId,
+        content: toolMsg.content,
+        is_error: toolMsg.isError || false,
+      };
+      if (last && last.role === 'user' && Array.isArray(last.content)) {
+        (last.content as AnthContent[]).push(resultBlock);
+      } else {
+        anthMessages.push({ role: 'user', content: [resultBlock] });
+      }
+    }
+  }
+
+  if (anthMessages.length && anthMessages[0].role !== 'user') {
+    anthMessages.unshift({ role: 'user', content: 'Continue.' });
+  }
+
+  const tools = (options.tools || []).map((t) => ({
+    name: t.name,
+    description: t.description,
+    input_schema: {
+      type: 'object',
+      ...(t.inputSchema || { properties: {} }),
+    },
+  }));
+
+  const requestParams: any = {
+    model: options.model,
+    max_tokens: options.maxTokens || 2000,
+    messages: anthMessages,
+    tools,
+    tool_choice: { type: options.toolChoice || 'auto' },
+  };
+  if (systemParts.length) {
+    requestParams.system = systemParts.join('\n\n');
+  }
+
+  const completion = await client.messages.create(requestParams);
+  const contentBlocks = completion.content || [];
+  const textContent = contentBlocks
+    .filter((b: any) => b.type === 'text')
+    .map((b: any) => b.text)
+    .join('');
+  const toolCalls: AIToolCall[] = contentBlocks
+    .filter((b: any) => b.type === 'tool_use')
+    .map((b: any) => ({
+      id: String(b.id),
+      name: String(b.name),
+      input: (b.input && typeof b.input === 'object' ? b.input : {}) as Record<string, unknown>,
+    }));
+
+  return {
+    content: textContent,
+    toolCalls,
+    stopReason: String(completion.stop_reason || (toolCalls.length ? 'tool_use' : 'end_turn')),
+    usage: completion.usage
+      ? {
+          promptTokens: completion.usage.input_tokens,
+          completionTokens: completion.usage.output_tokens,
+          totalTokens: completion.usage.input_tokens + completion.usage.output_tokens,
+        }
+      : undefined,
+  };
+}
+
+async function createOpenAICompletionWithTools(
+  options: AICompletionWithToolsOptions
+): Promise<AICompletionWithToolsResponse> {
+  const client = getOpenAIClient();
+  const oaiMessages: any[] = [];
+
+  for (const msg of options.messages) {
+    if (msg.role === 'system') {
+      oaiMessages.push({ role: 'system', content: (msg as AISystemMessage).content });
+    } else if (msg.role === 'user') {
+      oaiMessages.push({ role: 'user', content: (msg as AIUserTextMessage).content });
+    } else if (msg.role === 'assistant') {
+      const assistant = msg as AIAssistantToolMessage | AIMessage;
+      const toolCalls = (assistant as AIAssistantToolMessage).toolCalls || [];
+      oaiMessages.push({
+        role: 'assistant',
+        content: assistant.content || null,
+        tool_calls: toolCalls.length
+          ? toolCalls.map((c) => ({
+              id: c.id,
+              type: 'function',
+              function: { name: c.name, arguments: JSON.stringify(c.input || {}) },
+            }))
+          : undefined,
+      });
+    } else if (msg.role === 'tool') {
+      const toolMsg = msg as AIToolResultMessage;
+      oaiMessages.push({
+        role: 'tool',
+        tool_call_id: toolMsg.toolCallId,
+        content: toolMsg.content,
+      });
+    }
+  }
+
+  const completion = await client.chat.completions.create({
+    model: options.model,
+    messages: oaiMessages,
+    max_completion_tokens: options.maxTokens || 2000,
+    tools: (options.tools || []).map((t) => ({
+      type: 'function' as const,
+      function: {
+        name: t.name,
+        description: t.description,
+        parameters: t.inputSchema || { type: 'object', properties: {} },
+      },
+    })),
+    tool_choice: options.toolChoice === 'none' ? 'none' : 'auto',
+  });
+
+  const choice = completion.choices[0];
+  const message = choice?.message;
+  const toolCalls: AIToolCall[] = (message?.tool_calls || []).map((c: any) => {
+    let input: Record<string, unknown> = {};
+    try {
+      input = JSON.parse(c.function?.arguments || '{}');
+    } catch {
+      input = {};
+    }
+    return { id: String(c.id), name: String(c.function?.name || ''), input };
+  });
+
+  return {
+    content: message?.content || '',
+    toolCalls,
+    stopReason: toolCalls.length ? 'tool_use' : String(choice?.finish_reason || 'stop'),
+    usage: completion.usage
+      ? {
+          promptTokens: completion.usage.prompt_tokens,
+          completionTokens: completion.usage.completion_tokens,
+          totalTokens: completion.usage.total_tokens,
+        }
+      : undefined,
+  };
 } 

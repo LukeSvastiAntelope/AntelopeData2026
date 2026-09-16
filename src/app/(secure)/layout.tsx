@@ -3,6 +3,7 @@ import { AgentProvider } from "../context/AgentContext";
 import { useAgent } from "../context/AgentContext";
 import { AppSidebar } from "@/components/app-sidebar";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
+import { ConsultantDock } from "@/components/consultant/consultant-dock";
 
 const SecureLayout = ({ children }: { children: React.ReactNode }) => {
     return (
@@ -15,6 +16,9 @@ const SecureLayout = ({ children }: { children: React.ReactNode }) => {
                         {children}
                     </SidebarInset>
                 </div>
+
+                {/* Chat-alongside: does not gate the workflow spine */}
+                <ConsultantDock />
             </div>
         </SidebarProvider>
     );
