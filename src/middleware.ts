@@ -151,6 +151,8 @@ export default auth((req) => {
         '/compliance',
         '/volunteer-staff',
         '/agents',
+        '/spread',
+        '/outbound',
         // NOTE: '/blog', '/clients', '/about', '/pricing', '/contact' were moved
         // out of the (secure) route group to the public site — they are real
         // marketing pages and must be reachable without a session.
@@ -185,6 +187,8 @@ export const config = {
         '/compliance/:path*',
         '/volunteer-staff/:path*',
         '/agents/:path*',
+        '/spread/:path*',
+        '/outbound/:path*',
         '/logout'
     ],
 };
