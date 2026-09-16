@@ -43,62 +43,63 @@ async function detectCompletedStages(userId: number): Promise<WorkflowStageId[]>
   const db = await openSql();
   const completed: WorkflowStageId[] = [];
 
-  // Plan: visiting/using the platform counts as started — mark when any survey or twin exists
-  const [planRows] = await db.execute<RowDataPacket[]>(
-    `SELECT
-       (SELECT COUNT(*) FROM surveys WHERE created_by = ?) AS survey_count,
-       (SELECT COUNT(*) FROM agents WHERE user_id = ?) AS agent_count`,
-    [userId, userId]
-  );
-  if (Number(planRows[0]?.survey_count || 0) > 0 || Number(planRows[0]?.agent_count || 0) > 0) {
-    completed.push('plan');
-  }
+  const safeCount = async (sql: string, params: any[]) => {
+    try {
+      const [rows] = await db.execute<RowDataPacket[]>(sql, params);
+      return Number(rows[0]?.cnt || rows[0]?.survey_count || rows[0]?.agent_count || rows[0]?.list_count || rows[0]?.enriched_count || 0);
+    } catch (error) {
+      console.warn('Workflow signal query skipped:', (error as Error)?.message || error);
+      return 0;
+    }
+  };
 
-  // Know: voter file import signal — responder_agents with voter_file_id for this user's surveys,
-  // or any contact_lists owned by the user (list upload path).
-  const [knowRows] = await db.execute<RowDataPacket[]>(
-    `SELECT
-       (SELECT COUNT(*) FROM contact_lists WHERE user_id = ?) AS list_count,
-       (SELECT COUNT(*)
-          FROM responder_agents ra
-          INNER JOIN survey_responses sr ON sr.agent_token = ra.agent_token
-          INNER JOIN surveys s ON s.id = sr.survey_id
-         WHERE s.created_by = ?
-           AND ra.voter_file_id IS NOT NULL
-           AND ra.voter_file_id != '') AS enriched_count`,
-    [userId, userId]
+  // Plan: any survey or agent profile owned by the user
+  const surveyCount = await safeCount(
+    `SELECT COUNT(*) AS cnt FROM surveys WHERE created_by = ?`,
+    [userId]
   );
-  if (Number(knowRows[0]?.list_count || 0) > 0 || Number(knowRows[0]?.enriched_count || 0) > 0) {
-    completed.push('know');
-  }
+  const agentCount = await safeCount(
+    `SELECT COUNT(*) AS cnt FROM agents WHERE user_id = ?`,
+    [userId]
+  );
+  if (surveyCount > 0 || agentCount > 0) completed.push('plan');
 
-  // Ask: a published or active survey exists
-  const [askRows] = await db.execute<RowDataPacket[]>(
+  // Know: voter file / list upload signals
+  const listCount = await safeCount(
+    `SELECT COUNT(*) AS cnt FROM contact_lists WHERE user_id = ?`,
+    [userId]
+  );
+  const enrichedCount = await safeCount(
+    `SELECT COUNT(*) AS cnt
+       FROM responder_agents ra
+       INNER JOIN survey_responses sr ON sr.agent_token = ra.agent_token
+       INNER JOIN surveys s ON s.id = sr.survey_id
+      WHERE s.created_by = ?
+        AND ra.voter_file_id IS NOT NULL
+        AND ra.voter_file_id != ''`,
+    [userId]
+  );
+  if (listCount > 0 || enrichedCount > 0) completed.push('know');
+
+  // Ask: published or active survey
+  const askCount = await safeCount(
     `SELECT COUNT(*) AS cnt
        FROM surveys
       WHERE created_by = ?
         AND status IN ('published', 'active')`,
     [userId]
   );
-  if (Number(askRows[0]?.cnt || 0) > 0) {
-    completed.push('ask');
-  }
+  if (askCount > 0) completed.push('ask');
 
-  // Spread: leave empty for Phase 1 (placeholder only)
   // Understand: analytics cached for one of the user's surveys
-  const [understandRows] = await db.execute<RowDataPacket[]>(
+  const understandCount = await safeCount(
     `SELECT COUNT(*) AS cnt
        FROM survey_analytics_cache sac
        INNER JOIN surveys s ON s.id = sac.survey_id
       WHERE s.created_by = ?`,
     [userId]
   );
-  if (Number(understandRows[0]?.cnt || 0) > 0) {
-    completed.push('understand');
-  }
-
-  // Act: leave empty for Phase 1 unless fundraising contact list already counted under Know
-  // Spec only requires Know / Ask / Understand signals for now.
+  if (understandCount > 0) completed.push('understand');
 
   return Array.from(new Set(completed));
 }
