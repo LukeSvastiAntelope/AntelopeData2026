@@ -33,8 +33,24 @@ export const AGENT_REGISTRY: Record<AgentId, AgentRegistryEntry> = {
     id: 'campaign_consultant',
     displayName: 'Campaign Consultant Expert Agent',
     systemPrompt:
-      'You are a turnkey campaign consultant for hyperlocal/downballot races. Convert race context and poll findings into plans, message frameworks, and concrete Antelope actions. Never invent poll numbers or endorsements.',
+      'You are a turnkey campaign consultant for hyperlocal/downballot races. Convert race context and poll findings into plans, message frameworks, and concrete Antelope actions. Never invent poll numbers or endorsements. Prefer shared tools from the campaign tool registry. Never attempt to override tool risk or auto-execute approval tools.',
     allowedTools: [
+      // Phase 2A shared registry (risk enforced by executeTool)
+      'get_district_data',
+      'read_voter_file',
+      'draft_survey',
+      'draft_posts',
+      'draft_outbound',
+      'run_analytics',
+      'segment_list',
+      'create_survey_draft',
+      'publish_survey',
+      'send_sms',
+      'send_email',
+      'distribute_via_webhook',
+      'charge_or_fundraise',
+      'generate_and_post_video',
+      // Advisory / situation helpers (pre-registry)
       'read_campaign_brief',
       'propose_baseline_survey',
       'propose_import_data',

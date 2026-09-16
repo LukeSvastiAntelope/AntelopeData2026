@@ -1,4 +1,5 @@
 import { SurveyRepo } from "@/app/utils/database/survey-repo";
+import { executeTool } from "@/app/utils/services/tools";
 
 export type SurveyToolName = "list_surveys" | "get_survey" | "create_survey_draft";
 
@@ -152,7 +153,7 @@ export async function executeSurveyTool(args: ExecuteArgs): Promise<SurveyToolRe
     }
 
     const normalized = validateCreateSurveyDraftArgs(rawArgs);
-    if (!normalized.valid) {
+    if (normalized.valid === false) {
       return {
         ok: false,
         tool,
@@ -168,36 +169,47 @@ export async function executeSurveyTool(args: ExecuteArgs): Promise<SurveyToolRe
       };
     }
 
-    const createdId = await SurveyRepo.createSurvey(
+    // Shared Phase 2A tool — same create_survey_draft used by consultant / MCP.
+    const shared = await executeTool(
       {
-        title: normalized.title,
-        description: normalized.description || "",
-        questions: normalized.questions,
-        organizationId: normalized.organizationId || undefined,
-        isPublic: false,
-        autoPublish: false,
+        name: "create_survey_draft",
+        input: {
+          title: normalized.title,
+          description: normalized.description || "",
+          questions: normalized.questions.map((q) => q.prompt),
+          organizationId: normalized.organizationId,
+        },
       },
-      userId
+      { userId }
     );
 
-    const created = await SurveyRepo.getSurveyById(Number(createdId), userId);
+    if (shared.ok && shared.status === "executed") {
+      return {
+        ok: true,
+        tool,
+        data: {
+          id: Number(shared.data?.id),
+          slug: (shared.data?.slug as string | null) || null,
+          status: (shared.data?.status as string) || "draft",
+        },
+        summaryMarkdown: [
+          shared.summary,
+          "",
+          "Next commands:",
+          `- \`show survey ${Number(shared.data?.id)}\``,
+        ].join("\n"),
+      };
+    }
+
+    const errorCode =
+      shared.ok === false && shared.errorCode === "validation_error"
+        ? "validation_error"
+        : "internal_error";
     return {
-      ok: true,
+      ok: false,
       tool,
-      data: {
-        id: Number(createdId),
-        slug: (created as any)?.slug || null,
-        status: (created as any)?.status || "draft",
-      },
-      summaryMarkdown: [
-        "### Survey Draft Created",
-        `- ID: ${Number(createdId)}`,
-        `- Slug: ${(created as any)?.slug || "n/a"}`,
-        `- Status: ${(created as any)?.status || "draft"}`,
-        "",
-        "Next commands:",
-        `- \`show survey ${Number(createdId)}\``,
-      ].join("\n"),
+      errorCode,
+      summaryMarkdown: shared.summary,
     };
   } catch (error) {
     return {
