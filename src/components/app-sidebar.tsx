@@ -288,19 +288,26 @@ export function AppSidebar({ className, collapsible = 'offcanvas', ...props }: S
                         >
                           <span
                             className={cn(
-                              'flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-semibold shrink-0',
+                              'flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-semibold shrink-0 tabular-nums',
                               isComplete
                                 ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
                                 : isRecommended
                                   ? 'bg-foreground text-background'
                                   : 'bg-muted text-muted-foreground'
                             )}
+                            aria-label={`Stage ${stage.number}${isComplete ? ', complete' : ''}`}
                           >
-                            {isComplete ? <Check className="h-3 w-3" /> : stage.number}
+                            {stage.number}
                           </span>
                           <span className="flex-1 font-medium text-sidebar-foreground group-data-[collapsible=offcanvas]:hidden">
                             {stage.title}
                           </span>
+                          {isComplete && (
+                            <Check
+                              className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400 shrink-0 group-data-[collapsible=offcanvas]:hidden"
+                              aria-hidden
+                            />
+                          )}
                           {isRecommended && (
                             <Badge
                               variant="outline"
