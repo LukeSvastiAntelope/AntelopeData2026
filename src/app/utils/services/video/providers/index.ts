@@ -48,6 +48,7 @@ export type {
   VideoGenProvider,
   VideoJobHandle,
   VideoJobState,
+  VideoJobStatus,
   VideoProviderCapabilities,
   VideoProviderId,
   VideoAspectRatio,

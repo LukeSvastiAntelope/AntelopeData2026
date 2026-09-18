@@ -51,7 +51,7 @@ export const mockClipProvider: VideoClipProvider = {
   async submit(sourceUrl: string) {
     const createdAt = Date.now();
     const jobId = `mockclip_${createdAt}_${randomUUID().replace(/-/g, '').slice(0, 8)}`;
-    return { jobId, raw: { sourceUrl, createdAt } };
+    return { jobId };
   },
   async status(jobId: string) {
     const createdAt = parseCreatedAt(jobId);

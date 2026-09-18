@@ -25,7 +25,10 @@ async function mirrorRemoteVideo(
   userId: number
 ): Promise<string | null> {
   try {
-    const res = await fetch(remoteUrl);
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 12_000);
+    const res = await fetch(remoteUrl, { signal: controller.signal });
+    clearTimeout(timer);
     if (!res.ok) return null;
     const buf = Buffer.from(await res.arrayBuffer());
     const safeUserId = String(userId).replace(/[^a-zA-Z0-9_-]/g, '') || 'anon';

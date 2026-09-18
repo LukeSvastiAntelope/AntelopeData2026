@@ -41,11 +41,7 @@ export const mockVideoProvider: VideoGenProvider = {
   async generate(request: VideoGenRequest): Promise<VideoJobHandle> {
     const createdAt = Date.now();
     const jobId = `mock_${createdAt}_${randomUUID().replace(/-/g, '').slice(0, 8)}`;
-    return {
-      jobId,
-      provider: 'mock',
-      raw: { prompt: request.prompt, mode: request.mode, createdAt },
-    };
+    return { jobId, provider: 'mock' };
   },
   async status(jobId: string): Promise<VideoJobState> {
     const createdAt = parseMockCreatedAt(jobId);
