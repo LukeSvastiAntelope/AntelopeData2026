@@ -37,3 +37,4 @@ export {
 export { executeTool, executeApprovedTool } from './executor';
 
 export { createSurveyDraftTool } from './create-survey-draft';
+export { findPostableInsightTool } from './find-postable-insight';

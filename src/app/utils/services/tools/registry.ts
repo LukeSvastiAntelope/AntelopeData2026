@@ -13,6 +13,7 @@ import { sendEmailTool } from './send-email';
 import { distributeViaWebhookTool } from './distribute-via-webhook';
 import { chargeOrFundraiseTool } from './charge-or-fundraise';
 import { generateAndPostVideoTool } from './generate-and-post-video';
+import { findPostableInsightTool } from './find-postable-insight';
 
 /**
  * Canonical shared tool registry.
@@ -25,6 +26,7 @@ export const TOOL_REGISTRY: Record<CampaignToolName, CampaignTool> = {
   draft_posts: draftPostsTool,
   draft_outbound: draftOutboundTool,
   run_analytics: runAnalyticsTool,
+  find_postable_insight: findPostableInsightTool,
   segment_list: segmentListTool,
   create_survey_draft: createSurveyDraftTool,
   publish_survey: publishSurveyTool,
@@ -42,6 +44,7 @@ const AUTO_TOOLS: CampaignToolName[] = [
   'draft_posts',
   'draft_outbound',
   'run_analytics',
+  'find_postable_insight',
   'segment_list',
   'create_survey_draft',
 ];
