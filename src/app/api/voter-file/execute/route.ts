@@ -6,6 +6,9 @@ import {
   detectVoterFileFormat,
   transformVoterRow,
 } from '@/app/utils/voter-file-schema';
+import { VoterGeoRepo } from '@/app/utils/database/geo-repo';
+import { ensurePrimaryOrgId } from '@/app/api/dashboard/persons/org';
+import { isValidLatLng, parseCoord } from '@/app/utils/services/geo/spatial';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300; // 5 minutes for large files
@@ -98,6 +101,7 @@ export async function POST(req: NextRequest) {
     }
 
     const db = await openSql();
+    const organizationId = await ensurePrimaryOrgId(userId);
 
     // Pre-fetch existing responder agents for matching
     const [existingAgents]: any = await db.execute(
@@ -143,7 +147,35 @@ export async function POST(req: NextRequest) {
     let enriched = 0;
     let skipped = 0;
     let newVoterIds = 0;
+    let geoUpserted = 0;
     const errors: string[] = [];
+
+    async function upsertGeoFromTransformed(
+      transformed: Record<string, string>,
+      responderAgentId: number | null
+    ) {
+      const lat = parseCoord(transformed.latitude);
+      const lng = parseCoord(transformed.longitude);
+      const voterFileId = transformed.voter_file_id || null;
+      if (!responderAgentId && !voterFileId) return;
+
+      const hasCoords = isValidLatLng(lat, lng);
+      await VoterGeoRepo.upsertPoint({
+        organizationId,
+        responderAgentId,
+        voterFileId,
+        street: transformed.street_address || null,
+        city: transformed.location || null,
+        state: transformed.state || null,
+        zip: transformed.zip || null,
+        latitude: lat,
+        longitude: lng,
+        geocodeStatus: hasCoords ? 'ok' : 'pending',
+        geocodeSource: hasCoords ? 'voter_file' : null,
+        geocodeConfidence: hasCoords ? 0.95 : null,
+      });
+      geoUpserted++;
+    }
 
     for (let i = 0; i < rows.length; i++) {
       try {
@@ -262,8 +294,23 @@ export async function POST(req: NextRequest) {
             );
             newVoterIds++;
           }
+
+          // G1: write geocoded point (or queue for Census if lat/lng missing)
+          try {
+            await upsertGeoFromTransformed(transformed, match.responderId);
+          } catch (geoErr) {
+            errors.push(
+              `Row ${i + 1} geo: ${geoErr instanceof Error ? geoErr.message : 'geo upsert failed'}`
+            );
+          }
         } else {
           skipped++;
+          // Still land unmatched rows into voter_geo when we have a voter id or coords
+          try {
+            await upsertGeoFromTransformed(transformed, null);
+          } catch {
+            /* ignore unmatched without keys */
+          }
         }
       } catch (rowError) {
         errors.push(
@@ -280,6 +327,7 @@ export async function POST(req: NextRequest) {
         enriched,
         skipped,
         voterIdsLinked: newVoterIds,
+        geoUpserted,
         format: detection.format.name,
         errors: errors.slice(0, 20), // Cap error list
       },

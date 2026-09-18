@@ -119,6 +119,9 @@ const L2_FORMAT: VoterFileFormat = {
     { patterns: ['CommercialData_EstimatedHHIncome', 'HH_INCOME'], targetField: 'income', label: 'Household Income' },
     { patterns: ['Voters_OfficialRegEmail', 'EMAIL'], targetField: 'email', label: 'Email' },
     { patterns: ['Voters_Phone', 'PHONE'], targetField: 'phone_number', label: 'Phone' },
+    { patterns: ['Residence_Addresses_Latitude', 'Voters_Latitude', 'Latitude'], targetField: 'latitude', label: 'Latitude' },
+    { patterns: ['Residence_Addresses_Longitude', 'Voters_Longitude', 'Longitude'], targetField: 'longitude', label: 'Longitude' },
+    { patterns: ['Residence_Addresses_AddressLine', 'Residence_Addresses_AddressLine1', 'Address'], targetField: 'street_address', label: 'Street' },
   ],
 };
 
@@ -150,6 +153,33 @@ const TARGETSMART_FORMAT: VoterFileFormat = {
     { patterns: ['vb.voterbase_race', 'tsmart_race'], targetField: 'ethnicity', label: 'Race/Ethnicity' },
     { patterns: ['vb.voterbase_email', 'tsmart_email'], targetField: 'email', label: 'Email' },
     { patterns: ['vb.voterbase_phone', 'tsmart_phone'], targetField: 'phone_number', label: 'Phone' },
+    {
+      patterns: [
+        'vb.tsmart_latitude',
+        'vb.tsmart_exact_latitude',
+        'tsmart_latitude',
+        'vb.tsmart_lat',
+        'latitude',
+      ],
+      targetField: 'latitude',
+      label: 'Latitude',
+    },
+    {
+      patterns: [
+        'vb.tsmart_longitude',
+        'vb.tsmart_exact_longitude',
+        'tsmart_longitude',
+        'vb.tsmart_long',
+        'longitude',
+      ],
+      targetField: 'longitude',
+      label: 'Longitude',
+    },
+    {
+      patterns: ['vb.tsmart_full_address', 'tsmart_address', 'vb.voterbase_address'],
+      targetField: 'street_address',
+      label: 'Street',
+    },
   ],
 };
 
@@ -184,6 +214,9 @@ const GENERIC_STATE_FORMAT: VoterFileFormat = {
     { patterns: ['precinct', 'precinct_id', 'precinct_name'], targetField: 'precinct', label: 'Precinct' },
     { patterns: ['state_house', 'state_house_district', 'sldl'], targetField: 'state_house_district', label: 'State House District' },
     { patterns: ['state_senate', 'state_senate_district', 'sldu'], targetField: 'state_senate_district', label: 'State Senate District' },
+    { patterns: ['lat', 'latitude', 'y'], targetField: 'latitude', label: 'Latitude' },
+    { patterns: ['lng', 'lon', 'long', 'longitude', 'x'], targetField: 'longitude', label: 'Longitude' },
+    { patterns: ['street', 'address', 'address1', 'street_address', 'res_address'], targetField: 'street_address', label: 'Street' },
   ],
 };
 

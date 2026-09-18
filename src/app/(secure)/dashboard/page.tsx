@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import dynamic from 'next/dynamic'
+import Link from 'next/link'
 import { useSidebar } from "@/components/ui/sidebar"
 import { PanelLeft, Landmark, MapPin, Vote, Grid3x3, ChevronDown, ChevronRight, HandCoins, Bot, Plus, Play, Trash2, Loader2, Newspaper, Building2, Globe, Palette, Upload, Sparkles, Fence, Check, X, MessageSquare, Users, Printer } from 'lucide-react'
 import {
@@ -206,6 +207,10 @@ export default function DashboardPage() {
   const [geofenceDrawMode, setGeofenceDrawMode] = useState<null | 'include' | 'exclude'>(null)
   const [geofenceAddressRows, setGeofenceAddressRows] = useState<{ id: string; lng: number; lat: number; label?: string }[]>([])
   const [geofenceCsvLoading, setGeofenceCsvLoading] = useState(false)
+  const [geofenceLabelDraft, setGeofenceLabelDraft] = useState('Area A')
+  const [geofenceSaving, setGeofenceSaving] = useState(false)
+  const [geofenceQueryBusy, setGeofenceQueryBusy] = useState(false)
+  const [geofenceQueryCount, setGeofenceQueryCount] = useState<number | null>(null)
   const [customLayerData, setCustomLayerData] = useState<CustomLayerData | null>(null)
   const [customFileRows, setCustomFileRows] = useState<Record<string, string>[] | null>(null)
   const [customFileColumns, setCustomFileColumns] = useState<string[]>([])
@@ -281,7 +286,7 @@ export default function DashboardPage() {
     [geofences, geofenceDraftVertices, geofenceDrawMode, canvassClassifiedAddresses, handleGeofenceVertex]
   )
 
-  const finishGeofencePolygon = () => {
+  const finishGeofencePolygon = async () => {
     if (geofenceDraftVertices.length < 3) {
       toast.error('Add at least three clicks on the map to close a zone.')
       return
@@ -289,10 +294,103 @@ export default function DashboardPage() {
     if (!geofenceDrawMode) return
     const mode = geofenceDrawMode
     const ring = normalizeRing(geofenceDraftVertices)
-    setGeofences((prev) => [...prev, { id: crypto.randomUUID(), mode, ring }])
-    setGeofenceDraftVertices([])
-    setGeofenceDrawMode(null)
-    toast.success(mode === 'include' ? 'Canvass zone saved.' : 'Exclusion zone saved.')
+    const label =
+      geofenceLabelDraft.trim() ||
+      (mode === 'include' ? `Area ${geofences.length + 1}` : `Exclude ${geofences.length + 1}`)
+
+    setGeofenceSaving(true)
+    try {
+      // Client preview immediately (G1.4)
+      const localId = crypto.randomUUID()
+      setGeofences((prev) => [...prev, { id: localId, mode, ring, label }])
+      setGeofenceDraftVertices([])
+      setGeofenceDrawMode(null)
+
+      // Authoritative save → MySQL spatial geom
+      const res = await fetch('/api/dashboard/geofences', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          label,
+          fenceType: 'polygon',
+          purpose: mode === 'exclude' ? 'exclude' : 'include',
+          ring,
+          color: mode === 'exclude' ? '#ef4444' : '#22c55e',
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data.status) throw new Error(data.message || 'Could not save fence')
+
+      setGeofences((prev) =>
+        prev.map((f) =>
+          f.id === localId
+            ? { ...f, dbId: data.fence.id, label: data.fence.label, id: String(data.fence.id) }
+            : f
+        )
+      )
+      setGeofenceLabelDraft(`Area ${String.fromCharCode(65 + (geofences.length % 26))}`)
+      toast.success(`Saved “${data.fence.label}” — spatial query ready`)
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Fence save failed')
+    } finally {
+      setGeofenceSaving(false)
+    }
+  }
+
+  const loadSavedGeofences = useCallback(async () => {
+    try {
+      const res = await fetch('/api/dashboard/geofences')
+      const data = await res.json()
+      if (!res.ok || !data.status) return
+      const mapped: GeofencePolygon[] = (data.fences || [])
+        .filter((f: any) => f.fence_type === 'polygon' && Array.isArray(f.ring_json))
+        .map((f: any) => ({
+          id: String(f.id),
+          dbId: f.id,
+          label: f.label,
+          mode: f.purpose === 'exclude' ? 'exclude' : 'include',
+          ring: f.ring_json as [number, number][],
+        }))
+      setGeofences(mapped)
+      if (mapped.length) toast.success(`${mapped.length} saved fences loaded`)
+    } catch {
+      /* ignore */
+    }
+  }, [])
+
+  useEffect(() => {
+    if (layers.geofencing) {
+      void loadSavedGeofences()
+    }
+  }, [layers.geofencing, loadSavedGeofences])
+
+  const queryAddressesInFence = async (fence: GeofencePolygon) => {
+    if (!fence.dbId && !/^\d+$/.test(fence.id)) {
+      toast.error('Save the fence first, then query addresses')
+      return
+    }
+    const id = fence.dbId || Number(fence.id)
+    setGeofenceQueryBusy(true)
+    try {
+      const res = await fetch(`/api/dashboard/geofences/${id}?addresses=1`)
+      const data = await res.json()
+      if (!res.ok || !data.status) throw new Error(data.message || 'Query failed')
+      setGeofenceQueryCount(data.count)
+      const rows = (data.addresses || []).map((a: any) => ({
+        id: String(a.id),
+        lng: a.longitude,
+        lat: a.latitude,
+        label: a.label,
+      }))
+      if (rows.length) setGeofenceAddressRows(rows)
+      toast.success(
+        `“${fence.label || fence.id}”: ${data.count} addresses (MySQL ST_Contains)`
+      )
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Spatial query failed')
+    } finally {
+      setGeofenceQueryBusy(false)
+    }
   }
 
   const cancelGeofenceDraft = () => {
@@ -969,9 +1067,22 @@ export default function DashboardPage() {
                 <div className="space-y-2 text-[10px] text-muted-foreground">
                   <p>
                     Draw green <span className="text-emerald-500 font-medium">include</span> or red{' '}
-                    <span className="text-red-500 font-medium">exclude</span> zones. Upload a register CSV with lat/lng to see which
-                    addresses fall inside your turf (zoom in for street-level planning).
+                    <span className="text-red-500 font-medium">exclude</span> zones. Client preview highlights instantly;
+                    Finish saves to MySQL for authoritative spatial queries (and the{' '}
+                    <code className="text-[9px]">addresses_in_area</code> tool).
                   </p>
+                  <div className="flex items-center gap-1.5">
+                    <Label htmlFor="geofence-label" className="text-[10px] shrink-0">
+                      Label
+                    </Label>
+                    <Input
+                      id="geofence-label"
+                      value={geofenceLabelDraft}
+                      onChange={(e) => setGeofenceLabelDraft(e.target.value)}
+                      placeholder="Area A"
+                      className="h-7 text-[11px]"
+                    />
+                  </div>
                   <div className="flex flex-wrap gap-1">
                     <Button
                       size="sm"
@@ -999,8 +1110,19 @@ export default function DashboardPage() {
                     </Button>
                   </div>
                   <div className="flex flex-wrap gap-1">
-                    <Button size="sm" variant="secondary" className="h-7 text-[10px] px-2 gap-0.5" onClick={finishGeofencePolygon} disabled={!geofenceDrawMode || geofenceDraftVertices.length < 3}>
-                      <Check className="h-3 w-3" /> Finish zone
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      className="h-7 text-[10px] px-2 gap-0.5"
+                      onClick={finishGeofencePolygon}
+                      disabled={!geofenceDrawMode || geofenceDraftVertices.length < 3 || geofenceSaving}
+                    >
+                      {geofenceSaving ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <Check className="h-3 w-3" />
+                      )}
+                      Finish & save
                     </Button>
                     <Button size="sm" variant="ghost" className="h-7 text-[10px] px-2 gap-0.5" onClick={cancelGeofenceDraft}>
                       <X className="h-3 w-3" /> Cancel
@@ -1009,19 +1131,60 @@ export default function DashboardPage() {
                       size="sm"
                       variant="outline"
                       className="h-7 text-[10px] px-2"
+                      onClick={() => void loadSavedGeofences()}
+                    >
+                      Load saved
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 text-[10px] px-2"
                       onClick={() => {
-                        if (!confirm('Clear all geofence zones?')) return
+                        if (!confirm('Clear map zones? (Does not delete saved fences)')) return
                         setGeofences([])
                         setGeofenceDraftVertices([])
                         setGeofenceDrawMode(null)
+                        setGeofenceQueryCount(null)
                       }}
                     >
                       Clear zones
                     </Button>
                   </div>
+                  {geofences.length > 0 && (
+                    <div className="rounded border border-border/60 bg-muted/20 px-2 py-1.5 space-y-1">
+                      <p className="font-medium text-foreground text-[10px]">Saved fences</p>
+                      {geofences.map((f) => (
+                        <div key={f.id} className="flex items-center justify-between gap-1">
+                          <span className="truncate text-[10px]">
+                            {f.label || f.id}
+                            {f.mode === 'exclude' ? ' (exclude)' : ''}
+                            {!f.dbId && !/^\d+$/.test(f.id) ? ' · unsaved' : ''}
+                          </span>
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            className="h-6 text-[9px] px-1.5 shrink-0"
+                            disabled={geofenceQueryBusy || (!f.dbId && !/^\d+$/.test(f.id))}
+                            onClick={() => void queryAddressesInFence(f)}
+                          >
+                            {geofenceQueryBusy ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              'Query DB'
+                            )}
+                          </Button>
+                        </div>
+                      ))}
+                      {geofenceQueryCount != null && (
+                        <p className="text-[10px] text-cyan-600 dark:text-cyan-400">
+                          Last spatial query: {geofenceQueryCount} addresses
+                        </p>
+                      )}
+                    </div>
+                  )}
                   <p className="text-[9px] pt-1 border-t border-border/50">
-                    Rules: exclude wins. With include zones, only addresses inside an include (and not in exclude) are “canvass”.
-                    With no include zones, everywhere except excludes is canvass.
+                    Preview rules: exclude wins. With include zones, only addresses inside an include (and not in exclude)
+                    are “canvass”. DB Query uses ST_Contains on voter_geo — not the client classifier.
                   </p>
                   <label className="flex items-center justify-center gap-1.5 w-full px-2 py-1.5 rounded border border-dashed border-border text-[11px] cursor-pointer hover:bg-muted/50">
                     <Upload className="h-3 w-3" />

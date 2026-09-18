@@ -107,4 +107,5 @@ export type CampaignToolName =
   | 'charge_or_fundraise'
   | 'generate_and_post_video'
   | 'propose_cycle_action'
-  | 'clip_video';
+  | 'clip_video'
+  | 'addresses_in_area';

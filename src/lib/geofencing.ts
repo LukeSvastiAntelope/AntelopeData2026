@@ -1,5 +1,10 @@
 /**
  * Geofencing helpers for canvass planning (polygon rings in [lng, lat]).
+ *
+ * G1.4 — Client draw-preview ONLY. Instant in-browser highlighting while drawing.
+ * Authoritative "addresses in this area" queries run in MySQL against voter_geo
+ * (see GeofenceRepo / addressesInFence / addresses_in_area tool). Do not use this
+ * module for list export.
  */
 
 export type GeofenceMode = 'include' | 'exclude'
@@ -9,6 +14,10 @@ export interface GeofencePolygon {
   mode: GeofenceMode
   /** Closed ring: first point should equal last for MapLibre; we normalize in helpers */
   ring: [number, number][]
+  /** Persisted label when saved to MySQL geofences (G1) */
+  label?: string
+  /** Database id when persisted */
+  dbId?: number
 }
 
 export interface CanvassAddress {
