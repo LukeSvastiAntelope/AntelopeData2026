@@ -31,12 +31,17 @@ Required in `.env.local`:
 - `NEXT_PUBLIC_APP_URL` — App URL (e.g., `http://localhost:3000`)
 
 Optional (feature-gated):
-- `ANTHROPIC_API_KEY` — Claude AI (survey analytics, digital twins)
+- `ANTHROPIC_API_KEY` — Claude AI (survey analytics, digital twins, video prompt-assist)
 - `OPENAI_API_KEY` — GPT models
 - `PINECONE_API_KEY` — Vector embeddings
 - `STRIPE_SECRET_KEY` — Payments
 - `TELEGRAM_BOT_TOKEN` — Telegram channel integration
 - `SENDGRID_API_KEY` — Email sending
+- `FAL_KEY` — Wan 2.2 video generation via fal.ai (default provider when set)
+- `VIDEO_GEN_PROVIDER` — Override default provider (`wan` | `higgsfield` | `kling` | `mock` | `comfyui`)
+- `HIGGSFIELD_API_KEY` / `KLING_API_KEY` — optional cinematic video tiers
+- `COMFYUI_API_BASE` — self-hosted Wan/ComfyUI endpoint (V3 path)
+- `FAL_WAN_T2V_MODEL` / `FAL_WAN_I2V_MODEL` / `FAL_WAN_V2V_MODEL` — optional fal model overrides
 
 ## Architecture
 

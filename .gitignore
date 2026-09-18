@@ -126,3 +126,7 @@ data/*.xlsx
 NOTES.md
 .vercel
 TWILIO_HANDOFF.md
+
+# Video generation job store
+.data/
+public/uploads/

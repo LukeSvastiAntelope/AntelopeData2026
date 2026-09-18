@@ -21,16 +21,28 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ status: false, message: 'Missing file' }, { status: 400 })
     }
 
-    const allowed = ['image/png','image/jpeg','image/webp','image/gif','video/mp4']
+    const allowed = [
+      'image/png',
+      'image/jpeg',
+      'image/webp',
+      'image/gif',
+      'video/mp4',
+      'video/webm',
+      'video/quicktime',
+    ]
     const mime = file.type || ''
     if (!allowed.includes(mime)) {
       return NextResponse.json({ status: false, message: 'Unsupported file type' }, { status: 415 })
     }
 
     const size = file.size || 0
-    const maxBytes = 10 * 1024 * 1024 // 10MB images for now
-    if (mime.startsWith('image/') && size > maxBytes) {
+    const maxImageBytes = 10 * 1024 * 1024 // 10MB images
+    const maxVideoBytes = 80 * 1024 * 1024 // 80MB reference clips for i2v/v2v
+    if (mime.startsWith('image/') && size > maxImageBytes) {
       return NextResponse.json({ status: false, message: 'Image too large (max 10MB)' }, { status: 413 })
+    }
+    if (mime.startsWith('video/') && size > maxVideoBytes) {
+      return NextResponse.json({ status: false, message: 'Video too large (max 80MB)' }, { status: 413 })
     }
 
     // Derive target path
@@ -53,7 +65,23 @@ export async function POST(req: NextRequest) {
     }
 
     const original = file.name || 'upload'
-    const ext = path.extname(original) || (mime==='image/png'?'.png': mime==='image/jpeg'?'.jpg': mime==='image/webp'?'.webp': mime==='image/gif'?'.gif': mime==='video/mp4'?'.mp4':'')
+    const ext =
+      path.extname(original) ||
+      (mime === 'image/png'
+        ? '.png'
+        : mime === 'image/jpeg'
+          ? '.jpg'
+          : mime === 'image/webp'
+            ? '.webp'
+            : mime === 'image/gif'
+              ? '.gif'
+              : mime === 'video/mp4'
+                ? '.mp4'
+                : mime === 'video/webm'
+                  ? '.webm'
+                  : mime === 'video/quicktime'
+                    ? '.mov'
+                    : '')
     const base = `${Date.now()}_${Math.random().toString(36).slice(2,8)}`
     const filename = `${base}${ext}`
     const filepath = path.resolve(normalizedUserFolder, filename)

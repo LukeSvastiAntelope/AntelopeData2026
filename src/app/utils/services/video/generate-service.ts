@@ -1,0 +1,173 @@
+/**
+ * Orchestrates provider generate → poll → optional local mirror under public/uploads.
+ */
+
+import { randomUUID } from 'crypto';
+import { createWriteStream, existsSync, mkdirSync } from 'fs';
+import path from 'path';
+import {
+  getDefaultVideoProviderId,
+  getVideoProvider,
+  isModeSupported,
+  type VideoAspectRatio,
+  type VideoGenMode,
+  type VideoProviderId,
+} from '@/app/utils/services/video/providers';
+import { toAbsoluteAssetUrl } from '@/app/utils/services/video/asset-library';
+import {
+  loadVideoJob,
+  saveVideoJob,
+  type StoredVideoJob,
+} from '@/app/utils/services/video/job-store';
+
+async function mirrorRemoteVideo(
+  remoteUrl: string,
+  userId: number
+): Promise<string | null> {
+  try {
+    const res = await fetch(remoteUrl);
+    if (!res.ok) return null;
+    const buf = Buffer.from(await res.arrayBuffer());
+    const safeUserId = String(userId).replace(/[^a-zA-Z0-9_-]/g, '') || 'anon';
+    const now = new Date();
+    const folder = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const dir = path.resolve(process.cwd(), 'public', 'uploads', safeUserId, folder);
+    if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+    const filename = `video_${Date.now()}_${randomUUID().slice(0, 8)}.mp4`;
+    const filepath = path.join(dir, filename);
+    await new Promise<void>((resolve, reject) => {
+      const stream = createWriteStream(filepath);
+      stream.on('error', reject);
+      stream.on('finish', () => resolve());
+      stream.write(buf);
+      stream.end();
+    });
+    return `/uploads/${safeUserId}/${folder}/${filename}`;
+  } catch (error) {
+    console.warn('[video] mirror failed (non-fatal):', error);
+    return null;
+  }
+}
+
+export async function startVideoGeneration(params: {
+  userId: number;
+  prompt: string;
+  modelPrompt?: string;
+  provider?: VideoProviderId | string | null;
+  mode: VideoGenMode;
+  aspectRatio?: VideoAspectRatio;
+  durationSeconds?: number;
+  referenceImage?: string | null;
+  referenceVideo?: string | null;
+  negativePrompt?: string | null;
+}): Promise<StoredVideoJob> {
+  const providerId = (params.provider || getDefaultVideoProviderId()) as VideoProviderId;
+  const provider = getVideoProvider(providerId);
+  const caps = provider.capabilities();
+  if (!isModeSupported(caps, params.mode)) {
+    throw new Error(
+      `Provider ${providerId} does not support mode ${params.mode}. Supported: ${caps.modes.join(', ')}`
+    );
+  }
+
+  const modelPrompt = String(params.modelPrompt || params.prompt).trim();
+  if (!modelPrompt) throw new Error('prompt is required');
+
+  const appBase = process.env.NEXT_PUBLIC_APP_URL || process.env.AUTH_URL || undefined;
+  const referenceImage = params.referenceImage
+    ? toAbsoluteAssetUrl(params.referenceImage, appBase)
+    : null;
+  const referenceVideo = params.referenceVideo
+    ? toAbsoluteAssetUrl(params.referenceVideo, appBase)
+    : null;
+
+  const handle = await provider.generate(
+    {
+      prompt: modelPrompt,
+      mode: params.mode,
+      aspectRatio: params.aspectRatio || '9:16',
+      durationSeconds: params.durationSeconds || 5,
+      referenceImage,
+      referenceVideo,
+      negativePrompt: params.negativePrompt,
+    },
+    {}
+  );
+
+  const jobId = `vj_${randomUUID().replace(/-/g, '').slice(0, 16)}`;
+  const now = new Date().toISOString();
+  const job: StoredVideoJob = {
+    jobId,
+    providerJobId: handle.jobId,
+    provider: handle.provider,
+    userId: params.userId,
+    status: 'queued',
+    progress: 5,
+    mode: params.mode,
+    prompt: params.prompt,
+    modelPrompt,
+    aspectRatio: params.aspectRatio || '9:16',
+    referenceImage: params.referenceImage || null,
+    referenceVideo: params.referenceVideo || null,
+    createdAt: now,
+    updatedAt: now,
+  };
+  saveVideoJob(job);
+  return job;
+}
+
+export async function refreshVideoJob(jobId: string): Promise<StoredVideoJob> {
+  const job = loadVideoJob(jobId);
+  if (!job) throw new Error('Job not found');
+  if (job.status === 'succeeded' || job.status === 'failed' || job.status === 'canceled') {
+    return job;
+  }
+
+  const provider = getVideoProvider(job.provider);
+  const state = await provider.status(job.providerJobId);
+  job.status = state.status;
+  job.progress = state.progress ?? job.progress;
+  job.error = state.error || null;
+  job.updatedAt = new Date().toISOString();
+
+  if (state.status === 'succeeded' && state.assetUrl) {
+    job.assetUrl = state.assetUrl;
+    const local = await mirrorRemoteVideo(state.assetUrl, job.userId);
+    if (local) job.localAssetUrl = local;
+  }
+
+  saveVideoJob(job);
+  return job;
+}
+
+/**
+ * Blocking helper for tool execute path — poll until done or timeout.
+ */
+export async function generateVideoUntilDone(params: {
+  userId: number;
+  prompt: string;
+  modelPrompt?: string;
+  provider?: VideoProviderId | string | null;
+  mode?: VideoGenMode;
+  aspectRatio?: VideoAspectRatio;
+  durationSeconds?: number;
+  referenceImage?: string | null;
+  referenceVideo?: string | null;
+  timeoutMs?: number;
+}): Promise<StoredVideoJob> {
+  const job = await startVideoGeneration({
+    ...params,
+    mode: params.mode || 't2v',
+  });
+  const timeout = params.timeoutMs ?? 10 * 60_000;
+  const start = Date.now();
+  while (Date.now() - start < timeout) {
+    const refreshed = await refreshVideoJob(job.jobId);
+    if (refreshed.status === 'succeeded') return refreshed;
+    if (refreshed.status === 'failed' || refreshed.status === 'canceled') {
+      throw new Error(refreshed.error || `Video job ${refreshed.status}`);
+    }
+    await new Promise((r) => setTimeout(r, 2000));
+  }
+  throw new Error('Video generation timed out');
+}

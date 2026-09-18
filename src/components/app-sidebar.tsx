@@ -49,6 +49,7 @@ import {
   Send,
   Check,
   ArrowRight,
+  Clapperboard,
 } from 'lucide-react'
 import LogoText from '@/components/logo-text'
 import LogoIcon from '@/components/logo-icon'
@@ -114,7 +115,10 @@ const WORKFLOW_STAGES: WorkflowStage[] = [
     id: 'spread',
     number: 4,
     title: 'Spread',
-    items: [{ title: 'Distribution', href: '/spread', icon: Megaphone }],
+    items: [
+      { title: 'Distribution', href: '/spread', icon: Megaphone },
+      { title: 'Video', href: '/spread/video', icon: Clapperboard },
+    ],
   },
   {
     id: 'understand',
