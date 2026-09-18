@@ -42,6 +42,7 @@ export const AGENT_REGISTRY: Record<AgentId, AgentRegistryEntry> = {
       'draft_posts',
       'draft_outbound',
       'run_analytics',
+      'find_postable_insight',
       'segment_list',
       'create_survey_draft',
       'publish_survey',

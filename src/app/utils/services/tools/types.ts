@@ -97,6 +97,7 @@ export type CampaignToolName =
   | 'draft_posts'
   | 'draft_outbound'
   | 'run_analytics'
+  | 'find_postable_insight'
   | 'segment_list'
   | 'create_survey_draft'
   | 'publish_survey'
