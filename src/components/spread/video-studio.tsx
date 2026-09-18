@@ -12,6 +12,7 @@ import {
   Upload,
   Check,
   Clapperboard,
+  Scissors,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -25,8 +26,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { StagedActionCard, type StagedActionCardModel } from '@/components/consultant/staged-action-card';
+import { ClipStudioPanel } from '@/components/spread/clip-studio';
 import { cn } from '@/lib/utils';
+import { AI_DISCLOSURE_DEFAULT } from '@/app/utils/services/video/guardrails';
 
 type ProviderCap = {
   id: string;
@@ -100,6 +104,7 @@ export function VideoStudio() {
   const [error, setError] = useState<string | null>(null);
   const [staged, setStaged] = useState<StagedActionCardModel | null>(null);
   const [stageBusy, setStageBusy] = useState<number | null>(null);
+  const [includeAiDisclosure, setIncludeAiDisclosure] = useState(true);
   const fileRef = useRef<HTMLInputElement>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -287,6 +292,7 @@ export function VideoStudio() {
           platform: 'tiktok',
           script: modelPrompt || plain,
           provider,
+          includeAiDisclosure,
         }),
       });
       const data = await res.json();
@@ -346,6 +352,19 @@ export function VideoStudio() {
   };
 
   return (
+    <Tabs defaultValue="generate" className="w-full">
+      <TabsList className="mb-4">
+        <TabsTrigger value="generate" className="gap-1.5">
+          <Clapperboard className="h-3.5 w-3.5" />
+          Generate
+        </TabsTrigger>
+        <TabsTrigger value="clip" className="gap-1.5">
+          <Scissors className="h-3.5 w-3.5" />
+          Clip a long video
+        </TabsTrigger>
+      </TabsList>
+
+      <TabsContent value="generate">
     <div className="grid grid-cols-1 xl:grid-cols-5 gap-6">
       <div className="xl:col-span-3 space-y-5">
         <div className="space-y-1">
@@ -630,6 +649,20 @@ export function VideoStudio() {
                 rows={2}
                 className="text-sm"
               />
+              <label className="flex items-start gap-2 text-xs text-muted-foreground cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="mt-0.5"
+                  checked={includeAiDisclosure}
+                  onChange={(e) => setIncludeAiDisclosure(e.target.checked)}
+                />
+                <span>
+                  Include AI disclosure on caption
+                  <span className="block text-[11px] opacity-80 mt-0.5">
+                    {AI_DISCLOSURE_DEFAULT}
+                  </span>
+                </span>
+              </label>
               <div className="flex flex-wrap gap-2 justify-end">
                 <Button type="button" variant="ghost" size="sm" onClick={discardPreview}>
                   <Trash2 className="h-3.5 w-3.5" />
@@ -673,5 +706,11 @@ export function VideoStudio() {
         </p>
       </div>
     </div>
+      </TabsContent>
+
+      <TabsContent value="clip">
+        <ClipStudioPanel />
+      </TabsContent>
+    </Tabs>
   );
 }

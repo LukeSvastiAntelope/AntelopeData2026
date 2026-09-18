@@ -15,6 +15,7 @@ import { chargeOrFundraiseTool } from './charge-or-fundraise';
 import { generateAndPostVideoTool } from './generate-and-post-video';
 import { findPostableInsightTool } from './find-postable-insight';
 import { proposeCycleActionTool } from './propose-cycle-action';
+import { clipVideoTool } from './clip-video';
 
 /**
  * Canonical shared tool registry.
@@ -37,6 +38,7 @@ export const TOOL_REGISTRY: Record<CampaignToolName, CampaignTool> = {
   charge_or_fundraise: chargeOrFundraiseTool,
   generate_and_post_video: generateAndPostVideoTool,
   propose_cycle_action: proposeCycleActionTool,
+  clip_video: clipVideoTool,
 };
 
 const AUTO_TOOLS: CampaignToolName[] = [
@@ -49,6 +51,7 @@ const AUTO_TOOLS: CampaignToolName[] = [
   'find_postable_insight',
   'segment_list',
   'create_survey_draft',
+  'clip_video',
 ];
 
 const APPROVAL_TOOLS: CampaignToolName[] = [

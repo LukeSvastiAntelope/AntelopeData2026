@@ -106,4 +106,5 @@ export type CampaignToolName =
   | 'distribute_via_webhook'
   | 'charge_or_fundraise'
   | 'generate_and_post_video'
-  | 'propose_cycle_action';
+  | 'propose_cycle_action'
+  | 'clip_video';

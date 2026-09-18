@@ -38,8 +38,8 @@ export default function SpreadPage() {
                 <Badge variant="secondary">Live</Badge>
               </div>
               <p className="text-sm text-muted-foreground">
-                Describe a clip in plain words, expand with Claude, generate with Wan (or cinematic
-                providers), preview, then approve for post — never auto-posts.
+                Describe a clip in plain words, or clip a long speech into ranked shorts (Opus /
+                Klap). Preview, then approve for post — never auto-posts.
               </p>
               <Button asChild size="sm">
                 <Link href="/spread/video">Open video studio</Link>

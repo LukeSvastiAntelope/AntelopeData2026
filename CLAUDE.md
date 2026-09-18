@@ -42,6 +42,9 @@ Optional (feature-gated):
 - `HIGGSFIELD_API_KEY` / `KLING_API_KEY` — optional cinematic video tiers
 - `COMFYUI_API_BASE` — self-hosted Wan/ComfyUI endpoint (V3 path)
 - `FAL_WAN_T2V_MODEL` / `FAL_WAN_I2V_MODEL` / `FAL_WAN_V2V_MODEL` — optional fal model overrides
+- `OPUS_CLIP_API_KEY` / `OPUS_CLIP_ORG_ID` — Opus Clip long-form → shorts
+- `KLAP_API_KEY` — Klap long-form → shorts
+- `VIDEO_CLIP_PROVIDER` — Override default clipper (`opusclip` | `klap` | `mock`)
 
 ## Architecture
 

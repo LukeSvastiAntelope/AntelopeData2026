@@ -52,6 +52,7 @@ export const AGENT_REGISTRY: Record<AgentId, AgentRegistryEntry> = {
       'charge_or_fundraise',
       'generate_and_post_video',
       'propose_cycle_action',
+      'clip_video',
       // Advisory / situation helpers (pre-registry)
       'read_campaign_brief',
       'propose_baseline_survey',

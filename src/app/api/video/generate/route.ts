@@ -7,6 +7,7 @@ import {
   type VideoGenMode,
   type VideoProviderId,
 } from '@/app/utils/services/video/providers';
+import { assertOwnAssetUse } from '@/app/utils/services/video/guardrails';
 
 async function resolveUserId(req: NextRequest): Promise<number | null> {
   const session = await auth();

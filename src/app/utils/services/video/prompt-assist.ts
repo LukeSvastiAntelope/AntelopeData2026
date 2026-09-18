@@ -9,6 +9,7 @@ import type {
   VideoGenMode,
   VideoProviderId,
 } from '@/app/utils/services/video/providers';
+import { assertOwnAssetUse } from '@/app/utils/services/video/guardrails';
 
 export type VideoTemplateId =
   | 'announcement'
@@ -115,6 +116,11 @@ export async function assistVideoPrompt(params: {
   const plain = String(params.plainDescription || '').trim();
   if (!plain) throw new Error('plainDescription is required');
 
+  const guard = assertOwnAssetUse({ prompt: plain });
+  if (!guard.ok) {
+    throw new Error(guard.reason || 'Prompt blocked by content guardrail');
+  }
+
   const aspect = params.aspectRatio || '9:16';
   const duration = Math.min(Math.max(params.durationSeconds || 5, 2), 30);
   const template = VIDEO_TEMPLATES.find((t) => t.id === (params.templateId || 'custom'));
@@ -146,7 +152,7 @@ Return ONLY valid JSON (no markdown fences):
   "referenceGuidance": string|null,
   "explanation": string
 }
-Rules: no invented endorsements or poll numbers; keep language civic and honest; never request logos of opponents; ${modelIdiom(params.provider)} ${modeGuidance(params.mode)}`,
+Rules: no invented endorsements or poll numbers; keep language civic and honest; never request logos of opponents; NEVER animate, impersonate, or likeness-swap other real public figures or opponents — only the candidate's own likeness/assets or clearly fictional scenes; ${modelIdiom(params.provider)} ${modeGuidance(params.mode)}`,
       },
       {
         role: 'user',

@@ -39,3 +39,4 @@ export { executeTool, executeApprovedTool } from './executor';
 export { createSurveyDraftTool } from './create-survey-draft';
 export { findPostableInsightTool } from './find-postable-insight';
 export { proposeCycleActionTool } from './propose-cycle-action';
+export { clipVideoTool } from './clip-video';

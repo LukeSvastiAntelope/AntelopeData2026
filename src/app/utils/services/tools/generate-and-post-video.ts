@@ -1,5 +1,10 @@
 import { generateVideoUntilDone } from '@/app/utils/services/video/generate-service';
 import type { VideoGenMode, VideoProviderId } from '@/app/utils/services/video/providers';
+import {
+  applyAiDisclosure,
+  assertOwnAssetUse,
+  AI_DISCLOSURE_DEFAULT,
+} from '@/app/utils/services/video/guardrails';
 import type { CampaignTool } from './types';
 
 type Input = {
@@ -14,6 +19,9 @@ type Input = {
   aspectRatio?: string;
   referenceImage?: string;
   referenceVideo?: string;
+  /** Include AI-generated disclosure on the caption (post step). */
+  includeAiDisclosure?: boolean;
+  aiDisclosureText?: string;
 };
 
 /**
@@ -24,7 +32,7 @@ type Input = {
 export const generateAndPostVideoTool: CampaignTool<Input> = {
   name: 'generate_and_post_video',
   description:
-    'Generate a campaign video (Wan by default) for human review, then prepare it for posting. Requires approval. Generation may run on approve; nothing is published to social platforms from this tool — the human gate remains the only path to distribution.',
+    'Generate a campaign video (Wan by default) for human review, then prepare it for posting. Requires approval. Generation may run on approve; nothing is published to social platforms from this tool — the human gate remains the only path to distribution. Supports includeAiDisclosure for political AI labeling.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -41,14 +49,42 @@ export const generateAndPostVideoTool: CampaignTool<Input> = {
       aspectRatio: { type: 'string' },
       referenceImage: { type: 'string' },
       referenceVideo: { type: 'string' },
+      includeAiDisclosure: {
+        type: 'boolean',
+        description: 'Append AI-generated content disclosure to the caption',
+      },
+      aiDisclosureText: { type: 'string' },
     },
     additionalProperties: false,
   },
   risk: 'approval',
   async execute(input, ctx) {
-    const caption = String(input.caption || '').trim();
     const platform = String(input.platform || 'tiktok').trim();
     const existingUrl = String(input.videoUrl || '').trim();
+    const promptText = String(input.prompt || input.script || '').trim();
+
+    const guard = assertOwnAssetUse({
+      prompt: promptText,
+      caption: input.caption,
+      mode: input.mode,
+    });
+    if (!guard.ok) {
+      return {
+        summary: `### Post staging blocked\n${guard.reason}`,
+        data: {
+          implemented: true,
+          posted: false,
+          blocked: true,
+          reason: guard.reason,
+        },
+      };
+    }
+
+    const caption = applyAiDisclosure({
+      caption: String(input.caption || '').trim(),
+      includeDisclosure: Boolean(input.includeAiDisclosure),
+      disclosureText: input.aiDisclosureText || AI_DISCLOSURE_DEFAULT,
+    });
 
     let videoUrl = existingUrl;
     let generated = false;
@@ -56,15 +92,14 @@ export const generateAndPostVideoTool: CampaignTool<Input> = {
     let localAssetUrl: string | null = null;
 
     if (!videoUrl) {
-      const prompt = String(input.prompt || input.script || '').trim();
-      if (!prompt) {
+      if (!promptText) {
         throw new Error('script/prompt or videoUrl is required');
       }
       const mode = (String(input.mode || 't2v') as VideoGenMode) || 't2v';
       const job = await generateVideoUntilDone({
         userId: ctx.userId,
-        prompt,
-        modelPrompt: prompt,
+        prompt: promptText,
+        modelPrompt: promptText,
         provider: (input.provider as VideoProviderId) || undefined,
         mode,
         aspectRatio: (input.aspectRatio as any) || '9:16',
@@ -89,6 +124,7 @@ export const generateAndPostVideoTool: CampaignTool<Input> = {
         videoUrl ? `Preview: ${videoUrl}` : null,
         caption ? `Caption: ${caption}` : null,
         platform ? `Intended platform: ${platform}` : null,
+        input.includeAiDisclosure ? 'AI disclosure included on caption.' : null,
         '',
         '**Not posted.** Social publish is still human-gated and not auto-executed by this tool.',
       ]
@@ -104,6 +140,7 @@ export const generateAndPostVideoTool: CampaignTool<Input> = {
         provider: providerUsed,
         caption: caption || null,
         platform,
+        aiDisclosure: Boolean(input.includeAiDisclosure),
         requested: {
           script: input.script ?? null,
           prompt: input.prompt ?? null,

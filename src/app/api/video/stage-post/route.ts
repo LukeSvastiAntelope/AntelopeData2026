@@ -2,10 +2,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { ConsultantRepo } from '@/app/utils/database/consultant-repo';
 import { executeTool } from '@/app/utils/services/tools/executor';
+import {
+  AI_DISCLOSURE_DEFAULT,
+  assertOwnAssetUse,
+} from '@/app/utils/services/video/guardrails';
 
 /**
- * Stage a generated video for the human post gate (generate_and_post_video).
+ * Stage a generated/clipped video for the human post gate (generate_and_post_video).
  * Never posts — only creates a pending staged action / approval card.
+ * Surfaces AI disclosure affordance at this post step.
  */
 export async function POST(req: NextRequest) {
   try {
@@ -24,17 +29,31 @@ export async function POST(req: NextRequest) {
     if (!videoUrl) {
       return NextResponse.json({ error: 'videoUrl is required' }, { status: 400 });
     }
+
+    const guard = assertOwnAssetUse({
+      prompt: body.script || body.prompt || '',
+      caption: body.caption || '',
+    });
+    if (!guard.ok) {
+      return NextResponse.json({ error: guard.reason }, { status: 400 });
+    }
+
     const orgId =
       body.organizationId != null && Number.isFinite(Number(body.organizationId))
         ? Number(body.organizationId)
         : null;
 
+    const includeAiDisclosure =
+      body.includeAiDisclosure === undefined ? true : Boolean(body.includeAiDisclosure);
+
     const input = {
       videoUrl,
       caption: body.caption || '',
       platform: body.platform || 'tiktok',
-      script: body.script || body.prompt || '',
+      script: body.script || body.prompt || body.hook || '',
       provider: body.provider || undefined,
+      includeAiDisclosure,
+      aiDisclosureText: body.aiDisclosureText || AI_DISCLOSURE_DEFAULT,
     };
 
     const toolResult = await executeTool(
@@ -65,6 +84,7 @@ export async function POST(req: NextRequest) {
         input: toolResult.staged.input,
         description: toolResult.staged.description,
         videoUrl,
+        includeAiDisclosure,
       },
     });
 
@@ -75,9 +95,14 @@ export async function POST(req: NextRequest) {
         content: [
           '### Video ready — review before it goes out',
           toolResult.summary,
+          includeAiDisclosure
+            ? `_AI disclosure will be included: "${AI_DISCLOSURE_DEFAULT}"_`
+            : null,
           '',
           '_Nothing posts until you Approve on the card._',
-        ].join('\n'),
+        ]
+          .filter(Boolean)
+          .join('\n'),
         meta: {
           kind: 'staged_notice' as const,
           toolName: toolResult.tool,
@@ -93,6 +118,8 @@ export async function POST(req: NextRequest) {
       ok: true,
       staged,
       conversationId: conversation.id,
+      includeAiDisclosure,
+      disclosureText: AI_DISCLOSURE_DEFAULT,
     });
   } catch (error) {
     console.error('[video/stage-post]', error);
