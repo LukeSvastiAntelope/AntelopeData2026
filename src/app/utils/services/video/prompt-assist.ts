@@ -125,20 +125,38 @@ export async function assistVideoPrompt(params: {
   const duration = Math.min(Math.max(params.durationSeconds || 5, 2), 30);
   const template = VIDEO_TEMPLATES.find((t) => t.id === (params.templateId || 'custom'));
 
+  // Fail fast when no LLM key — still return a usable structured prompt.
+  if (!process.env.ANTHROPIC_API_KEY && !process.env.OPENAI_API_KEY) {
+    const fallback = fallbackStructured(plain, params.mode, aspect, duration);
+    return {
+      ...fallback,
+      explanation:
+        'Expanded with local templates (no Anthropic/OpenAI key configured). Edit freely before generating.',
+      referenceGuidance:
+        params.mode === 't2v'
+          ? undefined
+          : fallback.referenceGuidance,
+    };
+  }
+
   const model = process.env.ANTHROPIC_API_KEY
     ? 'claude-sonnet-4-6'
     : process.env.OPENAI_API_KEY
       ? 'gpt-4o'
       : 'claude-sonnet-4-6';
 
-  const completion = await createCompletion({
-    model,
-    temperature: 0.4,
-    maxTokens: 1200,
-    messages: [
-      {
-        role: 'system',
-        content: `You expand plain campaign video briefs into structured prompts for generative video models.
+  let completion;
+  try {
+    completion = await createCompletion({
+      model,
+      temperature: 0.4,
+      maxTokens: 1200,
+      // Keep the studio responsive if the provider hangs
+      // (ai-service may ignore unknown fields; we also race below).
+      messages: [
+        {
+          role: 'system',
+          content: `You expand plain campaign video briefs into structured prompts for generative video models.
 Return ONLY valid JSON (no markdown fences):
 {
   "subject": string,
@@ -153,26 +171,34 @@ Return ONLY valid JSON (no markdown fences):
   "explanation": string
 }
 Rules: no invented endorsements or poll numbers; keep language civic and honest; never request logos of opponents; NEVER animate, impersonate, or likeness-swap other real public figures or opponents — only the candidate's own likeness/assets or clearly fictional scenes; ${modelIdiom(params.provider)} ${modeGuidance(params.mode)}`,
-      },
-      {
-        role: 'user',
-        content: [
-          `Candidate brief: ${plain}`,
-          template && template.id !== 'custom'
-            ? `Template: ${template.label} — ${template.description}`
-            : null,
-          `Provider: ${params.provider}`,
-          `Mode: ${params.mode}`,
-          `Target aspect: ${aspect}`,
-          `Target duration seconds: ${duration}`,
-          params.hasReferenceImage ? 'Reference image: uploaded' : null,
-          params.hasReferenceVideo ? 'Reference video: uploaded' : null,
-        ]
-          .filter(Boolean)
-          .join('\n'),
-      },
-    ],
-  });
+        },
+        {
+          role: 'user',
+          content: [
+            `Candidate brief: ${plain}`,
+            template && template.id !== 'custom'
+              ? `Template: ${template.label} — ${template.description}`
+              : null,
+            `Provider: ${params.provider}`,
+            `Mode: ${params.mode}`,
+            `Target aspect: ${aspect}`,
+            `Target duration seconds: ${duration}`,
+            params.hasReferenceImage ? 'Reference image: uploaded' : null,
+            params.hasReferenceVideo ? 'Reference video: uploaded' : null,
+          ]
+            .filter(Boolean)
+            .join('\n'),
+        },
+      ],
+    });
+  } catch (error) {
+    console.warn('[prompt-assist] LLM failed, using fallback:', error);
+    return {
+      ...fallbackStructured(plain, params.mode, aspect, duration),
+      explanation:
+        'Model assist unavailable — used a local expansion. Edit the prompt before generating.',
+    };
+  }
 
   const raw = (completion.content || '').trim();
   const jsonMatch = raw.match(/\{[\s\S]*\}/);

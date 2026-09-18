@@ -180,9 +180,12 @@ export function VideoStudio() {
     setBusyAssist(true);
     setError(null);
     try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 20_000);
       const res = await fetch('/api/video/prompt-assist', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
         body: JSON.stringify({
           plainDescription: plain,
           provider,
@@ -195,6 +198,7 @@ export function VideoStudio() {
           referenceVideo: referenceKind === 'video' ? referenceUrl : null,
         }),
       });
+      clearTimeout(timer);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Prompt assist failed');
       setAssisted(data.assisted);
@@ -204,7 +208,13 @@ export function VideoStudio() {
       }
       return String(data.assisted.modelPrompt || '');
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Prompt assist failed');
+      const msg =
+        e instanceof Error && e.name === 'AbortError'
+          ? 'Prompt assist timed out — you can still generate with your plain description.'
+          : e instanceof Error
+            ? e.message
+            : 'Prompt assist failed';
+      setError(msg);
       return null;
     } finally {
       setBusyAssist(false);
@@ -234,7 +244,7 @@ export function VideoStudio() {
         setBusyGenerate(false);
         if (pollRef.current) clearInterval(pollRef.current);
       }
-    }, 2000);
+    }, 1500);
   };
 
   const runGenerate = async () => {
@@ -243,10 +253,10 @@ export function VideoStudio() {
     setPreviewUrl(null);
     setStaged(null);
     try {
-      let promptToUse = modelPrompt.trim();
+      // Never block generation on prompt-assist — use plain text if assist isn't ready.
+      const promptToUse = modelPrompt.trim() || plain.trim();
       if (!promptToUse) {
-        const assistedPrompt = await runAssist();
-        promptToUse = (assistedPrompt || '').trim() || plain;
+        throw new Error('Add a short description before generating');
       }
       const res = await fetch('/api/video/generate', {
         method: 'POST',
@@ -266,7 +276,26 @@ export function VideoStudio() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Generate failed');
       setJob(data.job);
-      pollJob(data.job.jobId);
+      // Immediate status poke so mock (~4s) doesn't wait on the first interval tick alone
+      void (async () => {
+        try {
+          const first = await fetch(`/api/video/jobs/${data.job.jobId}`);
+          const firstData = await first.json();
+          if (first.ok && firstData.job) {
+            setJob(firstData.job);
+            if (firstData.job.status === 'succeeded') {
+              setPreviewUrl(
+                firstData.job.localAssetUrl || firstData.job.assetUrl || null
+              );
+              setBusyGenerate(false);
+              return;
+            }
+          }
+        } catch {
+          /* fall through to poll */
+        }
+        pollJob(data.job.jobId);
+      })();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Generate failed');
       setBusyGenerate(false);
