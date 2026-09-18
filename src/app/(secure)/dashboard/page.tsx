@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import dynamic from 'next/dynamic'
 import { useSidebar } from "@/components/ui/sidebar"
-import { PanelLeft, Landmark, MapPin, Vote, Grid3x3, ChevronDown, ChevronRight, HandCoins, Bot, Plus, Play, Trash2, Loader2, Newspaper, Building2, Globe, Palette, Upload, Sparkles, Fence, Check, X, MessageSquare } from 'lucide-react'
+import { PanelLeft, Landmark, MapPin, Vote, Grid3x3, ChevronDown, ChevronRight, HandCoins, Bot, Plus, Play, Trash2, Loader2, Newspaper, Building2, Globe, Palette, Upload, Sparkles, Fence, Check, X, MessageSquare, Users } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -170,7 +170,37 @@ export default function DashboardPage() {
     fundraising: false,
     customizable: false,
     geofencing: false,
+    persons: false,
   })
+  const [personPins, setPersonPins] = useState<
+    {
+      id: number
+      lng: number
+      lat: number
+      label: string
+      effectiveParty?: string | null
+      party?: string | null
+      ageBucket?: string | null
+      canvassStatus?: string | null
+      district?: string | null
+      addressLine?: string | null
+      voterStatus?: string | null
+      matchConfidence?: number
+      canvassNotes?: string | null
+    }[]
+  >([])
+  const [personFilters, setPersonFilters] = useState({
+    party: [] as string[],
+    ageBucket: [] as string[],
+    voterStatus: [] as string[],
+  })
+  const [personHeatmap, setPersonHeatmap] = useState(false)
+  const [personLoading, setPersonLoading] = useState(false)
+  const [selectedPersonId, setSelectedPersonId] = useState<number | null>(null)
+  const [confirmParty, setConfirmParty] = useState('Democrat')
+  const [confirmStatus, setConfirmStatus] = useState('confirmed')
+  const [confirmNotes, setConfirmNotes] = useState('')
+  const [confirmBusy, setConfirmBusy] = useState(false)
   const [geofences, setGeofences] = useState<GeofencePolygon[]>([])
   const [geofenceDraftVertices, setGeofenceDraftVertices] = useState<[number, number][]>([])
   const [geofenceDrawMode, setGeofenceDrawMode] = useState<null | 'include' | 'exclude'>(null)
@@ -272,6 +302,112 @@ export default function DashboardPage() {
 
   const toggleLayer = (key: keyof typeof layers) => {
     setLayers(prev => ({ ...prev, [key]: !prev[key] }))
+  }
+
+  const loadPersons = useCallback(async (opts?: { silent?: boolean }) => {
+    setPersonLoading(true)
+    try {
+      const qs = new URLSearchParams()
+      if (personFilters.party.length) qs.set('party', personFilters.party.join(','))
+      if (personFilters.ageBucket.length) qs.set('ageBucket', personFilters.ageBucket.join(','))
+      if (personFilters.voterStatus.length) qs.set('voterStatus', personFilters.voterStatus.join(','))
+      const res = await fetch(`/api/dashboard/persons?${qs.toString()}`)
+      const data = await res.json()
+      if (!res.ok || !data.status) throw new Error(data.message || 'Failed to load households')
+      const pins = (data.people || []).map((p: any) => ({
+        id: p.id,
+        lng: p.lng,
+        lat: p.lat,
+        label: p.label,
+        effectiveParty: p.effectiveParty,
+        party: p.party,
+        ageBucket: p.ageBucket,
+        canvassStatus: p.canvassStatus,
+        district: p.district,
+        addressLine: p.addressLine,
+        voterStatus: p.voterStatus,
+        matchConfidence: p.matchConfidence,
+        canvassNotes: p.canvassNotes,
+      }))
+      setPersonPins(pins)
+      setLayers((prev) => ({ ...prev, persons: true }))
+      if (!opts?.silent) toast.success(`${pins.length} households on map`)
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Could not load households')
+    } finally {
+      setPersonLoading(false)
+    }
+  }, [personFilters])
+
+  useEffect(() => {
+    if (layers.persons) void loadPersons({ silent: true })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [personFilters.party.join(','), personFilters.ageBucket.join(','), personFilters.voterStatus.join(',')])
+
+  const selectedPerson = useMemo(
+    () => personPins.find((p) => p.id === selectedPersonId) || null,
+    [personPins, selectedPersonId]
+  )
+
+  const uploadPersonCsv = async (file: File) => {
+    setPersonLoading(true)
+    try {
+      const text = await file.text()
+      const lines = text.split(/\r?\n/).filter(Boolean)
+      if (lines.length < 2) throw new Error('CSV needs a header and at least one row')
+      const header = lines[0].split(',').map((h) => h.trim().replace(/^"|"$/g, ''))
+      const rows: Record<string, string>[] = []
+      for (let i = 1; i < lines.length; i++) {
+        const vals =
+          lines[i]
+            .match(/("([^"]*)")|([^,]+)/g)
+            ?.map((s) => (s?.startsWith('"') ? s.slice(1, -1) : s?.trim() ?? '')) ??
+          lines[i].split(',')
+        const row: Record<string, string> = {}
+        header.forEach((h, j) => {
+          row[h] = vals[j] ?? ''
+        })
+        rows.push(row)
+      }
+      const res = await fetch('/api/dashboard/persons', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rows }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data.status) throw new Error(data.message || 'Upload failed')
+      await loadPersons({ silent: true })
+      toast.success(`Mapped ${data.upserted} households (${data.count} total)`)
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Household upload failed')
+    } finally {
+      setPersonLoading(false)
+    }
+  }
+
+  const confirmPersonAtDoor = async () => {
+    if (!selectedPersonId) return
+    setConfirmBusy(true)
+    try {
+      const res = await fetch(`/api/dashboard/persons/${selectedPersonId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          status: confirmStatus,
+          party: confirmParty,
+          notes: confirmNotes,
+          applyPartyToRecord: true,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data.status) throw new Error(data.message || 'Confirm failed')
+      toast.success('Door confirmation saved — map lean updated')
+      await loadPersons({ silent: true })
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Confirm failed')
+    } finally {
+      setConfirmBusy(false)
+    }
   }
 
   const handleCreateSubmit = async () => {
@@ -535,10 +671,18 @@ export default function DashboardPage() {
           layers={layers}
           customLayerData={layers.customizable ? customLayerData : null}
           customMapPins={customMapPins}
+          personPins={layers.persons ? personPins : null}
+          personHeatmap={personHeatmap}
           geofencing={geofencingMapProps}
           onDistrictSelect={(district) => {
             setSelectedDistrict(district)
             loadDistrictIntel(district.districtCode)
+          }}
+          onPersonSelect={(id) => {
+            setSelectedPersonId(id)
+            const p = personPins.find((x) => x.id === id)
+            if (p?.effectiveParty) setConfirmParty(p.effectiveParty)
+            setRightPanelOpen(true)
           }}
         />
         <div style={{ position: 'absolute', top: 12, left: 12, zIndex: 20 }}>
@@ -580,6 +724,11 @@ export default function DashboardPage() {
                 <LayerToggle icon={<Vote className="h-3 w-3" />} label="Voters" active={layers.voters} colorClass="text-purple-400" activeBg="bg-purple-500/10 border-purple-500/20" onClick={() => toggleLayer('voters')} />
                 <LayerToggle icon={<HandCoins className="h-3 w-3" />} label="Fundraising" active={layers.fundraising} colorClass="text-emerald-400" activeBg="bg-emerald-500/10 border-emerald-500/20" onClick={() => toggleLayer('fundraising')} />
                 <LayerToggle icon={<Palette className="h-3 w-3" />} label="Customizable" active={layers.customizable} colorClass="text-violet-400" activeBg="bg-violet-500/10 border-violet-500/20" onClick={() => toggleLayer('customizable')} />
+                <LayerToggle icon={<Users className="h-3 w-3" />} label="Households" active={layers.persons} colorClass="text-sky-400" activeBg="bg-sky-500/10 border-sky-500/20" onClick={() => {
+                  const next = !layers.persons
+                  setLayers((prev) => ({ ...prev, persons: next }))
+                  if (next) void loadPersons()
+                }} />
                 <LayerToggle icon={<Fence className="h-3 w-3" />} label="Geofencing" active={layers.geofencing} colorClass="text-cyan-400" activeBg="bg-cyan-500/10 border-cyan-500/20" onClick={() => toggleLayer('geofencing')} />
               </div>
             </Section>
@@ -976,6 +1125,151 @@ export default function DashboardPage() {
                 </div>
               </Section>
             )}
+
+            <Section title="Households · party & address" defaultOpen>
+              <div className="space-y-2">
+                <p className="text-[10px] text-muted-foreground">
+                  Upload a mock / unified district CSV (lat/lng + party) to pin households by address.
+                  Filter by partisanship, toggle a density heatmap, then confirm lean at the door.
+                </p>
+                <label className="flex items-center justify-center gap-1.5 w-full px-2 py-1.5 rounded border border-dashed border-border text-[11px] cursor-pointer hover:bg-muted/50 transition-colors">
+                  <Upload className="h-3 w-3" />
+                  Upload household CSV
+                  <input
+                    type="file"
+                    accept=".csv"
+                    className="sr-only"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0]
+                      if (file) void uploadPersonCsv(file)
+                      e.target.value = ''
+                    }}
+                  />
+                </label>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="w-full h-7 text-[10px]"
+                  disabled={personLoading}
+                  onClick={() => void loadPersons()}
+                >
+                  {personLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Users className="h-3 w-3" />}
+                  Load from database
+                </Button>
+                <div className="space-y-1">
+                  <Label className="text-[10px]">Party / lean filter</Label>
+                  <div className="flex flex-wrap gap-1">
+                    {['Democrat', 'Republican', 'Independent', 'Unaffiliated'].map((p) => {
+                      const on = personFilters.party.includes(p)
+                      return (
+                        <button
+                          key={p}
+                          type="button"
+                          className={`px-1.5 py-0.5 rounded text-[10px] border ${on ? 'bg-sky-500/15 border-sky-500/40 text-sky-700 dark:text-sky-300' : 'border-border text-muted-foreground'}`}
+                          onClick={() =>
+                            setPersonFilters((prev) => ({
+                              ...prev,
+                              party: on ? prev.party.filter((x) => x !== p) : [...prev.party, p],
+                            }))
+                          }
+                        >
+                          {p}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[10px]">Age bucket</Label>
+                  <div className="flex flex-wrap gap-1">
+                    {['18-24', '25-34', '35-44', '45-54', '55-64', '65+'].map((b) => {
+                      const on = personFilters.ageBucket.includes(b)
+                      return (
+                        <button
+                          key={b}
+                          type="button"
+                          className={`px-1.5 py-0.5 rounded text-[10px] border ${on ? 'bg-sky-500/15 border-sky-500/40' : 'border-border text-muted-foreground'}`}
+                          onClick={() =>
+                            setPersonFilters((prev) => ({
+                              ...prev,
+                              ageBucket: on ? prev.ageBucket.filter((x) => x !== b) : [...prev.ageBucket, b],
+                            }))
+                          }
+                        >
+                          {b}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+                <label className="flex items-center gap-2 text-[10px] text-muted-foreground cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={personHeatmap}
+                    onChange={(e) => setPersonHeatmap(e.target.checked)}
+                  />
+                  Party density heatmap
+                </label>
+                <p className="text-[10px] text-muted-foreground">
+                  {personPins.length} households · pins colored by lean (blue Dem / red Rep / gold Ind)
+                </p>
+
+                {selectedPerson && (
+                  <div className="rounded border border-border p-2 space-y-1.5 bg-muted/20">
+                    <p className="text-[11px] font-medium">{selectedPerson.label}</p>
+                    <p className="text-[10px] text-muted-foreground">
+                      {selectedPerson.addressLine || '—'} · {selectedPerson.district || 'no district'}
+                    </p>
+                    <p className="text-[10px]">
+                      File lean: <strong>{selectedPerson.party || '—'}</strong>
+                      {selectedPerson.effectiveParty &&
+                      selectedPerson.effectiveParty !== selectedPerson.party
+                        ? ` → door: ${selectedPerson.effectiveParty}`
+                        : ''}
+                    </p>
+                    <Label className="text-[10px]">Confirm at door</Label>
+                    <select
+                      className="w-full rounded border border-border bg-background px-2 py-1 text-[11px]"
+                      value={confirmStatus}
+                      onChange={(e) => setConfirmStatus(e.target.value)}
+                    >
+                      <option value="confirmed">Confirmed</option>
+                      <option value="contacted">Contacted</option>
+                      <option value="not_home">Not home</option>
+                      <option value="refused">Refused</option>
+                      <option value="moved">Moved</option>
+                      <option value="wrong_address">Wrong address</option>
+                    </select>
+                    <select
+                      className="w-full rounded border border-border bg-background px-2 py-1 text-[11px]"
+                      value={confirmParty}
+                      onChange={(e) => setConfirmParty(e.target.value)}
+                    >
+                      <option>Democrat</option>
+                      <option>Republican</option>
+                      <option>Independent</option>
+                      <option>Unaffiliated</option>
+                    </select>
+                    <Textarea
+                      value={confirmNotes}
+                      onChange={(e) => setConfirmNotes(e.target.value)}
+                      placeholder="Door notes (optional)"
+                      rows={2}
+                      className="text-[11px] min-h-[48px]"
+                    />
+                    <Button
+                      size="sm"
+                      className="w-full h-7 text-[10px]"
+                      disabled={confirmBusy}
+                      onClick={() => void confirmPersonAtDoor()}
+                    >
+                      {confirmBusy ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
+                      Save door confirmation
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </Section>
 
             <Section title="Upload data set to map" defaultOpen={false}>
               <div className="space-y-2">

@@ -127,13 +127,42 @@ export interface GeofencingMapProps {
   onDrawVertex?: (lng: number, lat: number) => void
 }
 
+/** Household / person_records pin for D2 map filters. */
+export type PersonMapPin = {
+  id: number
+  lng: number
+  lat: number
+  label: string
+  effectiveParty?: string | null
+  party?: string | null
+  ageBucket?: string | null
+  canvassStatus?: string | null
+  district?: string | null
+  addressLine?: string | null
+}
+
 interface DashboardMapProps {
-  layers?: { political: boolean; districts: boolean; responses: boolean; voters: boolean; fundraising?: boolean; customizable?: boolean; geofencing?: boolean }
+  layers?: {
+    political: boolean
+    districts: boolean
+    responses: boolean
+    voters: boolean
+    fundraising?: boolean
+    customizable?: boolean
+    geofencing?: boolean
+    /** Unified household pins from person_records / mock upload */
+    persons?: boolean
+  }
   customLayerData?: CustomLayerData | null
   /** Point pins from uploaded CSV (lat/lng), e.g. schools/hospitals filtered via map assistant */
   customMapPins?: CustomMapPin[] | null
+  /** D2: address-level person pins colored by party lean */
+  personPins?: PersonMapPin[] | null
+  /** When true with persons layer, show density heatmap in addition to circles */
+  personHeatmap?: boolean
   geofencing?: GeofencingMapProps | null
   onDistrictSelect?: (district: { districtCode: string; state: string; districtNumber: number }) => void
+  onPersonSelect?: (personId: number) => void
 }
 
 // ---------------------------------------------------------------------------
@@ -193,10 +222,22 @@ function valueToColor(style: CustomLayerStyle, normalized: number): string {
   return `rgba(${r},${g},${b},0.65)`
 }
 
-export default function DashboardMap({ layers, customLayerData, customMapPins, geofencing, onDistrictSelect }: DashboardMapProps) {
+export default function DashboardMap({
+  layers,
+  customLayerData,
+  customMapPins,
+  personPins,
+  personHeatmap = false,
+  geofencing,
+  onDistrictSelect,
+  onPersonSelect,
+}: DashboardMapProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<any>(null)
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
+  // ... existing state continues below — keep personSelectRef
+  const onPersonSelectRef = useRef(onPersonSelect)
+  onPersonSelectRef.current = onPersonSelect
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [geoData, setGeoData] = useState<GeoData | null>(null)
   const [statePoliticalData, setStatePoliticalData] = useState<PoliticalFeature[]>([])
@@ -235,6 +276,7 @@ export default function DashboardMap({ layers, customLayerData, customMapPins, g
   const showFundraisingLayer = layers?.fundraising ?? false
   const showCustomizableLayer = layers?.customizable ?? false
   const showGeofencingLayer = layers?.geofencing ?? false
+  const showPersonsLayer = layers?.persons ?? false
 
   const [fundraisingOverlays, setFundraisingOverlays] = useState<any[]>([])
   const geofenceVertexRef = useRef<((lng: number, lat: number) => void) | undefined>(undefined)
@@ -498,6 +540,78 @@ export default function DashboardMap({ layers, customLayerData, customMapPins, g
           },
         })
 
+        // ---- Household / person_records pins (D2) — color by effective party lean ----
+        map.addSource('person-points', {
+          type: 'geojson',
+          data: { type: 'FeatureCollection', features: [] },
+        })
+        map.addLayer({
+          id: 'person-heatmap',
+          type: 'heatmap',
+          source: 'person-points',
+          layout: { visibility: 'none' },
+          paint: {
+            'heatmap-weight': 1,
+            'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 8, 0.6, 14, 2],
+            'heatmap-color': [
+              'interpolate', ['linear'], ['heatmap-density'],
+              0, 'rgba(0,0,0,0)',
+              0.2, 'rgba(59,130,246,0.25)',
+              0.45, 'rgba(168,85,247,0.45)',
+              0.7, 'rgba(239,68,68,0.55)',
+              1, 'rgba(220,38,38,0.8)',
+            ],
+            'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 8, 18, 14, 36],
+            'heatmap-opacity': 0.75,
+          },
+        })
+        map.addLayer({
+          id: 'person-points-circles',
+          type: 'circle',
+          source: 'person-points',
+          layout: { visibility: 'none' },
+          paint: {
+            'circle-radius': ['interpolate', ['linear'], ['zoom'], 8, 4, 14, 9],
+            'circle-color': [
+              'match',
+              ['downcase', ['coalesce', ['get', 'effectiveParty'], '']],
+              'democrat', '#2563eb',
+              'republican', '#dc2626',
+              'independent', '#ca8a04',
+              'unaffiliated', '#64748b',
+              '#7c3aed',
+            ],
+            'circle-opacity': 0.9,
+            'circle-stroke-width': [
+              'match',
+              ['coalesce', ['get', 'canvassStatus'], 'not_contacted'],
+              'confirmed', 3,
+              'contacted', 2,
+              1,
+            ],
+            'circle-stroke-color': isDark ? '#0f172a' : '#fff',
+          },
+        })
+        map.addLayer({
+          id: 'person-points-labels',
+          type: 'symbol',
+          source: 'person-points',
+          minzoom: 13,
+          layout: {
+            visibility: 'none',
+            'text-field': ['get', 'label'],
+            'text-size': 10,
+            'text-anchor': 'top',
+            'text-offset': [0, 0.85],
+            'text-max-width': 12,
+          },
+          paint: {
+            'text-color': isDark ? '#e2e8f0' : '#1e293b',
+            'text-halo-color': isDark ? '#0f172a' : '#fff',
+            'text-halo-width': 1.1,
+          },
+        })
+
         // ---- News event points (from news chat / campaign news with location + date) ----
         map.addSource('news-event-points', {
           type: 'geojson',
@@ -704,6 +818,18 @@ export default function DashboardMap({ layers, customLayerData, customMapPins, g
             map.fitBounds(bounds, { padding: 60, duration: 1200 })
           }
         }
+      })
+
+      map.on('click', 'person-points-circles', (e: any) => {
+        if (!e.features?.length) return
+        const id = Number(e.features[0].properties?.id)
+        if (Number.isFinite(id)) onPersonSelectRef.current?.(id)
+      })
+      map.on('mouseenter', 'person-points-circles', () => {
+        map.getCanvas().style.cursor = 'pointer'
+      })
+      map.on('mouseleave', 'person-points-circles', () => {
+        map.getCanvas().style.cursor = ''
       })
 
       // ---- News event point click: show popup with title, date, location ----
@@ -1009,6 +1135,41 @@ export default function DashboardMap({ layers, customLayerData, customMapPins, g
       map.setLayoutProperty('custom-upload-pins-labels', 'visibility', vis)
     } catch {}
   }, [status, showCustomizableLayer, customMapPins])
+
+  // Household person_records pins + optional density heatmap (D2)
+  useEffect(() => {
+    if (status !== 'ready' || !mapRef.current) return
+    const map = mapRef.current
+    const pins = personPins ?? []
+    const features = pins.map((p) => ({
+      type: 'Feature' as const,
+      properties: {
+        id: p.id,
+        label: p.label,
+        effectiveParty: p.effectiveParty || p.party || '',
+        canvassStatus: p.canvassStatus || 'not_contacted',
+        ageBucket: p.ageBucket || '',
+        district: p.district || '',
+      },
+      geometry: { type: 'Point' as const, coordinates: [p.lng, p.lat] },
+    }))
+    try {
+      const src = map.getSource('person-points')
+      if (src) (src as { setData: (d: object) => void }).setData({ type: 'FeatureCollection', features })
+    } catch (e) {
+      console.warn('person-points setData:', e)
+    }
+    const show = showPersonsLayer && features.length > 0
+    try {
+      map.setLayoutProperty('person-points-circles', 'visibility', show ? 'visible' : 'none')
+      map.setLayoutProperty('person-points-labels', 'visibility', show ? 'visible' : 'none')
+      map.setLayoutProperty(
+        'person-heatmap',
+        'visibility',
+        show && personHeatmap ? 'visible' : 'none'
+      )
+    } catch {}
+  }, [status, showPersonsLayer, personPins, personHeatmap])
 
   // -----------------------------------------------------------------------
   // Geofencing: polygons, draft vertices, canvass address pins
