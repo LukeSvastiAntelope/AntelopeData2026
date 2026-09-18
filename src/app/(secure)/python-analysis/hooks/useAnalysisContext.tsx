@@ -28,6 +28,8 @@ export interface AnalysisResult {
   type: 'text' | 'image' | 'table' | 'error';
   content: string;
   timestamp: Date;
+  /** Optional figure/step label used for PDF filenames */
+  label?: string;
 }
 
 export interface ExecutionState {
@@ -329,7 +331,7 @@ export function useAnalysisContext() {
                         fig = plt.gcf()
                         if fig.get_axes():  # Only save if there are plots
                             buf = BytesIO()
-                            fig.savefig(buf, format='png', dpi=100, bbox_inches='tight')
+                            fig.savefig(buf, format='png', dpi=200, bbox_inches='tight')
                             buf.seek(0)
                             img_str = base64.b64encode(buf.getvalue()).decode()
                             plot_data.append(f"data:image/png;base64,{img_str}")
@@ -565,7 +567,8 @@ print("\\nSuggestion: Try a simpler question or check if the variables exist in 
         newResults.push({
           type: 'image',
           content: plotData,
-          timestamp: new Date()
+          timestamp: new Date(),
+          label: `figure-${index + 1}`,
         });
       });
 

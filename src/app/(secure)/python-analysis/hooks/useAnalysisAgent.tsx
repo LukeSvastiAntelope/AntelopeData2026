@@ -305,7 +305,7 @@ export function useAnalysisAgent() {
                       fig = plt.gcf()
                       if fig.get_axes():  # Only save if there are plots
                           buf = BytesIO()
-                          fig.savefig(buf, format='png', dpi=100, bbox_inches='tight')
+                          fig.savefig(buf, format='png', dpi=200, bbox_inches='tight')
                           buf.seek(0)
                           img_str = base64.b64encode(buf.getvalue()).decode()
                           plot_data.append(f"data:image/png;base64,{img_str}")
