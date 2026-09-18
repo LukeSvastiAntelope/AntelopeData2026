@@ -124,7 +124,39 @@ export async function refreshVideoJob(jobId: string): Promise<StoredVideoJob> {
   }
 
   const provider = getVideoProvider(job.provider);
-  const state = await provider.status(job.providerJobId);
+  let state = await provider.status(job.providerJobId);
+
+  // Recover mock jobs whose in-memory map was lost (old ids) using stored createdAt.
+  if (
+    job.provider === 'mock' &&
+    state.status === 'failed' &&
+    String(state.error || '').includes('Unknown mock job')
+  ) {
+    const createdMs = Date.parse(job.createdAt);
+    if (Number.isFinite(createdMs)) {
+      const elapsed = Date.now() - createdMs;
+      if (elapsed < 1500) {
+        state = { ...state, status: 'queued', progress: 10, error: undefined };
+      } else if (elapsed < 4000) {
+        state = {
+          ...state,
+          status: 'running',
+          progress: Math.min(90, 20 + Math.floor(elapsed / 50)),
+          error: undefined,
+        };
+      } else {
+        state = {
+          ...state,
+          status: 'succeeded',
+          progress: 100,
+          error: undefined,
+          assetUrl:
+            'https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
+        };
+      }
+    }
+  }
+
   job.status = state.status;
   job.progress = state.progress ?? job.progress;
   job.error = state.error || null;

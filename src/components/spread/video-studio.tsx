@@ -282,11 +282,15 @@ export function VideoStudio() {
           const first = await fetch(`/api/video/jobs/${data.job.jobId}`);
           const firstData = await first.json();
           if (first.ok && firstData.job) {
-            setJob(firstData.job);
-            if (firstData.job.status === 'succeeded') {
-              setPreviewUrl(
-                firstData.job.localAssetUrl || firstData.job.assetUrl || null
-              );
+            const j = firstData.job as Job;
+            setJob(j);
+            if (j.status === 'succeeded') {
+              setPreviewUrl(j.localAssetUrl || j.assetUrl || null);
+              setBusyGenerate(false);
+              return;
+            }
+            if (j.status === 'failed' || j.status === 'canceled') {
+              setError(j.error || `Job ${j.status}`);
               setBusyGenerate(false);
               return;
             }

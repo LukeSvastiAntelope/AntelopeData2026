@@ -1,5 +1,8 @@
 /**
  * Mock clipper — studio works without Opus/Klap keys.
+ *
+ * Timing is encoded in the provider job id so status/clips survive
+ * Next.js HMR / module isolation.
  */
 
 import { randomUUID } from 'crypto';
@@ -9,14 +12,6 @@ import type {
   VideoClipProviderCapabilities,
   VideoClipSubmitOptions,
 } from './types';
-
-type MockJob = {
-  createdAt: number;
-  sourceUrl: string;
-  clips?: VideoClipCandidate[];
-};
-
-const JOBS = new Map<string, MockJob>();
 
 const SAMPLE_CLIPS = [
   {
@@ -36,6 +31,13 @@ const SAMPLE_CLIPS = [
   },
 ];
 
+function parseCreatedAt(jobId: string): number | null {
+  const m = /^mockclip_(\d{10,16})_/.exec(jobId);
+  if (!m) return null;
+  const n = Number(m[1]);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
 export const mockClipProvider: VideoClipProvider = {
   id: 'mock',
   capabilities(): VideoClipProviderCapabilities {
@@ -47,38 +49,34 @@ export const mockClipProvider: VideoClipProvider = {
     };
   },
   async submit(sourceUrl: string) {
-    const jobId = `mockclip_${randomUUID().replace(/-/g, '').slice(0, 12)}`;
-    JOBS.set(jobId, { createdAt: Date.now(), sourceUrl });
-    return { jobId };
+    const createdAt = Date.now();
+    const jobId = `mockclip_${createdAt}_${randomUUID().replace(/-/g, '').slice(0, 8)}`;
+    return { jobId, raw: { sourceUrl, createdAt } };
   },
   async status(jobId: string) {
-    const job = JOBS.get(jobId);
-    if (!job) {
+    const createdAt = parseCreatedAt(jobId);
+    if (!createdAt) {
       return { jobId, status: 'failed', error: 'Unknown mock clip job' };
     }
-    const elapsed = Date.now() - job.createdAt;
+    const elapsed = Date.now() - createdAt;
     if (elapsed < 2000) return { jobId, status: 'queued', progress: 15 };
     if (elapsed < 5000) return { jobId, status: 'running', progress: 55 };
     return { jobId, status: 'succeeded', progress: 100 };
   },
   async clips(jobId: string, _opts?: VideoClipSubmitOptions) {
-    const job = JOBS.get(jobId);
-    if (!job) throw new Error('Unknown mock clip job');
+    const createdAt = parseCreatedAt(jobId);
+    if (!createdAt) throw new Error('Unknown mock clip job');
     const state = await this.status(jobId);
     if (state.status !== 'succeeded') {
       throw new Error('Clips not ready yet');
     }
-    if (!job.clips) {
-      job.clips = SAMPLE_CLIPS.map((c, i) => ({
-        id: `${jobId}_${i}`,
-        url: c.url,
-        score: c.score,
-        hook: c.hook,
-        durationSeconds: 15 + i * 5,
-        captions: true,
-      }));
-      JOBS.set(jobId, job);
-    }
-    return job.clips;
+    return SAMPLE_CLIPS.map((c, i) => ({
+      id: `${jobId}_${i}`,
+      url: c.url,
+      score: c.score,
+      hook: c.hook,
+      durationSeconds: 15 + i * 5,
+      captions: true,
+    })) as VideoClipCandidate[];
   },
 };

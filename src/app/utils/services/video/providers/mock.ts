@@ -11,11 +11,19 @@ import type {
 /**
  * Local mock provider — keeps the studio usable without FAL_KEY / API keys.
  * Simulates async generation and returns a public sample MP4 URL.
+ *
+ * Job timing is encoded in the provider job id (`mock_<createdAtMs>_<nonce>`)
+ * so status survives Next.js HMR / module isolation (in-memory Maps do not).
  */
-const MOCK_JOBS = new Map<string, VideoJobState & { createdAt: number }>();
-
 const SAMPLE_MP4 =
   'https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4';
+
+function parseMockCreatedAt(jobId: string): number | null {
+  const m = /^mock_(\d{10,16})_/.exec(jobId);
+  if (!m) return null;
+  const n = Number(m[1]);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
 
 export const mockVideoProvider: VideoGenProvider = {
   id: 'mock',
@@ -31,20 +39,17 @@ export const mockVideoProvider: VideoGenProvider = {
     };
   },
   async generate(request: VideoGenRequest): Promise<VideoJobHandle> {
-    const jobId = `mock_${randomUUID().replace(/-/g, '').slice(0, 16)}`;
-    MOCK_JOBS.set(jobId, {
+    const createdAt = Date.now();
+    const jobId = `mock_${createdAt}_${randomUUID().replace(/-/g, '').slice(0, 8)}`;
+    return {
       jobId,
       provider: 'mock',
-      status: 'queued',
-      progress: 0,
-      createdAt: Date.now(),
-      raw: { prompt: request.prompt, mode: request.mode },
-    });
-    return { jobId, provider: 'mock' };
+      raw: { prompt: request.prompt, mode: request.mode, createdAt },
+    };
   },
   async status(jobId: string): Promise<VideoJobState> {
-    const job = MOCK_JOBS.get(jobId);
-    if (!job) {
+    const createdAt = parseMockCreatedAt(jobId);
+    if (!createdAt) {
       return {
         jobId,
         provider: 'mock',
@@ -52,27 +57,29 @@ export const mockVideoProvider: VideoGenProvider = {
         error: 'Unknown mock job',
       };
     }
-    const elapsed = Date.now() - job.createdAt;
+    const elapsed = Date.now() - createdAt;
     if (elapsed < 1500) {
-      job.status = 'queued';
-      job.progress = 10;
-    } else if (elapsed < 4000) {
-      job.status = 'running';
-      job.progress = Math.min(90, 20 + Math.floor(elapsed / 50));
-    } else {
-      job.status = 'succeeded';
-      job.progress = 100;
-      job.assetUrl = SAMPLE_MP4;
+      return {
+        jobId,
+        provider: 'mock',
+        status: 'queued',
+        progress: 10,
+      };
     }
-    MOCK_JOBS.set(jobId, job);
+    if (elapsed < 4000) {
+      return {
+        jobId,
+        provider: 'mock',
+        status: 'running',
+        progress: Math.min(90, 20 + Math.floor(elapsed / 50)),
+      };
+    }
     return {
-      jobId: job.jobId,
+      jobId,
       provider: 'mock',
-      status: job.status,
-      progress: job.progress,
-      assetUrl: job.assetUrl,
-      error: job.error,
-      raw: job.raw,
+      status: 'succeeded',
+      progress: 100,
+      assetUrl: SAMPLE_MP4,
     };
   },
   async result(jobId: string, opts?: VideoGenOptions) {
