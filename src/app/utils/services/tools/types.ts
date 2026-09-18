@@ -108,4 +108,6 @@ export type CampaignToolName =
   | 'generate_and_post_video'
   | 'propose_cycle_action'
   | 'clip_video'
-  | 'addresses_in_area';
+  | 'addresses_in_area'
+  | 'build_turf'
+  | 'list_turf_addresses';

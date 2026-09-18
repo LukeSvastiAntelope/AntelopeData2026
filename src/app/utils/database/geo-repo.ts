@@ -23,6 +23,9 @@ export type VoterGeoRow = {
   city: string | null;
   state: string | null;
   zip: string | null;
+  party: string | null;
+  partisan_score: number | null;
+  turnout_score: number | null;
   latitude: number | null;
   longitude: number | null;
   geocode_status: GeocodeStatus;
@@ -59,6 +62,9 @@ export class VoterGeoRepo {
     city?: string | null;
     state?: string | null;
     zip?: string | null;
+    party?: string | null;
+    partisanScore?: number | null;
+    turnoutScore?: number | null;
     latitude?: number | null;
     longitude?: number | null;
     geocodeStatus?: GeocodeStatus;
@@ -77,15 +83,25 @@ export class VoterGeoRepo {
         : 'pending';
     // SPATIAL INDEX requires NOT NULL — Null Island placeholder until geocoded
     const wkt = hasPt ? pointWkt4326(lat!, lng!) : pointWkt4326(0, 0);
+    const party = params.party || null;
+    const partisan =
+      params.partisanScore != null && Number.isFinite(Number(params.partisanScore))
+        ? Number(params.partisanScore)
+        : null;
+    const turnout =
+      params.turnoutScore != null && Number.isFinite(Number(params.turnoutScore))
+        ? Number(params.turnoutScore)
+        : null;
 
     // Prefer agent unique key when present; else org+voter_file_id
     if (params.responderAgentId) {
       const [result] = await sql.execute<ResultSetHeader>(
         `INSERT INTO voter_geo (
            organization_id, responder_agent_id, voter_file_id,
-           street, city, state, zip, latitude, longitude, pt,
+           street, city, state, zip, party, partisan_score, turnout_score,
+           latitude, longitude, pt,
            geocode_status, geocode_source, geocode_confidence, geocode_error
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ST_GeomFromText(?, 4326), ?, ?, ?, ?)
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ST_GeomFromText(?, 4326), ?, ?, ?, ?)
          ON DUPLICATE KEY UPDATE
            organization_id = COALESCE(VALUES(organization_id), organization_id),
            voter_file_id = COALESCE(VALUES(voter_file_id), voter_file_id),
@@ -93,6 +109,9 @@ export class VoterGeoRepo {
            city = COALESCE(VALUES(city), city),
            state = COALESCE(VALUES(state), state),
            zip = COALESCE(VALUES(zip), zip),
+           party = COALESCE(VALUES(party), party),
+           partisan_score = COALESCE(VALUES(partisan_score), partisan_score),
+           turnout_score = COALESCE(VALUES(turnout_score), turnout_score),
            latitude = COALESCE(VALUES(latitude), latitude),
            longitude = COALESCE(VALUES(longitude), longitude),
            pt = IF(VALUES(geocode_status) IN ('ok', 'provider'), VALUES(pt), pt),
@@ -109,6 +128,9 @@ export class VoterGeoRepo {
           params.city || null,
           params.state || null,
           params.zip || null,
+          party,
+          partisan,
+          turnout,
           lat,
           lng,
           wkt,
@@ -128,14 +150,18 @@ export class VoterGeoRepo {
     const [result] = await sql.execute<ResultSetHeader>(
       `INSERT INTO voter_geo (
          organization_id, responder_agent_id, voter_file_id,
-         street, city, state, zip, latitude, longitude, pt,
+         street, city, state, zip, party, partisan_score, turnout_score,
+         latitude, longitude, pt,
          geocode_status, geocode_source, geocode_confidence, geocode_error
-       ) VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ST_GeomFromText(?, 4326), ?, ?, ?, ?)
+       ) VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ST_GeomFromText(?, 4326), ?, ?, ?, ?)
        ON DUPLICATE KEY UPDATE
          street = COALESCE(VALUES(street), street),
          city = COALESCE(VALUES(city), city),
          state = COALESCE(VALUES(state), state),
          zip = COALESCE(VALUES(zip), zip),
+         party = COALESCE(VALUES(party), party),
+         partisan_score = COALESCE(VALUES(partisan_score), partisan_score),
+         turnout_score = COALESCE(VALUES(turnout_score), turnout_score),
          latitude = COALESCE(VALUES(latitude), latitude),
          longitude = COALESCE(VALUES(longitude), longitude),
          pt = IF(VALUES(geocode_status) IN ('ok', 'provider'), VALUES(pt), pt),
@@ -151,6 +177,9 @@ export class VoterGeoRepo {
         params.city || null,
         params.state || null,
         params.zip || null,
+        party,
+        partisan,
+        turnout,
         lat,
         lng,
         wkt,

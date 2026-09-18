@@ -17,6 +17,8 @@ import { findPostableInsightTool } from './find-postable-insight';
 import { proposeCycleActionTool } from './propose-cycle-action';
 import { clipVideoTool } from './clip-video';
 import { addressesInAreaTool } from './addresses-in-area';
+import { buildTurfTool } from './build-turf';
+import { listTurfAddressesTool } from './list-turf-addresses';
 
 /**
  * Canonical shared tool registry.
@@ -41,6 +43,8 @@ export const TOOL_REGISTRY: Record<CampaignToolName, CampaignTool> = {
   propose_cycle_action: proposeCycleActionTool,
   clip_video: clipVideoTool,
   addresses_in_area: addressesInAreaTool,
+  build_turf: buildTurfTool,
+  list_turf_addresses: listTurfAddressesTool,
 };
 
 const AUTO_TOOLS: CampaignToolName[] = [
@@ -55,6 +59,8 @@ const AUTO_TOOLS: CampaignToolName[] = [
   'create_survey_draft',
   'clip_video',
   'addresses_in_area',
+  'build_turf',
+  'list_turf_addresses',
 ];
 
 const APPROVAL_TOOLS: CampaignToolName[] = [

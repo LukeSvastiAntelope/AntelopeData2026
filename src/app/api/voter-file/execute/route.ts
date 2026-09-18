@@ -160,6 +160,12 @@ export async function POST(req: NextRequest) {
       if (!responderAgentId && !voterFileId) return;
 
       const hasCoords = isValidLatLng(lat, lng);
+      const partisan = transformed.partisan_score
+        ? Number(transformed.partisan_score)
+        : null;
+      const turnout = transformed.turnout_score
+        ? Number(transformed.turnout_score)
+        : null;
       await VoterGeoRepo.upsertPoint({
         organizationId,
         responderAgentId,
@@ -168,6 +174,9 @@ export async function POST(req: NextRequest) {
         city: transformed.location || null,
         state: transformed.state || null,
         zip: transformed.zip || null,
+        party: transformed.party_affiliation || null,
+        partisanScore: Number.isFinite(partisan) ? partisan : null,
+        turnoutScore: Number.isFinite(turnout) ? turnout : null,
         latitude: lat,
         longitude: lng,
         geocodeStatus: hasCoords ? 'ok' : 'pending',
