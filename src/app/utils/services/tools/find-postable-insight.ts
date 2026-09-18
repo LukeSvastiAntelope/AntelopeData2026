@@ -262,6 +262,28 @@ export const findPostableInsightTool: CampaignTool<Input> = {
       userId: ctx.userId,
     });
 
+    const orgId =
+      ctx.organizationId ?? (survey as { organization_id?: number | null }).organization_id ?? null;
+
+    // H1: write gated (or directional-as-context) findings into situation snapshot
+    try {
+      const { writeBackAfterPostableInsight } = await import(
+        '@/app/utils/services/situation-writeback-service'
+      );
+      await writeBackAfterPostableInsight({
+        surveyId,
+        userId: ctx.userId,
+        orgId,
+        publishable: scan.publishable,
+        directionalOnly: scan.directionalOnly,
+      });
+    } catch (writeBackError) {
+      console.warn(
+        `[H1 write-back] find_postable_insight write-back failed (non-fatal) for survey ${surveyId}:`,
+        writeBackError
+      );
+    }
+
     if (scan.insufficientData || scan.publishable.length === 0) {
       const msg =
         scan.insufficientDataMessage ||
@@ -293,7 +315,7 @@ export const findPostableInsightTool: CampaignTool<Input> = {
     const districtSummary = await maybeDistrictContext(
       surveyId,
       ctx.userId,
-      ctx.organizationId ?? (survey as any).organization_id ?? null
+      orgId
     );
 
     const candidates = await rankWithClaude({

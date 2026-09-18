@@ -38,6 +38,9 @@ export const runAnalyticsTool: CampaignTool<Input> = {
     const orchestrator = new AIAnalyticsOrchestrator();
     const result = await orchestrator.generateCompleteAnalytics(surveyId, {
       forceRegenerate: Boolean(input.forceRegenerate),
+      userId: ctx.userId,
+      organizationId:
+        ctx.organizationId ?? (survey as { organization_id?: number | null }).organization_id ?? null,
     });
 
     const insightPreview =

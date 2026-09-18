@@ -3,6 +3,33 @@ import { RowDataPacket } from 'mysql2/promise';
 
 export type AgentId = 'planner' | 'news' | 'campaign_manager' | 'campaign_consultant';
 
+/**
+ * Structured finding written back from analytics / postable-insight (H1).
+ * `conviction` = cleared significance gate (actionable evidence).
+ * `context` = directional_only / ungated notes — never a basis for nextActions.
+ */
+export type SituationFinding = {
+  claim: string;
+  confidence: {
+    effect: number;
+    pCorrected: number;
+    nPerGroup: {
+      groupA: string;
+      nA: number;
+      groupB: string;
+      nB: number;
+    };
+  };
+  sampleProvenance: {
+    surveyId: number;
+    channels: string[];
+    samplingNote: string;
+  };
+  source: string;
+  timestamp: string;
+  role: 'conviction' | 'context';
+};
+
 export interface AgentSituationSnapshot {
   summary: string;
   priorityTopics: string[];
@@ -11,6 +38,8 @@ export interface AgentSituationSnapshot {
   risks: string[];
   opportunities: string[];
   nextActions: string[];
+  /** Provenance-tagged findings from the analytics write-back edge (H1). */
+  findings: SituationFinding[];
   updatedAt: string;
 }
 
@@ -30,6 +59,8 @@ export interface CommitSituationUpdateInput {
   changeSummary?: string;
 }
 
+const MAX_FINDINGS = 40;
+
 function emptySnapshot(): AgentSituationSnapshot {
   return {
     summary: '',
@@ -39,8 +70,57 @@ function emptySnapshot(): AgentSituationSnapshot {
     risks: [],
     opportunities: [],
     nextActions: [],
+    findings: [],
     updatedAt: new Date().toISOString(),
   };
+}
+
+function normalizeFindings(findings: SituationFinding[] | undefined): SituationFinding[] {
+  if (!Array.isArray(findings)) return [];
+  const seen = new Set<string>();
+  const out: SituationFinding[] = [];
+  for (const raw of findings) {
+    if (!raw || typeof raw !== 'object') continue;
+    const role = raw.role === 'conviction' ? 'conviction' : 'context';
+    // Hard rule: conviction requires confidence stats; otherwise demote to context
+    const hasStats =
+      Number.isFinite(raw.confidence?.effect) &&
+      Number.isFinite(raw.confidence?.pCorrected) &&
+      Number.isFinite(raw.confidence?.nPerGroup?.nA) &&
+      Number.isFinite(raw.confidence?.nPerGroup?.nB);
+    const safeRole = role === 'conviction' && !hasStats ? 'context' : role;
+    const claim = String(raw.claim || '').trim();
+    if (!claim) continue;
+    const key = `${safeRole}|${claim}|${raw.source || ''}|${raw.timestamp || ''}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({
+      claim,
+      confidence: {
+        effect: Number(raw.confidence?.effect) || 0,
+        pCorrected: Number(raw.confidence?.pCorrected) || 1,
+        nPerGroup: {
+          groupA: String(raw.confidence?.nPerGroup?.groupA || 'n/a'),
+          nA: Number(raw.confidence?.nPerGroup?.nA) || 0,
+          groupB: String(raw.confidence?.nPerGroup?.groupB || 'n/a'),
+          nB: Number(raw.confidence?.nPerGroup?.nB) || 0,
+        },
+      },
+      sampleProvenance: {
+        surveyId: Number(raw.sampleProvenance?.surveyId) || 0,
+        channels: Array.isArray(raw.sampleProvenance?.channels)
+          ? raw.sampleProvenance.channels.map(String)
+          : [],
+        samplingNote: String(raw.sampleProvenance?.samplingNote || ''),
+      },
+      source: String(raw.source || 'unknown'),
+      timestamp: String(raw.timestamp || new Date().toISOString()),
+      role: safeRole,
+    });
+  }
+  return out
+    .sort((a, b) => String(b.timestamp).localeCompare(String(a.timestamp)))
+    .slice(0, MAX_FINDINGS);
 }
 
 function mergeSnapshot(
@@ -52,7 +132,7 @@ function mergeSnapshot(
     ...patch,
     updatedAt: new Date().toISOString(),
   };
-  // Normalize arrays with dedupe and bounded size.
+  // Normalize string arrays with dedupe and bounded size.
   const normalize = (arr: string[] | undefined, max = 20) =>
     Array.from(new Set((arr || []).map((v) => String(v).trim()).filter(Boolean))).slice(0, max);
   merged.priorityTopics = normalize(merged.priorityTopics, 15);
@@ -61,6 +141,13 @@ function mergeSnapshot(
   merged.risks = normalize(merged.risks, 15);
   merged.opportunities = normalize(merged.opportunities, 15);
   merged.nextActions = normalize(merged.nextActions, 20);
+  // Findings: caller typically passes the full capped list; normalize + enforce roles.
+  // Never invent nextActions from context findings here — that stays in write-back.
+  if (patch.findings !== undefined) {
+    merged.findings = normalizeFindings(patch.findings);
+  } else {
+    merged.findings = normalizeFindings(base.findings);
+  }
   return merged;
 }
 

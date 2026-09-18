@@ -165,6 +165,17 @@ export async function POST(
           : null,
     };
 
+    // H1 write-back identity (middleware injects x-user-id)
+    const userIdHeader = request.headers.get('x-user-id');
+    if (userIdHeader && Number.isFinite(Number(userIdHeader))) {
+      config.userId = Number(userIdHeader);
+    }
+    if (body.organizationId !== undefined && Number.isFinite(Number(body.organizationId))) {
+      config.organizationId = Number(body.organizationId);
+    } else if (config.campaignId) {
+      config.organizationId = config.campaignId;
+    }
+
     // Validate models are available
     const availableModels = getAllModels().map(m => m.id);
     const modelFields = ['analysisModel', 'queryModel', 'insightModel', 'visualizationModel'] as const;

@@ -43,6 +43,12 @@ export interface AIAnalyticsConfig {
   enableContextInjection?: boolean;
   /** Organization / campaign id when known */
   campaignId?: number | null;
+
+  /** H1 write-back: optional identity for situation commit */
+  userId?: number | null;
+  organizationId?: number | null;
+  /** Correlation id for agent_situation_document_versions.trace_id */
+  writeBackTraceId?: string;
 }
 
 export interface AIAnalyticsResult {
@@ -320,6 +326,33 @@ export class AIAnalyticsOrchestrator {
       
       // Log completion to database
       await this.logAnalysisCompletion(surveyId, result);
+
+      // H1: commit gated finding(s) into campaign_consultant situation snapshot
+      try {
+        const { writeBackAfterAnalytics } = await import(
+          '@/app/utils/services/situation-writeback-service'
+        );
+        const wb = await writeBackAfterAnalytics({
+          surveyId,
+          userId: config.userId ?? null,
+          orgId: config.organizationId ?? config.campaignId ?? null,
+          traceId: config.writeBackTraceId,
+        });
+        if (wb.committed) {
+          console.log(
+            `[H1 write-back] Analytics findings committed for survey ${surveyId}`
+          );
+        } else {
+          console.log(
+            `[H1 write-back] Analytics write-back skipped for survey ${surveyId}: ${wb.reason || 'unknown'}`
+          );
+        }
+      } catch (writeBackError) {
+        console.warn(
+          `[H1 write-back] Non-fatal failure for survey ${surveyId}:`,
+          writeBackError
+        );
+      }
       
       console.log(`AI analytics completed for survey ${surveyId} in ${result.performance.totalTimeMs}ms`);
       
