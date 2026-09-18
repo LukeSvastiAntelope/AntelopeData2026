@@ -385,23 +385,27 @@ export default function DashboardPage() {
     }
   }
 
-  const confirmPersonAtDoor = async () => {
+  const confirmPersonAtDoor = async (partyOverride?: string, statusOverride?: string) => {
     if (!selectedPersonId) return
+    const party = partyOverride || confirmParty
+    const status = statusOverride || confirmStatus
     setConfirmBusy(true)
     try {
       const res = await fetch(`/api/dashboard/persons/${selectedPersonId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          status: confirmStatus,
-          party: confirmParty,
+          status,
+          party,
           notes: confirmNotes,
           applyPartyToRecord: true,
         }),
       })
       const data = await res.json()
       if (!res.ok || !data.status) throw new Error(data.message || 'Confirm failed')
-      toast.success('Door confirmation saved — map lean updated')
+      setConfirmParty(party)
+      setConfirmStatus(status)
+      toast.success(`Door confirm: ${party}`)
       await loadPersons({ silent: true })
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Confirm failed')
@@ -678,13 +682,95 @@ export default function DashboardPage() {
             setSelectedDistrict(district)
             loadDistrictIntel(district.districtCode)
           }}
-          onPersonSelect={(id) => {
-            setSelectedPersonId(id)
-            const p = personPins.find((x) => x.id === id)
-            if (p?.effectiveParty) setConfirmParty(p.effectiveParty)
+          onPersonSelect={(person) => {
+            setSelectedPersonId(person.id)
+            if (person.effectiveParty) setConfirmParty(person.effectiveParty)
+            setConfirmStatus('confirmed')
             setRightPanelOpen(true)
           }}
         />
+        {selectedPerson && (
+          <div
+            style={{
+              position: 'absolute',
+              left: '50%',
+              bottom: 20,
+              transform: 'translateX(-50%)',
+              zIndex: 30,
+              width: 'min(420px, calc(100% - 24px))',
+            }}
+            className="rounded-xl border border-border bg-background/95 backdrop-blur-md shadow-2xl p-3 space-y-2"
+          >
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold truncate">{selectedPerson.label}</p>
+                <p className="text-[11px] text-muted-foreground truncate">
+                  {selectedPerson.addressLine || 'Household'} · lean{' '}
+                  <span className="font-medium text-foreground">
+                    {selectedPerson.effectiveParty || selectedPerson.party || 'unknown'}
+                  </span>
+                </p>
+              </div>
+              <button
+                type="button"
+                className="shrink-0 rounded-md p-1 text-muted-foreground hover:bg-muted"
+                onClick={() => setSelectedPersonId(null)}
+                aria-label="Close door confirm"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              At the door — tap the confirmed lean. Dot color updates immediately.
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              {(
+                [
+                  { party: 'Democrat', className: 'bg-blue-600 hover:bg-blue-700 text-white' },
+                  { party: 'Republican', className: 'bg-red-600 hover:bg-red-700 text-white' },
+                  { party: 'Independent', className: 'bg-amber-500 hover:bg-amber-600 text-white' },
+                  { party: 'Unaffiliated', className: 'bg-slate-600 hover:bg-slate-700 text-white' },
+                ] as const
+              ).map(({ party, className }) => (
+                <Button
+                  key={party}
+                  type="button"
+                  size="sm"
+                  disabled={confirmBusy}
+                  className={`h-10 text-xs font-semibold ${className}`}
+                  onClick={() => void confirmPersonAtDoor(party, 'confirmed')}
+                >
+                  {confirmBusy && confirmParty === party ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : null}
+                  {party}
+                </Button>
+              ))}
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {(
+                [
+                  ['not_home', 'Not home'],
+                  ['refused', 'Refused'],
+                  ['moved', 'Moved'],
+                  ['wrong_address', 'Wrong address'],
+                ] as const
+              ).map(([status, label]) => (
+                <Button
+                  key={status}
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={confirmBusy}
+                  className="h-7 text-[10px]"
+                  onClick={() => void confirmPersonAtDoor(confirmParty, status)}
+                >
+                  {label}
+                </Button>
+              ))}
+            </div>
+          </div>
+        )}
         <div style={{ position: 'absolute', top: 12, left: 12, zIndex: 20 }}>
           <button onClick={toggleSidebar} className={toggleBtnClass} title="Toggle sidebar">
             <PanelLeft className="h-3.5 w-3.5" />
@@ -1266,6 +1352,9 @@ export default function DashboardPage() {
                       {confirmBusy ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
                       Save door confirmation
                     </Button>
+                    <p className="text-[9px] text-muted-foreground">
+                      Tip: tap a household dot on the map for one-tap Dem/Rep confirm.
+                    </p>
                   </div>
                 )}
               </div>

@@ -162,7 +162,15 @@ interface DashboardMapProps {
   personHeatmap?: boolean
   geofencing?: GeofencingMapProps | null
   onDistrictSelect?: (district: { districtCode: string; state: string; districtNumber: number }) => void
-  onPersonSelect?: (personId: number) => void
+  /** Fired when a household pin is tapped (door-knock confirmation). */
+  onPersonSelect?: (person: {
+    id: number
+    lng: number
+    lat: number
+    label?: string
+    effectiveParty?: string | null
+    canvassStatus?: string | null
+  }) => void
 }
 
 // ---------------------------------------------------------------------------
@@ -571,7 +579,7 @@ export default function DashboardMap({
           source: 'person-points',
           layout: { visibility: 'none' },
           paint: {
-            'circle-radius': ['interpolate', ['linear'], ['zoom'], 8, 4, 14, 9],
+            'circle-radius': ['interpolate', ['linear'], ['zoom'], 8, 6, 12, 11, 16, 16],
             'circle-color': [
               'match',
               ['downcase', ['coalesce', ['get', 'effectiveParty'], '']],
@@ -581,13 +589,13 @@ export default function DashboardMap({
               'unaffiliated', '#64748b',
               '#7c3aed',
             ],
-            'circle-opacity': 0.9,
+            'circle-opacity': 0.92,
             'circle-stroke-width': [
               'match',
               ['coalesce', ['get', 'canvassStatus'], 'not_contacted'],
               'confirmed', 3,
               'contacted', 2,
-              1,
+              1.5,
             ],
             'circle-stroke-color': isDark ? '#0f172a' : '#fff',
           },
@@ -822,8 +830,19 @@ export default function DashboardMap({
 
       map.on('click', 'person-points-circles', (e: any) => {
         if (!e.features?.length) return
-        const id = Number(e.features[0].properties?.id)
-        if (Number.isFinite(id)) onPersonSelectRef.current?.(id)
+        e.originalEvent?.stopPropagation?.()
+        const f = e.features[0]
+        const id = Number(f.properties?.id)
+        if (!Number.isFinite(id)) return
+        const coords = f.geometry?.coordinates
+        onPersonSelectRef.current?.({
+          id,
+          lng: Array.isArray(coords) ? Number(coords[0]) : e.lngLat?.lng,
+          lat: Array.isArray(coords) ? Number(coords[1]) : e.lngLat?.lat,
+          label: f.properties?.label || '',
+          effectiveParty: f.properties?.effectiveParty || null,
+          canvassStatus: f.properties?.canvassStatus || null,
+        })
       })
       map.on('mouseenter', 'person-points-circles', () => {
         map.getCanvas().style.cursor = 'pointer'
