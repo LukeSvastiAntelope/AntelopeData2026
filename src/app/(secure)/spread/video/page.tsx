@@ -19,7 +19,7 @@ export default function SpreadVideoPage() {
               Spread · Video
             </h1>
             <Badge variant="secondary" className="ml-1">
-              Generate
+              Generate + Clip
             </Badge>
             <Link
               href="/spread"

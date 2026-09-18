@@ -39,6 +39,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'prompt is required' }, { status: 400 });
     }
 
+    const guard = assertOwnAssetUse({ prompt: modelPrompt });
+    if (!guard.ok) {
+      return NextResponse.json({ error: guard.reason }, { status: 400 });
+    }
+
     const job = await startVideoGeneration({
       userId,
       prompt,
