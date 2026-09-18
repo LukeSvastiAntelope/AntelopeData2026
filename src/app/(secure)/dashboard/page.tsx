@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import dynamic from 'next/dynamic'
 import { useSidebar } from "@/components/ui/sidebar"
-import { PanelLeft, Landmark, MapPin, Vote, Grid3x3, ChevronDown, ChevronRight, HandCoins, Bot, Plus, Play, Trash2, Loader2, Newspaper, Building2, Globe, Palette, Upload, Sparkles, Fence, Check, X, MessageSquare, Users } from 'lucide-react'
+import { PanelLeft, Landmark, MapPin, Vote, Grid3x3, ChevronDown, ChevronRight, HandCoins, Bot, Plus, Play, Trash2, Loader2, Newspaper, Building2, Globe, Palette, Upload, Sparkles, Fence, Check, X, MessageSquare, Users, Printer } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -389,9 +389,10 @@ export default function DashboardPage() {
     if (!selectedPersonId) return
     const party = partyOverride || confirmParty
     const status = statusOverride || confirmStatus
+    const confirmedId = selectedPersonId
     setConfirmBusy(true)
     try {
-      const res = await fetch(`/api/dashboard/persons/${selectedPersonId}`, {
+      const res = await fetch(`/api/dashboard/persons/${confirmedId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -405,8 +406,49 @@ export default function DashboardPage() {
       if (!res.ok || !data.status) throw new Error(data.message || 'Confirm failed')
       setConfirmParty(party)
       setConfirmStatus(status)
-      toast.success(`Door confirm: ${party}`)
-      await loadPersons({ silent: true })
+
+      // Keep the dot on the map: update in place and don't let party filters hide it
+      const updated = data.person
+      setPersonPins((prev) => {
+        const next = prev.map((p) =>
+          p.id === confirmedId
+            ? {
+                ...p,
+                party: updated?.party ?? party,
+                effectiveParty: updated?.effectiveParty ?? party,
+                canvassStatus: updated?.canvassStatus ?? status,
+                canvassNotes: updated?.canvassNotes ?? confirmNotes,
+              }
+            : p
+        )
+        // If a party filter had removed it from the last fetch, put it back
+        if (!next.some((p) => p.id === confirmedId) && updated?.lat != null && updated?.lng != null) {
+          next.push({
+            id: confirmedId,
+            lng: updated.lng,
+            lat: updated.lat,
+            label: updated.label || 'Household',
+            effectiveParty: updated.effectiveParty ?? party,
+            party: updated.party ?? party,
+            ageBucket: updated.ageBucket,
+            canvassStatus: updated.canvassStatus ?? status,
+            district: updated.district,
+            addressLine: updated.addressLine,
+            voterStatus: updated.voterStatus,
+            matchConfidence: updated.matchConfidence,
+            canvassNotes: updated.canvassNotes,
+          })
+        }
+        return next
+      })
+      setPersonFilters((prev) => {
+        if (!prev.party.length) return prev
+        if (prev.party.includes(party)) return prev
+        // Expanding filter keeps the recolored dot visible after confirm
+        return { ...prev, party: [...prev.party, party] }
+      })
+
+      toast.success(`Door confirm: ${party} — pin stays on map`)
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Confirm failed')
     } finally {
@@ -1241,6 +1283,12 @@ export default function DashboardPage() {
                 >
                   {personLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Users className="h-3 w-3" />}
                   Load from database
+                </Button>
+                <Button asChild size="sm" variant="secondary" className="w-full h-7 text-[10px]">
+                  <Link href="/dashboard/print-map">
+                    <Printer className="h-3 w-3" />
+                    Print on map
+                  </Link>
                 </Button>
                 <div className="space-y-1">
                   <Label className="text-[10px]">Party / lean filter</Label>
