@@ -5,6 +5,10 @@ import { RowDataPacket, ResultSetHeader } from 'mysql2';
 import { SurveyAnalysisResult } from './survey-analysis-types';
 import { StatisticalQueryResult } from './statistical-query-generator';
 import { createCompletion } from './ai-service';
+import {
+  formatAnalyticsContextForPrompt,
+  type AnalyticsContextBundle,
+} from './analytics-context-service';
 
 // NOTE: This file routes LLM calls through `createCompletion()` which lazily
 // initializes provider clients. Do not instantiate OpenAI at module-load time
@@ -14,6 +18,24 @@ export interface InsightGenerationConfig {
   insightModel?: string;
   forceRegenerate?: boolean;
   cacheExpirationHours?: number;
+  /** Phase B: inject campaign/district/voter context into the insight prompt */
+  enableContextInjection?: boolean;
+  analyticsContext?: AnalyticsContextBundle | null;
+  /** Query/chart ids for which to request model-written takeaways (Phase B de-template) */
+  chartInsightTargets?: Array<{
+    id: string;
+    title: string;
+    analysisType: string;
+    statsSummary: string;
+  }>;
+}
+
+export interface ChartInsightNarrative {
+  id: string;
+  keyTakeaway: string;
+  businessRelevance: string;
+  actionableInsight: string;
+  statisticalSignificance?: boolean;
 }
 
 export interface GeneratedInsights {
@@ -54,6 +76,9 @@ export interface GeneratedInsights {
     limitations: string[];
   };
   nextSteps: string[];
+  /** Phase B: model-generated per-chart narratives (optional) */
+  chartInsights?: ChartInsightNarrative[];
+  contextSourcesIncluded?: string[];
 }
 
 export class InsightGenerationService {
@@ -91,7 +116,8 @@ export class InsightGenerationService {
       surveyId,
       statisticalResults,
       analysisMetadata,
-      model
+      model,
+      config
     );
 
     // Cache the insights
@@ -104,53 +130,78 @@ export class InsightGenerationService {
     surveyId: number,
     statisticalResults: any[],
     analysisMetadata: any,
-    model: string
+    model: string,
+    config: InsightGenerationConfig = {}
   ): Promise<GeneratedInsights> {
-    const systemPrompt = `You are a senior data analyst and business intelligence expert. Your role is to transform statistical survey results into actionable business insights.
+    const useContext = Boolean(config.enableContextInjection && config.analyticsContext);
+    const contextBlock = useContext
+      ? formatAnalyticsContextForPrompt(config.analyticsContext!)
+      : '';
+
+    const systemPrompt = `You are a senior political data analyst for hyperlocal and downballot campaigns. Transform statistical survey results into actionable campaign insights.
 
 You excel at:
-- Identifying patterns and trends in data
-- Translating statistical findings into business language
-- Providing actionable recommendations
-- Assessing data quality and limitations
-- Prioritizing insights by business impact
+- Grounding narrative in computed statistics (never invent numbers)
+- Using campaign/district/voter-file context to make insights specific to this race
+- Saying when context is missing rather than inventing district facts
+- Prioritizing findings by campaign impact
 
-CRITICAL: Return ONLY valid JSON with no additional text, explanations, or markdown formatting.`;
+CRITICAL:
+- Treat STATISTICAL RESULTS as ground truth for all numbers, percentages, and counts.
+- Treat CONTEXT BUNDLE as background only — use it to localize insights; if a source is missing, omit it.
+- Return ONLY valid JSON with no markdown fences or commentary.`;
 
-    const userPrompt = `Analyze these survey results and generate comprehensive business insights:
+    const chartTargets = config.chartInsightTargets || [];
+    const chartSection =
+      useContext && chartTargets.length
+        ? `
 
-**Survey Context:**
+Also generate chartInsights for each target below. Numbers in keyTakeaway MUST match the provided statsSummary exactly (do not invent counts).
+${chartTargets
+  .map(
+    (t) =>
+      `- id: ${t.id}\n  title: ${t.title}\n  type: ${t.analysisType}\n  statsSummary: ${t.statsSummary}`
+  )
+  .join('\n')}`
+        : '';
+
+    const userPrompt = `Analyze these survey results and generate comprehensive campaign insights.
+
+=== (A) STATISTICAL QUERY RESULTS (GROUND TRUTH) ===
+${this.formatResultsForPrompt(statisticalResults)}
+
+=== (B) RAW CONTEXT BUNDLE ${useContext ? '(use to localize; omit missing sources)' : '(not enabled this run)'} ===
+${useContext ? contextBlock : 'Context injection disabled — rely on stats and survey metadata only.'}
+
+**Survey metadata:**
 - Survey ID: ${surveyId}
 - Survey Type: ${analysisMetadata.surveyType}
 - Main Themes: ${analysisMetadata.mainThemes?.join(', ')}
 - Analysis Complexity: ${analysisMetadata.analysisComplexity}
 
-**Statistical Results:**
-${this.formatResultsForPrompt(statisticalResults)}
-
-**Analysis Metadata:**
 ${JSON.stringify(analysisMetadata, null, 2)}
+${chartSection}
 
 Generate insights in this exact JSON structure:
 {
   "surveyId": ${surveyId},
-  "executiveSummary": "2-3 sentence high-level summary of key findings and implications",
+  "executiveSummary": "2-3 sentence high-level summary grounded in stats${useContext ? ' and district/campaign context when present' : ''}",
   "keyFindings": [
     {
       "title": "Clear, actionable finding title",
       "description": "Detailed explanation of the finding",
-      "statisticalEvidence": "Supporting data and statistics",
-      "businessImplication": "What this means for the business/organization",
+      "statisticalEvidence": "Supporting data and statistics copied from ground truth",
+      "businessImplication": "What this means for the campaign",
       "confidence": "high|medium|low",
       "priority": "critical|important|notable"
     }
   ],
   "demographicInsights": [
     {
-      "segment": "Demographic group (e.g., 'Age 25-34', 'High Income')",
+      "segment": "Demographic group",
       "finding": "Key insight about this segment",
       "comparison": "How this segment differs from others",
-      "actionable": "Specific action recommendations for this segment"
+      "actionable": "Specific action recommendations"
     }
   ],
   "correlationInsights": [
@@ -159,12 +210,12 @@ Generate insights in this exact JSON structure:
       "relationship": "Description of the relationship",
       "strength": "strong|moderate|weak",
       "interpretation": "What this relationship means",
-      "businessRelevance": "Why this matters for business decisions"
+      "businessRelevance": "Why this matters for campaign decisions"
     }
   ],
   "recommendations": [
     {
-      "category": "Area of focus (e.g., 'Product Development', 'Customer Service')",
+      "category": "Area of focus",
       "recommendation": "Specific action to take",
       "rationale": "Why this recommendation is important",
       "priority": "high|medium|low",
@@ -177,49 +228,60 @@ Generate insights in this exact JSON structure:
     "reliability": "assessment of data reliability",
     "limitations": ["list", "of", "data", "limitations"]
   },
-  "nextSteps": ["array", "of", "recommended", "next", "steps"]
+  "nextSteps": ["array", "of", "recommended", "next", "steps"],
+  "chartInsights": [
+    {
+      "id": "chart id from targets",
+      "keyTakeaway": "Narrative takeaway with exact numbers from statsSummary",
+      "businessRelevance": "Why this chart matters for this district/campaign",
+      "actionableInsight": "Concrete next step",
+      "statisticalSignificance": true
+    }
+  ]
 }
 
 **Guidelines:**
-- Focus on actionable insights, not just data descriptions
-- Prioritize findings by business impact and statistical significance
-- Be specific about recommendations and timeframes
-- Acknowledge data limitations honestly
-- Use business language, not statistical jargon
-- Identify 3-7 key findings, 2-5 demographic insights, and 3-8 recommendations`;
+- Prefer campaign language over generic business jargon when context is political
+- When district or voter-file context exists, reference it specifically
+- When prior surveys exist, note continuity or contrast if stats support it
+- Never invent poll numbers, district PVI, or list sizes not present in (A) or (B)
+- Identify 3-7 key findings, 2-5 demographic insights, and 3-8 recommendations
+- If chartInsights targets were provided, include one entry per target id`;
 
-    console.log(`Generating insights for survey ${surveyId} with model: ${model}`);
-    
+    console.log(
+      `Generating insights for survey ${surveyId} with model: ${model} (contextInjection=${useContext})`
+    );
+
     const response = await createCompletion({
       model,
       messages: [
         { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt }
+        { role: 'user', content: userPrompt },
       ],
-      temperature: 0.4, // Balanced creativity and consistency
-      maxTokens: 8000
+      temperature: 0.4,
+      // Context + chartInsights need more headroom than the legacy path
+      maxTokens: useContext ? 16000 : 8000,
     });
 
     let insights: GeneratedInsights;
     try {
-      // Clean up the response content to handle markdown code blocks
       let cleanedContent = response.content;
-      
-      // Remove markdown code blocks if present
-      cleanedContent = cleanedContent.replace(/```json\s*/g, '').replace(/```\s*$/g, '');
-      
-      // Remove any leading/trailing whitespace
+      cleanedContent = cleanedContent.replace(/```json\s*/gi, '').replace(/```/g, '');
       cleanedContent = cleanedContent.trim();
-      
-      insights = JSON.parse(cleanedContent);
+      const jsonMatch = cleanedContent.match(/\{[\s\S]*\}/);
+      const candidate = jsonMatch ? jsonMatch[0] : cleanedContent;
+      insights = JSON.parse(candidate);
     } catch (error) {
-      console.error('Failed to parse AI insights response:', response.content);
+      console.error('Failed to parse AI insights response:', response.content?.slice?.(0, 2000) || response.content);
       throw new Error('AI returned invalid JSON response for insights');
     }
 
-    // Validate insights structure
     if (!insights.executiveSummary || !insights.keyFindings || !Array.isArray(insights.keyFindings)) {
       throw new Error('AI insights missing required fields');
+    }
+
+    if (useContext && config.analyticsContext) {
+      insights.contextSourcesIncluded = config.analyticsContext.sourcesIncluded;
     }
 
     return insights;
