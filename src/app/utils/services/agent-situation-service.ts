@@ -40,8 +40,30 @@ export interface AgentSituationSnapshot {
   nextActions: string[];
   /** Provenance-tagged findings from the analytics write-back edge (H1). */
   findings: SituationFinding[];
+  /**
+   * Human steering directives (H2.5) — high-priority input for the next proposer pass.
+   * Not approve/dismiss flags; free-text campaign guidance.
+   */
+  humanDirectives: HumanDirective[];
+  /** Loop runtime metadata written by the H2 proposer. */
+  loopMeta: LoopMetaState;
   updatedAt: string;
 }
+
+export type HumanDirective = {
+  text: string;
+  recordedAt: string;
+  /** Who recorded it (user id as string, or 'system'). */
+  source?: string;
+};
+
+export type LoopMetaState = {
+  lastProposerAt?: string | null;
+  lastAction?: 'improved_survey' | 'iterate' | 'pivot' | 'hold' | null;
+  lastTriggers?: string[];
+  lastReasoningTrace?: string | null;
+  lastStagedActionId?: number | null;
+};
 
 export interface AgentSituationDocument {
   orgId: number;
@@ -60,6 +82,7 @@ export interface CommitSituationUpdateInput {
 }
 
 const MAX_FINDINGS = 40;
+const MAX_DIRECTIVES = 20;
 
 function emptySnapshot(): AgentSituationSnapshot {
   return {
@@ -71,6 +94,8 @@ function emptySnapshot(): AgentSituationSnapshot {
     opportunities: [],
     nextActions: [],
     findings: [],
+    humanDirectives: [],
+    loopMeta: {},
     updatedAt: new Date().toISOString(),
   };
 }
@@ -123,6 +148,31 @@ function normalizeFindings(findings: SituationFinding[] | undefined): SituationF
     .slice(0, MAX_FINDINGS);
 }
 
+function normalizeDirectives(
+  directives: HumanDirective[] | undefined
+): HumanDirective[] {
+  if (!Array.isArray(directives)) return [];
+  const seen = new Set<string>();
+  const out: HumanDirective[] = [];
+  for (const d of directives) {
+    if (!d || typeof d !== 'object') continue;
+    const text = String(d.text || '').trim();
+    if (!text) continue;
+    const recordedAt = String(d.recordedAt || new Date().toISOString());
+    const key = `${text.toLowerCase()}|${recordedAt}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({
+      text,
+      recordedAt,
+      source: d.source ? String(d.source) : undefined,
+    });
+  }
+  return out
+    .sort((a, b) => String(b.recordedAt).localeCompare(String(a.recordedAt)))
+    .slice(0, MAX_DIRECTIVES);
+}
+
 function mergeSnapshot(
   base: AgentSituationSnapshot,
   patch: Partial<AgentSituationSnapshot>
@@ -148,6 +198,16 @@ function mergeSnapshot(
   } else {
     merged.findings = normalizeFindings(base.findings);
   }
+  // Directives: patch may pass full list or we keep base
+  if (patch.humanDirectives !== undefined) {
+    merged.humanDirectives = normalizeDirectives(patch.humanDirectives);
+  } else {
+    merged.humanDirectives = normalizeDirectives(base.humanDirectives);
+  }
+  merged.loopMeta = {
+    ...(base.loopMeta || {}),
+    ...(patch.loopMeta || {}),
+  };
   return merged;
 }
 
@@ -225,5 +285,83 @@ export class AgentSituationService {
       version: nextVersion,
       snapshot: mergedSnapshot,
     };
+  }
+
+  /** Recent version history for loop memory weighting (newest first). */
+  static async listRecentVersions(
+    orgId: number,
+    agentId: AgentId,
+    limit = 10
+  ): Promise<
+    Array<{
+      version: number;
+      changeSummary: string | null;
+      changedByAgent: string;
+      traceId: string | null;
+      createdAt: string | null;
+      snapshot: AgentSituationSnapshot;
+      delta: Partial<AgentSituationSnapshot>;
+    }>
+  > {
+    const db = await openSql();
+    const capped = Math.min(Math.max(limit, 1), 40);
+    const [rows] = await db.execute<RowDataPacket[]>(
+      `SELECT version, snapshot_json, delta_json, change_summary, changed_by_agent, trace_id, created_at
+       FROM agent_situation_document_versions
+       WHERE org_id = ? AND agent_id = ?
+       ORDER BY version DESC
+       LIMIT ${capped}`,
+      [orgId, agentId]
+    );
+    return rows.map((row) => {
+      const rawSnap =
+        typeof row.snapshot_json === 'string'
+          ? JSON.parse(row.snapshot_json)
+          : row.snapshot_json || {};
+      const rawDelta =
+        typeof row.delta_json === 'string'
+          ? JSON.parse(row.delta_json || '{}')
+          : row.delta_json || {};
+      return {
+        version: Number(row.version),
+        changeSummary: row.change_summary != null ? String(row.change_summary) : null,
+        changedByAgent: String(row.changed_by_agent || ''),
+        traceId: row.trace_id != null ? String(row.trace_id) : null,
+        createdAt: row.created_at ? new Date(row.created_at).toISOString() : null,
+        snapshot: { ...emptySnapshot(), ...rawSnap },
+        delta: rawDelta as Partial<AgentSituationSnapshot>,
+      };
+    });
+  }
+
+  /** Append a human steering directive (H2.5) — first-class next-pass input. */
+  static async recordHumanDirective(params: {
+    orgId: number;
+    text: string;
+    source?: string;
+    traceId?: string;
+  }): Promise<AgentSituationDocument> {
+    const text = String(params.text || '').trim();
+    if (!text) throw new Error('directive text is required');
+    const current = await this.getCurrent(params.orgId, 'campaign_consultant');
+    const next: HumanDirective[] = [
+      {
+        text,
+        recordedAt: new Date().toISOString(),
+        source: params.source || 'human',
+      },
+      ...(current.snapshot.humanDirectives || []),
+    ];
+    return this.commitUpdate({
+      orgId: params.orgId,
+      agentId: 'campaign_consultant',
+      changedByAgent: 'campaign_consultant',
+      traceId: params.traceId || `directive-${Date.now()}`,
+      changeSummary: `Human directive: ${text.slice(0, 120)}`,
+      patch: {
+        humanDirectives: next,
+        priorityTopics: [text, ...(current.snapshot.priorityTopics || [])],
+      },
+    });
   }
 }

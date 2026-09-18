@@ -37,6 +37,7 @@ const publicRoutes = [
     '/api/digital-twin/check-email', // Check for existing digital twin by email
     '/api/digital-twin/magic-link', // Send magic link for digital twin access
     '/api/surveys/cron/close-expired', // Cron job to close expired surveys
+    '/api/cron/loop-propose', // H2 loop proposer platform cron
     '/api/channels/telegram/webhook', // Telegram webhook must be public
     // Local testing: allow direct access to Google Sheets import endpoints;
     // the handlers themselves still require 'x-user-id' header.

@@ -215,6 +215,18 @@ export async function commitFindingsToSituation(params: {
       },
     });
 
+    // H2: response_count trigger — fire-and-forget proposer (never blocks analytics)
+    void import('@/app/utils/services/loop/proposer')
+      .then(({ maybeProposeAfterAnalytics }) =>
+        maybeProposeAfterAnalytics({
+          orgId,
+          userId: params.userId,
+        })
+      )
+      .catch((err) =>
+        console.warn('[situation-writeback] loop proposer hook failed:', err)
+      );
+
     return { committed: true, version: doc.version };
   } catch (error) {
     console.error('[situation-writeback] commit failed (non-fatal):', error);

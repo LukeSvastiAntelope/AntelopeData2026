@@ -14,6 +14,7 @@ import { distributeViaWebhookTool } from './distribute-via-webhook';
 import { chargeOrFundraiseTool } from './charge-or-fundraise';
 import { generateAndPostVideoTool } from './generate-and-post-video';
 import { findPostableInsightTool } from './find-postable-insight';
+import { proposeCycleActionTool } from './propose-cycle-action';
 
 /**
  * Canonical shared tool registry.
@@ -35,6 +36,7 @@ export const TOOL_REGISTRY: Record<CampaignToolName, CampaignTool> = {
   distribute_via_webhook: distributeViaWebhookTool,
   charge_or_fundraise: chargeOrFundraiseTool,
   generate_and_post_video: generateAndPostVideoTool,
+  propose_cycle_action: proposeCycleActionTool,
 };
 
 const AUTO_TOOLS: CampaignToolName[] = [
@@ -56,6 +58,7 @@ const APPROVAL_TOOLS: CampaignToolName[] = [
   'distribute_via_webhook',
   'charge_or_fundraise',
   'generate_and_post_video',
+  'propose_cycle_action',
 ];
 
 export function getTool(name: string): CampaignTool | undefined {

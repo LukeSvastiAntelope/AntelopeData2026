@@ -8,6 +8,7 @@ import {
     type ExternalRefreshSummary,
 } from '@/app/utils/political-data-refresh';
 import { runCampaignNewsDigest, type CampaignNewsDigestSummary } from '@/app/utils/campaign-news';
+import { runScheduledProposer } from '@/app/utils/services/loop/proposer';
 
 let lastRunAt: string | null = null;
 let lastRunStatus: 'success' | 'error' | 'never' = 'never';
@@ -27,6 +28,7 @@ export interface DailyTaskSummary {
     openfec: SourceResult<ExternalRefreshSummary[]>;
     census: SourceResult<ExternalRefreshSummary[]>;
     campaignNewsDigest: SourceResult<CampaignNewsDigestSummary>;
+    loopProposer: SourceResult<{ orgsConsidered: number; ran: number; skipped: number }>;
 }
 
 async function runPerStateRefresh(
@@ -98,20 +100,43 @@ export async function runDailyPlatformTasks() {
             };
         }
 
+        // H2: loop proposer (days_elapsed + other enabled triggers). Platform
+        // cron at /api/cron/loop-propose is the serverless-reliable path; this
+        // keeps long-lived node processes in sync when init-scheduler runs.
+        let loopProposer: SourceResult<{ orgsConsidered: number; ran: number; skipped: number }>;
+        try {
+            const proposerSummary = await runScheduledProposer();
+            loopProposer = {
+                status: 'success',
+                data: {
+                    orgsConsidered: proposerSummary.orgsConsidered,
+                    ran: proposerSummary.ran,
+                    skipped: proposerSummary.skipped,
+                },
+            };
+        } catch (error) {
+            loopProposer = {
+                status: 'error',
+                error: error instanceof Error ? error.message : 'Unknown error',
+            };
+        }
+
         const summary: DailyTaskSummary = {
-            tasksRun: 4,
+            tasksRun: 5,
             states,
             csv,
             openfec,
             census,
             campaignNewsDigest,
+            loopProposer,
         };
 
         const hasSourceError =
             csv.status === 'error' ||
             openfec.status === 'error' ||
             census.status === 'error' ||
-            campaignNewsDigest.status === 'error';
+            campaignNewsDigest.status === 'error' ||
+            loopProposer.status === 'error';
 
         lastRunAt = new Date().toISOString();
         lastRunStatus = hasSourceError ? 'error' : 'success';
@@ -119,7 +144,7 @@ export async function runDailyPlatformTasks() {
         lastRunError = hasSourceError ? 'One or more data sources failed' : null;
 
         console.log(
-            `✅ Daily data refresh completed. states=${states.length}, csv=${csv.status}, openfec=${openfec.status}, census=${census.status}, campaignNewsDigest=${campaignNewsDigest.status}`
+            `✅ Daily data refresh completed. states=${states.length}, csv=${csv.status}, openfec=${openfec.status}, census=${census.status}, campaignNewsDigest=${campaignNewsDigest.status}, loopProposer=${loopProposer.status}`
         );
 
         return summary;

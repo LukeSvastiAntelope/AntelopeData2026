@@ -1,0 +1,12 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/loop-propose",
+      "schedule": "0 7 * * *"
+    },
+    {
+      "path": "/api/surveys/cron/close-expired",
+      "schedule": "0 8 * * *"
+    }
+  ]
+}

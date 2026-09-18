@@ -51,6 +51,7 @@ export const AGENT_REGISTRY: Record<AgentId, AgentRegistryEntry> = {
       'distribute_via_webhook',
       'charge_or_fundraise',
       'generate_and_post_video',
+      'propose_cycle_action',
       // Advisory / situation helpers (pre-registry)
       'read_campaign_brief',
       'propose_baseline_survey',
