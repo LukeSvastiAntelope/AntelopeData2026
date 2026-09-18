@@ -6,6 +6,12 @@ import { StatisticalQueryGenerator, StatisticalAnalysisConfig } from './statisti
 import { InsightGenerationService, InsightGenerationConfig } from './insight-generation-service';
 import { VisualizationEngine, VisualizationConfig } from './visualization-engine';
 import { SimpleStatsGenerator } from './simple-stats-generator';
+import {
+  buildAnalyticsContext,
+  isContextInjectionEnabled,
+  type AnalyticsContextBundle,
+} from './analytics-context-service';
+import type { ChartInsightNarrative, GeneratedInsights } from './insight-generation-service';
 
 export interface AIAnalyticsConfig {
   // Model selection for different stages
@@ -32,6 +38,11 @@ export interface AIAnalyticsConfig {
   minimumResponses?: number;
   maxCharts?: number;
   includeRawData?: boolean;
+
+  /** Phase B: inject district/voter/prior-survey context into insights */
+  enableContextInjection?: boolean;
+  /** Organization / campaign id when known */
+  campaignId?: number | null;
 }
 
 export interface AIAnalyticsResult {
@@ -210,6 +221,34 @@ export class AIAnalyticsOrchestrator {
       
       console.log(`Generated and executed ${result.queryResults.length} queries in ${result.performance.queryTimeMs}ms`);
 
+      // Phase B: assemble context bundle (never fails the run)
+      const contextEnabled = isContextInjectionEnabled(config.enableContextInjection);
+      let analyticsContext: AnalyticsContextBundle | null = null;
+      if (contextEnabled) {
+        try {
+          analyticsContext = await buildAnalyticsContext(surveyId, config.campaignId);
+          console.log(
+            `Analytics context for survey ${surveyId}: included=[${analyticsContext.sourcesIncluded.join(',')}] missing=[${analyticsContext.sourcesMissing.join(',')}]`
+          );
+        } catch (ctxErr) {
+          console.warn('buildAnalyticsContext failed (continuing without context):', ctxErr);
+          analyticsContext = null;
+        }
+      }
+
+      const successfulResults = result.queryResults.filter(r => r.success);
+      const chartInsightTargets = contextEnabled
+        ? successfulResults.slice(0, 6).map((qr, idx) => {
+            const chartId = `chart_${qr.id || qr.queryId || idx}`;
+            return {
+              id: chartId,
+              title: String(qr.title || qr.analysisType || `Analysis ${idx + 1}`),
+              analysisType: String(qr.analysisType || 'distribution'),
+              statsSummary: this.summarizeQueryStatsForPrompt(qr),
+            };
+          })
+        : [];
+
       // Step 4: Generate Insights
       const insightStart = Date.now();
       console.log('Step 4: Generating business insights...');
@@ -217,16 +256,26 @@ export class AIAnalyticsOrchestrator {
       const insightConfig: InsightGenerationConfig = {
         insightModel: config.insightModel,
         forceRegenerate: config.forceRegenerate || config.forceRegenerateInsights,
-        cacheExpirationHours: config.insightsCacheHours
+        cacheExpirationHours: config.insightsCacheHours,
+        enableContextInjection: contextEnabled,
+        analyticsContext,
+        chartInsightTargets,
       };
       
-      const successfulResults = result.queryResults.filter(r => r.success);
-      result.insights = await this.insightService.generateInsights(
-        surveyId,
-        successfulResults,
-        result.analysis,
-        insightConfig
-      );
+      let insightsFromModel = false;
+      try {
+        result.insights = await this.insightService.generateInsights(
+          surveyId,
+          successfulResults,
+          result.analysis,
+          insightConfig
+        );
+        insightsFromModel = true;
+      } catch (insightError) {
+        console.error('Insight model failed; using deterministic fallback insights:', insightError);
+        result.insights = this.buildFallbackInsights(surveyId, successfulResults, analyticsContext);
+        insightsFromModel = false;
+      }
       result.metadata.cacheStatus.insights = insightConfig.forceRegenerate ? 'generated' : 'cached';
       result.performance.insightTimeMs = Date.now() - insightStart;
       
@@ -238,10 +287,18 @@ export class AIAnalyticsOrchestrator {
       
       // Skip AI visualization - create charts directly from statistical results
       const successfulQueryResults = result.queryResults.filter(r => r.success);
+      const modelChartInsights: ChartInsightNarrative[] = Array.isArray(result.insights?.chartInsights)
+        ? result.insights.chartInsights
+        : [];
       
       if (successfulQueryResults.length > 0) {
         // Create charts directly from statistical data without AI
-        result.dashboard = this.createDirectDashboard(surveyId, successfulQueryResults);
+        result.dashboard = this.createDirectDashboard(
+          surveyId,
+          successfulQueryResults,
+          modelChartInsights,
+          contextEnabled && insightsFromModel
+        );
         console.log(`Created dashboard with ${result.dashboard.charts.length} charts directly from data`);
       } else {
         // Fallback dashboard
@@ -512,15 +569,24 @@ export class AIAnalyticsOrchestrator {
       console.error('Failed to parse cached analytics data:', error);
       return null;
     }
-    }
+  }
 
-  private createDirectDashboard(surveyId: number, queryResults: any[]): any {
+  private createDirectDashboard(
+    surveyId: number,
+    queryResults: any[],
+    modelChartInsights: ChartInsightNarrative[] = [],
+    preferModelInsights = false
+  ): any {
     const charts: any[] = [];
+    const byId = new Map(
+      modelChartInsights
+        .filter((c) => c && c.id)
+        .map((c) => [String(c.id), c] as const)
+    );
 
-    // Create charts directly from statistical query results
     for (const queryResult of queryResults) {
       if (queryResult.data && queryResult.data.length > 0) {
-        const chart = this.createChartFromQueryResult(queryResult);
+        const chart = this.createChartFromQueryResult(queryResult, byId, preferModelInsights);
         if (chart) {
           charts.push(chart);
         }
@@ -548,16 +614,34 @@ export class AIAnalyticsOrchestrator {
     };
   }
 
-  private createChartFromQueryResult(queryResult: any): any | null {
+  private createChartFromQueryResult(
+    queryResult: any,
+    modelInsightsById: Map<string, ChartInsightNarrative> = new Map(),
+    preferModelInsights = false
+  ): any | null {
     if (!queryResult.data || queryResult.data.length === 0) {
       return null;
     }
 
-    // Use the preserved unique ID from SimpleStatsGenerator
     const uniqueId = queryResult.id || `${queryResult.analysisType || 'unknown'}_${Math.random().toString(36).substr(2, 9)}`;
+    const chartId = `chart_${uniqueId}`;
+    const fallbackInsight = this.generateDataInsight(queryResult.data, queryResult.analysisType);
+    const modelInsight = modelInsightsById.get(chartId);
+    const insights =
+      preferModelInsights && modelInsight
+        ? {
+            keyTakeaway: modelInsight.keyTakeaway || fallbackInsight.keyTakeaway,
+            statisticalSignificance:
+              typeof modelInsight.statisticalSignificance === 'boolean'
+                ? modelInsight.statisticalSignificance
+                : fallbackInsight.statisticalSignificance,
+            businessRelevance: modelInsight.businessRelevance || fallbackInsight.businessRelevance,
+            actionableInsight: modelInsight.actionableInsight || fallbackInsight.actionableInsight,
+            source: 'model',
+          }
+        : { ...fallbackInsight, source: 'template' };
 
     if (queryResult.analysisType === 'cross_tab') {
-      // Convert raw rows to heat-map friendly format (keeping numeric values for now)
       const heatmapData = queryResult.data.map((row: any) => ({
         x: row.demo_answer,
         y: row.opinion_answer,
@@ -566,7 +650,7 @@ export class AIAnalyticsOrchestrator {
 
       const [xLabelRaw, yLabelRaw] = (queryResult.title || '').split(' × ').map(p => p?.trim());
       return {
-        id: `chart_${uniqueId}`,
+        id: chartId,
         type: 'heatmap',
         title: queryResult.title || 'Cross-tabulation',
         description: queryResult.description || 'Cross-tabulation between two questions',
@@ -575,17 +659,16 @@ export class AIAnalyticsOrchestrator {
           xAxis: { key: 'x', label: xLabelRaw || 'XAxis', type: 'category' },
           yAxis: { key: 'y', label: yLabelRaw || 'YAxis', type: 'category' },
         },
-        insights: this.generateDataInsight(queryResult.data, queryResult.analysisType),
+        insights,
         priority: 5,
         category: 'correlation',
       };
     }
 
-    // Default to distribution bar chart
     const chartType = 'bar' as const;
 
     return {
-      id: `chart_${uniqueId}`,
+      id: chartId,
       type: chartType,
       title: queryResult.title || 'Distribution',
       description: queryResult.description || `Statistical distribution (${queryResult.data.length} categories)`,
@@ -600,12 +683,13 @@ export class AIAnalyticsOrchestrator {
         showTooltip: true,
         formatters: { percentage: 'percentage' },
       },
-      insights: this.generateDataInsight(queryResult.data, queryResult.analysisType),
+      insights,
       priority: 5,
       category: 'opinion',
     };
   }
 
+  /** Deterministic chart takeaways — fallback only when model insights unavailable. */
   private generateDataInsight(data: any[], analysisType: string): any {
     if (!data || data.length === 0) {
       return {
@@ -641,13 +725,82 @@ export class AIAnalyticsOrchestrator {
       };
     }
 
-    // Cross-tab insight
     const topCombo = [...data].sort((a, b) => (b.count || 0) - (a.count || 0))[0];
     return {
       keyTakeaway: `Most common combination: ${topCombo.demo_answer} × ${topCombo.opinion_answer} (${topCombo.count} responses)`,
       statisticalSignificance: totalResponses >= 30,
       businessRelevance: `${data.length} combinations from ${totalResponses} responses`,
       actionableInsight: 'Use heat-map to spot clusters',
+    };
+  }
+
+  private summarizeQueryStatsForPrompt(qr: any): string {
+    const data = Array.isArray(qr.data) ? qr.data : [];
+    if (!data.length) return 'no rows';
+    const total = data.reduce((sum: number, row: any) => sum + Number(row.count || 0), 0);
+    const top = [...data].sort((a, b) => Number(b.count || 0) - Number(a.count || 0)).slice(0, 3);
+    const topBits = top.map((row) => {
+      if (row.answer_value != null) {
+        return `${row.answer_value}=${row.count}${row.percentage != null ? ` (${row.percentage}%)` : ''}`;
+      }
+      return `${row.demo_answer}×${row.opinion_answer}=${row.count}`;
+    });
+    return `n=${total}; top: ${topBits.join('; ')}`;
+  }
+
+  private buildFallbackInsights(
+    surveyId: number,
+    successfulResults: any[],
+    context: AnalyticsContextBundle | null
+  ): GeneratedInsights {
+    const first = successfulResults[0];
+    const evidence = first ? this.summarizeQueryStatsForPrompt(first) : 'No successful statistical queries';
+    const districtHint = context?.organization?.districtCode || context?.districtProfile?.districtCode;
+    return {
+      surveyId,
+      executiveSummary: districtHint
+        ? `Fallback summary for survey ${surveyId} (${districtHint}): model insight generation failed; numbers below are from computed stats only.`
+        : `Fallback summary for survey ${surveyId}: model insight generation failed; numbers below are from computed stats only.`,
+      keyFindings: [
+        {
+          title: 'Statistical snapshot (template fallback)',
+          description: 'Automated fallback because the insight model call failed or returned invalid JSON.',
+          statisticalEvidence: evidence,
+          businessImplication: 'Re-run analytics with forceRegenerate once the model is healthy.',
+          confidence: 'low',
+          priority: 'notable',
+        },
+      ],
+      demographicInsights: [],
+      correlationInsights: [],
+      recommendations: [
+        {
+          category: 'Data Quality',
+          recommendation: 'Re-run AI insights when the provider is available',
+          rationale: 'Template fallback preserves stats but loses campaign-specific narrative',
+          priority: 'medium',
+          timeframe: 'immediate',
+        },
+      ],
+      dataQuality: {
+        responseRate: 0,
+        completeness: 0,
+        reliability: 'Limited — insight model fallback',
+        limitations: ['Insight model unavailable; chart takeaways use deterministic templates'],
+      },
+      nextSteps: ['Force-regenerate insights when Anthropic/OpenAI is reachable'],
+      chartInsights: successfulResults.slice(0, 12).map((qr, idx) => {
+        const id = `chart_${qr.id || qr.queryId || idx}`;
+        const templated = this.generateDataInsight(qr.data || [], qr.analysisType || 'distribution');
+        return {
+          id,
+          keyTakeaway: templated.keyTakeaway,
+          businessRelevance: templated.businessRelevance,
+          actionableInsight: templated.actionableInsight,
+          statisticalSignificance: templated.statisticalSignificance,
+        };
+      }),
+      contextSourcesIncluded: context?.sourcesIncluded || [],
     };
   }
 

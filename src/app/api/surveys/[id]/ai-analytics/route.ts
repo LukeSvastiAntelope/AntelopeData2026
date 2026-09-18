@@ -124,33 +124,45 @@ export async function POST(
     }
 
     const body = await request.json().catch(() => ({}));
+
+    const envFlag = (process.env.ANALYTICS_CONTEXT_INJECTION || '').trim().toLowerCase();
+    const envContextOn = envFlag === '1' || envFlag === 'true' || envFlag === 'yes' || envFlag === 'on';
     
-    // Extract configuration from request body
+    // Extract configuration from request body.
+    // Model fields stay undefined unless the client/env sets them so Phase A
+    // orchestrator defaults (claude-sonnet-4-6) apply — this is the A/B switch.
     const config: AIAnalyticsConfig = {
-      // Model selection
-      analysisModel: body.analysisModel || 'gpt-4o',
-      queryModel: body.queryModel || 'gpt-4o-mini',
-      insightModel: body.insightModel || 'gpt-4o',
-      visualizationModel: body.visualizationModel || 'gpt-4o',
+      analysisModel: body.analysisModel || process.env.ANALYTICS_ANALYSIS_MODEL || undefined,
+      queryModel: body.queryModel || process.env.ANALYTICS_QUERY_MODEL || undefined,
+      insightModel: body.insightModel || process.env.ANALYTICS_INSIGHT_MODEL || undefined,
+      visualizationModel:
+        body.visualizationModel || process.env.ANALYTICS_VISUALIZATION_MODEL || undefined,
       
-      // Force regeneration options
       forceRegenerate: body.forceRegenerate || false,
       forceRegenerateAnalysis: body.forceRegenerateAnalysis || false,
       forceRegenerateQueries: body.forceRegenerateQueries || false,
       forceRegenerateInsights: body.forceRegenerateInsights || false,
       forceRegenerateVisualizations: body.forceRegenerateVisualizations || false,
       
-      // Cache settings - Updated defaults for longer persistence
-      cacheExpirationHours: body.cacheExpirationHours || 720, // 30 days instead of 24 hours
-      analysisCacheHours: body.analysisCacheHours || 720, // 30 days instead of 48 hours
-      queryCacheHours: body.queryCacheHours || 720, // 30 days instead of 24 hours
-      insightsCacheHours: body.insightsCacheHours || 720, // 30 days instead of 48 hours
-      visualizationCacheHours: body.visualizationCacheHours || 720, // 30 days instead of 24 hours
+      cacheExpirationHours: body.cacheExpirationHours || 720,
+      analysisCacheHours: body.analysisCacheHours || 720,
+      queryCacheHours: body.queryCacheHours || 720,
+      insightsCacheHours: body.insightsCacheHours || 720,
+      visualizationCacheHours: body.visualizationCacheHours || 720,
       
-      // Quality settings
       minimumResponses: body.minimumResponses || 10,
       maxCharts: body.maxCharts || 12,
-      includeRawData: body.includeRawData || false
+      includeRawData: body.includeRawData || false,
+
+      // Phase B flag — independent of model switch
+      enableContextInjection:
+        typeof body.enableContextInjection === 'boolean'
+          ? body.enableContextInjection
+          : envContextOn,
+      campaignId:
+        body.campaignId !== undefined && Number.isFinite(Number(body.campaignId))
+          ? Number(body.campaignId)
+          : null,
     };
 
     // Validate models are available
