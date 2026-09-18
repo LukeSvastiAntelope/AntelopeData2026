@@ -1,0 +1,6 @@
+voter_id,first_name,last_name,email,phone,street,city,state,zip,birthdate,party,gender,voter_status,district,latitude,longitude
+1001,Maria,Santos,maria.santos@example.com,415-555-0101,1200 Market Street,San Francisco,CA,94102,1988-04-12,D,F,A,CA-11,37.7793,-122.4192
+1002,James,Chen,jchen@example.com,415-555-0102,450 Hayes St,San Francisco,CA,94102,1975-11-03,DEM,M,Active,CA-11,37.7765,-122.4241
+1003,Aisha,Rahman,arahman@example.com,,88 Valencia Street,San Francisco,CA,94103,1994-07-21,IND,F,A,CA-11,37.7678,-122.4220
+1004,Robert,Nguyen,rob.nguyen@example.com,4155550104,55 9th Street,San Francisco,CA,94103,1962-01-19,R,M,A,CA-11,37.7761,-122.4148
+1005,Elena,Morales,emorales@example.com,4155550105,200 Fillmore Street,San Francisco,CA,94117,1999-09-08,D,F,A,CA-11,37.7719,-122.4305

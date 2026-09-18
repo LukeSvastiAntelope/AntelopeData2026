@@ -1,0 +1,13 @@
+cluster_key,first_name,last_name,email,phone,street,unit,city,state,zip,birthdate,age_years,age_bucket,party,gender,voter_status,district,owner_occupied,property_type,latitude,longitude,match_confidence,source_row_ids
+mock_0001,Maria,Santos,maria.santos@example.com,4155550101,1200 MARKET ST,,SAN FRANCISCO,CA,94102,1988-04-12,36,35-44,Democrat,F,Registered,CA-11,1,Single Family,37.7793000,-122.4192000,0.96,voter:1001|property:P-88
+mock_0002,James,Chen,jchen@example.com,4155550102,450 HAYES ST,2,SAN FRANCISCO,CA,94102,1975-11-03,48,45-54,Democrat,M,Registered,CA-11,1,Condo,37.7765000,-122.4241000,0.93,voter:1002|consumer:C-12
+mock_0003,Aisha,Rahman,arahman@example.com,4155550103,88 VALENCIA ST,,SAN FRANCISCO,CA,94103,1994-07-21,30,25-34,Independent,F,Registered,CA-11,0,Multi Family,37.7678000,-122.4220000,0.91,voter:1003|property:P-91
+mock_0004,Robert,Nguyen,rob.nguyen@example.com,4155550104,55 9TH ST,,SAN FRANCISCO,CA,94103,1962-01-19,62,55-64,Republican,M,Registered,CA-11,1,Single Family,37.7761000,-122.4148000,0.88,voter:1004|property:P-77
+mock_0005,Elena,Morales,emorales@example.com,4155550105,200 FILLMORE ST,,SAN FRANCISCO,CA,94117,1999-09-08,25,25-34,Democrat,F,Registered,CA-11,0,Condo,37.7719000,-122.4305000,0.94,voter:1005|canvass:K-3
+mock_0006,David,Okoye,dokoye@example.com,4155550106,901 DIVISADERO ST,,SAN FRANCISCO,CA,94115,1981-12-30,42,35-44,Democrat,M,Inactive,CA-11,1,Single Family,37.7798000,-122.4382000,0.87,voter:1006|property:P-55
+mock_0007,Priya,Patel,ppatel@example.com,4155550107,333 GOUGH ST,,SAN FRANCISCO,CA,94102,1990-05-14,34,25-34,Democrat,F,Registered,CA-11,0,Condo,37.7769000,-122.4228000,0.95,voter:1007|consumer:C-44
+mock_0008,Michael,Brooks,mbrooks@example.com,4155550108,77 PAGE ST,,SAN FRANCISCO,CA,94102,1955-03-02,69,65+,Republican,M,Registered,CA-11,1,Single Family,37.7744000,-122.4215000,0.90,voter:1008|property:P-12
+mock_0009,Sofia,Alvarez,salva@example.com,4155550109,1400 MISSION ST,401,SAN FRANCISCO,CA,94103,2000-10-17,23,18-24,Independent,F,Registered,CA-11,0,Condo,37.7752000,-122.4179000,0.89,voter:1009|survey:S-19
+mock_0010,William,Park,wpark@example.com,4155550110,600 BUCHANAN ST,,SAN FRANCISCO,CA,94102,1970-08-25,54,45-54,Democrat,M,Registered,CA-11,1,Single Family,37.7749000,-122.4273000,0.92,voter:1010|property:P-33
+mock_0011,Hannah,Goldberg,hgold@example.com,4155550111,25 GROVE ST,,SAN FRANCISCO,CA,94102,1986-02-11,38,35-44,Democrat,F,Registered,CA-11,0,Multi Family,37.7786000,-122.4157000,0.86,voter:1011|consumer:C-7
+mock_0012,Carlos,Diaz,cdiaz@example.com,4155550112,1100 FOLSOM ST,,SAN FRANCISCO,CA,94103,1992-06-06,32,25-34,Independent,M,Registered,CA-11,1,Condo,37.7758000,-122.4095000,0.91,voter:1012|property:P-41

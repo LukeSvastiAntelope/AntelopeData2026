@@ -1,0 +1,6 @@
+parcel_id,first_name,last_name,street,city,state,zip,owner_occupied,property_type,latitude,longitude,phone
+P-88,Maria,Santos,1200 Market St,San Francisco,CA,94102,yes,Single Family,37.7793,-122.4192,4155550101
+P-91,Aisha,Rahman,88 Valencia St,San Francisco,CA,94103,no,Multi Family,37.7678,-122.4220,
+P-77,Robert,Nguyen,55 Ninth St,San Francisco,CA,94103,1,Single Family,37.7761,-122.4148,415-555-0104
+P-55,David,Okoye,901 Divisadero Street,San Francisco,CA,94115,true,Single Family,37.7798,-122.4382,4155550106
+P-12,Mike,Brooks,77 Page Street,San Francisco,CA,94102,yes,Single Family,37.7744,-122.4215,4155550108

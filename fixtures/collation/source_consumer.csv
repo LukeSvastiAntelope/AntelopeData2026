@@ -1,0 +1,4 @@
+id,first_name,last_name,email,phone,street,city,state,zip,age,party
+C-12,James,Chen,jchen@example.com,4155550102,450 Hayes Street,San Francisco,CA,94102,48,Democrat
+C-44,Priya,Patel,ppatel@example.com,415-555-0107,333 Gough St,San Francisco,CA,94102,34,D
+C-7,Hannah,Goldberg,hgold@example.com,4155550111,25 Grove Street,San Francisco,CA,94102,38,Democrat

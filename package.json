@@ -8,8 +8,10 @@
       "start": "next start",
       "lint": "next lint",
       "postinstall": "node -e \"const fs=require('fs');const p='node_modules/maplibre-gl/dist/maplibre-gl.css';const o='public/maplibre-gl.css';try{fs.copyFileSync(p,o);console.log('maplibre-gl.css copied');}catch(e){}\"",
-      "init-scheduler": "node scripts/init-scheduler.js",
-      "cron:surveys": "node scripts/close-expired-surveys.js"
+    "init-scheduler": "node scripts/init-scheduler.js",
+    "cron:surveys": "node scripts/close-expired-surveys.js",
+    "collation:run": "tsx --tsconfig tsconfig.json -r dotenv/config scripts/collation/run-collation.ts",
+    "collation:load-mock": "tsx --tsconfig tsconfig.json -r dotenv/config scripts/collation/load-mock.ts"
    },
    "dependencies": {
       "@anthropic-ai/sdk": "^0.54.0",
