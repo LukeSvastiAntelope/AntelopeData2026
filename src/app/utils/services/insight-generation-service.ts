@@ -61,7 +61,7 @@ export class InsightGenerationService {
   private defaultCacheHours: number;
 
   constructor(
-    defaultModel: string = 'gpt-4o', // Best model for insight generation
+    defaultModel: string = 'claude-sonnet-4-6',
     defaultCacheHours: number = 48
   ) {
     this.defaultModel = defaultModel;

@@ -79,20 +79,20 @@ export class AIAnalyticsOrchestrator {
   private visualizationEngine: VisualizationEngine;
 
   constructor(config: Partial<AIAnalyticsConfig> = {}) {
-    // Initialize engines with optimized model assignments
+    // Defaults: claude-sonnet-4-6. Override any stage via config.*Model (A/B / rollback).
     this.analysisEngine = new SurveyAnalysisEngine(
-      config.analysisModel || 'gpt-4o-mini' // Simple analysis, don't need complex reasoning
+      config.analysisModel || 'claude-sonnet-4-6'
     );
     this.queryGenerator = new StatisticalQueryGenerator(
-      config.queryModel || 'gpt-4o-mini', // Simple SQL generation
+      config.queryModel || 'claude-sonnet-4-6',
       config.queryCacheHours || 24
     );
     this.insightService = new InsightGenerationService(
-      config.insightModel || 'deepseek-chat', // Best for business insights
+      config.insightModel || 'claude-sonnet-4-6',
       config.insightsCacheHours || 48
     );
     this.visualizationEngine = new VisualizationEngine(
-      config.visualizationModel || 'gpt-4o', // Good for structured visualization
+      config.visualizationModel || 'claude-sonnet-4-6',
       config.visualizationCacheHours || 24
     );
   }
@@ -148,10 +148,10 @@ export class AIAnalyticsOrchestrator {
       },
       metadata: {
         modelsUsed: {
-          analysis: config.analysisModel || 'gpt-4o',
-          queries: config.queryModel || 'gpt-4o-mini',
-          insights: config.insightModel || 'gpt-4o',
-          visualization: config.visualizationModel || 'gpt-4o'
+          analysis: config.analysisModel || 'claude-sonnet-4-6',
+          queries: config.queryModel || 'claude-sonnet-4-6',
+          insights: config.insightModel || 'claude-sonnet-4-6',
+          visualization: config.visualizationModel || 'claude-sonnet-4-6'
         },
         generatedAt: new Date().toISOString(),
         cacheStatus: {
