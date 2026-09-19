@@ -1,11 +1,21 @@
 'use client'
 
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
+import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { SidebarTrigger } from '@/components/ui/sidebar'
 import { Button } from '@/components/ui/button'
 import { Loader2, Printer, ArrowLeft, Users, Route } from 'lucide-react'
+
+const PrintWalkMap = dynamic(() => import('@/components/print-walk-map'), {
+  ssr: false,
+  loading: () => (
+    <div className="rounded-lg border border-border h-[min(70vh,560px)] min-h-[360px] flex items-center justify-center text-sm text-muted-foreground gap-2 print:hidden">
+      <Loader2 className="h-4 w-4 animate-spin" /> Loading map…
+    </div>
+  ),
+})
 
 type MapPerson = {
   id: number
@@ -248,18 +258,37 @@ function PrintMapInner() {
                 </span>
               </div>
 
-              <div className="rounded-lg border border-border overflow-hidden bg-white print:border-black">
+              <PrintWalkMap
+                title={
+                  turfLabel
+                    ? `${turfLabel}`
+                    : 'Canvass map'
+                }
+                stops={walkList.map((p) => ({
+                  id: p.id,
+                  lat: p.lat,
+                  lng: p.lng,
+                  label: p.label,
+                  addressLine: p.addressLine,
+                  party: p.party,
+                  effectiveParty: p.effectiveParty,
+                  index: p.index,
+                }))}
+              />
+
+              {/* Static SVG retained for print only */}
+              <div className="hidden print:block rounded-lg border border-black overflow-hidden bg-white">
                 <svg
                   viewBox="0 0 900 640"
                   className="w-full h-auto"
                   role="img"
-                  aria-label="Canvass map"
+                  aria-label="Canvass map print"
                 >
                   <rect x="0" y="0" width="900" height="640" fill="#f8fafc" />
                   <text x="20" y="24" fontSize="14" fill="#0f172a" fontWeight="600">
                     {turfLabel
                       ? `${turfLabel} — numbers match turf walk order`
-                      : 'Canvass map — tap numbers match walk list'}
+                      : 'Canvass map — numbers match walk list'}
                   </text>
                   {plot.map((p) => (
                     <g key={p.id}>
