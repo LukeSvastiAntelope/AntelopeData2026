@@ -51,6 +51,7 @@ import {
   ArrowRight,
   Clapperboard,
   Crosshair,
+  Network,
 } from 'lucide-react'
 import LogoText from '@/components/logo-text'
 import LogoIcon from '@/components/logo-icon'
@@ -95,6 +96,7 @@ const WORKFLOW_STAGES: WorkflowStage[] = [
     items: [
       { title: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
       { title: 'Campaign Consultant', href: '/agents/campaign-consultant', icon: Bot },
+      { title: 'Agent map', href: '/agents/map', icon: Network },
       {
         title: 'Targeting/Propensity Planning',
         href: '/targeting/propensity',

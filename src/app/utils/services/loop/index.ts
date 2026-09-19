@@ -9,3 +9,9 @@ export {
   steeringBiasFromDirectives,
 } from './discipline';
 export type { LoopRecommendationAction, WeightedFinding } from './discipline';
+export {
+  AGENT_TOPOLOGY_NODES,
+  AGENT_TOPOLOGY_EDGES,
+  NEXT_SCHEDULED_HINT,
+} from './topology';
+export type { TopologyNodeDef, TopologyEdgeDef, TopologyRole, TopologyZone } from './topology';
