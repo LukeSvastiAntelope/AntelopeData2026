@@ -131,6 +131,23 @@ const EditSurveyPage = () => {
   const [previewMatches, setPreviewMatches] = useState<any[]>([])
   const [loadingPreview, setLoadingPreview] = useState(false)
 
+  // AT1 — survey auto-trigger (per-survey run-itself setting)
+  const [atEnabled, setAtEnabled] = useState(false)
+  const [atThreshold, setAtThreshold] = useState(20)
+  const [atActions, setAtActions] = useState<{ analytics: boolean; newsletter: boolean; video: boolean }>({
+    analytics: true,
+    newsletter: false,
+    video: false,
+  })
+  const [atAutonomy, setAtAutonomy] = useState<'propose' | 'auto'>('propose')
+  const [atResponseCount, setAtResponseCount] = useState(0)
+  const [atFiredCount, setAtFiredCount] = useState(0)
+  const [atLastFiredAt, setAtLastFiredAt] = useState<string | null>(null)
+  const [atSaving, setAtSaving] = useState(false)
+  const [atEvents, setAtEvents] = useState<
+    Array<{ id: number; eventType: string; responseCount: number; createdAt: string | null }>
+  >([])
+
   // Drag and drop state
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
@@ -268,8 +285,79 @@ const EditSurveyPage = () => {
           }
         })
         .catch(()=>{})
+      // AT1 auto-trigger config
+      fetch(`/api/surveys/${surveyId}/autotrigger`)
+        .then((r) => r.json())
+        .then((data) => {
+          if (!data?.status || !data.config) return
+          setAtEnabled(Boolean(data.config.enabled))
+          setAtThreshold(Number(data.config.threshold) || 20)
+          const acts = data.config.actions || ['analytics']
+          setAtActions({
+            analytics: acts.includes('analytics'),
+            newsletter: acts.includes('newsletter'),
+            video: acts.includes('video'),
+          })
+          setAtAutonomy(data.config.autonomy === 'auto' ? 'auto' : 'propose')
+          setAtFiredCount(Number(data.config.firedCount) || 0)
+          setAtLastFiredAt(data.config.lastFiredAt || null)
+          setAtResponseCount(Number(data.responseCount) || 0)
+          setAtEvents(
+            (data.events || []).map((e: any) => ({
+              id: e.id,
+              eventType: e.eventType,
+              responseCount: e.responseCount,
+              createdAt: e.createdAt,
+            }))
+          )
+        })
+        .catch(() => {})
     }
   }, [surveyId])
+
+  const handleSaveAutotrigger = async () => {
+    setAtSaving(true)
+    setError(null)
+    try {
+      const actions = (
+        [
+          atActions.analytics && 'analytics',
+          atActions.newsletter && 'newsletter',
+          atActions.video && 'video',
+        ] as const
+      ).filter(Boolean) as Array<'analytics' | 'newsletter' | 'video'>
+      const res = await fetch(`/api/surveys/${surveyId}/autotrigger`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          enabled: atEnabled,
+          threshold: atThreshold,
+          actions: actions.length ? actions : ['analytics'],
+          autonomy: atAutonomy,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data.status) throw new Error(data.message || 'Failed to save auto-trigger')
+      setAtFiredCount(Number(data.config?.firedCount) || 0)
+      setAtLastFiredAt(data.config?.lastFiredAt || null)
+      setAtResponseCount(Number(data.responseCount) || 0)
+      if (data.fire?.fired) {
+        setAtEvents((prev) => [
+          {
+            id: data.fire.eventId,
+            eventType: 'autotrigger.fired',
+            responseCount: data.fire.responseCount,
+            createdAt: new Date().toISOString(),
+          },
+          ...prev,
+        ])
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to save auto-trigger')
+    } finally {
+      setAtSaving(false)
+    }
+  }
 
   const fetchSurvey = async () => {
     try {
@@ -846,6 +934,112 @@ const EditSurveyPage = () => {
                   </div>
                 )}
               </div>
+            </CardContent>
+          </Card>
+
+          {/* AT1 — Auto-trigger: survey runs itself past a response threshold */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Sparkles className="h-5 w-5" />
+                Auto-trigger
+              </CardTitle>
+              <CardDescription>
+                When responses cross the threshold, run analytics → postable insight once per crossing.
+                Newsletter / video drafts attach in a later step; autonomy controls approval vs end-to-end send.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="atEnabled"
+                  checked={atEnabled}
+                  onCheckedChange={(checked) => setAtEnabled(checked as boolean)}
+                />
+                <Label htmlFor="atEnabled" className="cursor-pointer">
+                  Enable auto-trigger for this survey
+                </Label>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <Label htmlFor="atThreshold">Response threshold</Label>
+                  <Input
+                    id="atThreshold"
+                    type="number"
+                    min={1}
+                    value={atThreshold}
+                    onChange={(e) => setAtThreshold(Math.max(1, Number(e.target.value) || 1))}
+                    className="mt-1 max-w-[140px]"
+                    disabled={!atEnabled}
+                  />
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Fires once when count crosses each multiple (default 20). Current responses:{' '}
+                    {atResponseCount}.
+                  </p>
+                </div>
+                <div>
+                  <Label htmlFor="atAutonomy">Autonomy</Label>
+                  <Select
+                    value={atAutonomy}
+                    onValueChange={(v) => setAtAutonomy(v as 'propose' | 'auto')}
+                    disabled={!atEnabled}
+                  >
+                    <SelectTrigger id="atAutonomy" className="mt-1">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="propose">propose — stage for approval</SelectItem>
+                      <SelectItem value="auto">auto — agent owns end-to-end</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Actions on fire</Label>
+                <div className="flex flex-wrap gap-4">
+                  {(
+                    [
+                      ['analytics', 'Analytics'],
+                      ['newsletter', 'Newsletter draft'],
+                      ['video', 'Video draft'],
+                    ] as const
+                  ).map(([key, label]) => (
+                    <div key={key} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`at-action-${key}`}
+                        checked={atActions[key]}
+                        disabled={!atEnabled || key === 'analytics'}
+                        onCheckedChange={(checked) =>
+                          setAtActions((prev) => ({ ...prev, [key]: Boolean(checked) }))
+                        }
+                      />
+                      <Label htmlFor={`at-action-${key}`} className="cursor-pointer text-sm">
+                        {label}
+                        {key === 'analytics' ? ' (required)' : ''}
+                      </Label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="rounded-md border border-border/60 px-3 py-2 text-xs text-muted-foreground space-y-1">
+                <p>
+                  Fired {atFiredCount} time{atFiredCount === 1 ? '' : 's'}
+                  {atLastFiredAt ? ` · last ${new Date(atLastFiredAt).toLocaleString()}` : ''}
+                </p>
+                {atEvents[0] && (
+                  <p>
+                    Latest event: {atEvents[0].eventType} @ {atEvents[0].responseCount} responses
+                  </p>
+                )}
+              </div>
+
+              <Button size="sm" onClick={() => void handleSaveAutotrigger()} disabled={atSaving}>
+                {atSaving ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : null}
+                Save auto-trigger
+              </Button>
             </CardContent>
           </Card>
 

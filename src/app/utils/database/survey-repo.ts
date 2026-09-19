@@ -501,7 +501,21 @@ export const SurveyRepo = {
             
             await connection.commit();
             connection.release();
-            
+
+            // AT1: fire-and-forget auto-trigger check (threshold crossing → analytics chain).
+            // Never blocks or fails the submission.
+            try {
+                const { scheduleAutotriggerCheck } = await import(
+                    '@/app/utils/services/autotrigger-service'
+                );
+                scheduleAutotriggerCheck(Number(data.surveyId), 'ingest');
+            } catch (e) {
+                console.error(
+                    '[SurveyRepo] autotrigger schedule failed (non-blocking):',
+                    e instanceof Error ? e.message : e
+                );
+            }
+
             return { responseId, agentToken, isExistingTwin };
             
         } catch (error) {

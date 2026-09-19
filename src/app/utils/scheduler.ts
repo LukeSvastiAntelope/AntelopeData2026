@@ -13,6 +13,7 @@ import {
     drainPendingGeocode,
     type GeocodeDrainSummary,
 } from '@/app/utils/services/geo/geocode';
+import { pollSurveyAutotriggers } from '@/app/utils/services/autotrigger-service';
 
 let lastRunAt: string | null = null;
 let lastRunStatus: 'success' | 'error' | 'never' = 'never';
@@ -35,6 +36,8 @@ export interface DailyTaskSummary {
     loopProposer: SourceResult<{ orgsConsidered: number; ran: number; skipped: number }>;
     /** G1: drain voter_geo pending Census geocodes (platform cron, not upload path). */
     voterGeocode: SourceResult<GeocodeDrainSummary>;
+    /** AT1: survey auto-trigger backstop (quiet→jump). */
+    autotriggerPoll: SourceResult<{ considered: number; fired: number; skipped: number }>;
 }
 
 async function runPerStateRefresh(
@@ -139,8 +142,27 @@ export async function runDailyPlatformTasks() {
             };
         }
 
+        // AT1: survey auto-trigger backstop (primary path is ingest + /api/cron/autotrigger-poll).
+        let autotriggerPoll: SourceResult<{ considered: number; fired: number; skipped: number }>;
+        try {
+            const atSummary = await pollSurveyAutotriggers();
+            autotriggerPoll = {
+                status: 'success',
+                data: {
+                    considered: atSummary.considered,
+                    fired: atSummary.fired,
+                    skipped: atSummary.skipped,
+                },
+            };
+        } catch (error) {
+            autotriggerPoll = {
+                status: 'error',
+                error: error instanceof Error ? error.message : 'Unknown error',
+            };
+        }
+
         const summary: DailyTaskSummary = {
-            tasksRun: 6,
+            tasksRun: 7,
             states,
             csv,
             openfec,
@@ -148,6 +170,7 @@ export async function runDailyPlatformTasks() {
             campaignNewsDigest,
             loopProposer,
             voterGeocode,
+            autotriggerPoll,
         };
 
         const hasSourceError =
@@ -156,7 +179,8 @@ export async function runDailyPlatformTasks() {
             census.status === 'error' ||
             campaignNewsDigest.status === 'error' ||
             loopProposer.status === 'error' ||
-            voterGeocode.status === 'error';
+            voterGeocode.status === 'error' ||
+            autotriggerPoll.status === 'error';
 
         lastRunAt = new Date().toISOString();
         lastRunStatus = hasSourceError ? 'error' : 'success';
@@ -164,7 +188,7 @@ export async function runDailyPlatformTasks() {
         lastRunError = hasSourceError ? 'One or more data sources failed' : null;
 
         console.log(
-            `✅ Daily data refresh completed. states=${states.length}, csv=${csv.status}, openfec=${openfec.status}, census=${census.status}, campaignNewsDigest=${campaignNewsDigest.status}, loopProposer=${loopProposer.status}, voterGeocode=${voterGeocode.status}`
+            `✅ Daily data refresh completed. states=${states.length}, csv=${csv.status}, openfec=${openfec.status}, census=${census.status}, campaignNewsDigest=${campaignNewsDigest.status}, loopProposer=${loopProposer.status}, voterGeocode=${voterGeocode.status}, autotriggerPoll=${autotriggerPoll.status}`
         );
 
         return summary;

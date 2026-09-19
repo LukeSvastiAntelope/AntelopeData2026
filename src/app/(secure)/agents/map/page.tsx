@@ -115,6 +115,22 @@ export default function AgentMapPage() {
   const [windowDays, setWindowDays] = useState(30)
   const [responseThreshold, setResponseThreshold] = useState(80)
   const [daysThreshold, setDaysThreshold] = useState(7)
+  const [surveyAutotriggers, setSurveyAutotriggers] = useState<
+    Array<{
+      surveyId: number
+      surveyTitle: string
+      enabled: boolean
+      threshold: number
+      autonomy: string
+      firedCount: number
+      lastFiredAt: string | null
+      responseCount: number
+      actions: string[]
+    }>
+  >([])
+  const [scrapers, setScrapers] = useState<
+    Array<{ id: number; type: string; name: string; enabled: boolean; lastRunAt: string | null }>
+  >([])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -131,6 +147,13 @@ export default function AgentMapPage() {
       setWindowDays(json.loopConfig.budgets.windowDays)
       setResponseThreshold(json.loopConfig.triggers.response_count?.threshold ?? 80)
       setDaysThreshold(json.loopConfig.triggers.days_elapsed?.threshold ?? 7)
+
+      const atRes = await fetch('/api/autotriggers')
+      const atJson = await atRes.json().catch(() => null)
+      if (atRes.ok && atJson?.status) {
+        setSurveyAutotriggers(atJson.surveyAutotriggers || [])
+        setScrapers(atJson.scrapers || [])
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed')
     } finally {
@@ -658,6 +681,91 @@ export default function AgentMapPage() {
                           ))}
                         </ul>
                       )}
+                    </div>
+                    <div className="space-y-2 border-t border-border pt-4">
+                      <p className="text-xs font-semibold">Automations</p>
+                      <p className="text-[10px] text-muted-foreground">
+                        Survey auto-triggers and scrapers in one place. Configure a survey on its
+                        edit page.
+                      </p>
+
+                      <div className="space-y-1.5">
+                        <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                          Survey auto-triggers
+                        </p>
+                        {surveyAutotriggers.length === 0 ? (
+                          <p className="text-[11px] text-muted-foreground">
+                            None configured yet. Enable on a survey&apos;s Auto-trigger card.
+                          </p>
+                        ) : (
+                          <ul className="space-y-1.5 max-h-40 overflow-y-auto">
+                            {surveyAutotriggers.map((t) => (
+                              <li
+                                key={t.surveyId}
+                                className="rounded border border-border/60 px-2 py-1.5 text-[11px]"
+                              >
+                                <div className="flex items-center justify-between gap-2">
+                                  <Link
+                                    href={`/surveys/${t.surveyId}/edit`}
+                                    className="font-medium text-foreground hover:underline truncate"
+                                  >
+                                    {t.surveyTitle || `Survey #${t.surveyId}`}
+                                  </Link>
+                                  <Badge
+                                    variant={t.enabled ? 'default' : 'secondary'}
+                                    className="text-[9px] shrink-0"
+                                  >
+                                    {t.enabled ? 'on' : 'off'}
+                                  </Badge>
+                                </div>
+                                <p className="text-muted-foreground mt-0.5">
+                                  ≥{t.threshold} · {t.autonomy} · {t.responseCount} responses · fired{' '}
+                                  {t.firedCount}
+                                  {t.lastFiredAt ? ` · ${fmtWhen(t.lastFiredAt)}` : ''}
+                                </p>
+                                <p className="text-muted-foreground">
+                                  {(t.actions || []).join(', ') || 'analytics'}
+                                </p>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+
+                      <div className="space-y-1.5 pt-2">
+                        <div className="flex items-center justify-between">
+                          <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                            Scraper automations
+                          </p>
+                          <Link
+                            href="/dashboard"
+                            className="text-[10px] text-muted-foreground hover:underline"
+                          >
+                            Manage on dashboard
+                          </Link>
+                        </div>
+                        {scrapers.length === 0 ? (
+                          <p className="text-[11px] text-muted-foreground">No scrapers yet.</p>
+                        ) : (
+                          <ul className="space-y-1 max-h-28 overflow-y-auto">
+                            {scrapers.map((s) => (
+                              <li
+                                key={s.id}
+                                className="flex items-center justify-between gap-2 text-[11px] border-l-2 border-border pl-2"
+                              >
+                                <span className="truncate">
+                                  {s.name}{' '}
+                                  <span className="text-muted-foreground">({s.type})</span>
+                                </span>
+                                <span className="text-muted-foreground shrink-0">
+                                  {s.enabled ? 'on' : 'off'}
+                                  {s.lastRunAt ? ` · ${fmtWhen(s.lastRunAt)}` : ''}
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
                     </div>
                   </div>
                 )}
