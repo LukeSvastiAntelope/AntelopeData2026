@@ -1102,7 +1102,8 @@ export default function DashboardPage() {
               </button>
             </div>
             <p className="text-[11px] text-muted-foreground">
-              Field stop — record lean or disposition. Updates turf outcome (and household if linked).
+              Field stop — append-only contact log + current-status rollup. DNC request
+              suppresses this voter everywhere.
             </p>
             <div className="grid grid-cols-2 gap-2">
               {(
@@ -1119,7 +1120,7 @@ export default function DashboardPage() {
                   size="sm"
                   disabled={confirmBusy}
                   className={`h-10 text-xs font-semibold ${className}`}
-                  onClick={() => void confirmTurfStopAtDoor(party, 'confirmed')}
+                  onClick={() => void confirmTurfStopAtDoor(party, 'supporter')}
                 >
                   {confirmBusy && confirmParty === party ? (
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -1131,17 +1132,21 @@ export default function DashboardPage() {
             <div className="flex flex-wrap gap-1.5">
               {(
                 [
+                  ['lean_support', 'Lean support'],
+                  ['undecided', 'Undecided'],
+                  ['lean_against', 'Lean against'],
                   ['not_home', 'Not home'],
-                  ['refused', 'Refused'],
                   ['moved', 'Moved'],
                   ['wrong_address', 'Wrong address'],
+                  ['refused', 'Refused'],
+                  ['dnc_request', 'DNC'],
                 ] as const
               ).map(([status, label]) => (
                 <Button
                   key={status}
                   type="button"
                   size="sm"
-                  variant="outline"
+                  variant={status === 'dnc_request' ? 'destructive' : 'outline'}
                   disabled={confirmBusy}
                   className="h-7 text-[10px]"
                   onClick={() => void confirmTurfStopAtDoor(confirmParty, status)}

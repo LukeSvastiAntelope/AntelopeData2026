@@ -14,7 +14,7 @@ type Input = {
 export const recordTurfStopTool: CampaignTool<Input> = {
   name: 'record_turf_stop',
   description:
-    'Record a field outcome on a turf walk-list stop (confirmed / not_home / refused / …). Mirrors to person_records when linked; refused also adds contact_suppression.',
+    'Append a canvass contact on a turf stop (full trail) and update the current-status rollup. Statuses: not_home, moved, wrong_address, supporter, lean_support, undecided, lean_against, refused, dnc_request (+ legacy confirmed/contacted). dnc_request and refused write contact_suppression; outcomes feed the consultant situation snapshot.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -23,7 +23,8 @@ export const recordTurfStopTool: CampaignTool<Input> = {
       voterGeoId: { type: 'number', description: 'Stop voter_geo id from the walk-list' },
       status: {
         type: 'string',
-        description: 'confirmed | contacted | not_home | refused | moved | wrong_address',
+        description:
+          'not_home | moved | wrong_address | supporter | lean_support | undecided | lean_against | refused | dnc_request | confirmed | contacted',
       },
       party: { type: 'string' },
       notes: { type: 'string' },
@@ -42,7 +43,7 @@ export const recordTurfStopTool: CampaignTool<Input> = {
     }
     if (!turfId) throw new Error('turf or turfId required');
 
-    const { outcome, address } = await TurfRepo.recordStop({
+    const { outcome, address, contactId } = await TurfRepo.recordStop({
       organizationId: ctx.organizationId,
       turfId,
       voterGeoId: Number(input.voterGeoId),
@@ -55,8 +56,9 @@ export const recordTurfStopTool: CampaignTool<Input> = {
     return {
       summary: `Stop #${address?.sortOrder ?? '?'} ${address?.label || outcome.voter_geo_id}: ${outcome.status}${
         outcome.party ? ` · ${outcome.party}` : ''
-      }`,
+      } (contact #${contactId})`,
       data: {
+        contactId,
         outcome,
         address: address
           ? {

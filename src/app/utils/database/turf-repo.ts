@@ -95,7 +95,12 @@ export type TurfStopStatus =
   | 'not_home'
   | 'refused'
   | 'moved'
-  | 'wrong_address';
+  | 'wrong_address'
+  | 'supporter'
+  | 'lean_support'
+  | 'undecided'
+  | 'lean_against'
+  | 'dnc_request';
 
 export type TurfStopOutcome = {
   id: number;
@@ -130,7 +135,15 @@ const DEFAULT_CONTACTED = [
   'refused',
   'moved',
   'wrong_address',
+  'supporter',
+  'lean_support',
+  'undecided',
+  'lean_against',
+  'dnc_request',
 ];
+
+/** Brief G3 statuses that auto-write contact_suppression. */
+const DNC_STATUSES = new Set<TurfStopStatus>(['dnc_request', 'refused']);
 
 /** Map segment presets / shorthand onto turf filters. */
 export function filtersFromSegmentId(segmentId: string | null | undefined): TurfFilters {
@@ -691,7 +704,11 @@ export class TurfRepo {
   }
 
   /**
-   * Record a door outcome on a turf stop. Also mirrors to person_records when linked.
+   * G3 — record a door outcome:
+   * 1) append-only canvass_contacts (full trail)
+   * 2) upsert turf_stop_outcomes (current-status rollup)
+   * 3) dnc_request/refused → contact_suppression
+   * 4) situation snapshot write-back (campaign signal)
    */
   static async recordStop(params: {
     organizationId: number;
@@ -701,13 +718,14 @@ export class TurfRepo {
     status: TurfStopStatus;
     party?: string | null;
     notes?: string | null;
-  }): Promise<{ outcome: TurfStopOutcome; address: TurfAddress | null }> {
+    surveyResponseId?: number | null;
+  }): Promise<{ outcome: TurfStopOutcome; address: TurfAddress | null; contactId: number }> {
     const turf = await this.getById(params.turfId, params.organizationId);
     if (!turf) throw new Error('Turf not found');
 
     const sql = await openSql();
     const [addrRows] = await sql.execute(
-      `SELECT voter_geo_id, person_record_id FROM turf_addresses
+      `SELECT voter_geo_id, person_record_id, voter_file_id FROM turf_addresses
        WHERE turf_id = ? AND voter_geo_id = ? LIMIT 1`,
       [params.turfId, params.voterGeoId]
     );
@@ -716,7 +734,30 @@ export class TurfRepo {
 
     const personRecordId =
       addr.person_record_id != null ? Number(addr.person_record_id) : null;
+    const voterFileId = addr.voter_file_id ? String(addr.voter_file_id) : null;
 
+    // G3.1 — append-only contact log (never UPDATE)
+    const [contactResult] = await sql.execute<ResultSetHeader>(
+      `INSERT INTO canvass_contacts
+        (organization_id, voter_geo_id, person_record_id, voter_file_id, turf_id,
+         canvasser_id, status, note, party, survey_response_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        params.organizationId,
+        params.voterGeoId,
+        personRecordId,
+        voterFileId,
+        params.turfId,
+        params.recordedBy,
+        params.status,
+        params.notes ?? null,
+        params.party ?? null,
+        params.surveyResponseId ?? null,
+      ]
+    );
+    const contactId = Number(contactResult.insertId);
+
+    // G3.2 — current-status rollup (latest contact wins)
     await sql.execute(
       `INSERT INTO turf_stop_outcomes
         (organization_id, turf_id, voter_geo_id, person_record_id, status, party, notes, recorded_by)
@@ -759,21 +800,43 @@ export class TurfRepo {
       }
     }
 
-    // Auto-add refused stops to contact_suppression (universal DNC)
-    if (params.status === 'refused') {
+    // G3.3 — dnc_request (and refused) auto-write contact_suppression
+    let suppressed = false;
+    if (DNC_STATUSES.has(params.status)) {
       try {
         await ContactSuppressionRepo.add({
           organizationId: params.organizationId,
           voterGeoId: params.voterGeoId,
           personRecordId,
-          reason: 'refused_at_door',
+          voterFileId,
+          reason:
+            params.status === 'dnc_request' ? 'dnc_request_at_door' : 'refused_at_door',
           source: 'refused',
+          notes: params.notes ?? null,
           createdBy: params.recordedBy,
         });
+        suppressed = true;
       } catch {
         /* may already exist */
       }
     }
+
+    // G3.3 — feed situation snapshot (fire-and-forget; never blocks the door log)
+    void import('@/app/utils/services/situation-writeback-service')
+      .then(({ commitCanvassOutcomeToSituation }) =>
+        commitCanvassOutcomeToSituation({
+          orgId: params.organizationId,
+          turfId: params.turfId,
+          turfLabel: turf.label,
+          voterGeoId: params.voterGeoId,
+          status: params.status,
+          party: params.party ?? null,
+          note: params.notes ?? null,
+          canvasserId: params.recordedBy,
+          suppressed,
+        })
+      )
+      .catch((e) => console.warn('[turf recordStop] situation write-back failed', e));
 
     const [outRows] = await sql.execute(
       `SELECT id, organization_id, turf_id, voter_geo_id, person_record_id,
@@ -802,7 +865,7 @@ export class TurfRepo {
     const address =
       listed.addresses.find((a) => a.voterGeoId === params.voterGeoId) || null;
 
-    return { outcome, address };
+    return { outcome, address, contactId };
   }
 
   static async delete(id: number, organizationId: number): Promise<boolean> {

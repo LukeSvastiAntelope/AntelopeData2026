@@ -393,3 +393,91 @@ export async function writeBackAfterPostableInsight(params: {
     changeSummary: `Postable-insight write-back (survey ${params.surveyId})`,
   });
 }
+
+/**
+ * G3.3 — door-knock outcomes as campaign signal into the consultant situation.
+ * Context-only (never conviction / nextActions). Never throws to field callers.
+ */
+export async function commitCanvassOutcomeToSituation(params: {
+  orgId: number;
+  turfId: number | null;
+  turfLabel?: string | null;
+  voterGeoId: number;
+  status: string;
+  party?: string | null;
+  note?: string | null;
+  canvasserId: number;
+  suppressed?: boolean;
+}): Promise<{ committed: boolean; reason?: string }> {
+  try {
+    const orgId = Number(params.orgId);
+    if (!Number.isFinite(orgId) || orgId <= 0) {
+      return { committed: false, reason: 'no_org' };
+    }
+
+    const where = params.turfLabel
+      ? `turf "${params.turfLabel}"`
+      : params.turfId
+        ? `turf #${params.turfId}`
+        : 'field';
+    const partyBit = params.party ? ` · lean ${params.party}` : '';
+    const noteBit = params.note ? ` — ${params.note.slice(0, 120)}` : '';
+    const suppressBit = params.suppressed ? ' (DNC written)' : '';
+    const claim = `Canvass ${params.status} at geo#${params.voterGeoId} (${where})${partyBit}${noteBit}${suppressBit}`;
+
+    const finding: SituationFinding = {
+      claim,
+      confidence: {
+        effect: 0,
+        pCorrected: 1,
+        nPerGroup: { groupA: 'canvass', nA: 1, groupB: 'n/a', nB: 0 },
+      },
+      sampleProvenance: {
+        surveyId: 0,
+        channels: ['canvass'],
+        samplingNote:
+          'Field door-knock outcome — observational campaign signal, not a probability sample.',
+      },
+      source: 'canvass_contacts',
+      timestamp: new Date().toISOString(),
+      role: 'context',
+    };
+
+    const current = await AgentSituationService.getCurrent(orgId, 'campaign_consultant');
+    const existing = Array.isArray(current.snapshot.findings) ? current.snapshot.findings : [];
+    const mergedFindings = [...existing, finding]
+      .sort((a, b) => String(b.timestamp).localeCompare(String(a.timestamp)))
+      .slice(0, MAX_FINDINGS);
+
+    await AgentSituationService.commitUpdate({
+      orgId,
+      agentId: 'campaign_consultant',
+      changedByAgent: 'campaign_consultant',
+      traceId: `canvass-${params.voterGeoId}-${randomUUID().slice(0, 8)}`,
+      changeSummary: `G3 canvass write-back: ${params.status} geo#${params.voterGeoId}`,
+      patch: {
+        findings: mergedFindings,
+        evidenceRefs: [claim, ...(current.snapshot.evidenceRefs || [])].slice(0, 40),
+        // Supportive lean outcomes surface as opportunities; DNC/refused as risks
+        opportunities:
+          params.status === 'supporter' || params.status === 'lean_support' || params.status === 'confirmed'
+            ? [claim, ...(current.snapshot.opportunities || [])].slice(0, 20)
+            : undefined,
+        risks:
+          params.status === 'dnc_request' ||
+          params.status === 'refused' ||
+          params.status === 'lean_against'
+            ? [claim, ...(current.snapshot.risks || [])].slice(0, 20)
+            : undefined,
+      },
+    });
+
+    return { committed: true };
+  } catch (e) {
+    console.warn('[situation-writeback] canvass commit failed:', e);
+    return {
+      committed: false,
+      reason: e instanceof Error ? e.message : 'canvass_writeback_failed',
+    };
+  }
+}

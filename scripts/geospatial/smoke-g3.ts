@@ -1,14 +1,14 @@
 /**
- * G3 smoke: assign Saturday Dem walk, record a stop, list enriched outcomes.
+ * G3 smoke: assign turf, append canvass contacts, DNC → suppression, rollup status.
  *
  *   npx tsx --tsconfig tsconfig.json -r dotenv/config scripts/geospatial/smoke-g3.ts
  */
 
-import { TurfRepo } from '../../src/app/utils/database/turf-repo';
+import { openSql, closePool } from '../../src/app/utils/database/db';
+import { TurfRepo, ContactSuppressionRepo } from '../../src/app/utils/database/turf-repo';
 import { assignTurfTool } from '../../src/app/utils/services/tools/assign-turf';
 import { recordTurfStopTool } from '../../src/app/utils/services/tools/record-turf-stop';
 import { listTurfAddressesTool } from '../../src/app/utils/services/tools/list-turf-addresses';
-import { closePool } from '../../src/app/utils/database/db';
 
 require('dotenv').config({ path: '.env.local' });
 require('dotenv').config();
@@ -34,35 +34,66 @@ async function main() {
   if (addresses.length < 1) throw new Error('Turf has no addresses');
   const stop = addresses[0];
 
+  // First contact — supporter (append)
   const recorded = await recordTurfStopTool.execute(
     {
       turf: 'Saturday Dem walk',
       voterGeoId: stop.voterGeoId,
-      status: 'confirmed',
+      status: 'supporter',
       party: 'Democrat',
-      notes: 'g3 smoke',
+      notes: 'g3 smoke supporter',
     },
     { userId, organizationId: orgId }
   );
-  if ((recorded.data as { outcome: { status: string } }).outcome.status !== 'confirmed') {
-    throw new Error('record_turf_stop failed');
+  if ((recorded.data as { outcome: { status: string } }).outcome.status !== 'supporter') {
+    throw new Error('record_turf_stop supporter failed');
   }
 
-  const listed = await listTurfAddressesTool.execute(
+  // Second contact — dnc_request (append trail + suppress)
+  const dnc = await recordTurfStopTool.execute(
+    {
+      turf: 'Saturday Dem walk',
+      voterGeoId: stop.voterGeoId,
+      status: 'dnc_request',
+      notes: 'g3 smoke dnc',
+    },
+    { userId, organizationId: orgId }
+  );
+  if ((dnc.data as { outcome: { status: string } }).outcome.status !== 'dnc_request') {
+    throw new Error('record_turf_stop dnc_request failed');
+  }
+
+  const sql = await openSql();
+  const [trail] = await sql.execute(
+    `SELECT id, status FROM canvass_contacts
+     WHERE organization_id = ? AND voter_geo_id = ? AND turf_id = ?
+     ORDER BY id ASC`,
+    [orgId, stop.voterGeoId, turf.id]
+  );
+  const contacts = trail as { id: number; status: string }[];
+  if (contacts.length < 2) {
+    throw new Error(`Expected append-only trail >=2, got ${contacts.length}`);
+  }
+  if (contacts[contacts.length - 1].status !== 'dnc_request') {
+    throw new Error('Latest contact should be dnc_request');
+  }
+
+  const suppressed = await ContactSuppressionRepo.list(orgId, 500);
+  const hitSuppress = suppressed.find((s) => s.voter_geo_id === stop.voterGeoId);
+  if (!hitSuppress) {
+    throw new Error('dnc_request did not write contact_suppression');
+  }
+
+  const refreshed = await TurfRepo.listAddresses(turf.id, orgId);
+  const hit = refreshed.addresses.find((a) => a.voterGeoId === stop.voterGeoId);
+  if (!hit || hit.canvassStatus !== 'dnc_request') {
+    throw new Error(`Expected rollup dnc_request, got ${hit?.canvassStatus}`);
+  }
+
+  await listTurfAddressesTool.execute(
     { turf: 'Saturday Dem walk' },
     { userId, organizationId: orgId }
   );
-  const rows = (listed.data as { addresses: { voterGeoId: number; canvassStatus?: string }[] })
-    .addresses;
-  // list_turf_addresses tool maps without canvassStatus — check repo path
-  const refreshed = await TurfRepo.listAddresses(turf.id, orgId);
-  const hit = refreshed.addresses.find((a) => a.voterGeoId === stop.voterGeoId);
-  if (!hit || hit.canvassStatus !== 'confirmed') {
-    throw new Error(`Expected confirmed status on stop, got ${hit?.canvassStatus}`);
-  }
-  if (hit.sortOrder !== 1 && hit.sortOrder == null) {
-    throw new Error('sortOrder missing on turf address');
-  }
 
   turf = await TurfRepo.getById(turf.id, orgId);
   console.log({
@@ -70,9 +101,10 @@ async function main() {
     assignedTo: turf?.assigned_to,
     stop: hit.voterGeoId,
     status: hit.canvassStatus,
-    listedCount: rows.length,
+    trailLen: contacts.length,
+    suppressed: hitSuppress.reason,
   });
-  console.log('PASS: G3 smoke — assign + record stop + enriched walk-list');
+  console.log('PASS: G3 smoke — append trail + DNC suppression + rollup');
 }
 
 main()
@@ -81,5 +113,5 @@ main()
     process.exitCode = 1;
   })
   .finally(async () => {
-    await closePool();
+    await closePool().catch(() => undefined);
   });

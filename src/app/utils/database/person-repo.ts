@@ -17,7 +17,12 @@ export type CanvassStatus =
   | 'not_home'
   | 'refused'
   | 'moved'
-  | 'wrong_address';
+  | 'wrong_address'
+  | 'supporter'
+  | 'lean_support'
+  | 'undecided'
+  | 'lean_against'
+  | 'dnc_request';
 
 export type PersonRecordRow = {
   id: number;
