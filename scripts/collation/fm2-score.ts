@@ -321,11 +321,18 @@ async function main() {
   );
 }
 
-main()
-  .catch((e) => {
-    console.error('FAIL', e);
-    process.exitCode = 1;
-  })
-  .finally(async () => {
-    await closePool().catch(() => undefined);
-  });
+// Only run batch when executed directly (not when imported for unit checks)
+const isDirectRun =
+  process.argv[1]?.includes('fm2-score') ||
+  process.argv[1]?.endsWith('fm2-score.ts');
+
+if (isDirectRun) {
+  main()
+    .catch((e) => {
+      console.error('FAIL', e);
+      process.exitCode = 1;
+    })
+    .finally(async () => {
+      await closePool().catch(() => undefined);
+    });
+}
