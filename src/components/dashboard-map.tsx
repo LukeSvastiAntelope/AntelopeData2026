@@ -127,7 +127,7 @@ export interface GeofencingMapProps {
   onDrawVertex?: (lng: number, lat: number) => void
 }
 
-/** Household / person_records pin for D2 map filters. */
+/** Household / person_records pin for D2 map filters + P3 propensity. */
 export type PersonMapPin = {
   id: number
   lng: number
@@ -139,6 +139,14 @@ export type PersonMapPin = {
   canvassStatus?: string | null
   district?: string | null
   addressLine?: string | null
+  /** P3: hot | warm | cold */
+  tier?: 'hot' | 'warm' | 'cold' | string | null
+  /** P3: confidence = 1 − w */
+  confidence?: number | null
+  /** P3: blended propensity */
+  propensity?: number | null
+  /** estimated (prior-heavy) vs confirmed (engagement-heavy) */
+  signal?: 'estimated' | 'confirmed' | null
 }
 
 /** Ordered turf walk-list stop (G3 field data). */
@@ -151,6 +159,9 @@ export type TurfStopPin = {
   party?: string | null
   canvassStatus?: string | null
   personRecordId?: number | null
+  tier?: string | null
+  confidence?: number | null
+  signal?: 'estimated' | 'confirmed' | null
 }
 
 interface DashboardMapProps {
@@ -174,6 +185,8 @@ interface DashboardMapProps {
   personPins?: PersonMapPin[] | null
   /** When true with persons layer, show density heatmap in addition to circles */
   personHeatmap?: boolean
+  /** P3: color household pins by propensity tier instead of party */
+  personColorMode?: 'party' | 'tier'
   /** G3: numbered walk-list stops from a saved turf */
   turfStops?: TurfStopPin[] | null
   geofencing?: GeofencingMapProps | null
@@ -254,6 +267,7 @@ export default function DashboardMap({
   customMapPins,
   personPins,
   personHeatmap = false,
+  personColorMode = 'party',
   turfStops,
   geofencing,
   onDistrictSelect,
@@ -603,6 +617,7 @@ export default function DashboardMap({
           layout: { visibility: 'none' },
           paint: {
             'circle-radius': ['interpolate', ['linear'], ['zoom'], 8, 6, 12, 11, 16, 16],
+            // Default party colors; runtime may swap to tier via setPaintProperty
             'circle-color': [
               'match',
               ['downcase', ['coalesce', ['get', 'effectiveParty'], '']],
@@ -612,15 +627,31 @@ export default function DashboardMap({
               'unaffiliated', '#64748b',
               '#7c3aed',
             ],
-            'circle-opacity': 0.92,
-            'circle-stroke-width': [
-              'match',
-              ['coalesce', ['get', 'canvassStatus'], 'not_contacted'],
-              'confirmed', 3,
-              'contacted', 2,
-              1.5,
+            // Estimated (low conf) softer; confirmed solid
+            'circle-opacity': [
+              'case',
+              ['==', ['get', 'signal'], 'confirmed'], 0.95,
+              0.55,
             ],
-            'circle-stroke-color': isDark ? '#0f172a' : '#fff',
+            'circle-stroke-width': [
+              'case',
+              ['==', ['get', 'signal'], 'confirmed'], 3,
+              ['match',
+                ['coalesce', ['get', 'canvassStatus'], 'not_contacted'],
+                'confirmed', 2.5,
+                'contacted', 2,
+                1.25,
+              ],
+            ],
+            // Confirmed engagement → emerald ring; estimated → amber
+            'circle-stroke-color': [
+              'case',
+              ['==', ['get', 'signal'], 'confirmed'],
+              '#059669',
+              ['==', ['get', 'signal'], 'estimated'],
+              '#d97706',
+              isDark ? '#0f172a' : '#fff',
+            ],
           },
         })
         map.addLayer({
@@ -1252,7 +1283,7 @@ export default function DashboardMap({
     } catch {}
   }, [status, showCustomizableLayer, customMapPins])
 
-  // Household person_records pins + optional density heatmap (D2)
+  // Household person_records pins + optional density heatmap (D2 + P3 tier)
   useEffect(() => {
     if (status !== 'ready' || !mapRef.current) return
     const map = mapRef.current
@@ -1266,6 +1297,10 @@ export default function DashboardMap({
         canvassStatus: p.canvassStatus || 'not_contacted',
         ageBucket: p.ageBucket || '',
         district: p.district || '',
+        tier: p.tier || '',
+        confidence: p.confidence ?? 0,
+        propensity: p.propensity ?? 0,
+        signal: p.signal || (p.confidence != null && p.confidence >= 0.55 ? 'confirmed' : 'estimated'),
       },
       geometry: { type: 'Point' as const, coordinates: [p.lng, p.lat] },
     }))
@@ -1284,8 +1319,29 @@ export default function DashboardMap({
         'visibility',
         show && personHeatmap ? 'visible' : 'none'
       )
+      // P3: party vs tier fill
+      if (personColorMode === 'tier') {
+        map.setPaintProperty('person-points-circles', 'circle-color', [
+          'match',
+          ['coalesce', ['get', 'tier'], ''],
+          'hot', '#ea580c',
+          'warm', '#d97706',
+          'cold', '#0284c7',
+          '#94a3b8',
+        ])
+      } else {
+        map.setPaintProperty('person-points-circles', 'circle-color', [
+          'match',
+          ['downcase', ['coalesce', ['get', 'effectiveParty'], '']],
+          'democrat', '#2563eb',
+          'republican', '#dc2626',
+          'independent', '#ca8a04',
+          'unaffiliated', '#64748b',
+          '#7c3aed',
+        ])
+      }
     } catch {}
-  }, [status, showPersonsLayer, personPins, personHeatmap])
+  }, [status, showPersonsLayer, personPins, personHeatmap, personColorMode])
 
   // Turf walk-list numbered stops (G3)
   useEffect(() => {

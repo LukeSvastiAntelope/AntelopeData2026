@@ -24,6 +24,8 @@ type FunnelSummary = {
   avgPropensity: number | null
   avgConfidence: number | null
   decayK: number
+  estimated?: number
+  confirmed?: number
 }
 
 type VoterRow = {
@@ -38,6 +40,7 @@ type VoterRow = {
   p0: number
   evidence_e: number
   tier: 'hot' | 'warm' | 'cold'
+  signal?: 'estimated' | 'confirmed'
   recomputed_at: string
 }
 
@@ -57,18 +60,21 @@ function tierTone(tier: string) {
 export default function PropensityPlanningPage() {
   const [summary, setSummary] = useState<FunnelSummary | null>(null)
   const [voters, setVoters] = useState<VoterRow[]>([])
+  const [whoToWork, setWhoToWork] = useState<VoterRow[]>([])
   const [tier, setTier] = useState<TierFilter>('all')
+  const [excludeDnc, setExcludeDnc] = useState(true)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [note, setNote] = useState<string | null>(null)
 
-  const load = useCallback(async (tierFilter: TierFilter) => {
+  const load = useCallback(async (tierFilter: TierFilter, notDnc: boolean) => {
     setLoading(true)
     setError(null)
     try {
-      const params = new URLSearchParams({ list: '1', limit: '200' })
+      const params = new URLSearchParams({ list: '1', whoNext: '1', limit: '200' })
       if (tierFilter !== 'all') params.set('tier', tierFilter)
+      if (notDnc) params.set('excludeSuppressed', '1')
       const res = await fetch(`/api/dashboard/propensity?${params}`)
       const data = await res.json()
       if (!res.ok || !data.status) {
@@ -76,19 +82,21 @@ export default function PropensityPlanningPage() {
       }
       setSummary(data.summary)
       setVoters(data.voters || [])
+      setWhoToWork(data.whoToWork || [])
       setNote(data.note || null)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load')
       setSummary(null)
       setVoters([])
+      setWhoToWork([])
     } finally {
       setLoading(false)
     }
   }, [])
 
   useEffect(() => {
-    void load(tier)
-  }, [load, tier])
+    void load(tier, excludeDnc)
+  }, [load, tier, excludeDnc])
 
   const refresh = async () => {
     setRefreshing(true)
@@ -105,7 +113,7 @@ export default function PropensityPlanningPage() {
       }
       setSummary(data.summary)
       setNote(data.note || `Refreshed ${data.refreshed ?? 0} voters`)
-      await load(tier)
+      await load(tier, excludeDnc)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Refresh failed')
     } finally {
@@ -217,6 +225,9 @@ export default function PropensityPlanningPage() {
               <p className="text-[11px] text-muted-foreground">
                 Avg P {pct(summary?.avgPropensity)} · conf {pct(summary?.avgConfidence)} ·{' '}
                 {summary?.total ?? 0} voters
+                {summary?.estimated != null
+                  ? ` · ${summary.estimated} est / ${summary.confirmed ?? 0} confirmed`
+                  : ''}
               </p>
               <p className="text-[10px] text-muted-foreground">
                 Config: <code className="text-[10px]">PROPENSITY_DECAY_K</code> (default 0.85)
@@ -242,6 +253,51 @@ export default function PropensityPlanningPage() {
                 </>
               )}
             </div>
+          </div>
+
+          <div className="space-y-3">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <h2 className="text-sm font-medium">Who to work next</h2>
+              <label className="flex items-center gap-2 text-[11px] text-muted-foreground cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={excludeDnc}
+                  onChange={(e) => setExcludeDnc(e.target.checked)}
+                />
+                Not DNC
+              </label>
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              Ranked by tier × freshness — hot confirmed doors first; already-done doors sink.
+              Compose with Area A on the Dashboard map filters.
+            </p>
+            {loading ? null : whoToWork.length === 0 ? (
+              <p className="text-sm text-muted-foreground italic">No open leads in this filter.</p>
+            ) : (
+              <ol className="space-y-1.5 rounded-md border border-border divide-y divide-border/60">
+                {whoToWork.slice(0, 20).map((v, i) => (
+                  <li
+                    key={v.person_record_id}
+                    className="flex items-center justify-between gap-3 px-3 py-2 text-sm"
+                  >
+                    <div className="min-w-0">
+                      <p className="font-medium truncate">
+                        {i + 1}. {v.label || `Person #${v.person_record_id}`}
+                      </p>
+                      <p className="text-[11px] text-muted-foreground">
+                        {[v.party, v.district].filter(Boolean).join(' · ') || '—'} · P=
+                        {v.propensity.toFixed(3)} · {v.signal || 'estimated'}
+                      </p>
+                    </div>
+                    <span
+                      className={`shrink-0 inline-flex items-center rounded border px-1.5 py-0.5 text-[10px] capitalize ${tierTone(v.tier)}`}
+                    >
+                      {v.tier}
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            )}
           </div>
 
           <div className="space-y-3">
@@ -286,6 +342,7 @@ export default function PropensityPlanningPage() {
                     <tr>
                       <th className="text-left font-medium px-3 py-2">Voter</th>
                       <th className="text-left font-medium px-3 py-2">Tier</th>
+                      <th className="text-left font-medium px-3 py-2">Signal</th>
                       <th className="text-right font-medium px-3 py-2">P</th>
                       <th className="text-right font-medium px-3 py-2">Conf</th>
                       <th className="text-right font-medium px-3 py-2">w (prior)</th>
@@ -311,6 +368,9 @@ export default function PropensityPlanningPage() {
                           >
                             {v.tier}
                           </span>
+                        </td>
+                        <td className="px-3 py-2 text-[11px] text-muted-foreground capitalize">
+                          {v.signal || (v.confidence >= 0.55 ? 'confirmed' : 'estimated')}
                         </td>
                         <td className="px-3 py-2 text-right tabular-nums font-medium">
                           {v.propensity.toFixed(3)}

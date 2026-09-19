@@ -5,7 +5,23 @@ import type { PropensityTier } from '@/app/utils/propensity/config';
 
 export const runtime = 'nodejs';
 
-/** GET /api/dashboard/propensity — funnel summary + optional tier list. */
+function csvList(v: string | null): string[] | undefined {
+  if (!v) return undefined;
+  const parts = v
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  return parts.length ? parts : undefined;
+}
+
+function parseTiers(v: string | null): PropensityTier[] | undefined {
+  const list = csvList(v);
+  if (!list) return undefined;
+  const tiers = list.filter((t): t is PropensityTier => t === 'hot' || t === 'warm' || t === 'cold');
+  return tiers.length ? tiers : undefined;
+}
+
+/** GET /api/dashboard/propensity — funnel + who-to-work + optional tier list. */
 export async function GET(request: NextRequest) {
   try {
     const userId = request.headers.get('x-user-id');
@@ -13,8 +29,15 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ status: false, message: 'Unauthorized' }, { status: 401 });
     }
     const orgId = await ensurePrimaryOrgId(userId);
-    const tier = request.nextUrl.searchParams.get('tier') as PropensityTier | null;
-    const includeList = request.nextUrl.searchParams.get('list') === '1';
+    const sp = request.nextUrl.searchParams;
+    const tier = parseTiers(sp.get('tier'));
+    const includeList = sp.get('list') === '1';
+    const whoNext = sp.get('whoNext') === '1' || sp.get('who_next') === '1';
+    const excludeSuppressed =
+      sp.get('excludeSuppressed') === '1' ||
+      sp.get('excludeSuppressed') === 'true' ||
+      sp.get('notDnc') === '1';
+    const includeAreas = csvList(sp.get('includeArea') || sp.get('includeAreas'));
 
     const summary = await PropensityRepo.funnelSummary(orgId);
     const payload: Record<string, unknown> = {
@@ -24,10 +47,22 @@ export async function GET(request: NextRequest) {
       note: 'Materialized propensity view — recomputed from engagement; not a frozen score.',
     };
 
+    if (whoNext) {
+      payload.whoToWork = await PropensityRepo.whoToWorkNext(orgId, {
+        tier: tier?.length === 1 ? tier[0] : tier,
+        excludeSuppressed: excludeSuppressed || undefined,
+        includeFenceLabels: includeAreas,
+        limit: Number(sp.get('limit') || 40),
+        openOnly: sp.get('openOnly') !== '0',
+      });
+    }
+
     if (includeList) {
       payload.voters = await PropensityRepo.listByOrg(orgId, {
-        tier: tier || undefined,
-        limit: Number(request.nextUrl.searchParams.get('limit') || 200),
+        tier: tier?.length === 1 ? tier[0] : tier,
+        excludeSuppressed: excludeSuppressed || undefined,
+        includeFenceLabels: includeAreas,
+        limit: Number(sp.get('limit') || 200),
       });
     }
 

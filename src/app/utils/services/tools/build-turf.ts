@@ -16,6 +16,8 @@ type Input = {
   excludeFenceIds?: number[];
   segmentId?: string;
   party?: string[];
+  /** P3: hot | warm | cold — composable with Area A / not-DNC */
+  propensityTier?: Array<'hot' | 'warm' | 'cold'>;
   minPartisanScore?: number;
   maxPartisanScore?: number;
   minTurnoutScore?: number;
@@ -37,7 +39,7 @@ type Input = {
 export const buildTurfTool: CampaignTool<Input> = {
   name: 'build_turf',
   description:
-    'Build and save a named turf (ordered walk-list). Layers: include fences ∩ filters − exclude fences − do-not-contact − optional already-contacted. Example: includeAreas=["Area A"], segmentId="likely-dem", excludeContacted=true.',
+    'Build and save a named turf (ordered walk-list). Layers: include fences ∩ filters − exclude fences − do-not-contact − optional already-contacted. Example: includeAreas=["Area A"], propensityTier=["hot"], excludeSuppressed=true.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -56,9 +58,14 @@ export const buildTurfTool: CampaignTool<Input> = {
       excludeFenceIds: { type: 'array', items: { type: 'number' } },
       segmentId: {
         type: 'string',
-        description: 'Preset shorthand e.g. likely-dem, likely-voters, swing-voters',
+        description: 'Preset shorthand e.g. likely-dem, hot, warm, cold, swing-voters',
       },
       party: { type: 'array', items: { type: 'string' } },
+      propensityTier: {
+        type: 'array',
+        items: { type: 'string', enum: ['hot', 'warm', 'cold'] },
+        description: 'P3 propensity tiers — e.g. ["hot"] for hot + Area A + not-DNC',
+      },
       minPartisanScore: { type: 'number' },
       maxPartisanScore: { type: 'number' },
       minTurnoutScore: { type: 'number' },
@@ -89,6 +96,7 @@ export const buildTurfTool: CampaignTool<Input> = {
     const fromSegment = filtersFromSegmentId(input.segmentId);
     const filters: TurfFilters = mergeFilters(fromSegment, {
       party: input.party,
+      propensityTier: input.propensityTier,
       minPartisanScore: input.minPartisanScore,
       maxPartisanScore: input.maxPartisanScore,
       minTurnoutScore: input.minTurnoutScore,

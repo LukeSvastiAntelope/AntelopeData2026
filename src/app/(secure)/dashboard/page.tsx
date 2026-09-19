@@ -189,6 +189,10 @@ export default function DashboardPage() {
       voterStatus?: string | null
       matchConfidence?: number
       canvassNotes?: string | null
+      tier?: string | null
+      confidence?: number | null
+      propensity?: number | null
+      signal?: 'estimated' | 'confirmed' | null
     }[]
   >([])
   const [turfList, setTurfList] = useState<
@@ -218,6 +222,8 @@ export default function DashboardPage() {
     avgPropensity: number | null
     avgConfidence: number | null
     decayK: number
+    estimated?: number
+    confirmed?: number
   } | null>(null)
   const [propensityLoading, setPropensityLoading] = useState(false)
   const [propensityRefreshing, setPropensityRefreshing] = useState(false)
@@ -225,8 +231,27 @@ export default function DashboardPage() {
     party: [] as string[],
     ageBucket: [] as string[],
     voterStatus: [] as string[],
+    /** P3 tier chips */
+    tier: [] as string[],
+    /** Area A / geofence labels */
+    includeArea: [] as string[],
+    excludeSuppressed: false,
   })
   const [personHeatmap, setPersonHeatmap] = useState(false)
+  const [personColorMode, setPersonColorMode] = useState<'party' | 'tier'>('tier')
+  const [whoToWork, setWhoToWork] = useState<
+    {
+      person_record_id: number
+      label?: string
+      party?: string | null
+      tier: string
+      propensity: number
+      confidence: number
+      signal?: string
+      latitude?: number | null
+      longitude?: number | null
+    }[]
+  >([])
   const [personLoading, setPersonLoading] = useState(false)
   const [selectedPersonId, setSelectedPersonId] = useState<number | null>(null)
   const [confirmParty, setConfirmParty] = useState('Democrat')
@@ -440,6 +465,9 @@ export default function DashboardPage() {
       if (personFilters.party.length) qs.set('party', personFilters.party.join(','))
       if (personFilters.ageBucket.length) qs.set('ageBucket', personFilters.ageBucket.join(','))
       if (personFilters.voterStatus.length) qs.set('voterStatus', personFilters.voterStatus.join(','))
+      if (personFilters.tier.length) qs.set('tier', personFilters.tier.join(','))
+      if (personFilters.includeArea.length) qs.set('includeArea', personFilters.includeArea.join(','))
+      if (personFilters.excludeSuppressed) qs.set('excludeSuppressed', '1')
       const res = await fetch(`/api/dashboard/persons?${qs.toString()}`)
       const data = await res.json()
       if (!res.ok || !data.status) throw new Error(data.message || 'Failed to load households')
@@ -457,6 +485,10 @@ export default function DashboardPage() {
         voterStatus: p.voterStatus,
         matchConfidence: p.matchConfidence,
         canvassNotes: p.canvassNotes,
+        tier: p.propensity?.tier ?? null,
+        confidence: p.propensity?.confidence ?? null,
+        propensity: p.propensity?.blended ?? null,
+        signal: p.propensity?.signal ?? null,
       }))
       setPersonPins(pins)
       setLayers((prev) => ({ ...prev, persons: true }))
@@ -471,7 +503,14 @@ export default function DashboardPage() {
   useEffect(() => {
     if (layers.persons) void loadPersons({ silent: true })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [personFilters.party.join(','), personFilters.ageBucket.join(','), personFilters.voterStatus.join(',')])
+  }, [
+    personFilters.party.join(','),
+    personFilters.ageBucket.join(','),
+    personFilters.voterStatus.join(','),
+    personFilters.tier.join(','),
+    personFilters.includeArea.join(','),
+    personFilters.excludeSuppressed,
+  ])
 
   const selectedPerson = useMemo(
     () => personPins.find((p) => p.id === selectedPersonId) || null,
@@ -606,16 +645,21 @@ export default function DashboardPage() {
   const loadPropensity = useCallback(async (opts?: { silent?: boolean }) => {
     if (!opts?.silent) setPropensityLoading(true)
     try {
-      const res = await fetch('/api/dashboard/propensity')
+      const qs = new URLSearchParams({ whoNext: '1', limit: '25' })
+      if (personFilters.tier.length) qs.set('tier', personFilters.tier.join(','))
+      if (personFilters.includeArea.length) qs.set('includeArea', personFilters.includeArea.join(','))
+      if (personFilters.excludeSuppressed) qs.set('excludeSuppressed', '1')
+      const res = await fetch(`/api/dashboard/propensity?${qs}`)
       const data = await res.json()
       if (!res.ok || !data.status) return
       setPropensitySummary(data.summary || null)
+      setWhoToWork(data.whoToWork || [])
     } catch {
       /* ignore */
     } finally {
       if (!opts?.silent) setPropensityLoading(false)
     }
-  }, [])
+  }, [personFilters.tier, personFilters.includeArea, personFilters.excludeSuppressed])
 
   const refreshPropensity = useCallback(async () => {
     setPropensityRefreshing(true)
@@ -629,12 +673,14 @@ export default function DashboardPage() {
       if (!res.ok || !data.status) throw new Error(data.message || 'Refresh failed')
       setPropensitySummary(data.summary || null)
       toast.success(`Propensity refreshed · ${data.refreshed ?? 0} voters`)
+      await loadPropensity({ silent: true })
+      if (layers.persons) await loadPersons({ silent: true })
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Propensity refresh failed')
     } finally {
       setPropensityRefreshing(false)
     }
-  }, [])
+  }, [loadPropensity, loadPersons, layers.persons])
 
   const loadTurfStops = useCallback(async (turfId: number) => {
     setTurfLoading(true)
@@ -1000,6 +1046,7 @@ export default function DashboardPage() {
           customMapPins={customMapPins}
           personPins={layers.persons ? personPins : null}
           personHeatmap={personHeatmap}
+          personColorMode={personColorMode}
           turfStops={layers.turf ? turfStops : null}
           geofencing={geofencingMapProps}
           onDistrictSelect={(district) => {
@@ -1250,8 +1297,8 @@ export default function DashboardPage() {
             <Section title="Propensity funnel" defaultOpen>
               <div className="space-y-2 text-[10px] text-muted-foreground">
                 <p>
-                  Decaying blend P = w·p₀ + (1−w)·q. Materialized view — recomputed from engagement,
-                  not a frozen score.
+                  Hot / warm / cold from the decaying blend. Pins: solid emerald ring = confirmed,
+                  amber = estimated.
                 </p>
                 {propensityLoading && !propensitySummary ? (
                   <div className="flex items-center gap-1.5">
@@ -1260,39 +1307,104 @@ export default function DashboardPage() {
                 ) : propensitySummary ? (
                   <div className="space-y-1.5">
                     <div className="grid grid-cols-3 gap-1">
-                      <div className="rounded border border-orange-500/30 bg-orange-500/10 px-1.5 py-1 text-center">
-                        <p className="text-[9px] uppercase text-orange-600 dark:text-orange-400">Hot</p>
-                        <p className="text-[12px] font-semibold text-foreground tabular-nums">
-                          {propensitySummary.hot}
-                        </p>
-                      </div>
-                      <div className="rounded border border-amber-500/30 bg-amber-500/10 px-1.5 py-1 text-center">
-                        <p className="text-[9px] uppercase text-amber-600 dark:text-amber-400">Warm</p>
-                        <p className="text-[12px] font-semibold text-foreground tabular-nums">
-                          {propensitySummary.warm}
-                        </p>
-                      </div>
-                      <div className="rounded border border-sky-500/30 bg-sky-500/10 px-1.5 py-1 text-center">
-                        <p className="text-[9px] uppercase text-sky-600 dark:text-sky-400">Cold</p>
-                        <p className="text-[12px] font-semibold text-foreground tabular-nums">
-                          {propensitySummary.cold}
-                        </p>
-                      </div>
+                      {(['hot', 'warm', 'cold'] as const).map((t) => {
+                        const count =
+                          t === 'hot'
+                            ? propensitySummary.hot
+                            : t === 'warm'
+                              ? propensitySummary.warm
+                              : propensitySummary.cold
+                        const on = personFilters.tier.includes(t)
+                        const tone =
+                          t === 'hot'
+                            ? 'border-orange-500/40 bg-orange-500/10 text-orange-700 dark:text-orange-300'
+                            : t === 'warm'
+                              ? 'border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300'
+                              : 'border-sky-500/40 bg-sky-500/10 text-sky-700 dark:text-sky-300'
+                        return (
+                          <button
+                            key={t}
+                            type="button"
+                            title={`Filter map to ${t}`}
+                            className={`rounded border px-1.5 py-1 text-center capitalize ${tone} ${
+                              on ? 'ring-1 ring-foreground/40' : ''
+                            }`}
+                            onClick={() => {
+                              setPersonFilters((prev) => ({
+                                ...prev,
+                                tier: on ? prev.tier.filter((x) => x !== t) : [...prev.tier, t],
+                              }))
+                              setLayers((prev) => ({ ...prev, persons: true }))
+                              setPersonColorMode('tier')
+                            }}
+                          >
+                            <p className="text-[9px] uppercase">{t}</p>
+                            <p className="text-[12px] font-semibold text-foreground tabular-nums">
+                              {count}
+                            </p>
+                          </button>
+                        )
+                      })}
                     </div>
                     <p className="text-[9px]">
                       k={propensitySummary.decayK.toFixed(2)} · avg P{' '}
                       {propensitySummary.avgPropensity != null
                         ? propensitySummary.avgPropensity.toFixed(2)
                         : '—'}{' '}
-                      · conf{' '}
-                      {propensitySummary.avgConfidence != null
-                        ? propensitySummary.avgConfidence.toFixed(2)
-                        : '—'}
+                      · est {propensitySummary.estimated ?? '—'} / conf{' '}
+                      {propensitySummary.confirmed ?? '—'}
                     </p>
                   </div>
                 ) : (
                   <p className="italic">No rows yet — recompute after households are on the map.</p>
                 )}
+
+                <div className="space-y-1">
+                  <p className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    Who to work next
+                  </p>
+                  {whoToWork.length === 0 ? (
+                    <p className="italic text-[9px]">Refresh propensity to populate the work list.</p>
+                  ) : (
+                    <div className="max-h-36 overflow-y-auto space-y-1">
+                      {whoToWork.slice(0, 12).map((w, i) => (
+                        <button
+                          key={w.person_record_id}
+                          type="button"
+                          className="w-full text-left rounded border border-border/50 px-1.5 py-1 hover:bg-muted/40"
+                          onClick={() => {
+                            if (w.latitude != null && w.longitude != null) {
+                              setLayers((prev) => ({ ...prev, persons: true }))
+                              setSelectedPersonId(w.person_record_id)
+                            }
+                          }}
+                        >
+                          <div className="flex items-center justify-between gap-1">
+                            <span className="truncate text-[10px] text-foreground">
+                              {i + 1}. {w.label || `#${w.person_record_id}`}
+                            </span>
+                            <span
+                              className={`shrink-0 text-[9px] capitalize px-1 rounded border ${
+                                w.tier === 'hot'
+                                  ? 'border-orange-500/40 text-orange-600'
+                                  : w.tier === 'warm'
+                                    ? 'border-amber-500/40 text-amber-600'
+                                    : 'border-sky-500/40 text-sky-600'
+                              }`}
+                            >
+                              {w.tier}
+                            </span>
+                          </div>
+                          <p className="text-[9px] text-muted-foreground">
+                            P={w.propensity.toFixed(2)} · {w.signal || 'estimated'} ·{' '}
+                            {w.party || '—'}
+                          </p>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
                 <div className="flex gap-1">
                   <Button
                     size="sm"
@@ -1918,6 +2030,84 @@ export default function DashboardPage() {
                   </div>
                 </div>
                 <div className="space-y-1">
+                  <Label className="text-[10px]">Propensity tier</Label>
+                  <div className="flex flex-wrap gap-1">
+                    {(['hot', 'warm', 'cold'] as const).map((t) => {
+                      const on = personFilters.tier.includes(t)
+                      const tone =
+                        t === 'hot'
+                          ? 'bg-orange-500/15 border-orange-500/40 text-orange-700 dark:text-orange-300'
+                          : t === 'warm'
+                            ? 'bg-amber-500/15 border-amber-500/40 text-amber-700 dark:text-amber-300'
+                            : 'bg-sky-500/15 border-sky-500/40 text-sky-700 dark:text-sky-300'
+                      return (
+                        <button
+                          key={t}
+                          type="button"
+                          className={`px-1.5 py-0.5 rounded text-[10px] border capitalize ${
+                            on ? tone : 'border-border text-muted-foreground'
+                          }`}
+                          onClick={() =>
+                            setPersonFilters((prev) => ({
+                              ...prev,
+                              tier: on ? prev.tier.filter((x) => x !== t) : [...prev.tier, t],
+                            }))
+                          }
+                        >
+                          {t}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[10px]">Inside area (geofence label)</Label>
+                  <div className="flex flex-wrap gap-1">
+                    {Array.from(
+                      new Set([
+                        'Area A',
+                        ...geofences.filter((g) => g.mode === 'include' && g.label).map((g) => g.label!),
+                      ])
+                    ).map((label) => {
+                      const on = personFilters.includeArea.includes(label)
+                      return (
+                        <button
+                          key={label}
+                          type="button"
+                          className={`px-1.5 py-0.5 rounded text-[10px] border ${
+                            on
+                              ? 'bg-teal-500/15 border-teal-500/40 text-teal-700 dark:text-teal-300'
+                              : 'border-border text-muted-foreground'
+                          }`}
+                          onClick={() =>
+                            setPersonFilters((prev) => ({
+                              ...prev,
+                              includeArea: on
+                                ? prev.includeArea.filter((x) => x !== label)
+                                : [...prev.includeArea, label],
+                            }))
+                          }
+                        >
+                          {label}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+                <label className="flex items-center gap-2 text-[10px] text-muted-foreground cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={personFilters.excludeSuppressed}
+                    onChange={(e) =>
+                      setPersonFilters((prev) => ({
+                        ...prev,
+                        excludeSuppressed: e.target.checked,
+                      }))
+                    }
+                  />
+                  Not DNC (exclude suppressed)
+                </label>
+                <div className="space-y-1">
                   <Label className="text-[10px]">Age bucket</Label>
                   <div className="flex flex-wrap gap-1">
                     {['18-24', '25-34', '35-44', '45-54', '55-64', '65+'].map((b) => {
@@ -1948,8 +2138,35 @@ export default function DashboardPage() {
                   />
                   Party density heatmap
                 </label>
+                <div className="flex gap-1">
+                  <button
+                    type="button"
+                    className={`flex-1 px-1.5 py-0.5 rounded text-[10px] border ${
+                      personColorMode === 'tier'
+                        ? 'bg-orange-500/15 border-orange-500/40'
+                        : 'border-border text-muted-foreground'
+                    }`}
+                    onClick={() => setPersonColorMode('tier')}
+                  >
+                    Color by tier
+                  </button>
+                  <button
+                    type="button"
+                    className={`flex-1 px-1.5 py-0.5 rounded text-[10px] border ${
+                      personColorMode === 'party'
+                        ? 'bg-sky-500/15 border-sky-500/40'
+                        : 'border-border text-muted-foreground'
+                    }`}
+                    onClick={() => setPersonColorMode('party')}
+                  >
+                    Color by party
+                  </button>
+                </div>
                 <p className="text-[10px] text-muted-foreground">
-                  {personPins.length} households · pins colored by lean (blue Dem / red Rep / gold Ind)
+                  {personPins.length} households ·{' '}
+                  {personColorMode === 'tier'
+                    ? 'tier fill (hot/warm/cold) · emerald=confirmed · amber=estimated'
+                    : 'party fill · emerald ring=confirmed engagement'}
                 </p>
 
                 {selectedPerson && (

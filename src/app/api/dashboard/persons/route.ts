@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PersonRepo, toMapPerson } from '@/app/utils/database/person-repo';
+import { PropensityRepo } from '@/app/utils/database/propensity-repo';
 import { ensurePrimaryOrgId } from '@/app/api/dashboard/persons/org';
+import type { PropensityTier } from '@/app/utils/propensity/config';
 
 export const runtime = 'nodejs';
 
@@ -13,7 +15,7 @@ function csvList(v: string | null): string[] | undefined {
   return parts.length ? parts : undefined;
 }
 
-/** GET /api/dashboard/persons — filtered household pins for the map (D2). */
+/** GET /api/dashboard/persons — filtered household pins for the map (D2 + P3 tier). */
 export async function GET(request: NextRequest) {
   try {
     const userId = request.headers.get('x-user-id');
@@ -24,6 +26,11 @@ export async function GET(request: NextRequest) {
     const orgId = await ensurePrimaryOrgId(userId);
 
     const sp = request.nextUrl.searchParams;
+    const tierRaw = csvList(sp.get('tier') || sp.get('propensityTier'));
+    const propensityTier = tierRaw?.filter((t): t is PropensityTier =>
+      t === 'hot' || t === 'warm' || t === 'cold'
+    );
+
     const people = await PersonRepo.listForMap({
       organizationId: orgId,
       party: csvList(sp.get('party')),
@@ -37,14 +44,43 @@ export async function GET(request: NextRequest) {
           ? null
           : sp.get('ownerOccupied') === '1' || sp.get('ownerOccupied') === 'true',
       minConfidence: sp.get('minConfidence') ? Number(sp.get('minConfidence')) : undefined,
+      propensityTier,
+      excludeSuppressed:
+        sp.get('excludeSuppressed') === '1' || sp.get('excludeSuppressed') === 'true',
+      includeFenceLabels: csvList(sp.get('includeArea') || sp.get('includeAreas')),
+      includeFenceIds: csvList(sp.get('includeFenceIds'))?.map(Number).filter(Number.isFinite),
+      excludeFenceLabels: csvList(sp.get('excludeArea') || sp.get('excludeAreas')),
       limit: sp.get('limit') ? Number(sp.get('limit')) : 5000,
     });
+
+    // Enrich from materialized view when available
+    const stored = await PropensityRepo.listByOrg(orgId, { limit: 5000 });
+    const byId = new Map(
+      stored.map((r) => [
+        r.person_record_id,
+        {
+          propensity: r.propensity,
+          confidence: r.confidence,
+          tier: r.tier,
+          priorWeight: r.prior_weight,
+          priorP0: r.p0,
+          posteriorQ: r.posterior_q,
+          evidenceE: r.evidence_e,
+        },
+      ])
+    );
 
     return NextResponse.json({
       status: true,
       organizationId: orgId,
       count: people.length,
-      people: people.map(toMapPerson),
+      people: people.map((p) => toMapPerson(p, byId.get(p.id) || null)),
+      filters: {
+        tier: propensityTier || [],
+        excludeSuppressed:
+          sp.get('excludeSuppressed') === '1' || sp.get('excludeSuppressed') === 'true',
+        includeArea: csvList(sp.get('includeArea') || sp.get('includeAreas')) || [],
+      },
     });
   } catch (error) {
     console.error('[dashboard/persons GET]', error);
@@ -130,6 +166,12 @@ export async function POST(request: NextRequest) {
     }
 
     const result = await PersonRepo.upsertFromUpload(orgId, withCoords);
+    // Refresh propensity for uploaded set (bounded)
+    try {
+      await PropensityRepo.refreshOrganization(orgId, { limit: Math.min(withCoords.length, 2000) });
+    } catch (e) {
+      console.warn('[persons POST propensity refresh]', e);
+    }
     const people = await PersonRepo.listForMap({ organizationId: orgId, limit: 5000 });
 
     return NextResponse.json({
@@ -137,7 +179,7 @@ export async function POST(request: NextRequest) {
       upserted: result.upserted,
       skippedWithoutCoords: mapped.length - withCoords.length,
       count: people.length,
-      people: people.map(toMapPerson),
+      people: people.map((p) => toMapPerson(p)),
     });
   } catch (error) {
     console.error('[dashboard/persons POST]', error);

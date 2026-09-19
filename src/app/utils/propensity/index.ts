@@ -17,4 +17,14 @@ export {
   eventsFromPersonCanvass,
   eventsFromTurfOutcome,
 } from './evidence';
-export { getDecayK, DEFAULT_DECAY_K, bucketTier, PROPENSITY_FORMULA_VERSION } from './config';
+export {
+  getDecayK,
+  DEFAULT_DECAY_K,
+  bucketTier,
+  tierRank,
+  isConfirmedConfidence,
+  CONFIDENCE_CONFIRMED_THRESHOLD,
+  PROPENSITY_FORMULA_VERSION,
+} from './config';
+export { whoToWorkSortKey, sortWhoToWork } from './sales';
+export type { WhoToWorkInput } from './sales';

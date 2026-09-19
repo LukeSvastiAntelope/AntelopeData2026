@@ -64,6 +64,14 @@ export type PersonMapFilters = {
   ownerOccupied?: boolean | null;
   canvassStatus?: string[];
   minConfidence?: number;
+  /** P3: filter by materialized propensity tier */
+  propensityTier?: Array<'hot' | 'warm' | 'cold'>;
+  /** P3: subtract contact_suppression on person_record_id */
+  excludeSuppressed?: boolean;
+  includeFenceIds?: number[];
+  includeFenceLabels?: string[];
+  excludeFenceIds?: number[];
+  excludeFenceLabels?: string[];
   bbox?: { west: number; south: number; east: number; north: number };
   limit?: number;
 };
@@ -108,58 +116,150 @@ function ageBucketFromYears(age: number | null): string | null {
 export class PersonRepo {
   static async listForMap(filters: PersonMapFilters = {}): Promise<PersonRecordRow[]> {
     const sql = await openSql();
-    const where: string[] = ['latitude IS NOT NULL', 'longitude IS NOT NULL'];
+    const where: string[] = ['pr.latitude IS NOT NULL', 'pr.longitude IS NOT NULL'];
     const params: unknown[] = [];
 
     if (filters.organizationId != null) {
-      where.push('organization_id = ?');
+      where.push('pr.organization_id = ?');
       params.push(filters.organizationId);
     }
     if (filters.party?.length) {
       // Effective lean: door-confirmed party wins when present
       where.push(
-        `COALESCE(NULLIF(canvass_party, ''), party) IN (${filters.party.map(() => '?').join(',')})`
+        `COALESCE(NULLIF(pr.canvass_party, ''), pr.party) IN (${filters.party.map(() => '?').join(',')})`
       );
       params.push(...filters.party);
     }
     if (filters.ageBucket?.length) {
-      where.push(`age_bucket IN (${filters.ageBucket.map(() => '?').join(',')})`);
+      where.push(`pr.age_bucket IN (${filters.ageBucket.map(() => '?').join(',')})`);
       params.push(...filters.ageBucket);
     }
     if (filters.voterStatus?.length) {
-      where.push(`voter_status IN (${filters.voterStatus.map(() => '?').join(',')})`);
+      where.push(`pr.voter_status IN (${filters.voterStatus.map(() => '?').join(',')})`);
       params.push(...filters.voterStatus);
     }
     if (filters.district?.length) {
-      where.push(`district IN (${filters.district.map(() => '?').join(',')})`);
+      where.push(`pr.district IN (${filters.district.map(() => '?').join(',')})`);
       params.push(...filters.district);
     }
     if (filters.zip?.length) {
-      where.push(`zip IN (${filters.zip.map(() => '?').join(',')})`);
+      where.push(`pr.zip IN (${filters.zip.map(() => '?').join(',')})`);
       params.push(...filters.zip);
     }
     if (filters.ownerOccupied != null) {
-      where.push('owner_occupied = ?');
+      where.push('pr.owner_occupied = ?');
       params.push(filters.ownerOccupied ? 1 : 0);
     }
     if (filters.canvassStatus?.length) {
       where.push(
-        `IFNULL(canvass_status, 'not_contacted') IN (${filters.canvassStatus.map(() => '?').join(',')})`
+        `IFNULL(pr.canvass_status, 'not_contacted') IN (${filters.canvassStatus.map(() => '?').join(',')})`
       );
       params.push(...filters.canvassStatus);
     }
     if (filters.minConfidence != null) {
-      where.push('match_confidence >= ?');
+      where.push('pr.match_confidence >= ?');
       params.push(filters.minConfidence);
     }
+    if (filters.propensityTier?.length) {
+      where.push(
+        `EXISTS (
+           SELECT 1 FROM voter_propensity vp
+           WHERE vp.person_record_id = pr.id
+             AND vp.tier IN (${filters.propensityTier.map(() => '?').join(',')})
+         )`
+      );
+      params.push(...filters.propensityTier);
+    }
+    if (filters.excludeSuppressed) {
+      where.push(
+        `NOT EXISTS (
+           SELECT 1 FROM contact_suppression cs
+           WHERE cs.organization_id = pr.organization_id
+             AND cs.person_record_id = pr.id
+         )`
+      );
+    }
     if (filters.bbox) {
-      where.push('longitude BETWEEN ? AND ? AND latitude BETWEEN ? AND ?');
+      where.push('pr.longitude BETWEEN ? AND ? AND pr.latitude BETWEEN ? AND ?');
       params.push(filters.bbox.west, filters.bbox.east, filters.bbox.south, filters.bbox.north);
+    }
+
+    // Geofence include / exclude (same layers as turf cutting)
+    if (filters.includeFenceIds?.length || filters.includeFenceLabels?.length) {
+      const { GeofenceRepo } = await import('@/app/utils/database/geo-repo');
+      const ids = new Set<number>(filters.includeFenceIds || []);
+      for (const label of filters.includeFenceLabels || []) {
+        if (filters.organizationId != null) {
+          const f = await GeofenceRepo.getByLabel(label, filters.organizationId);
+          if (f) ids.add(f.id);
+        }
+      }
+      const includeIds = [...ids];
+      if (includeIds.length) {
+        where.push(
+          `EXISTS (
+             SELECT 1 FROM geofences fi
+             WHERE fi.organization_id = pr.organization_id
+               AND fi.id IN (${includeIds.map(() => '?').join(',')})
+               AND (
+                 (fi.fence_type = 'polygon' AND ST_Contains(
+                    fi.geom,
+                    ST_GeomFromText(CONCAT('POINT(', pr.latitude, ' ', pr.longitude, ')'), 4326)
+                  ))
+                 OR (
+                   fi.fence_type = 'circle' AND fi.radius_m IS NOT NULL
+                   AND ST_Distance_Sphere(
+                     ST_GeomFromText(CONCAT('POINT(', pr.latitude, ' ', pr.longitude, ')'), 4326),
+                     fi.geom
+                   ) <= fi.radius_m
+                 )
+               )
+           )`
+        );
+        params.push(...includeIds);
+      } else {
+        // Labels requested but none resolved → empty result
+        where.push('1 = 0');
+      }
+    }
+    if (filters.excludeFenceIds?.length || filters.excludeFenceLabels?.length) {
+      const { GeofenceRepo } = await import('@/app/utils/database/geo-repo');
+      const ids = new Set<number>(filters.excludeFenceIds || []);
+      for (const label of filters.excludeFenceLabels || []) {
+        if (filters.organizationId != null) {
+          const f = await GeofenceRepo.getByLabel(label, filters.organizationId);
+          if (f) ids.add(f.id);
+        }
+      }
+      const excludeIds = [...ids];
+      if (excludeIds.length) {
+        where.push(
+          `NOT EXISTS (
+             SELECT 1 FROM geofences fe
+             WHERE fe.organization_id = pr.organization_id
+               AND fe.id IN (${excludeIds.map(() => '?').join(',')})
+               AND (
+                 (fe.fence_type = 'polygon' AND ST_Contains(
+                    fe.geom,
+                    ST_GeomFromText(CONCAT('POINT(', pr.latitude, ' ', pr.longitude, ')'), 4326)
+                  ))
+                 OR (
+                   fe.fence_type = 'circle' AND fe.radius_m IS NOT NULL
+                   AND ST_Distance_Sphere(
+                     ST_GeomFromText(CONCAT('POINT(', pr.latitude, ' ', pr.longitude, ')'), 4326),
+                     fe.geom
+                   ) <= fe.radius_m
+                 )
+               )
+           )`
+        );
+        params.push(...excludeIds);
+      }
     }
 
     const limit = Math.min(Math.max(filters.limit || 5000, 1), 20000);
     const [rows] = await sql.execute(
-      `SELECT * FROM person_records WHERE ${where.join(' AND ')} ORDER BY id ASC LIMIT ${limit}`,
+      `SELECT pr.* FROM person_records pr WHERE ${where.join(' AND ')} ORDER BY pr.id ASC LIMIT ${limit}`,
       params
     );
     return rows as PersonRecordRow[];
@@ -368,23 +468,69 @@ export class PersonRepo {
 }
 
 /** Map API shape with effective (door-confirmed) party for coloring. */
-export function toMapPerson(row: PersonRecordRow) {
+export function toMapPerson(
+  row: PersonRecordRow,
+  stored?: {
+    propensity: number;
+    confidence: number;
+    tier: string;
+    priorWeight: number;
+    priorP0: number;
+    posteriorQ: number | null;
+    evidenceE: number;
+  } | null
+) {
   const effectiveParty = (row.canvass_party || row.party || '').trim() || null;
-  // P2 propensity — recomputed from Map prior + engagement (not a stored ballistic score).
-  // Orchestrator must use propensity.blended, never propensity.priorP0.
-  const events = eventsFromPersonCanvass(row);
-  const propensity = resolvePropensityForOrchestrator(
-    {
-      party: row.party,
-      canvassParty: row.canvass_party,
-      voterStatus: row.voter_status,
-      district: row.district,
-      zip: row.zip,
-      state: row.state,
-    },
-    0,
-    events
-  );
+  // Prefer materialized voter_propensity when present; else live recompute (P2).
+  let propensity: {
+    blended: number;
+    priorWeight: number;
+    phase: string;
+    confidence: number;
+    posteriorQ: number | null;
+    tier: string;
+    evidenceE: number;
+    priorP0: number;
+    priorFormula: string;
+  };
+  if (stored) {
+    propensity = {
+      blended: stored.propensity,
+      priorWeight: stored.priorWeight,
+      phase: stored.evidenceE > 0 || stored.posteriorQ != null ? 'p2_blend' : 'p1_prior_only',
+      confidence: stored.confidence,
+      posteriorQ: stored.posteriorQ,
+      tier: stored.tier,
+      evidenceE: stored.evidenceE,
+      priorP0: stored.priorP0,
+      priorFormula: 'p1.prior.v1',
+    };
+  } else {
+    const events = eventsFromPersonCanvass(row);
+    const read = resolvePropensityForOrchestrator(
+      {
+        party: row.party,
+        canvassParty: row.canvass_party,
+        voterStatus: row.voter_status,
+        district: row.district,
+        zip: row.zip,
+        state: row.state,
+      },
+      0,
+      events
+    );
+    propensity = {
+      blended: read.blended,
+      priorWeight: read.priorWeight,
+      phase: read.phase,
+      confidence: read.confidence ?? 0,
+      posteriorQ: read.posteriorQ ?? null,
+      tier: read.tier ?? 'warm',
+      evidenceE: read.evidenceE ?? 0,
+      priorP0: read.prior.p0,
+      priorFormula: read.prior.formulaVersion,
+    };
+  }
 
   return {
     id: row.id,
@@ -410,18 +556,19 @@ export function toMapPerson(row: PersonRecordRow) {
     canvassNotes: row.canvass_notes,
     lat: Number(row.latitude),
     lng: Number(row.longitude),
-    /** Propensity read (P2 blend). Prefer `blended` for decisions. */
+    /** Propensity read (P2 blend / P3 sales). Prefer `blended` for decisions. */
     propensity: {
       blended: propensity.blended,
       priorWeight: propensity.priorWeight,
       phase: propensity.phase,
-      confidence: propensity.confidence ?? 0,
-      posteriorQ: propensity.posteriorQ ?? null,
-      tier: propensity.tier ?? 'warm',
-      evidenceE: propensity.evidenceE ?? 0,
+      confidence: propensity.confidence,
+      posteriorQ: propensity.posteriorQ,
+      tier: propensity.tier,
+      evidenceE: propensity.evidenceE,
       // Audit-only prior snapshot — not for targeting
-      priorP0: propensity.prior.p0,
-      priorFormula: propensity.prior.formulaVersion,
+      priorP0: propensity.priorP0,
+      priorFormula: propensity.priorFormula,
+      signal: propensity.confidence >= 0.55 ? 'confirmed' : 'estimated',
     },
   };
 }

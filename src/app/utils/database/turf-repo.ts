@@ -43,6 +43,8 @@ export type TurfFilters = {
   district?: string[];
   voterStatus?: string[];
   ageBucket?: string[];
+  /** P3: hot / warm / cold from voter_propensity via nearby person */
+  propensityTier?: Array<'hot' | 'warm' | 'cold'>;
   /** Preset id from voter-segment-presets (mapped to party/score where possible) */
   segmentId?: string | null;
 };
@@ -151,6 +153,15 @@ export function filtersFromSegmentId(segmentId: string | null | undefined): Turf
       return { minTurnoutScore: 70 };
     case 'low-propensity':
       return { maxTurnoutScore: 40 };
+    case 'hot':
+    case 'hot-leads':
+      return { propensityTier: ['hot'] };
+    case 'warm':
+    case 'warm-leads':
+      return { propensityTier: ['warm'] };
+    case 'cold':
+    case 'cold-leads':
+      return { propensityTier: ['cold'] };
     default:
       return { segmentId };
   }
@@ -169,6 +180,7 @@ export function mergeFilters(base: TurfFilters = {}, extra: TurfFilters = {}): T
     district: extra.district?.length ? extra.district : base.district,
     voterStatus: extra.voterStatus?.length ? extra.voterStatus : base.voterStatus,
     ageBucket: extra.ageBucket?.length ? extra.ageBucket : base.ageBucket,
+    propensityTier: extra.propensityTier?.length ? extra.propensityTier : base.propensityTier,
     segmentId: extra.segmentId ?? base.segmentId,
   };
 }
@@ -418,6 +430,20 @@ export async function queryTurfAddresses(
   if (filters.zip?.length) {
     where.push(`vg.zip IN (${filters.zip.map(() => '?').join(',')})`);
     params.push(...filters.zip);
+  }
+  if (filters.propensityTier?.length) {
+    where.push(
+      `EXISTS (
+         SELECT 1 FROM person_records prt
+         JOIN voter_propensity vpt ON vpt.person_record_id = prt.id
+         WHERE prt.organization_id = vg.organization_id
+           AND prt.latitude IS NOT NULL AND vg.latitude IS NOT NULL
+           AND ABS(prt.latitude - vg.latitude) < 0.0002
+           AND ABS(prt.longitude - vg.longitude) < 0.0002
+           AND vpt.tier IN (${filters.propensityTier.map(() => '?').join(',')})
+       )`
+    );
+    params.push(...filters.propensityTier);
   }
 
   const [rows] = await sql.execute(
