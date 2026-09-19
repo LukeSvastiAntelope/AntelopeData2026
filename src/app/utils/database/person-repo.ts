@@ -8,6 +8,7 @@ import type { RowDataPacket, ResultSetHeader } from 'mysql2';
 import { createHash } from 'crypto';
 import { resolvePropensityForOrchestrator } from '@/app/utils/propensity/blend';
 import { eventsFromPersonCanvass } from '@/app/utils/propensity/evidence';
+import { toOrchestratorPropensity } from '@/app/utils/propensity/quarantine';
 
 export type CanvassStatus =
   | 'not_contacted'
@@ -482,29 +483,26 @@ export function toMapPerson(
 ) {
   const effectiveParty = (row.canvass_party || row.party || '').trim() || null;
   // Prefer materialized voter_propensity when present; else live recompute (P2).
-  let propensity: {
-    blended: number;
-    priorWeight: number;
-    phase: string;
-    confidence: number;
-    posteriorQ: number | null;
-    tier: string;
-    evidenceE: number;
-    priorP0: number;
-    priorFormula: string;
-  };
+  let blended: number;
+  let priorWeight: number;
+  let confidence: number;
+  let tier: string;
+  let phase: string;
+  let evidenceE: number;
+  let posteriorQ: number | null;
+  let priorP0: number;
+  let priorFormula: string;
+
   if (stored) {
-    propensity = {
-      blended: stored.propensity,
-      priorWeight: stored.priorWeight,
-      phase: stored.evidenceE > 0 || stored.posteriorQ != null ? 'p2_blend' : 'p1_prior_only',
-      confidence: stored.confidence,
-      posteriorQ: stored.posteriorQ,
-      tier: stored.tier,
-      evidenceE: stored.evidenceE,
-      priorP0: stored.priorP0,
-      priorFormula: 'p1.prior.v1',
-    };
+    blended = stored.propensity;
+    priorWeight = stored.priorWeight;
+    confidence = stored.confidence;
+    tier = stored.tier;
+    phase = stored.evidenceE > 0 || stored.posteriorQ != null ? 'p2_blend' : 'p1_prior_only';
+    evidenceE = stored.evidenceE;
+    posteriorQ = stored.posteriorQ;
+    priorP0 = stored.priorP0;
+    priorFormula = 'p1.prior.v1';
   } else {
     const events = eventsFromPersonCanvass(row);
     const read = resolvePropensityForOrchestrator(
@@ -519,18 +517,25 @@ export function toMapPerson(
       0,
       events
     );
-    propensity = {
-      blended: read.blended,
-      priorWeight: read.priorWeight,
-      phase: read.phase,
-      confidence: read.confidence ?? 0,
-      posteriorQ: read.posteriorQ ?? null,
-      tier: read.tier ?? 'warm',
-      evidenceE: read.evidenceE ?? 0,
-      priorP0: read.prior.p0,
-      priorFormula: read.prior.formulaVersion,
-    };
+    blended = read.blended;
+    priorWeight = read.priorWeight;
+    confidence = read.confidence ?? 0;
+    tier = read.tier ?? 'warm';
+    phase = read.phase;
+    evidenceE = read.evidenceE ?? 0;
+    posteriorQ = read.posteriorQ ?? null;
+    priorP0 = read.prior.p0;
+    priorFormula = read.prior.formulaVersion;
   }
+
+  const propensity = toOrchestratorPropensity({
+    blended,
+    priorWeight,
+    phase,
+    confidence,
+    tier,
+    evidenceE,
+  });
 
   return {
     id: row.id,
@@ -556,19 +561,18 @@ export function toMapPerson(
     canvassNotes: row.canvass_notes,
     lat: Number(row.latitude),
     lng: Number(row.longitude),
-    /** Propensity read (P2 blend / P3 sales). Prefer `blended` for decisions. */
-    propensity: {
-      blended: propensity.blended,
-      priorWeight: propensity.priorWeight,
-      phase: propensity.phase,
-      confidence: propensity.confidence,
-      posteriorQ: propensity.posteriorQ,
-      tier: propensity.tier,
-      evidenceE: propensity.evidenceE,
-      // Audit-only prior snapshot — not for targeting
-      priorP0: propensity.priorP0,
-      priorFormula: propensity.priorFormula,
-      signal: propensity.confidence >= 0.55 ? 'confirmed' : 'estimated',
+    /**
+     * P4 Orchestrator quarantine view — blended + tier only.
+     * Decision / map pins / consultant must use this, never propensityAudit.priorP0.
+     */
+    propensity,
+    /** Human audit / planning UI only — never pass to Orchestrator decision path. */
+    propensityAudit: {
+      priorP0,
+      priorFormula,
+      posteriorQ,
+      evidenceE,
+      priorWeight,
     },
   };
 }

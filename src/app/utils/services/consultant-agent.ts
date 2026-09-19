@@ -14,6 +14,7 @@ import {
   type ConsultantStagedAction,
   type ConsultantStoredMessage,
 } from '@/app/utils/database/consultant-repo';
+import { stripRawPriorFromPayload } from '@/app/utils/propensity/quarantine';
 
 const CONSULTANT_MODEL =
   process.env.ANTHROPIC_API_KEY
@@ -110,11 +111,13 @@ function formatToolResultForModel(result: ToolExecutionResult): string {
       errorCode: result.errorCode,
     });
   }
+  // P4 quarantine: never let raw prior p0 reach the Orchestrator model loop
+  const data = result.data ? stripRawPriorFromPayload(result.data) : null;
   return JSON.stringify({
     status: result.status,
     tool: result.tool,
     summary: result.summary,
-    data: result.data ?? null,
+    data,
   });
 }
 

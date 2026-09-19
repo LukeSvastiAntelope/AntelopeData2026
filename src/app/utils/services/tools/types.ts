@@ -6,6 +6,8 @@
  * model output or caller-supplied arguments.
  */
 
+import type { PropensityOrchestratorView } from '@/app/utils/propensity/types';
+
 export type ToolRisk = 'auto' | 'approval';
 
 /** Minimal JSON Schema object shape for tool inputs (no Zod dependency). */
@@ -16,9 +18,18 @@ export type ToolInputSchema = {
   additionalProperties?: boolean;
 };
 
+/**
+ * Tool / Orchestrator execution context.
+ * P4: optional `propensity` is the quarantine view only (blended + tier) — never raw p0.
+ */
 export type ToolContext = {
   userId: number;
   organizationId?: number | null;
+  /**
+   * Blended propensity tier for the active voter / cohort decision, when attached.
+   * Must be PropensityOrchestratorView — no prior.p0.
+   */
+  propensity?: PropensityOrchestratorView | null;
 };
 
 /** Result returned by a tool's execute handler after it actually runs. */

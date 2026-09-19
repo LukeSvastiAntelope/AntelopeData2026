@@ -6,6 +6,7 @@ import type {
   ToolExecutionResult,
   ToolRisk,
 } from './types';
+import { stripRawPriorFromPayload } from '@/app/utils/propensity/quarantine';
 
 /**
  * Strip any model-supplied attempt to override execution policy.
@@ -93,7 +94,8 @@ export async function executeTool(
       tool: tool.name,
       risk,
       summary: result.summary,
-      data: result.data,
+      // P4: quarantine raw prior out of every tool payload before Orchestrator reads it
+      data: result.data ? stripRawPriorFromPayload(result.data) : undefined,
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';

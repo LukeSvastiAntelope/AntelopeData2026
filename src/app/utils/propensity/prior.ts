@@ -193,20 +193,47 @@ export function priorWeightForBlend(responseEvidenceCount: number, k?: number): 
 
 /**
  * Tripwire helper: decision paths must not receive raw prior.p0.
- * Returns only the blended scalar (+ metadata without prior.p0 as a top-level field).
+ * Returns the P4 Orchestrator quarantine view (blended + tier, no prior).
  */
 export function propensityDecisionValue(read: {
   blended: number;
   priorWeight: number;
-  phase: string;
+  phase?: string;
+  confidence?: number;
+  tier?: string | null;
+  evidenceE?: number;
+  responseEvidenceCount?: number;
 }): {
+  blended: number;
   value: number;
+  tier: 'hot' | 'warm' | 'cold';
   priorWeight: number;
-  phase: string;
+  confidence: number;
+  signal: 'estimated' | 'confirmed';
+  phase: 'p1_prior_only' | 'p2_blend' | 'p3_funnel' | 'p4_tier';
 } {
+  const priorWeight = Number.isFinite(read.priorWeight) ? read.priorWeight : 1;
+  const confidence =
+    read.confidence != null && Number.isFinite(read.confidence)
+      ? read.confidence
+      : Math.max(0, Math.min(1, 1 - priorWeight));
+  const tier =
+    read.tier === 'hot' || read.tier === 'warm' || read.tier === 'cold' ? read.tier : 'warm';
+  const phase =
+    read.phase === 'p1_prior_only'
+      ? 'p1_prior_only'
+      : read.phase === 'p3_funnel'
+        ? 'p3_funnel'
+        : read.phase === 'p2_blend'
+          ? 'p2_blend'
+          : 'p4_tier';
   return {
+    blended: read.blended,
     value: read.blended,
-    priorWeight: read.priorWeight,
-    phase: read.phase,
+    tier,
+    priorWeight,
+    confidence,
+    signal: confidence >= 0.55 ? 'confirmed' : 'estimated',
+    phase,
   };
 }

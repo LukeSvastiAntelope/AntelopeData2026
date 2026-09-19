@@ -28,3 +28,10 @@ export {
 } from './config';
 export { whoToWorkSortKey, sortWhoToWork } from './sales';
 export type { WhoToWorkInput } from './sales';
+export {
+  toOrchestratorPropensity,
+  orchestratorViewFromRead,
+  stripRawPriorFromPayload,
+  assertNoRawPriorInDecision,
+  isOrchestratorPropensityView,
+} from './quarantine';

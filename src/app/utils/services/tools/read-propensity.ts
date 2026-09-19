@@ -1,9 +1,14 @@
 /**
  * read_propensity — funnel / who-to-work / tier summary (risk: auto).
+ * P4: tool data is Orchestrator-quarantined (blended + tier only — never priorP0).
  */
 
 import { PropensityRepo } from '@/app/utils/database/propensity-repo';
 import { getDecayK } from '@/app/utils/propensity/config';
+import {
+  assertNoRawPriorInDecision,
+  toOrchestratorPropensity,
+} from '@/app/utils/propensity/quarantine';
 import type { CampaignTool } from './types';
 
 type Input = {
@@ -18,7 +23,7 @@ type Input = {
 export const readPropensityTool: CampaignTool<Input> = {
   name: 'read_propensity',
   description:
-    'Read the campaign propensity funnel (hot / warm / cold) and optionally the “who to work next” ranked list. Supports Area A + not-DNC composition via includeAreas and excludeSuppressed. Returns blended values — not a static score.',
+    'Read the campaign propensity funnel (hot / warm / cold) and optionally the “who to work next” ranked list. Returns blended propensity + tier only — never the raw prior. Supports Area A + not-DNC via includeAreas / excludeSuppressed.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -74,17 +79,63 @@ export const readPropensityTool: CampaignTool<Input> = {
 
     const voters = await PropensityRepo.listByOrg(ctx.organizationId, listOpts);
 
+    const mapRow = (v: (typeof voters)[number]) => {
+      const view = toOrchestratorPropensity({
+        blended: v.propensity,
+        priorWeight: v.prior_weight,
+        confidence: v.confidence,
+        tier: v.tier,
+        evidenceE: v.evidence_e,
+        phase: 'p4_tier',
+      });
+      return {
+        personRecordId: v.person_record_id,
+        label: v.label,
+        party: v.party,
+        lat: v.latitude,
+        lng: v.longitude,
+        ...view,
+      };
+    };
+
+    const data = {
+      decayK: getDecayK(),
+      summary: {
+        hot: summary.hot,
+        warm: summary.warm,
+        cold: summary.cold,
+        total: summary.total,
+        avgPropensity: summary.avgPropensity,
+        avgConfidence: summary.avgConfidence,
+        estimated: summary.estimated,
+        confirmed: summary.confirmed,
+        decayK: summary.decayK,
+      },
+      whoToWork: whoToWork.map(mapRow),
+      voters: voters.map(mapRow),
+    };
+
+    // Tripwire: never leak raw prior into Orchestrator tool data
+    assertNoRawPriorInDecision(data, 'read_propensity.data');
+
     const workLines = whoToWork
       .slice(0, 15)
-      .map(
-        (v, i) =>
-          `${i + 1}. ${v.label || `person#${v.person_record_id}`} · ${v.tier} · P=${v.propensity.toFixed(2)} · ${v.signal} · w=${v.prior_weight.toFixed(2)}`
-      )
+      .map((v, i) => {
+        const view = toOrchestratorPropensity({
+          blended: v.propensity,
+          priorWeight: v.prior_weight,
+          confidence: v.confidence,
+          tier: v.tier,
+          evidenceE: v.evidence_e,
+          phase: 'p4_tier',
+        });
+        return `${i + 1}. ${v.label || `person#${v.person_record_id}`} · ${view.tier} · P=${view.blended.toFixed(2)} · ${view.signal} · w=${view.priorWeight.toFixed(2)}`;
+      })
       .join('\n');
 
     return {
       summary: [
-        '### Propensity funnel (sales surface)',
+        '### Propensity funnel (Orchestrator view — blended only)',
         '',
         `- Decay k: ${summary.decayK} (PROPENSITY_DECAY_K)`,
         `- Hot: ${summary.hot} · Warm: ${summary.warm} · Cold: ${summary.cold} · Total: ${summary.total}`,
@@ -96,36 +147,9 @@ export const readPropensityTool: CampaignTool<Input> = {
         '### Who to work next',
         workLines || '_Empty — refresh or loosen filters._',
         '',
-        '_Compose with Area A + not-DNC via includeAreas / excludeSuppressed. Materialized view — not ballistic._',
+        '_Quarantine: blended + tier only. Raw prior p0 is never returned to the decision loop._',
       ].join('\n'),
-      data: {
-        decayK: getDecayK(),
-        summary,
-        whoToWork: whoToWork.map((v) => ({
-          personRecordId: v.person_record_id,
-          label: v.label,
-          blended: v.propensity,
-          confidence: v.confidence,
-          tier: v.tier,
-          signal: v.signal,
-          priorWeight: v.prior_weight,
-          party: v.party,
-          lat: v.latitude,
-          lng: v.longitude,
-        })),
-        voters: voters.map((v) => ({
-          personRecordId: v.person_record_id,
-          label: v.label,
-          blended: v.propensity,
-          confidence: v.confidence,
-          tier: v.tier,
-          signal: v.signal,
-          priorWeight: v.prior_weight,
-          priorP0: v.p0,
-          posteriorQ: v.posterior_q,
-          evidenceE: v.evidence_e,
-        })),
-      },
+      data,
     };
   },
 };

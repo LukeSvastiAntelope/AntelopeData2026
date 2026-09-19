@@ -1,10 +1,10 @@
 /**
- * Propensity read-layer types (P1+).
+ * Propensity read-layer types (P1–P4).
  *
  * Legal invariant against the thesis:
  *   - Values are recomputed from inputs / event stream (never a frozen ballistic score).
  *   - The prior’s blend weight decays toward zero once the voter responds (P2).
- *   - The Orchestrator reads `blended` only — never `prior.p0` as a decision input.
+ *   - The Orchestrator reads `blended` (+ tier) only — never `prior.p0` as a decision input.
  *
  * Tripwires (tests must fail if broken): recompute | decay | no-raw-prior-in-decision.
  */
@@ -48,6 +48,7 @@ export type PriorComponents = {
 /**
  * Prior p0 ∈ [0,1] — coarse propensity toward Dem-lean scale (1=Dem, 0=Rep, 0.5=swing).
  * Explicitly NOT a targetable score. Cold-start MAP input only.
+ * Never placed on Orchestrator ctx or tool decision payloads.
  */
 export type PriorResult = {
   /** Coarse prior. Recomputed from inputs; do not persist as a ballistic target. */
@@ -62,8 +63,9 @@ export type PriorResult = {
 };
 
 /**
- * What the Orchestrator (and any decision path) may read.
- * `blended` is the only decision-facing value — even when P1 has no event blend yet.
+ * Full internal read (blend math + audit prior).
+ * Decision code must project through `toOrchestratorPropensity` / `propensityDecisionValue`
+ * — never pass `prior.p0` into the Orchestrator loop.
  */
 export type PropensityRead = {
   /** Always prefer this field for decisions / tools / funnel. */
@@ -83,8 +85,31 @@ export type PropensityRead = {
   confidence?: number;
   /** P2: observed posterior; null until directional signal */
   posteriorQ?: number | null;
-  /** P2: hot | warm | cold */
+  /** P2/P3: hot | warm | cold */
   tier?: 'hot' | 'warm' | 'cold';
   /** P2: accumulated evidence e */
   evidenceE?: number;
+};
+
+/**
+ * P4 — What the Orchestrator (consultant tool loop / decision path) may see.
+ * Omits raw prior p0 entirely. Explore→exploit reads `blended` + `tier` only.
+ */
+export type PropensityOrchestratorView = {
+  /** Recomputed blend P = w·p0 + (1−w)·q — the only decision scalar. */
+  blended: number;
+  /**
+   * Alias of blended for older decision helpers / tests.
+   * Prefer `blended` in new code.
+   */
+  value: number;
+  /** Funnel bucket of blended P. */
+  tier: 'hot' | 'warm' | 'cold';
+  /** prior_weight w — for estimated vs confirmed UI, not a target score. */
+  priorWeight: number;
+  /** confidence = 1 − w */
+  confidence: number;
+  /** estimated (prior-heavy) vs confirmed (engagement-heavy) */
+  signal: 'estimated' | 'confirmed';
+  phase: 'p1_prior_only' | 'p2_blend' | 'p3_funnel' | 'p4_tier';
 };
