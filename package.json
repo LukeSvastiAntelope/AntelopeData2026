@@ -14,7 +14,8 @@
     "collation:load-mock": "tsx --tsconfig tsconfig.json -r dotenv/config scripts/collation/load-mock.ts",
     "collation:fm1": "npx tsx --tsconfig tsconfig.json -r dotenv/config scripts/collation/fm1-blocking.ts",
     "collation:fm2": "npx tsx --tsconfig tsconfig.json -r dotenv/config scripts/collation/fm2-score.ts",
-    "collation:fm3": "npx tsx --tsconfig tsconfig.json -r dotenv/config scripts/collation/fm3-decide.ts"
+    "collation:fm3": "npx tsx --tsconfig tsconfig.json -r dotenv/config scripts/collation/fm3-decide.ts",
+    "collation:fm4": "npx tsx --tsconfig tsconfig.json -r dotenv/config scripts/collation/fm4-writeback.ts"
    },
    "dependencies": {
       "@anthropic-ai/sdk": "^0.54.0",

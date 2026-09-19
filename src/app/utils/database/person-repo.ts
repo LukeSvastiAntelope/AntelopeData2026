@@ -52,6 +52,9 @@ export type PersonRecordRow = {
   canvass_notes: string | null;
   canvass_confirmed_at: Date | string | null;
   canvass_by_user_id: number | null;
+  /** Soft-archive target after FM4 merge; NULL = live serving record */
+  merged_into_person_id: number | null;
+  merged_at: Date | string | null;
   field_provenance: unknown;
   source_row_ids: unknown;
   latitude: number | null;
@@ -122,7 +125,11 @@ function ageBucketFromYears(age: number | null): string | null {
 export class PersonRepo {
   static async listForMap(filters: PersonMapFilters = {}): Promise<PersonRecordRow[]> {
     const sql = await openSql();
-    const where: string[] = ['pr.latitude IS NOT NULL', 'pr.longitude IS NOT NULL'];
+    const where: string[] = [
+      'pr.latitude IS NOT NULL',
+      'pr.longitude IS NOT NULL',
+      'pr.merged_into_person_id IS NULL',
+    ];
     const params: unknown[] = [];
 
     if (filters.organizationId != null) {
@@ -287,7 +294,8 @@ export class PersonRepo {
   static async countByOrg(organizationId: number | null): Promise<number> {
     const sql = await openSql();
     const [rows] = await sql.execute(
-      `SELECT COUNT(*) AS c FROM person_records WHERE organization_id <=> ?`,
+      `SELECT COUNT(*) AS c FROM person_records
+       WHERE organization_id <=> ? AND merged_into_person_id IS NULL`,
       [organizationId]
     );
     return Number((rows as RowDataPacket[])[0]?.c || 0);

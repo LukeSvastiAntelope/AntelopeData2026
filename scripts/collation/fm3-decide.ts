@@ -105,7 +105,8 @@ async function main() {
           orgId,
           c.left_person_id,
           c.right_person_id,
-          score
+          score,
+          { matchCandidateId: c.id }
         );
         await conn.execute(
           `UPDATE person_match_candidates
@@ -114,10 +115,16 @@ async function main() {
           [score, c.id, orgId]
         );
         await conn.commit();
-        autoMerged++;
-        console.log(
-          `auto-merge survivor=#${result.survivorId} loser=#${result.loserId} score=${score}`
-        );
+        if (result.skipped) {
+          console.log(
+            `auto-merge skip ${c.left_person_id}/${c.right_person_id}: ${result.reason}`
+          );
+        } else {
+          autoMerged++;
+          console.log(
+            `auto-merge survivor=#${result.survivorId} loser=#${result.loserId} audit=#${result.auditId} score=${score}`
+          );
+        }
       } catch (e) {
         await conn.rollback();
         errors++;

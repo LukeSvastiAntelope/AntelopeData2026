@@ -146,7 +146,11 @@ function pairsFromBlocks(
 
 async function loadPeople(organizationId: number | null): Promise<PersonBlockRow[]> {
   const sql = await openSql();
-  const where = organizationId != null ? 'WHERE pr.organization_id = ?' : '';
+  // FM4: only live (non soft-archived) persons — settled merges stay out of blocking
+  const where =
+    organizationId != null
+      ? 'WHERE pr.organization_id = ? AND pr.merged_into_person_id IS NULL'
+      : 'WHERE pr.merged_into_person_id IS NULL';
   const params = organizationId != null ? [organizationId] : [];
   const [rows] = await sql.execute(
     `SELECT

@@ -109,7 +109,14 @@ export async function PATCH(request: NextRequest) {
         orgId,
         Number(row.person_a_id),
         Number(row.person_b_id),
-        Number(row.score)
+        Number(row.score),
+        {
+          matchCandidateId: row.match_candidate_id
+            ? Number(row.match_candidate_id)
+            : null,
+          mergeCandidateId: id,
+          notes: body.notes ? String(body.notes) : null,
+        }
       );
       await conn.execute(
         `UPDATE merge_candidates
