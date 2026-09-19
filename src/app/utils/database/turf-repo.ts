@@ -359,7 +359,7 @@ export async function queryTurfAddresses(
     params.push(organizationId, ...excludeIds);
   }
 
-  // Global DNC
+  // Global DNC — match any key on contact_suppression (geo / file / agent / person)
   if (excludeSuppressed) {
     where.push(
       `NOT EXISTS (
@@ -370,6 +370,17 @@ export async function queryTurfAddresses(
              OR (cs.voter_file_id IS NOT NULL AND vg.voter_file_id IS NOT NULL AND cs.voter_file_id = vg.voter_file_id)
              OR (cs.responder_agent_id IS NOT NULL AND vg.responder_agent_id IS NOT NULL
                  AND cs.responder_agent_id = vg.responder_agent_id)
+             OR (
+               cs.person_record_id IS NOT NULL
+               AND EXISTS (
+                 SELECT 1 FROM person_records prs
+                 WHERE prs.id = cs.person_record_id
+                   AND prs.organization_id = vg.organization_id
+                   AND prs.latitude IS NOT NULL AND vg.latitude IS NOT NULL
+                   AND ABS(prs.latitude - vg.latitude) < 0.0002
+                   AND ABS(prs.longitude - vg.longitude) < 0.0002
+               )
+             )
            )
        )`
     );
