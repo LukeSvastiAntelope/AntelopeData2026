@@ -681,7 +681,6 @@ export default function DashboardMap({
             visibility: 'none',
             'text-field': ['to-string', ['get', 'sortOrder']],
             'text-size': 11,
-            'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
             'text-allow-overlap': true,
           },
           paint: {
