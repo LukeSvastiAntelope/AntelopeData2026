@@ -75,8 +75,9 @@ async function main() {
     );
   }
 
-  let r = await maybeFireSurveyAutotrigger(surveyId, {
+  let   r = await maybeFireSurveyAutotrigger(surveyId, {
     skipChain: true,
+    skipOutputs: true,
     source: 'smoke',
   });
   assert(!r.fired && r.skippedReason === 'below_threshold', 'should not fire below threshold');
@@ -94,7 +95,11 @@ async function main() {
     );
   }
 
-  r = await maybeFireSurveyAutotrigger(surveyId, { skipChain: true, source: 'smoke' });
+  r = await maybeFireSurveyAutotrigger(surveyId, {
+    skipChain: true,
+    skipOutputs: true,
+    source: 'smoke',
+  });
   assert(r.fired === true, 'must fire on first crossing');
   assert(r.band === 1, 'band 1');
   assert(r.eventId != null && r.eventId > 0, 'event id');
@@ -105,7 +110,11 @@ async function main() {
   assert(events[0].responseCount === 5, 'event response count');
 
   // Idempotent — same band must not re-fire
-  r = await maybeFireSurveyAutotrigger(surveyId, { skipChain: true, source: 'smoke' });
+  r = await maybeFireSurveyAutotrigger(surveyId, {
+    skipChain: true,
+    skipOutputs: true,
+    source: 'smoke',
+  });
   assert(!r.fired && r.skippedReason === 'already_fired_this_band', 'no re-fire same band');
 
   // Jump to 10 — second band
@@ -124,6 +133,7 @@ async function main() {
   const poll = await pollSurveyAutotriggers({
     orgId: orgId ?? undefined,
     skipChain: true,
+    skipOutputs: true,
   });
   const hit = poll.results.find((x) => x.surveyId === surveyId && x.fired);
   assert(!!hit, 'scheduler backstop fires next band');

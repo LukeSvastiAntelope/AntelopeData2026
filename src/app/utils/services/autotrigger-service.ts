@@ -1,18 +1,34 @@
 /**
- * AT1.2 — Auto-trigger firing: threshold crossing → analytics → find_postable_insight.
+ * AT1.2 / AT2 — Auto-trigger firing + output drafts.
  *
  * Idempotent: atomic claim per response-count band (floor(count/threshold)).
- * Never re-fires on every new response. Scheduler poll is a backstop for quiet→jump.
+ * On fire: analytics → find_postable_insight → (AT2) newsletter/video drafts
+ * with mandatory small-sample disclaimer, staged via consultant_staged_actions.
  */
 
 import { SurveyAutotriggerRepo } from '@/app/utils/database/survey-autotrigger-repo';
 import { openSql } from '@/app/utils/database/db';
 import { executeTool } from '@/app/utils/services/tools/executor';
+import {
+  scanPostableInsights,
+  type ComputedContrast,
+} from '@/app/utils/services/postable-insight-service';
+import {
+  candidateToFinding,
+  contrastToFinding,
+  generateAndStageAutotriggerOutputs,
+  type FindingDraftSource,
+  type StagedDraftResult,
+} from '@/app/utils/services/autotrigger-outputs';
 import type { RowDataPacket } from 'mysql2';
 
 export type FireAutotriggerOptions = {
-  /** Skip LLM chain — claim + emit event only (smoke / dry-run). */
+  /** Skip LLM analytics/insight chain — claim + emit event only. */
   skipChain?: boolean;
+  /** Skip AT2 newsletter/video generation. */
+  skipOutputs?: boolean;
+  /** Template drafts + mock video URL (smoke). */
+  mockOutputs?: boolean;
   /** Source tag for the event result payload. */
   source?: 'ingest' | 'scheduler' | 'manual' | 'smoke';
 };
@@ -26,16 +42,18 @@ export type FireAutotriggerResult = {
   eventId?: number;
   analyticsOk?: boolean;
   insightOk?: boolean;
+  drafts?: StagedDraftResult[];
   summary?: string;
 };
 
 async function resolveSurveyOwner(surveyId: number): Promise<{
   userId: number;
   organizationId: number | null;
+  title: string;
 } | null> {
   const db = await openSql();
   const [rows] = await db.execute<RowDataPacket[]>(
-    `SELECT created_by, organization_id FROM surveys WHERE id = ? LIMIT 1`,
+    `SELECT created_by, organization_id, title FROM surveys WHERE id = ? LIMIT 1`,
     [surveyId]
   );
   if (!rows[0]) return null;
@@ -43,7 +61,26 @@ async function resolveSurveyOwner(surveyId: number): Promise<{
     userId: Number(rows[0].created_by),
     organizationId:
       rows[0].organization_id != null ? Number(rows[0].organization_id) : null,
+    title: String(rows[0].title || `Survey ${surveyId}`),
   };
+}
+
+function pickFindingForOutputs(params: {
+  candidates: Record<string, unknown>[];
+  directionalOnly: ComputedContrast[];
+  totalResponses: number;
+}): FindingDraftSource | null {
+  if (params.candidates.length) {
+    return candidateToFinding(params.candidates[0], params.totalResponses);
+  }
+  if (params.directionalOnly.length) {
+    // Prefer largest cells among directional for a usable thin draft
+    const sorted = [...params.directionalOnly].sort(
+      (a, b) => Math.min(b.nA, b.nB) - Math.min(a.nA, a.nB)
+    );
+    return contrastToFinding(sorted[0], params.totalResponses);
+  }
+  return null;
 }
 
 /**
@@ -87,6 +124,9 @@ export async function maybeFireSurveyAutotrigger(
   let analyticsOk = false;
   let insightOk = false;
   let summary = 'claimed';
+  let drafts: StagedDraftResult[] = [];
+  let insightCandidates: Record<string, unknown>[] = [];
+  let insightTotal = responseCount;
 
   if (!options.skipChain) {
     try {
@@ -100,7 +140,6 @@ export async function maybeFireSurveyAutotrigger(
       summary = e instanceof Error ? e.message : 'analytics_failed';
     }
 
-    // Always attempt postable-insight after analytics (AT1 chain), even if analytics soft-failed
     try {
       const insight = await executeTool(
         { name: 'find_postable_insight', input: { surveyId, maxCandidates: 3 } },
@@ -108,6 +147,13 @@ export async function maybeFireSurveyAutotrigger(
       );
       insightOk = insight.ok && insight.status === 'executed';
       if (insightOk) summary = insight.summary || summary;
+      const data = (insight.data || {}) as Record<string, unknown>;
+      if (Array.isArray(data.candidates)) {
+        insightCandidates = data.candidates as Record<string, unknown>[];
+      }
+      if (typeof data.totalResponses === 'number') {
+        insightTotal = data.totalResponses;
+      }
     } catch (e) {
       if (!analyticsOk) {
         summary = e instanceof Error ? e.message : 'insight_failed';
@@ -117,6 +163,78 @@ export async function maybeFireSurveyAutotrigger(
     summary = 'skip_chain';
     analyticsOk = true;
     insightOk = true;
+  }
+
+  // AT2: newsletter / video drafts from publishable or thin (directional) finding
+  const wantOutputs =
+    !options.skipOutputs &&
+    (cfg.actions.includes('newsletter') || cfg.actions.includes('video'));
+
+  if (wantOutputs) {
+    try {
+      let directionalOnly: ComputedContrast[] = [];
+      if (!insightCandidates.length) {
+        try {
+          const scan = await scanPostableInsights({
+            surveyId,
+            userId: owner.userId,
+          });
+          directionalOnly = scan.directionalOnly;
+          insightTotal = scan.totalResponses;
+          // If scan found publishable but tool returned none (e.g. skipChain), use them
+          if (!insightCandidates.length && scan.publishable.length) {
+            insightCandidates = scan.publishable.map((c) => ({
+              claim: contrastToFinding(c, scan.totalResponses).claim,
+              honestCaveat: c.uncertaintyNote,
+              nA: c.nA,
+              nB: c.nB,
+              effect: c.absoluteEffect,
+              pCorrected: c.pCorrected,
+              outcomePrompt: c.outcomePrompt,
+              groupA: c.groupA,
+              groupB: c.groupB,
+              groupingField: c.groupingField,
+              contrastId: c.id,
+            }));
+          }
+        } catch (e) {
+          console.warn(
+            '[autotrigger] scan for AT2 outputs failed (non-fatal):',
+            e instanceof Error ? e.message : e
+          );
+        }
+      }
+
+      const finding = pickFindingForOutputs({
+        candidates: insightCandidates,
+        directionalOnly,
+        totalResponses: insightTotal,
+      });
+
+      if (finding) {
+        const out = await generateAndStageAutotriggerOutputs({
+          surveyId,
+          surveyTitle: owner.title,
+          userId: owner.userId,
+          organizationId: owner.organizationId,
+          actions: cfg.actions,
+          finding,
+          options: {
+            mockOutputs: options.mockOutputs,
+            skipVideoGenerate: options.mockOutputs,
+          },
+        });
+        drafts = out.drafts;
+        if (drafts.length) {
+          summary = `${summary}\nAT2 staged ${drafts.map((d) => d.kind).join(', ')}`;
+        }
+      }
+    } catch (e) {
+      console.error(
+        `[autotrigger] AT2 outputs failed survey=${surveyId}:`,
+        e instanceof Error ? e.message : e
+      );
+    }
   }
 
   const eventId = await SurveyAutotriggerRepo.emitEvent({
@@ -133,13 +251,18 @@ export async function maybeFireSurveyAutotrigger(
       analyticsOk,
       insightOk,
       skipChain: Boolean(options.skipChain),
+      drafts: drafts.map((d) => ({
+        kind: d.kind,
+        stagedActionId: d.stagedActionId,
+        disclaimerApplied: d.disclaimerApplied,
+      })),
       summary: summary.slice(0, 2000),
       firedCount: cfg.firedCount,
     },
   });
 
   console.log(
-    `[autotrigger] fired survey=${surveyId} band=${band} count=${responseCount} event=#${eventId} source=${options.source || 'ingest'}`
+    `[autotrigger] fired survey=${surveyId} band=${band} count=${responseCount} event=#${eventId} drafts=${drafts.length} source=${options.source || 'ingest'}`
   );
 
   return {
@@ -150,6 +273,7 @@ export async function maybeFireSurveyAutotrigger(
     eventId,
     analyticsOk,
     insightOk,
+    drafts,
     summary,
   };
 }
@@ -174,6 +298,8 @@ export function scheduleAutotriggerCheck(
 export async function pollSurveyAutotriggers(params?: {
   orgId?: number;
   skipChain?: boolean;
+  skipOutputs?: boolean;
+  mockOutputs?: boolean;
 }): Promise<{
   considered: number;
   fired: number;
@@ -188,6 +314,8 @@ export async function pollSurveyAutotriggers(params?: {
     const r = await maybeFireSurveyAutotrigger(row.surveyId, {
       source: 'scheduler',
       skipChain: params?.skipChain,
+      skipOutputs: params?.skipOutputs,
+      mockOutputs: params?.mockOutputs,
     });
     results.push(r);
     if (r.fired) fired++;
