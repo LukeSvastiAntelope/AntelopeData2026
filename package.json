@@ -11,7 +11,8 @@
     "init-scheduler": "node scripts/init-scheduler.js",
     "cron:surveys": "node scripts/close-expired-surveys.js",
     "collation:run": "tsx --tsconfig tsconfig.json -r dotenv/config scripts/collation/run-collation.ts",
-    "collation:load-mock": "tsx --tsconfig tsconfig.json -r dotenv/config scripts/collation/load-mock.ts"
+    "collation:load-mock": "tsx --tsconfig tsconfig.json -r dotenv/config scripts/collation/load-mock.ts",
+    "collation:fm1": "npx tsx --tsconfig tsconfig.json -r dotenv/config scripts/collation/fm1-blocking.ts"
    },
    "dependencies": {
       "@anthropic-ai/sdk": "^0.54.0",
