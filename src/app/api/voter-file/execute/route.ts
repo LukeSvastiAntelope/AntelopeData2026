@@ -9,6 +9,7 @@ import {
 import { VoterGeoRepo } from '@/app/utils/database/geo-repo';
 import { ensurePrimaryOrgId } from '@/app/api/dashboard/persons/org';
 import { isValidLatLng, parseCoord } from '@/app/utils/services/geo/spatial';
+import { drainPendingGeocode } from '@/app/utils/services/geo/geocode';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300; // 5 minutes for large files
@@ -326,6 +327,13 @@ export async function POST(req: NextRequest) {
           `Row ${i + 1}: ${rowError instanceof Error ? rowError.message : 'Unknown error'}`
         );
       }
+    }
+
+    // G1: queue drain — do not block the import response on Census calls.
+    if (geoUpserted > 0) {
+      void drainPendingGeocode({ limit: 50, delayMs: 200 }).catch((err) => {
+        console.warn('[voter-file/execute] background geocode drain failed:', err);
+      });
     }
 
     return NextResponse.json({

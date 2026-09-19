@@ -3,6 +3,8 @@
  * Swappable later via GEOCODE_PROVIDER env.
  */
 
+import { VoterGeoRepo } from '@/app/utils/database/geo-repo';
+
 export type GeocodeResult = {
   ok: true;
   latitude: number;
@@ -12,6 +14,12 @@ export type GeocodeResult = {
 } | {
   ok: false;
   error: string;
+};
+
+export type GeocodeDrainSummary = {
+  considered: number;
+  ok: number;
+  failed: number;
 };
 
 export async function geocodeAddressCensus(params: {
@@ -73,4 +81,47 @@ export async function geocodeAddress(params: {
   if (provider === 'census') return geocodeAddressCensus(params);
   // Future: mapbox / google — same result shape
   return geocodeAddressCensus(params);
+}
+
+/**
+ * Drain voter_geo rows with geocode_status=pending.
+ * Used by platform cron and post-import background work — never block upload.
+ */
+export async function drainPendingGeocode(options?: {
+  limit?: number;
+  delayMs?: number;
+}): Promise<GeocodeDrainSummary> {
+  const limit = Math.max(1, Math.min(500, options?.limit ?? 100));
+  const delayMs = Math.max(0, options?.delayMs ?? 250);
+  const pending = await VoterGeoRepo.listPendingGeocode(limit);
+
+  let ok = 0;
+  let failed = 0;
+  for (const row of pending) {
+    const result = await geocodeAddress({
+      street: row.street,
+      city: row.city,
+      state: row.state,
+      zip: row.zip,
+    });
+    if (result.ok === true) {
+      await VoterGeoRepo.markGeocoded(
+        row.id,
+        result.latitude,
+        result.longitude,
+        result.source,
+        result.confidence
+      );
+      ok++;
+    } else {
+      const message = result.ok === false ? result.error : 'geocode failed';
+      await VoterGeoRepo.markFailed(row.id, message);
+      failed++;
+    }
+    if (delayMs > 0) {
+      await new Promise((r) => setTimeout(r, delayMs));
+    }
+  }
+
+  return { considered: pending.length, ok, failed };
 }

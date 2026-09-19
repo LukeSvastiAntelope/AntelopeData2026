@@ -9,6 +9,10 @@ import {
 } from '@/app/utils/political-data-refresh';
 import { runCampaignNewsDigest, type CampaignNewsDigestSummary } from '@/app/utils/campaign-news';
 import { runScheduledProposer } from '@/app/utils/services/loop/proposer';
+import {
+    drainPendingGeocode,
+    type GeocodeDrainSummary,
+} from '@/app/utils/services/geo/geocode';
 
 let lastRunAt: string | null = null;
 let lastRunStatus: 'success' | 'error' | 'never' = 'never';
@@ -29,6 +33,8 @@ export interface DailyTaskSummary {
     census: SourceResult<ExternalRefreshSummary[]>;
     campaignNewsDigest: SourceResult<CampaignNewsDigestSummary>;
     loopProposer: SourceResult<{ orgsConsidered: number; ran: number; skipped: number }>;
+    /** G1: drain voter_geo pending Census geocodes (platform cron, not upload path). */
+    voterGeocode: SourceResult<GeocodeDrainSummary>;
 }
 
 async function runPerStateRefresh(
@@ -121,14 +127,27 @@ export async function runDailyPlatformTasks() {
             };
         }
 
+        // G1: drain pending Census geocodes (upload only queues; cron drains).
+        let voterGeocode: SourceResult<GeocodeDrainSummary>;
+        try {
+            const geocodeSummary = await drainPendingGeocode({ limit: 200, delayMs: 200 });
+            voterGeocode = { status: 'success', data: geocodeSummary };
+        } catch (error) {
+            voterGeocode = {
+                status: 'error',
+                error: error instanceof Error ? error.message : 'Unknown error',
+            };
+        }
+
         const summary: DailyTaskSummary = {
-            tasksRun: 5,
+            tasksRun: 6,
             states,
             csv,
             openfec,
             census,
             campaignNewsDigest,
             loopProposer,
+            voterGeocode,
         };
 
         const hasSourceError =
@@ -136,7 +155,8 @@ export async function runDailyPlatformTasks() {
             openfec.status === 'error' ||
             census.status === 'error' ||
             campaignNewsDigest.status === 'error' ||
-            loopProposer.status === 'error';
+            loopProposer.status === 'error' ||
+            voterGeocode.status === 'error';
 
         lastRunAt = new Date().toISOString();
         lastRunStatus = hasSourceError ? 'error' : 'success';
@@ -144,7 +164,7 @@ export async function runDailyPlatformTasks() {
         lastRunError = hasSourceError ? 'One or more data sources failed' : null;
 
         console.log(
-            `✅ Daily data refresh completed. states=${states.length}, csv=${csv.status}, openfec=${openfec.status}, census=${census.status}, campaignNewsDigest=${campaignNewsDigest.status}, loopProposer=${loopProposer.status}`
+            `✅ Daily data refresh completed. states=${states.length}, csv=${csv.status}, openfec=${openfec.status}, census=${census.status}, campaignNewsDigest=${campaignNewsDigest.status}, loopProposer=${loopProposer.status}, voterGeocode=${voterGeocode.status}`
         );
 
         return summary;
