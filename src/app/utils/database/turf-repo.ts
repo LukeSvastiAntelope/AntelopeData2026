@@ -198,6 +198,87 @@ export function mergeFilters(base: TurfFilters = {}, extra: TurfFilters = {}): T
   };
 }
 
+export type CanvassContactRow = {
+  id: number;
+  organization_id: number;
+  voter_geo_id: number;
+  person_record_id: number | null;
+  voter_file_id: string | null;
+  turf_id: number | null;
+  canvasser_id: number;
+  status: TurfStopStatus | string;
+  note: string | null;
+  party: string | null;
+  survey_response_id: number | null;
+  client_event_id: string | null;
+  recorded_at: Date;
+};
+
+/** G4: append-only contact trail queries for offline delta sync. */
+export class CanvassContactRepo {
+  static async listSince(params: {
+    organizationId: number;
+    sinceId?: number | null;
+    since?: string | Date | null;
+    canvasserId?: number | null;
+    turfId?: number | null;
+    limit?: number;
+  }): Promise<CanvassContactRow[]> {
+    const sql = await openSql();
+    const limit = Math.min(Math.max(params.limit || 500, 1), 5000);
+    const where: string[] = ['organization_id = ?'];
+    const args: unknown[] = [params.organizationId];
+
+    if (params.sinceId != null && Number.isFinite(Number(params.sinceId))) {
+      where.push('id > ?');
+      args.push(Number(params.sinceId));
+    }
+    if (params.since) {
+      const d = new Date(params.since);
+      if (!Number.isNaN(d.getTime())) {
+        where.push('recorded_at > ?');
+        args.push(d);
+      }
+    }
+    if (params.canvasserId != null) {
+      where.push('canvasser_id = ?');
+      args.push(Number(params.canvasserId));
+    }
+    if (params.turfId != null) {
+      where.push('turf_id = ?');
+      args.push(Number(params.turfId));
+    }
+
+    const [rows] = await sql.execute(
+      `SELECT id, organization_id, voter_geo_id, person_record_id, voter_file_id,
+              turf_id, canvasser_id, status, note, party, survey_response_id,
+              client_event_id, recorded_at
+       FROM canvass_contacts
+       WHERE ${where.join(' AND ')}
+       ORDER BY id ASC
+       LIMIT ${limit}`,
+      args
+    );
+
+    return (rows as any[]).map((r) => ({
+      id: Number(r.id),
+      organization_id: Number(r.organization_id),
+      voter_geo_id: Number(r.voter_geo_id),
+      person_record_id: r.person_record_id != null ? Number(r.person_record_id) : null,
+      voter_file_id: r.voter_file_id,
+      turf_id: r.turf_id != null ? Number(r.turf_id) : null,
+      canvasser_id: Number(r.canvasser_id),
+      status: r.status,
+      note: r.note,
+      party: r.party,
+      survey_response_id:
+        r.survey_response_id != null ? Number(r.survey_response_id) : null,
+      client_event_id: r.client_event_id,
+      recorded_at: r.recorded_at,
+    }));
+  }
+}
+
 export class ContactSuppressionRepo {
   static async list(organizationId: number, limit = 500): Promise<ContactSuppressionRow[]> {
     const sql = await openSql();
@@ -530,6 +611,23 @@ export class TurfRepo {
     return (rows as any[]).map(normalizeTurf);
   }
 
+  /** G4: turfs assigned to a canvasser (MiniVAN pull surface). */
+  static async listByAssignee(
+    organizationId: number,
+    assignedTo: number
+  ): Promise<TurfRow[]> {
+    const sql = await openSql();
+    const [rows] = await sql.execute(
+      `SELECT id, organization_id, label, definition, assigned_to, address_count,
+              notes, created_by, created_at, updated_at
+       FROM turfs
+       WHERE organization_id = ? AND assigned_to = ?
+       ORDER BY label ASC`,
+      [organizationId, assignedTo]
+    );
+    return (rows as any[]).map(normalizeTurf);
+  }
+
   static async getById(id: number, organizationId: number): Promise<TurfRow | null> {
     const sql = await openSql();
     const [rows] = await sql.execute(
@@ -719,6 +817,10 @@ export class TurfRepo {
     party?: string | null;
     notes?: string | null;
     surveyResponseId?: number | null;
+    /** G4 offline: client-supplied door time (ISO). Defaults to server now. */
+    recordedAt?: string | Date | null;
+    /** G4 offline: idempotent retry key (unique per org). */
+    clientEventId?: string | null;
   }): Promise<{ outcome: TurfStopOutcome; address: TurfAddress | null; contactId: number }> {
     const turf = await this.getById(params.turfId, params.organizationId);
     if (!turf) throw new Error('Turf not found');
@@ -735,13 +837,79 @@ export class TurfRepo {
     const personRecordId =
       addr.person_record_id != null ? Number(addr.person_record_id) : null;
     const voterFileId = addr.voter_file_id ? String(addr.voter_file_id) : null;
+    const clientEventId = params.clientEventId
+      ? String(params.clientEventId).trim().slice(0, 64)
+      : null;
+    const recordedAt = params.recordedAt ? new Date(params.recordedAt) : new Date();
+    if (Number.isNaN(recordedAt.getTime())) {
+      throw new Error('recordedAt must be a valid datetime');
+    }
+
+    // Idempotent offline retry: return existing contact if client_event_id already landed
+    if (clientEventId) {
+      const [existing] = await sql.execute(
+        `SELECT id FROM canvass_contacts
+         WHERE organization_id = ? AND client_event_id = ? LIMIT 1`,
+        [params.organizationId, clientEventId]
+      );
+      const prior = (existing as any[])[0];
+      if (prior) {
+        const [outRows] = await sql.execute(
+          `SELECT id, organization_id, turf_id, voter_geo_id, person_record_id,
+                  status, party, notes, recorded_by, recorded_at
+           FROM turf_stop_outcomes
+           WHERE turf_id = ? AND voter_geo_id = ? LIMIT 1`,
+          [params.turfId, params.voterGeoId]
+        );
+        const o = (outRows as any[])[0];
+        const listed = await this.listAddresses(params.turfId, params.organizationId, {
+          limit: 20000,
+        });
+        const address =
+          listed.addresses.find((a) => a.voterGeoId === params.voterGeoId) || null;
+        if (!o) {
+          return {
+            contactId: Number(prior.id),
+            outcome: {
+              id: 0,
+              organization_id: params.organizationId,
+              turf_id: params.turfId,
+              voter_geo_id: params.voterGeoId,
+              person_record_id: personRecordId,
+              status: params.status,
+              party: params.party ?? null,
+              notes: params.notes ?? null,
+              recorded_by: params.recordedBy,
+              recorded_at: recordedAt,
+            },
+            address,
+          };
+        }
+        return {
+          contactId: Number(prior.id),
+          outcome: {
+            id: Number(o.id),
+            organization_id: Number(o.organization_id),
+            turf_id: Number(o.turf_id),
+            voter_geo_id: Number(o.voter_geo_id),
+            person_record_id: o.person_record_id != null ? Number(o.person_record_id) : null,
+            status: o.status,
+            party: o.party,
+            notes: o.notes,
+            recorded_by: Number(o.recorded_by),
+            recorded_at: o.recorded_at,
+          },
+          address,
+        };
+      }
+    }
 
     // G3.1 — append-only contact log (never UPDATE)
     const [contactResult] = await sql.execute<ResultSetHeader>(
       `INSERT INTO canvass_contacts
         (organization_id, voter_geo_id, person_record_id, voter_file_id, turf_id,
-         canvasser_id, status, note, party, survey_response_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         canvasser_id, status, note, party, survey_response_id, client_event_id, recorded_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         params.organizationId,
         params.voterGeoId,
@@ -753,6 +921,8 @@ export class TurfRepo {
         params.notes ?? null,
         params.party ?? null,
         params.surveyResponseId ?? null,
+        clientEventId,
+        recordedAt,
       ]
     );
     const contactId = Number(contactResult.insertId);

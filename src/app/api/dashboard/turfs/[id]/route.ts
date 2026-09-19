@@ -76,6 +76,9 @@ export async function PATCH(
         status: String(body.status) as TurfStopStatus,
         party: body.party ?? null,
         notes: body.notes ?? null,
+        surveyResponseId: body.surveyResponseId != null ? Number(body.surveyResponseId) : null,
+        recordedAt: body.recordedAt ?? null,
+        clientEventId: body.clientEventId ?? null,
       });
       return NextResponse.json({ status: true, ...result });
     }

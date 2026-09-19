@@ -8,6 +8,8 @@ type Input = {
   status: string;
   party?: string;
   notes?: string;
+  recordedAt?: string;
+  clientEventId?: string;
 };
 
 /** record_turf_stop — door outcome on a walk-list stop (risk: auto). */
@@ -28,6 +30,14 @@ export const recordTurfStopTool: CampaignTool<Input> = {
       },
       party: { type: 'string' },
       notes: { type: 'string' },
+      recordedAt: {
+        type: 'string',
+        description: 'ISO door timestamp (G4 offline). Defaults to server now.',
+      },
+      clientEventId: {
+        type: 'string',
+        description: 'Idempotent offline retry key (unique per org).',
+      },
     },
     required: ['voterGeoId', 'status'],
     additionalProperties: false,
@@ -51,6 +61,8 @@ export const recordTurfStopTool: CampaignTool<Input> = {
       status: String(input.status) as TurfStopStatus,
       party: input.party ?? null,
       notes: input.notes ?? null,
+      recordedAt: input.recordedAt ?? null,
+      clientEventId: input.clientEventId ?? null,
     });
 
     return {

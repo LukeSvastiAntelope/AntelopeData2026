@@ -11,7 +11,7 @@ import { ensurePrimaryOrgId } from '@/app/api/dashboard/persons/org';
 
 export const runtime = 'nodejs';
 
-/** GET /api/dashboard/turfs — list saved turfs. */
+/** GET /api/dashboard/turfs — list saved turfs (optional ?assignedTo=me|<userId>). */
 export async function GET(request: NextRequest) {
   try {
     const userId = request.headers.get('x-user-id');
@@ -19,7 +19,21 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ status: false, message: 'Unauthorized' }, { status: 401 });
     }
     const orgId = await ensurePrimaryOrgId(userId);
-    const turfs = await TurfRepo.list(orgId);
+    const assignedRaw = request.nextUrl.searchParams.get('assignedTo');
+    let turfs;
+    if (assignedRaw) {
+      const assignedTo =
+        assignedRaw === 'me' ? Number(userId) : Number(assignedRaw);
+      if (!Number.isFinite(assignedTo) || assignedTo <= 0) {
+        return NextResponse.json(
+          { status: false, message: 'assignedTo must be me or a user id' },
+          { status: 400 }
+        );
+      }
+      turfs = await TurfRepo.listByAssignee(orgId, assignedTo);
+    } else {
+      turfs = await TurfRepo.list(orgId);
+    }
     return NextResponse.json({ status: true, organizationId: orgId, turfs });
   } catch (error) {
     console.error('[turfs GET]', error);
