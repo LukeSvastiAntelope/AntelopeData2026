@@ -218,7 +218,6 @@ export default function AgentMapPage() {
   }
 
   const maxCol = 3
-  const maxRow = 4
 
   return (
     <div className="flex-1 p-2 w-full bg-background min-h-0">
@@ -295,78 +294,118 @@ export default function AgentMapPage() {
                   </span>
                 </div>
 
-                <div
-                  className="relative rounded-lg border border-border/60 bg-muted/10 p-4"
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: `repeat(${maxCol}, minmax(0, 1fr))`,
-                    gridTemplateRows: `repeat(${maxRow}, minmax(88px, auto))`,
-                    gap: '12px',
-                    minHeight: 420,
-                  }}
-                >
-                  {/* Soft edge lines via CSS — fixed, not editable */}
+                <div className="rounded-lg border border-border/60 bg-muted/10 p-4 space-y-3">
                   {data?.topology.edges.map((e) => (
                     <div key={`${e.from}-${e.to}`} className="sr-only">
                       {e.from} → {e.to}
                     </div>
                   ))}
 
-                  {data?.topology.nodes.map((node) => {
-                    const active = selectedId === node.id
-                    return (
-                      <button
-                        key={node.id}
-                        type="button"
-                        onClick={() => setSelectedId(node.id)}
-                        className={`relative rounded-lg border px-3 py-2.5 text-left transition-shadow hover:shadow-md ${roleTone(
-                          node.role
-                        )} ${active ? 'ring-2 ring-offset-2 ring-offset-background ring-foreground/40' : ''}`}
-                        style={{ gridColumn: node.col, gridRow: node.row }}
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <div>
-                            <p className="text-sm font-medium leading-tight">{node.label}</p>
-                            <p className="text-[10px] opacity-70 capitalize mt-0.5">
-                              {node.role.replace('_', ' ')}
-                            </p>
-                          </div>
-                          <Badge
-                            variant="outline"
-                            className={`h-5 text-[9px] ${
-                              node.enabled ? 'border-emerald-500/40' : 'border-muted-foreground/30'
-                            }`}
-                          >
-                            {node.enabled ? 'on' : 'manual'}
-                          </Badge>
-                        </div>
-                        <p className="text-[10px] opacity-80 mt-2 line-clamp-2">
-                          {node.summary || node.description}
-                        </p>
-                        <div className="mt-2 flex items-center justify-between gap-1 text-[9px] opacity-70">
-                          <span>Last {fmtWhen(node.lastRun)}</span>
-                          {node.pendingGates > 0 && (
-                            <span className="text-amber-700 dark:text-amber-400">
-                              {node.pendingGates} gate
-                            </span>
-                          )}
-                        </div>
-                      </button>
-                    )
-                  })}
-
-                  {/* Gate divider annotation spanning row 4 */}
+                  {/* Auto zone — feeders / situation / executors / core */}
                   <div
-                    className="pointer-events-none absolute left-3 right-3 border-t-2 border-dashed border-amber-500/50"
-                    style={{ top: 'calc(75% - 6px)' }}
-                    aria-hidden
-                  />
-                  <p
-                    className="pointer-events-none absolute left-1/2 -translate-x-1/2 text-[10px] uppercase tracking-wider text-amber-700 dark:text-amber-400 bg-card px-2"
-                    style={{ top: 'calc(75% - 16px)' }}
+                    className="grid gap-3"
+                    style={{
+                      gridTemplateColumns: `repeat(${maxCol}, minmax(0, 1fr))`,
+                      gridTemplateRows: 'repeat(3, minmax(88px, auto))',
+                    }}
                   >
-                    Human gate — approval zone below
-                  </p>
+                    {data?.topology.nodes
+                      .filter((n) => n.zone === 'auto')
+                      .map((node) => {
+                        const active = selectedId === node.id
+                        return (
+                          <button
+                            key={node.id}
+                            type="button"
+                            onClick={() => setSelectedId(node.id)}
+                            className={`relative rounded-lg border px-3 py-2.5 text-left transition-shadow hover:shadow-md ${roleTone(
+                              node.role
+                            )} ${active ? 'ring-2 ring-offset-2 ring-offset-background ring-foreground/40' : ''}`}
+                            style={{ gridColumn: node.col, gridRow: node.row }}
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div>
+                                <p className="text-sm font-medium leading-tight">{node.label}</p>
+                                <p className="text-[10px] opacity-70 capitalize mt-0.5">
+                                  {node.role.replace('_', ' ')}
+                                </p>
+                              </div>
+                              <Badge
+                                variant="outline"
+                                className={`h-5 text-[9px] ${
+                                  node.enabled
+                                    ? 'border-emerald-500/40'
+                                    : 'border-muted-foreground/30'
+                                }`}
+                              >
+                                {node.enabled ? 'on' : 'manual'}
+                              </Badge>
+                            </div>
+                            <p className="text-[10px] opacity-80 mt-2 line-clamp-2">
+                              {node.summary || node.description}
+                            </p>
+                            <div className="mt-2 flex items-center justify-between gap-1 text-[9px] opacity-70">
+                              <span>Last {fmtWhen(node.lastRun)}</span>
+                              {node.pendingGates > 0 && (
+                                <span className="text-amber-700 dark:text-amber-400">
+                                  {node.pendingGates} gate
+                                </span>
+                              )}
+                            </div>
+                          </button>
+                        )
+                      })}
+                  </div>
+
+                  {/* Checkpoint line between auto and approval zones */}
+                  <div className="relative flex items-center gap-3 py-1" aria-hidden>
+                    <div className="flex-1 border-t-2 border-dashed border-amber-500/50" />
+                    <p className="shrink-0 text-[10px] uppercase tracking-wider text-amber-700 dark:text-amber-400 px-1">
+                      Human gate — approval zone below
+                    </p>
+                    <div className="flex-1 border-t-2 border-dashed border-amber-500/50" />
+                  </div>
+
+                  {/* Approval zone */}
+                  <div className="grid grid-cols-3 gap-3">
+                    {data?.topology.nodes
+                      .filter((n) => n.zone !== 'auto')
+                      .map((node) => {
+                        const active = selectedId === node.id
+                        return (
+                          <button
+                            key={node.id}
+                            type="button"
+                            onClick={() => setSelectedId(node.id)}
+                            className={`relative rounded-lg border px-3 py-2.5 text-left transition-shadow hover:shadow-md col-start-2 ${roleTone(
+                              node.role
+                            )} ${active ? 'ring-2 ring-offset-2 ring-offset-background ring-foreground/40' : ''}`}
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div>
+                                <p className="text-sm font-medium leading-tight">{node.label}</p>
+                                <p className="text-[10px] opacity-70 capitalize mt-0.5">
+                                  {node.role.replace('_', ' ')}
+                                </p>
+                              </div>
+                              <Badge
+                                variant="outline"
+                                className={`h-5 text-[9px] ${
+                                  node.pendingGates > 0
+                                    ? 'border-amber-500/50'
+                                    : 'border-muted-foreground/30'
+                                }`}
+                              >
+                                {node.pendingGates > 0 ? `${node.pendingGates} pending` : 'clear'}
+                              </Badge>
+                            </div>
+                            <p className="text-[10px] opacity-80 mt-2 line-clamp-2">
+                              {node.description}
+                            </p>
+                          </button>
+                        )
+                      })}
+                  </div>
                 </div>
 
                 <div className="rounded-md border border-border/60 px-3 py-2 text-[11px] text-muted-foreground flex items-start gap-2">
