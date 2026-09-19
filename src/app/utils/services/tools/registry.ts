@@ -21,6 +21,7 @@ import { buildTurfTool } from './build-turf';
 import { listTurfAddressesTool } from './list-turf-addresses';
 import { assignTurfTool } from './assign-turf';
 import { recordTurfStopTool } from './record-turf-stop';
+import { readPropensityTool } from './read-propensity';
 
 /**
  * Canonical shared tool registry.
@@ -49,6 +50,7 @@ export const TOOL_REGISTRY: Record<CampaignToolName, CampaignTool> = {
   list_turf_addresses: listTurfAddressesTool,
   assign_turf: assignTurfTool,
   record_turf_stop: recordTurfStopTool,
+  read_propensity: readPropensityTool,
 };
 
 const AUTO_TOOLS: CampaignToolName[] = [
@@ -67,6 +69,7 @@ const AUTO_TOOLS: CampaignToolName[] = [
   'list_turf_addresses',
   'assign_turf',
   'record_turf_stop',
+  'read_propensity',
 ];
 
 const APPROVAL_TOOLS: CampaignToolName[] = [

@@ -4,6 +4,17 @@ export {
   computePriorP0,
   effectiveMapParty,
   priorWeightForBlend,
-  resolvePropensityForOrchestrator,
   propensityDecisionValue,
 } from './prior';
+export {
+  computePropensityBlend,
+  priorWeightFromEvidence,
+  propensityReadFromBlend,
+  resolvePropensityForOrchestrator,
+} from './blend';
+export {
+  accumulateEvidence,
+  eventsFromPersonCanvass,
+  eventsFromTurfOutcome,
+} from './evidence';
+export { getDecayK, DEFAULT_DECAY_K, bucketTier, PROPENSITY_FORMULA_VERSION } from './config';

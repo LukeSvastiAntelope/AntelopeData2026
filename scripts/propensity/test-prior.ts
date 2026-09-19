@@ -8,8 +8,8 @@ import {
   computePriorP0,
   priorWeightForBlend,
   propensityDecisionValue,
-  resolvePropensityForOrchestrator,
-} from '../../src/app/utils/propensity/prior';
+} from '../../src/app/utils/propensity/prior'
+import { resolvePropensityForOrchestrator } from '../../src/app/utils/propensity/blend';
 
 function assert(cond: boolean, msg: string) {
   if (!cond) throw new Error(msg);

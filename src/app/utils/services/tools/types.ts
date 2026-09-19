@@ -112,4 +112,5 @@ export type CampaignToolName =
   | 'build_turf'
   | 'list_turf_addresses'
   | 'assign_turf'
-  | 'record_turf_stop';
+  | 'record_turf_stop'
+  | 'read_propensity';

@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { useSidebar } from "@/components/ui/sidebar"
-import { PanelLeft, Landmark, MapPin, Vote, Grid3x3, ChevronDown, ChevronRight, HandCoins, Bot, Plus, Play, Trash2, Loader2, Newspaper, Building2, Globe, Palette, Upload, Sparkles, Fence, Check, X, MessageSquare, Users, Printer, Route } from 'lucide-react'
+import { PanelLeft, Landmark, MapPin, Vote, Grid3x3, ChevronDown, ChevronRight, HandCoins, Bot, Plus, Play, Trash2, Loader2, Newspaper, Building2, Globe, Palette, Upload, Sparkles, Fence, Check, X, MessageSquare, Users, Printer, Route, Crosshair, RefreshCw } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -210,6 +210,17 @@ export default function DashboardPage() {
   >([])
   const [turfLoading, setTurfLoading] = useState(false)
   const [selectedTurfStopId, setSelectedTurfStopId] = useState<number | null>(null)
+  const [propensitySummary, setPropensitySummary] = useState<{
+    hot: number
+    warm: number
+    cold: number
+    total: number
+    avgPropensity: number | null
+    avgConfidence: number | null
+    decayK: number
+  } | null>(null)
+  const [propensityLoading, setPropensityLoading] = useState(false)
+  const [propensityRefreshing, setPropensityRefreshing] = useState(false)
   const [personFilters, setPersonFilters] = useState({
     party: [] as string[],
     ageBucket: [] as string[],
@@ -592,6 +603,39 @@ export default function DashboardPage() {
     }
   }, [])
 
+  const loadPropensity = useCallback(async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) setPropensityLoading(true)
+    try {
+      const res = await fetch('/api/dashboard/propensity')
+      const data = await res.json()
+      if (!res.ok || !data.status) return
+      setPropensitySummary(data.summary || null)
+    } catch {
+      /* ignore */
+    } finally {
+      if (!opts?.silent) setPropensityLoading(false)
+    }
+  }, [])
+
+  const refreshPropensity = useCallback(async () => {
+    setPropensityRefreshing(true)
+    try {
+      const res = await fetch('/api/dashboard/propensity', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ limit: 500 }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data.status) throw new Error(data.message || 'Refresh failed')
+      setPropensitySummary(data.summary || null)
+      toast.success(`Propensity refreshed · ${data.refreshed ?? 0} voters`)
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Propensity refresh failed')
+    } finally {
+      setPropensityRefreshing(false)
+    }
+  }, [])
+
   const loadTurfStops = useCallback(async (turfId: number) => {
     setTurfLoading(true)
     try {
@@ -624,6 +668,10 @@ export default function DashboardPage() {
   useEffect(() => {
     if (layers.turf) void loadTurfList()
   }, [layers.turf, loadTurfList])
+
+  useEffect(() => {
+    void loadPropensity({ silent: true })
+  }, [loadPropensity])
 
   const assignActiveTurfToMe = async () => {
     if (!activeTurfId) return
@@ -1196,6 +1244,77 @@ export default function DashboardPage() {
                     if (next) void loadTurfList()
                   }}
                 />
+              </div>
+            </Section>
+
+            <Section title="Propensity funnel" defaultOpen>
+              <div className="space-y-2 text-[10px] text-muted-foreground">
+                <p>
+                  Decaying blend P = w·p₀ + (1−w)·q. Materialized view — recomputed from engagement,
+                  not a frozen score.
+                </p>
+                {propensityLoading && !propensitySummary ? (
+                  <div className="flex items-center gap-1.5">
+                    <Loader2 className="h-3 w-3 animate-spin" /> Loading…
+                  </div>
+                ) : propensitySummary ? (
+                  <div className="space-y-1.5">
+                    <div className="grid grid-cols-3 gap-1">
+                      <div className="rounded border border-orange-500/30 bg-orange-500/10 px-1.5 py-1 text-center">
+                        <p className="text-[9px] uppercase text-orange-600 dark:text-orange-400">Hot</p>
+                        <p className="text-[12px] font-semibold text-foreground tabular-nums">
+                          {propensitySummary.hot}
+                        </p>
+                      </div>
+                      <div className="rounded border border-amber-500/30 bg-amber-500/10 px-1.5 py-1 text-center">
+                        <p className="text-[9px] uppercase text-amber-600 dark:text-amber-400">Warm</p>
+                        <p className="text-[12px] font-semibold text-foreground tabular-nums">
+                          {propensitySummary.warm}
+                        </p>
+                      </div>
+                      <div className="rounded border border-sky-500/30 bg-sky-500/10 px-1.5 py-1 text-center">
+                        <p className="text-[9px] uppercase text-sky-600 dark:text-sky-400">Cold</p>
+                        <p className="text-[12px] font-semibold text-foreground tabular-nums">
+                          {propensitySummary.cold}
+                        </p>
+                      </div>
+                    </div>
+                    <p className="text-[9px]">
+                      k={propensitySummary.decayK.toFixed(2)} · avg P{' '}
+                      {propensitySummary.avgPropensity != null
+                        ? propensitySummary.avgPropensity.toFixed(2)
+                        : '—'}{' '}
+                      · conf{' '}
+                      {propensitySummary.avgConfidence != null
+                        ? propensitySummary.avgConfidence.toFixed(2)
+                        : '—'}
+                    </p>
+                  </div>
+                ) : (
+                  <p className="italic">No rows yet — recompute after households are on the map.</p>
+                )}
+                <div className="flex gap-1">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="flex-1 h-7 text-[10px]"
+                    disabled={propensityRefreshing}
+                    onClick={() => void refreshPropensity()}
+                  >
+                    {propensityRefreshing ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      <RefreshCw className="h-3 w-3" />
+                    )}
+                    Refresh
+                  </Button>
+                  <Button size="sm" variant="secondary" className="flex-1 h-7 text-[10px]" asChild>
+                    <Link href="/targeting/propensity">
+                      <Crosshair className="h-3 w-3" />
+                      Plan
+                    </Link>
+                  </Button>
+                </div>
               </div>
             </Section>
 

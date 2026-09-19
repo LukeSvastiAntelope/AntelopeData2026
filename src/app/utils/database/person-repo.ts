@@ -6,7 +6,8 @@
 import { openSql } from '@/app/utils/database/db';
 import type { RowDataPacket, ResultSetHeader } from 'mysql2';
 import { createHash } from 'crypto';
-import { resolvePropensityForOrchestrator } from '@/app/utils/propensity/prior';
+import { resolvePropensityForOrchestrator } from '@/app/utils/propensity/blend';
+import { eventsFromPersonCanvass } from '@/app/utils/propensity/evidence';
 
 export type CanvassStatus =
   | 'not_contacted'
@@ -222,6 +223,17 @@ export class PersonRepo {
         params.organizationId,
       ]
     );
+
+    // P2: incremental refresh of materialized propensity view
+    if (params.organizationId != null) {
+      try {
+        const { PropensityRepo } = await import('@/app/utils/database/propensity-repo');
+        await PropensityRepo.refreshPerson(params.id, params.organizationId);
+      } catch (e) {
+        console.warn('[propensity refresh after canvass]', e);
+      }
+    }
+
     return this.getById(params.id, params.organizationId);
   }
 
@@ -358,16 +370,21 @@ export class PersonRepo {
 /** Map API shape with effective (door-confirmed) party for coloring. */
 export function toMapPerson(row: PersonRecordRow) {
   const effectiveParty = (row.canvass_party || row.party || '').trim() || null;
-  // P1 propensity prior — recomputed read-layer (not a stored score).
+  // P2 propensity — recomputed from Map prior + engagement (not a stored ballistic score).
   // Orchestrator must use propensity.blended, never propensity.priorP0.
-  const propensity = resolvePropensityForOrchestrator({
-    party: row.party,
-    canvassParty: row.canvass_party,
-    voterStatus: row.voter_status,
-    district: row.district,
-    zip: row.zip,
-    state: row.state,
-  });
+  const events = eventsFromPersonCanvass(row);
+  const propensity = resolvePropensityForOrchestrator(
+    {
+      party: row.party,
+      canvassParty: row.canvass_party,
+      voterStatus: row.voter_status,
+      district: row.district,
+      zip: row.zip,
+      state: row.state,
+    },
+    0,
+    events
+  );
 
   return {
     id: row.id,
@@ -393,11 +410,15 @@ export function toMapPerson(row: PersonRecordRow) {
     canvassNotes: row.canvass_notes,
     lat: Number(row.latitude),
     lng: Number(row.longitude),
-    /** Cold-start propensity read (P1). Prefer `blended` for decisions. */
+    /** Propensity read (P2 blend). Prefer `blended` for decisions. */
     propensity: {
       blended: propensity.blended,
       priorWeight: propensity.priorWeight,
       phase: propensity.phase,
+      confidence: propensity.confidence ?? 0,
+      posteriorQ: propensity.posteriorQ ?? null,
+      tier: propensity.tier ?? 'warm',
+      evidenceE: propensity.evidenceE ?? 0,
       // Audit-only prior snapshot — not for targeting
       priorP0: propensity.prior.p0,
       priorFormula: propensity.prior.formulaVersion,

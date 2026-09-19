@@ -6,7 +6,8 @@
  * targetable score (data as MAP, not verdict).
  */
 
-import type { PriorComponents, PriorMapInputs, PriorResult, PropensityRead } from './types';
+import type { PriorComponents, PriorMapInputs, PriorResult } from './types';
+import { getDecayK } from './config';
 
 const FORMULA = 'p1.prior.v1' as const;
 
@@ -181,51 +182,27 @@ export function computePriorP0(inputs: PriorMapInputs): PriorResult {
 }
 
 /**
- * Prior weight in the blend. P1: no response evidence → weight 1.
- * P2 will decay this toward 0 as survey/canvass evidence accumulates.
- *
- * Tripwire: once evidenceCount > 0, weight must be < 1 (enforced in P2 tests).
+ * Prior weight helper (count → e). Canonical math: w = exp(-k · e).
  */
-export function priorWeightForBlend(responseEvidenceCount: number): number {
-  const n = Math.max(0, Math.floor(responseEvidenceCount || 0));
+export function priorWeightForBlend(responseEvidenceCount: number, k?: number): number {
+  const n = Math.max(0, Number(responseEvidenceCount) || 0);
+  const decay = k ?? getDecayK();
   if (n <= 0) return 1;
-  // Placeholder decay curve (P2 owns the real blend). Kept here so P1 exports
-  // the tripwire surface: weight falls as evidence grows.
-  return clamp01(1 / (1 + n));
-}
-
-/**
- * Orchestrator-facing read. Decision code must use `blended` only.
- * P1: blended === p0 (priorWeight=1, no event blend yet).
- */
-export function resolvePropensityForOrchestrator(
-  inputs: PriorMapInputs,
-  responseEvidenceCount = 0
-): PropensityRead {
-  const prior = computePriorP0(inputs);
-  const priorWeight = priorWeightForBlend(responseEvidenceCount);
-  // P1: no event posterior yet — blended collapses to prior.
-  // P2 replaces the `0.5` stub with a real event posterior.
-  const eventPosteriorStub = 0.5;
-  const blended = clamp01(priorWeight * prior.p0 + (1 - priorWeight) * eventPosteriorStub);
-
-  return {
-    blended,
-    priorWeight,
-    prior,
-    responseEvidenceCount: Math.max(0, Math.floor(responseEvidenceCount || 0)),
-    phase: responseEvidenceCount > 0 ? 'p2_blend' : 'p1_prior_only',
-  };
+  return clamp01(Math.exp(-decay * n));
 }
 
 /**
  * Tripwire helper: decision paths must not receive raw prior.p0.
  * Returns only the blended scalar (+ metadata without prior.p0 as a top-level field).
  */
-export function propensityDecisionValue(read: PropensityRead): {
+export function propensityDecisionValue(read: {
+  blended: number;
+  priorWeight: number;
+  phase: string;
+}): {
   value: number;
   priorWeight: number;
-  phase: PropensityRead['phase'];
+  phase: string;
 } {
   return {
     value: read.blended,

@@ -70,13 +70,21 @@ export type PropensityRead = {
   blended: number;
   /**
    * Current weight on the prior in the blend (P1: 1.0 with no responses).
-   * Decays toward 0 as response evidence accumulates (P2).
+   * Decays toward 0 as engagement accumulates (P2): w = exp(-k · e).
    */
   priorWeight: number;
   /** Cold-start prior — for audit / decay math only. NEVER pass to decision logic. */
   prior: PriorResult;
-  /** Evidence count driving decay (P1 always 0). */
+  /** Evidence event count (audit). */
   responseEvidenceCount: number;
   /** Phase tag so callers know blend maturity. */
   phase: 'p1_prior_only' | 'p2_blend' | 'p3_funnel' | 'p4_tier';
+  /** P2: confidence = 1 − w */
+  confidence?: number;
+  /** P2: observed posterior; null until directional signal */
+  posteriorQ?: number | null;
+  /** P2: hot | warm | cold */
+  tier?: 'hot' | 'warm' | 'cold';
+  /** P2: accumulated evidence e */
+  evidenceE?: number;
 };
