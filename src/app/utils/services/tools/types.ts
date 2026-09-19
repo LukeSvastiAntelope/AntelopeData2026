@@ -110,4 +110,6 @@ export type CampaignToolName =
   | 'clip_video'
   | 'addresses_in_area'
   | 'build_turf'
-  | 'list_turf_addresses';
+  | 'list_turf_addresses'
+  | 'assign_turf'
+  | 'record_turf_stop';

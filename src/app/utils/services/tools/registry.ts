@@ -19,6 +19,8 @@ import { clipVideoTool } from './clip-video';
 import { addressesInAreaTool } from './addresses-in-area';
 import { buildTurfTool } from './build-turf';
 import { listTurfAddressesTool } from './list-turf-addresses';
+import { assignTurfTool } from './assign-turf';
+import { recordTurfStopTool } from './record-turf-stop';
 
 /**
  * Canonical shared tool registry.
@@ -45,6 +47,8 @@ export const TOOL_REGISTRY: Record<CampaignToolName, CampaignTool> = {
   addresses_in_area: addressesInAreaTool,
   build_turf: buildTurfTool,
   list_turf_addresses: listTurfAddressesTool,
+  assign_turf: assignTurfTool,
+  record_turf_stop: recordTurfStopTool,
 };
 
 const AUTO_TOOLS: CampaignToolName[] = [
@@ -61,6 +65,8 @@ const AUTO_TOOLS: CampaignToolName[] = [
   'addresses_in_area',
   'build_turf',
   'list_turf_addresses',
+  'assign_turf',
+  'record_turf_stop',
 ];
 
 const APPROVAL_TOOLS: CampaignToolName[] = [

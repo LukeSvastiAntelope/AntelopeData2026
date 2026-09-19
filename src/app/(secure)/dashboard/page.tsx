@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { useSidebar } from "@/components/ui/sidebar"
-import { PanelLeft, Landmark, MapPin, Vote, Grid3x3, ChevronDown, ChevronRight, HandCoins, Bot, Plus, Play, Trash2, Loader2, Newspaper, Building2, Globe, Palette, Upload, Sparkles, Fence, Check, X, MessageSquare, Users, Printer } from 'lucide-react'
+import { PanelLeft, Landmark, MapPin, Vote, Grid3x3, ChevronDown, ChevronRight, HandCoins, Bot, Plus, Play, Trash2, Loader2, Newspaper, Building2, Globe, Palette, Upload, Sparkles, Fence, Check, X, MessageSquare, Users, Printer, Route } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -172,6 +172,7 @@ export default function DashboardPage() {
     customizable: false,
     geofencing: false,
     persons: false,
+    turf: false,
   })
   const [personPins, setPersonPins] = useState<
     {
@@ -190,6 +191,25 @@ export default function DashboardPage() {
       canvassNotes?: string | null
     }[]
   >([])
+  const [turfList, setTurfList] = useState<
+    { id: number; label: string; address_count: number; assigned_to: number | null }[]
+  >([])
+  const [activeTurfId, setActiveTurfId] = useState<number | null>(null)
+  const [activeTurfLabel, setActiveTurfLabel] = useState<string | null>(null)
+  const [turfStops, setTurfStops] = useState<
+    {
+      voterGeoId: number
+      sortOrder: number
+      lng: number
+      lat: number
+      label: string
+      party?: string | null
+      canvassStatus?: string | null
+      personRecordId?: number | null
+    }[]
+  >([])
+  const [turfLoading, setTurfLoading] = useState(false)
+  const [selectedTurfStopId, setSelectedTurfStopId] = useState<number | null>(null)
   const [personFilters, setPersonFilters] = useState({
     party: [] as string[],
     ageBucket: [] as string[],
@@ -554,6 +574,121 @@ export default function DashboardPage() {
     }
   }
 
+  const loadTurfList = useCallback(async () => {
+    try {
+      const res = await fetch('/api/dashboard/turfs')
+      const data = await res.json()
+      if (!res.ok || !data.status) return
+      setTurfList(
+        (data.turfs || []).map((t: any) => ({
+          id: t.id,
+          label: t.label,
+          address_count: t.address_count,
+          assigned_to: t.assigned_to,
+        }))
+      )
+    } catch {
+      /* ignore */
+    }
+  }, [])
+
+  const loadTurfStops = useCallback(async (turfId: number) => {
+    setTurfLoading(true)
+    try {
+      const res = await fetch(`/api/dashboard/turfs/${turfId}?addresses=1`)
+      const data = await res.json()
+      if (!res.ok || !data.status) throw new Error(data.message || 'Failed to load turf')
+      setActiveTurfId(turfId)
+      setActiveTurfLabel(data.turf?.label || null)
+      setTurfStops(
+        (data.addresses || []).map((a: any) => ({
+          voterGeoId: a.voterGeoId,
+          sortOrder: a.sortOrder || 0,
+          lng: a.longitude,
+          lat: a.latitude,
+          label: a.label,
+          party: a.party,
+          canvassStatus: a.canvassStatus,
+          personRecordId: a.personRecordId,
+        }))
+      )
+      setLayers((prev) => ({ ...prev, turf: true }))
+      toast.success(`Loaded “${data.turf?.label}” · ${data.count} stops`)
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Turf load failed')
+    } finally {
+      setTurfLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (layers.turf) void loadTurfList()
+  }, [layers.turf, loadTurfList])
+
+  const assignActiveTurfToMe = async () => {
+    if (!activeTurfId) return
+    try {
+      const res = await fetch(`/api/dashboard/turfs/${activeTurfId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ assignToSelf: true }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data.status) throw new Error(data.message || 'Assign failed')
+      setTurfList((prev) =>
+        prev.map((t) =>
+          t.id === activeTurfId ? { ...t, assigned_to: data.turf?.assigned_to ?? t.assigned_to } : t
+        )
+      )
+      toast.success(`Assigned “${data.turf?.label || 'turf'}” to you`)
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Assign failed')
+    }
+  }
+
+  const confirmTurfStopAtDoor = async (partyOverride?: string, statusOverride?: string) => {
+    if (!activeTurfId || selectedTurfStopId == null) return
+    const party = partyOverride || confirmParty
+    const status = statusOverride || confirmStatus
+    const stopId = selectedTurfStopId
+    setConfirmBusy(true)
+    try {
+      const res = await fetch(`/api/dashboard/turfs/${activeTurfId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          voterGeoId: stopId,
+          status,
+          party,
+          notes: confirmNotes,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data.status) throw new Error(data.message || 'Stop update failed')
+      setTurfStops((prev) =>
+        prev.map((s) =>
+          s.voterGeoId === stopId
+            ? {
+                ...s,
+                party: data.address?.party ?? party,
+                canvassStatus: data.address?.canvassStatus ?? status,
+              }
+            : s
+        )
+      )
+      toast.success(`Stop recorded: ${status}${party ? ` · ${party}` : ''}`)
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Stop record failed')
+    } finally {
+      setConfirmBusy(false)
+    }
+  }
+
+  const selectedTurfStop = useMemo(
+    () => turfStops.find((s) => s.voterGeoId === selectedTurfStopId) || null,
+    [turfStops, selectedTurfStopId]
+  )
+
   const handleCreateSubmit = async () => {
     const name = createName.trim() || getDefaultName(createType, createConfig)
     const config = getConfigForType(createType, createConfig)
@@ -817,6 +952,7 @@ export default function DashboardPage() {
           customMapPins={customMapPins}
           personPins={layers.persons ? personPins : null}
           personHeatmap={personHeatmap}
+          turfStops={layers.turf ? turfStops : null}
           geofencing={geofencingMapProps}
           onDistrictSelect={(district) => {
             setSelectedDistrict(district)
@@ -824,12 +960,104 @@ export default function DashboardPage() {
           }}
           onPersonSelect={(person) => {
             setSelectedPersonId(person.id)
+            setSelectedTurfStopId(null)
             if (person.effectiveParty) setConfirmParty(person.effectiveParty)
             setConfirmStatus('confirmed')
             setRightPanelOpen(true)
           }}
+          onTurfStopSelect={(stop) => {
+            setSelectedTurfStopId(stop.voterGeoId)
+            setSelectedPersonId(null)
+            if (stop.party) setConfirmParty(stop.party)
+            setConfirmStatus('confirmed')
+            setRightPanelOpen(true)
+          }}
         />
-        {selectedPerson && (
+        {selectedTurfStop && (
+          <div
+            style={{
+              position: 'absolute',
+              left: '50%',
+              bottom: 20,
+              transform: 'translateX(-50%)',
+              zIndex: 30,
+              width: 'min(420px, calc(100% - 24px))',
+            }}
+            className="rounded-xl border border-teal-500/30 bg-background/95 backdrop-blur-md shadow-2xl p-3 space-y-2"
+          >
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold truncate">
+                  #{selectedTurfStop.sortOrder} · {selectedTurfStop.label}
+                </p>
+                <p className="text-[11px] text-muted-foreground truncate">
+                  {activeTurfLabel || 'Turf'} · {selectedTurfStop.canvassStatus || 'not_contacted'} ·{' '}
+                  <span className="font-medium text-foreground">
+                    {selectedTurfStop.party || 'unknown lean'}
+                  </span>
+                </p>
+              </div>
+              <button
+                type="button"
+                className="shrink-0 rounded-md p-1 text-muted-foreground hover:bg-muted"
+                onClick={() => setSelectedTurfStopId(null)}
+                aria-label="Close turf stop"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              Field stop — record lean or disposition. Updates turf outcome (and household if linked).
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              {(
+                [
+                  { party: 'Democrat', className: 'bg-blue-600 hover:bg-blue-700 text-white' },
+                  { party: 'Republican', className: 'bg-red-600 hover:bg-red-700 text-white' },
+                  { party: 'Independent', className: 'bg-amber-500 hover:bg-amber-600 text-white' },
+                  { party: 'Unaffiliated', className: 'bg-slate-600 hover:bg-slate-700 text-white' },
+                ] as const
+              ).map(({ party, className }) => (
+                <Button
+                  key={party}
+                  type="button"
+                  size="sm"
+                  disabled={confirmBusy}
+                  className={`h-10 text-xs font-semibold ${className}`}
+                  onClick={() => void confirmTurfStopAtDoor(party, 'confirmed')}
+                >
+                  {confirmBusy && confirmParty === party ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : null}
+                  {party}
+                </Button>
+              ))}
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {(
+                [
+                  ['not_home', 'Not home'],
+                  ['refused', 'Refused'],
+                  ['moved', 'Moved'],
+                  ['wrong_address', 'Wrong address'],
+                ] as const
+              ).map(([status, label]) => (
+                <Button
+                  key={status}
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={confirmBusy}
+                  className="h-7 text-[10px]"
+                  onClick={() => void confirmTurfStopAtDoor(confirmParty, status)}
+                >
+                  {label}
+                </Button>
+              ))}
+            </div>
+          </div>
+        )}
+        {selectedPerson && !selectedTurfStop && (
           <div
             style={{
               position: 'absolute',
@@ -956,6 +1184,18 @@ export default function DashboardPage() {
                   if (next) void loadPersons()
                 }} />
                 <LayerToggle icon={<Fence className="h-3 w-3" />} label="Geofencing" active={layers.geofencing} colorClass="text-cyan-400" activeBg="bg-cyan-500/10 border-cyan-500/20" onClick={() => toggleLayer('geofencing')} />
+                <LayerToggle
+                  icon={<Route className="h-3 w-3" />}
+                  label="Turf walk"
+                  active={layers.turf}
+                  colorClass="text-teal-400"
+                  activeBg="bg-teal-500/10 border-teal-500/20"
+                  onClick={() => {
+                    const next = !layers.turf
+                    setLayers((prev) => ({ ...prev, turf: next }))
+                    if (next) void loadTurfList()
+                  }}
+                />
               </div>
             </Section>
 
@@ -1264,6 +1504,88 @@ export default function DashboardPage() {
                             <span className="text-slate-500">Neutral {geofenceStats.neutral}</span>
                           </>
                         )}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </Section>
+            )}
+
+            {layers.turf && (
+              <Section title="Turf walk-list" defaultOpen>
+                <div className="space-y-2 text-[10px] text-muted-foreground">
+                  <p>
+                    Load a saved turf (from <code className="text-[9px]">build_turf</code>) as numbered field
+                    stops. Assign yourself, knock, record outcomes.
+                  </p>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="w-full h-7 text-[10px]"
+                    disabled={turfLoading}
+                    onClick={() => void loadTurfList()}
+                  >
+                    {turfLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Route className="h-3 w-3" />}
+                    Refresh turfs
+                  </Button>
+                  {turfList.length === 0 ? (
+                    <p className="text-[10px] italic">No saved turfs yet. Build one via consultant or API.</p>
+                  ) : (
+                    <div className="space-y-1 max-h-40 overflow-y-auto">
+                      {turfList.map((t) => (
+                        <div
+                          key={t.id}
+                          className={`flex items-center justify-between gap-1 rounded border px-1.5 py-1 ${
+                            activeTurfId === t.id ? 'border-teal-500/50 bg-teal-500/10' : 'border-border/60'
+                          }`}
+                        >
+                          <button
+                            type="button"
+                            className="min-w-0 text-left truncate text-[10px] text-foreground"
+                            onClick={() => void loadTurfStops(t.id)}
+                          >
+                            {t.label}
+                            <span className="text-muted-foreground"> · {t.address_count}</span>
+                          </button>
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            className="h-6 text-[9px] px-1.5 shrink-0"
+                            disabled={turfLoading}
+                            onClick={() => void loadTurfStops(t.id)}
+                          >
+                            Load
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {activeTurfId && (
+                    <div className="rounded border border-border/60 bg-muted/20 px-2 py-1.5 space-y-1.5">
+                      <p className="font-medium text-foreground text-[10px]">
+                        Active: {activeTurfLabel} · {turfStops.length} stops
+                      </p>
+                      <div className="flex flex-wrap gap-1">
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          className="h-7 text-[10px]"
+                          onClick={() => void assignActiveTurfToMe()}
+                        >
+                          Assign to me
+                        </Button>
+                        <Button asChild size="sm" variant="outline" className="h-7 text-[10px]">
+                          <Link href={`/dashboard/print-map?turfId=${activeTurfId}`}>
+                            <Printer className="h-3 w-3" />
+                            Print walk sheet
+                          </Link>
+                        </Button>
+                      </div>
+                      <p className="text-[9px]">
+                        Done:{' '}
+                        {turfStops.filter((s) => s.canvassStatus && s.canvassStatus !== 'not_contacted').length}
+                        {' / '}
+                        {turfStops.length}
                       </p>
                     </div>
                   )}

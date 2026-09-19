@@ -63,6 +63,7 @@ export const listTurfAddressesTool: CampaignTool<Input> = {
         returned: addresses.length,
         addresses: addresses.map((a) => ({
           voterGeoId: a.voterGeoId,
+          sortOrder: a.sortOrder,
           label: a.label,
           party: a.party,
           street: a.street,
@@ -71,6 +72,7 @@ export const listTurfAddressesTool: CampaignTool<Input> = {
           zip: a.zip,
           lat: a.latitude,
           lng: a.longitude,
+          canvassStatus: a.canvassStatus,
         })),
       },
     };

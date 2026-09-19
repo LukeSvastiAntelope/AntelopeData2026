@@ -141,6 +141,18 @@ export type PersonMapPin = {
   addressLine?: string | null
 }
 
+/** Ordered turf walk-list stop (G3 field data). */
+export type TurfStopPin = {
+  voterGeoId: number
+  sortOrder: number
+  lng: number
+  lat: number
+  label: string
+  party?: string | null
+  canvassStatus?: string | null
+  personRecordId?: number | null
+}
+
 interface DashboardMapProps {
   layers?: {
     political: boolean
@@ -152,6 +164,8 @@ interface DashboardMapProps {
     geofencing?: boolean
     /** Unified household pins from person_records / mock upload */
     persons?: boolean
+    /** Saved turf walk-list numbered stops */
+    turf?: boolean
   }
   customLayerData?: CustomLayerData | null
   /** Point pins from uploaded CSV (lat/lng), e.g. schools/hospitals filtered via map assistant */
@@ -160,6 +174,8 @@ interface DashboardMapProps {
   personPins?: PersonMapPin[] | null
   /** When true with persons layer, show density heatmap in addition to circles */
   personHeatmap?: boolean
+  /** G3: numbered walk-list stops from a saved turf */
+  turfStops?: TurfStopPin[] | null
   geofencing?: GeofencingMapProps | null
   onDistrictSelect?: (district: { districtCode: string; state: string; districtNumber: number }) => void
   /** Fired when a household pin is tapped (door-knock confirmation). */
@@ -171,6 +187,8 @@ interface DashboardMapProps {
     effectiveParty?: string | null
     canvassStatus?: string | null
   }) => void
+  /** Fired when a turf walk stop is tapped. */
+  onTurfStopSelect?: (stop: TurfStopPin) => void
 }
 
 // ---------------------------------------------------------------------------
@@ -236,9 +254,11 @@ export default function DashboardMap({
   customMapPins,
   personPins,
   personHeatmap = false,
+  turfStops,
   geofencing,
   onDistrictSelect,
   onPersonSelect,
+  onTurfStopSelect,
 }: DashboardMapProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<any>(null)
@@ -246,6 +266,8 @@ export default function DashboardMap({
   // ... existing state continues below — keep personSelectRef
   const onPersonSelectRef = useRef(onPersonSelect)
   onPersonSelectRef.current = onPersonSelect
+  const onTurfStopSelectRef = useRef(onTurfStopSelect)
+  onTurfStopSelectRef.current = onTurfStopSelect
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [geoData, setGeoData] = useState<GeoData | null>(null)
   const [statePoliticalData, setStatePoliticalData] = useState<PoliticalFeature[]>([])
@@ -285,6 +307,7 @@ export default function DashboardMap({
   const showCustomizableLayer = layers?.customizable ?? false
   const showGeofencingLayer = layers?.geofencing ?? false
   const showPersonsLayer = layers?.persons ?? false
+  const showTurfLayer = layers?.turf ?? false
 
   const [fundraisingOverlays, setFundraisingOverlays] = useState<any[]>([])
   const geofenceVertexRef = useRef<((lng: number, lat: number) => void) | undefined>(undefined)
@@ -620,6 +643,54 @@ export default function DashboardMap({
           },
         })
 
+        // ---- Turf walk-list numbered stops (G3) ----
+        map.addSource('turf-stops', {
+          type: 'geojson',
+          data: { type: 'FeatureCollection', features: [] },
+        })
+        map.addLayer({
+          id: 'turf-stops-circles',
+          type: 'circle',
+          source: 'turf-stops',
+          layout: { visibility: 'none' },
+          paint: {
+            'circle-radius': ['interpolate', ['linear'], ['zoom'], 10, 7, 14, 11, 16, 14],
+            'circle-color': [
+              'match',
+              ['downcase', ['coalesce', ['get', 'party'], '']],
+              'democrat', '#2563eb',
+              'republican', '#dc2626',
+              'independent', '#ca8a04',
+              'unaffiliated', '#64748b',
+              '#0d9488',
+            ],
+            'circle-opacity': [
+              'case',
+              ['==', ['get', 'canvassStatus'], 'not_contacted'], 0.95,
+              0.55,
+            ],
+            'circle-stroke-width': 2,
+            'circle-stroke-color': isDark ? '#042f2e' : '#fff',
+          },
+        })
+        map.addLayer({
+          id: 'turf-stops-labels',
+          type: 'symbol',
+          source: 'turf-stops',
+          layout: {
+            visibility: 'none',
+            'text-field': ['to-string', ['get', 'sortOrder']],
+            'text-size': 11,
+            'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
+            'text-allow-overlap': true,
+          },
+          paint: {
+            'text-color': '#fff',
+            'text-halo-color': isDark ? '#042f2e' : '#0f172a',
+            'text-halo-width': 1.2,
+          },
+        })
+
         // ---- News event points (from news chat / campaign news with location + date) ----
         map.addSource('news-event-points', {
           type: 'geojson',
@@ -848,6 +919,33 @@ export default function DashboardMap({
         map.getCanvas().style.cursor = 'pointer'
       })
       map.on('mouseleave', 'person-points-circles', () => {
+        map.getCanvas().style.cursor = ''
+      })
+
+      map.on('click', 'turf-stops-circles', (e: any) => {
+        if (!e.features?.length) return
+        e.originalEvent?.stopPropagation?.()
+        const f = e.features[0]
+        const voterGeoId = Number(f.properties?.voterGeoId)
+        if (!Number.isFinite(voterGeoId)) return
+        const coords = f.geometry?.coordinates
+        onTurfStopSelectRef.current?.({
+          voterGeoId,
+          sortOrder: Number(f.properties?.sortOrder) || 0,
+          lng: Array.isArray(coords) ? Number(coords[0]) : e.lngLat?.lng,
+          lat: Array.isArray(coords) ? Number(coords[1]) : e.lngLat?.lat,
+          label: f.properties?.label || '',
+          party: f.properties?.party || null,
+          canvassStatus: f.properties?.canvassStatus || null,
+          personRecordId: f.properties?.personRecordId
+            ? Number(f.properties.personRecordId)
+            : null,
+        })
+      })
+      map.on('mouseenter', 'turf-stops-circles', () => {
+        map.getCanvas().style.cursor = 'pointer'
+      })
+      map.on('mouseleave', 'turf-stops-circles', () => {
         map.getCanvas().style.cursor = ''
       })
 
@@ -1189,6 +1287,36 @@ export default function DashboardMap({
       )
     } catch {}
   }, [status, showPersonsLayer, personPins, personHeatmap])
+
+  // Turf walk-list numbered stops (G3)
+  useEffect(() => {
+    if (status !== 'ready' || !mapRef.current) return
+    const map = mapRef.current
+    const stops = turfStops ?? []
+    const features = stops.map((s) => ({
+      type: 'Feature' as const,
+      properties: {
+        voterGeoId: s.voterGeoId,
+        sortOrder: s.sortOrder,
+        label: s.label,
+        party: s.party || '',
+        canvassStatus: s.canvassStatus || 'not_contacted',
+        personRecordId: s.personRecordId ?? '',
+      },
+      geometry: { type: 'Point' as const, coordinates: [s.lng, s.lat] },
+    }))
+    try {
+      const src = map.getSource('turf-stops')
+      if (src) (src as { setData: (d: object) => void }).setData({ type: 'FeatureCollection', features })
+    } catch (e) {
+      console.warn('turf-stops setData:', e)
+    }
+    const show = showTurfLayer && features.length > 0
+    try {
+      map.setLayoutProperty('turf-stops-circles', 'visibility', show ? 'visible' : 'none')
+      map.setLayoutProperty('turf-stops-labels', 'visibility', show ? 'visible' : 'none')
+    } catch {}
+  }, [status, showTurfLayer, turfStops])
 
   // -----------------------------------------------------------------------
   // Geofencing: polygons, draft vertices, canvass address pins

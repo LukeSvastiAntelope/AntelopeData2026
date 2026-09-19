@@ -1,10 +1,11 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import { SidebarTrigger } from '@/components/ui/sidebar'
 import { Button } from '@/components/ui/button'
-import { Loader2, Printer, ArrowLeft, Users } from 'lucide-react'
+import { Loader2, Printer, ArrowLeft, Users, Route } from 'lucide-react'
 
 type MapPerson = {
   id: number
@@ -18,6 +19,7 @@ type MapPerson = {
   canvassStatus?: string | null
   district?: string | null
   phone?: string | null
+  sortOrder?: number | null
 }
 
 function partyColor(party: string | null | undefined): string {
@@ -38,9 +40,13 @@ function partyShort(party: string | null | undefined): string {
   return '?'
 }
 
-/** Printable canvass map: SVG plot of household dots + walk list. */
-export default function PrintMapPage() {
+function PrintMapInner() {
+  const searchParams = useSearchParams()
+  const turfIdParam = searchParams.get('turfId')
+  const turfId = turfIdParam ? Number(turfIdParam) : null
+
   const [people, setPeople] = useState<MapPerson[]>([])
+  const [turfLabel, setTurfLabel] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [partyFilter, setPartyFilter] = useState<string[]>([])
@@ -49,32 +55,53 @@ export default function PrintMapPage() {
     setLoading(true)
     setError(null)
     try {
-      const qs = new URLSearchParams()
-      if (partyFilter.length) qs.set('party', partyFilter.join(','))
-      const res = await fetch(`/api/dashboard/persons?${qs.toString()}`)
-      const data = await res.json()
-      if (!res.ok || !data.status) throw new Error(data.message || 'Failed to load households')
-      setPeople(
-        (data.people || []).map((p: any) => ({
-          id: p.id,
-          lat: p.lat,
-          lng: p.lng,
-          label: p.label,
-          addressLine: p.addressLine,
-          party: p.party,
-          effectiveParty: p.effectiveParty,
-          ageBucket: p.ageBucket,
-          canvassStatus: p.canvassStatus,
-          district: p.district,
-          phone: p.phone,
-        }))
-      )
+      if (turfId && Number.isFinite(turfId)) {
+        const res = await fetch(`/api/dashboard/turfs/${turfId}?addresses=1`)
+        const data = await res.json()
+        if (!res.ok || !data.status) throw new Error(data.message || 'Failed to load turf')
+        setTurfLabel(data.turf?.label || `Turf #${turfId}`)
+        setPeople(
+          (data.addresses || []).map((a: any) => ({
+            id: a.voterGeoId,
+            lat: a.latitude,
+            lng: a.longitude,
+            label: a.label,
+            addressLine: [a.street, a.city, a.state, a.zip].filter(Boolean).join(', '),
+            party: a.party,
+            effectiveParty: a.party,
+            canvassStatus: a.canvassStatus,
+            sortOrder: a.sortOrder,
+          }))
+        )
+      } else {
+        setTurfLabel(null)
+        const qs = new URLSearchParams()
+        if (partyFilter.length) qs.set('party', partyFilter.join(','))
+        const res = await fetch(`/api/dashboard/persons?${qs.toString()}`)
+        const data = await res.json()
+        if (!res.ok || !data.status) throw new Error(data.message || 'Failed to load households')
+        setPeople(
+          (data.people || []).map((p: any) => ({
+            id: p.id,
+            lat: p.lat,
+            lng: p.lng,
+            label: p.label,
+            addressLine: p.addressLine,
+            party: p.party,
+            effectiveParty: p.effectiveParty,
+            ageBucket: p.ageBucket,
+            canvassStatus: p.canvassStatus,
+            district: p.district,
+            phone: p.phone,
+          }))
+        )
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Load failed')
     } finally {
       setLoading(false)
     }
-  }, [partyFilter])
+  }, [partyFilter, turfId])
 
   useEffect(() => {
     void load()
@@ -92,7 +119,6 @@ export default function PrintMapPage() {
       minLng = Math.min(minLng, p.lng)
       maxLng = Math.max(maxLng, p.lng)
     }
-    // pad so single-point sets still render
     if (maxLat - minLat < 0.002) {
       minLat -= 0.001
       maxLat += 0.001
@@ -113,19 +139,19 @@ export default function PrintMapPage() {
     return people.map((p, i) => {
       const x = pad + ((p.lng - minLng) / (maxLng - minLng || 1)) * (w - pad * 2)
       const y = pad + (1 - (p.lat - minLat) / (maxLat - minLat || 1)) * (h - pad * 2)
-      return { ...p, x, y, index: i + 1 }
+      return { ...p, x, y, index: p.sortOrder || i + 1 }
     })
   }, [people, bounds])
 
-  const walkList = useMemo(
-    () =>
-      [...plot].sort((a, b) => {
-        // Rough walk order: north→south, then west→east
-        if (Math.abs(b.lat - a.lat) > 0.0003) return b.lat - a.lat
-        return a.lng - b.lng
-      }),
-    [plot]
-  )
+  const walkList = useMemo(() => {
+    if (turfId) {
+      return [...plot].sort((a, b) => (a.sortOrder || a.index) - (b.sortOrder || b.index))
+    }
+    return [...plot].sort((a, b) => {
+      if (Math.abs(b.lat - a.lat) > 0.0003) return b.lat - a.lat
+      return a.lng - b.lng
+    })
+  }, [plot, turfId])
 
   const counts = useMemo(() => {
     const c: Record<string, number> = {}
@@ -144,8 +170,10 @@ export default function PrintMapPage() {
             <SidebarTrigger className="-ml-0.5 h-5 w-5 text-muted-foreground hover:text-foreground print:hidden" />
             <div className="h-4 border-l border-border mx-4 print:hidden" />
             <h1 className="text-base font-medium text-card-foreground flex items-center gap-2">
-              <Users className="h-4 w-4" />
-              Print on map · door-knock sheet
+              {turfId ? <Route className="h-4 w-4" /> : <Users className="h-4 w-4" />}
+              {turfLabel
+                ? `Walk sheet · ${turfLabel}`
+                : 'Print on map · door-knock sheet'}
             </h1>
             <div className="ml-auto flex items-center gap-2 print:hidden">
               <Button asChild size="sm" variant="outline">
@@ -164,35 +192,38 @@ export default function PrintMapPage() {
         <div className="border-b border-border print:hidden" />
 
         <div className="p-6 space-y-6 print:p-4">
-          <div className="flex flex-wrap items-center gap-2 print:hidden">
-            <span className="text-xs text-muted-foreground">Filter for print:</span>
-            {['Democrat', 'Republican', 'Independent', 'Unaffiliated'].map((p) => {
-              const on = partyFilter.includes(p)
-              return (
-                <button
-                  key={p}
-                  type="button"
-                  className={`px-2 py-1 rounded text-xs border ${
-                    on ? 'bg-sky-500/15 border-sky-500/40' : 'border-border text-muted-foreground'
-                  }`}
-                  onClick={() =>
-                    setPartyFilter((prev) =>
-                      on ? prev.filter((x) => x !== p) : [...prev, p]
-                    )
-                  }
-                >
-                  {p}
-                </button>
-              )
-            })}
-            <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => void load()}>
-              Refresh
-            </Button>
-          </div>
+          {!turfId && (
+            <div className="flex flex-wrap items-center gap-2 print:hidden">
+              <span className="text-xs text-muted-foreground">Filter for print:</span>
+              {['Democrat', 'Republican', 'Independent', 'Unaffiliated'].map((p) => {
+                const on = partyFilter.includes(p)
+                return (
+                  <button
+                    key={p}
+                    type="button"
+                    className={`px-2 py-1 rounded text-xs border ${
+                      on ? 'bg-sky-500/15 border-sky-500/40' : 'border-border text-muted-foreground'
+                    }`}
+                    onClick={() =>
+                      setPartyFilter((prev) =>
+                        on ? prev.filter((x) => x !== p) : [...prev, p]
+                      )
+                    }
+                  >
+                    {p}
+                  </button>
+                )
+              })}
+              <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => void load()}>
+                Refresh
+              </Button>
+            </div>
+          )}
 
           {loading && (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" /> Loading households…
+              <Loader2 className="h-4 w-4 animate-spin" />{' '}
+              {turfId ? 'Loading turf walk-list…' : 'Loading households…'}
             </div>
           )}
           {error && <p className="text-sm text-destructive">{error}</p>}
@@ -201,7 +232,7 @@ export default function PrintMapPage() {
             <>
               <div className="flex flex-wrap gap-4 text-xs">
                 <span>
-                  <strong>{people.length}</strong> households
+                  <strong>{people.length}</strong> {turfId ? 'stops' : 'households'}
                 </span>
                 {Object.entries(counts).map(([k, v]) => (
                   <span key={k} className="inline-flex items-center gap-1.5">
@@ -222,11 +253,13 @@ export default function PrintMapPage() {
                   viewBox="0 0 900 640"
                   className="w-full h-auto"
                   role="img"
-                  aria-label="Household canvass map"
+                  aria-label="Canvass map"
                 >
                   <rect x="0" y="0" width="900" height="640" fill="#f8fafc" />
                   <text x="20" y="24" fontSize="14" fill="#0f172a" fontWeight="600">
-                    Canvass map — tap numbers match walk list
+                    {turfLabel
+                      ? `${turfLabel} — numbers match turf walk order`
+                      : 'Canvass map — tap numbers match walk list'}
                   </text>
                   {plot.map((p) => (
                     <g key={p.id}>
@@ -250,7 +283,6 @@ export default function PrintMapPage() {
                       </text>
                     </g>
                   ))}
-                  {/* Legend */}
                   <g transform="translate(20,600)">
                     {[
                       ['Democrat', '#2563eb'],
@@ -270,7 +302,9 @@ export default function PrintMapPage() {
               </div>
 
               <div>
-                <h2 className="text-sm font-semibold mb-2">Walk list (N→S, then W→E)</h2>
+                <h2 className="text-sm font-semibold mb-2">
+                  {turfId ? 'Walk list (turf sort order)' : 'Walk list (N→S, then W→E)'}
+                </h2>
                 <div className="overflow-x-auto rounded-lg border border-border print:border-black">
                   <table className="w-full text-xs">
                     <thead className="bg-muted/40 print:bg-transparent">
@@ -340,5 +374,20 @@ export default function PrintMapPage() {
         }
       `}</style>
     </div>
+  )
+}
+
+/** Printable canvass map — Suspense for useSearchParams. */
+export default function PrintMapPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex-1 p-6 text-sm text-muted-foreground flex items-center gap-2">
+          <Loader2 className="h-4 w-4 animate-spin" /> Loading walk sheet…
+        </div>
+      }
+    >
+      <PrintMapInner />
+    </Suspense>
   )
 }

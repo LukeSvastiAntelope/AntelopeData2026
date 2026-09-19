@@ -79,6 +79,33 @@ export type TurfAddress = {
   turnoutScore: number | null;
   label: string;
   canvassStatus: string | null;
+  /** Walk order (1-based) when loaded from a saved turf */
+  sortOrder?: number | null;
+  /** Field outcome party if recorded on this turf stop */
+  fieldParty?: string | null;
+  fieldNotes?: string | null;
+};
+
+export type TurfStopStatus =
+  | 'not_contacted'
+  | 'contacted'
+  | 'confirmed'
+  | 'not_home'
+  | 'refused'
+  | 'moved'
+  | 'wrong_address';
+
+export type TurfStopOutcome = {
+  id: number;
+  organization_id: number;
+  turf_id: number;
+  voter_geo_id: number;
+  person_record_id: number | null;
+  status: TurfStopStatus;
+  party: string | null;
+  notes: string | null;
+  recorded_by: number;
+  recorded_at: Date;
 };
 
 export type TurfRow = {
@@ -576,11 +603,16 @@ export class TurfRepo {
     const limit = Math.min(Math.max(opts?.limit || 5000, 1), 20000);
     const offset = Math.max(opts?.offset || 0, 0);
     const [rows] = await sql.execute(
-      `SELECT voter_geo_id, voter_file_id, person_record_id, street, city, state, zip,
-              latitude, longitude, party, label
-       FROM turf_addresses
-       WHERE turf_id = ?
-       ORDER BY sort_order ASC
+      `SELECT ta.sort_order, ta.voter_geo_id, ta.voter_file_id, ta.person_record_id,
+              ta.street, ta.city, ta.state, ta.zip, ta.latitude, ta.longitude, ta.party, ta.label,
+              o.status AS field_status, o.party AS field_party, o.notes AS field_notes,
+              pr.canvass_status AS person_canvass_status
+       FROM turf_addresses ta
+       LEFT JOIN turf_stop_outcomes o
+         ON o.turf_id = ta.turf_id AND o.voter_geo_id = ta.voter_geo_id
+       LEFT JOIN person_records pr ON pr.id = ta.person_record_id
+       WHERE ta.turf_id = ?
+       ORDER BY ta.sort_order ASC
        LIMIT ${limit} OFFSET ${offset}`,
       [turfId]
     );
@@ -594,13 +626,146 @@ export class TurfRepo {
       zip: r.zip,
       latitude: Number(r.latitude),
       longitude: Number(r.longitude),
-      party: r.party,
+      party: r.field_party || r.party,
       partisanScore: null,
       turnoutScore: null,
       label: r.label || [r.street, r.city, r.state, r.zip].filter(Boolean).join(', '),
-      canvassStatus: null,
+      canvassStatus:
+        r.field_status || r.person_canvass_status || 'not_contacted',
+      sortOrder: r.sort_order != null ? Number(r.sort_order) : null,
+      fieldParty: r.field_party || null,
+      fieldNotes: r.field_notes || null,
     }));
     return { turf, addresses };
+  }
+
+  static async assign(
+    id: number,
+    organizationId: number,
+    assignedTo: number | null
+  ): Promise<TurfRow | null> {
+    const sql = await openSql();
+    await sql.execute(
+      `UPDATE turfs SET assigned_to = ?, updated_at = CURRENT_TIMESTAMP
+       WHERE id = ? AND organization_id = ?`,
+      [assignedTo, id, organizationId]
+    );
+    return this.getById(id, organizationId);
+  }
+
+  /**
+   * Record a door outcome on a turf stop. Also mirrors to person_records when linked.
+   */
+  static async recordStop(params: {
+    organizationId: number;
+    turfId: number;
+    voterGeoId: number;
+    recordedBy: number;
+    status: TurfStopStatus;
+    party?: string | null;
+    notes?: string | null;
+  }): Promise<{ outcome: TurfStopOutcome; address: TurfAddress | null }> {
+    const turf = await this.getById(params.turfId, params.organizationId);
+    if (!turf) throw new Error('Turf not found');
+
+    const sql = await openSql();
+    const [addrRows] = await sql.execute(
+      `SELECT voter_geo_id, person_record_id FROM turf_addresses
+       WHERE turf_id = ? AND voter_geo_id = ? LIMIT 1`,
+      [params.turfId, params.voterGeoId]
+    );
+    const addr = (addrRows as any[])[0];
+    if (!addr) throw new Error('Stop not on this turf');
+
+    const personRecordId =
+      addr.person_record_id != null ? Number(addr.person_record_id) : null;
+
+    await sql.execute(
+      `INSERT INTO turf_stop_outcomes
+        (organization_id, turf_id, voter_geo_id, person_record_id, status, party, notes, recorded_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE
+         status = VALUES(status),
+         party = VALUES(party),
+         notes = VALUES(notes),
+         person_record_id = COALESCE(VALUES(person_record_id), person_record_id),
+         recorded_by = VALUES(recorded_by),
+         recorded_at = CURRENT_TIMESTAMP,
+         updated_at = CURRENT_TIMESTAMP`,
+      [
+        params.organizationId,
+        params.turfId,
+        params.voterGeoId,
+        personRecordId,
+        params.status,
+        params.party ?? null,
+        params.notes ?? null,
+        params.recordedBy,
+      ]
+    );
+
+    // Mirror to household person_records when linked (D3 door confirm)
+    if (personRecordId) {
+      try {
+        const { PersonRepo } = await import('@/app/utils/database/person-repo');
+        await PersonRepo.confirmInPerson({
+          id: personRecordId,
+          organizationId: params.organizationId,
+          userId: params.recordedBy,
+          status: params.status,
+          party: params.party ?? null,
+          notes: params.notes ?? null,
+          applyPartyToRecord: true,
+        });
+      } catch (e) {
+        console.warn('[turf recordStop] person mirror failed', e);
+      }
+    }
+
+    // Auto-add refused stops to contact_suppression (universal DNC)
+    if (params.status === 'refused') {
+      try {
+        await ContactSuppressionRepo.add({
+          organizationId: params.organizationId,
+          voterGeoId: params.voterGeoId,
+          personRecordId,
+          reason: 'refused_at_door',
+          source: 'refused',
+          createdBy: params.recordedBy,
+        });
+      } catch {
+        /* may already exist */
+      }
+    }
+
+    const [outRows] = await sql.execute(
+      `SELECT id, organization_id, turf_id, voter_geo_id, person_record_id,
+              status, party, notes, recorded_by, recorded_at
+       FROM turf_stop_outcomes
+       WHERE turf_id = ? AND voter_geo_id = ? LIMIT 1`,
+      [params.turfId, params.voterGeoId]
+    );
+    const o = (outRows as any[])[0];
+    const outcome: TurfStopOutcome = {
+      id: Number(o.id),
+      organization_id: Number(o.organization_id),
+      turf_id: Number(o.turf_id),
+      voter_geo_id: Number(o.voter_geo_id),
+      person_record_id: o.person_record_id != null ? Number(o.person_record_id) : null,
+      status: o.status,
+      party: o.party,
+      notes: o.notes,
+      recorded_by: Number(o.recorded_by),
+      recorded_at: o.recorded_at,
+    };
+
+    const listed = await this.listAddresses(params.turfId, params.organizationId, {
+      limit: 20000,
+    });
+    const address =
+      listed.addresses.find((a) => a.voterGeoId === params.voterGeoId) || null;
+
+    return { outcome, address };
   }
 
   static async delete(id: number, organizationId: number): Promise<boolean> {
