@@ -6,6 +6,7 @@
 import { openSql } from '@/app/utils/database/db';
 import type { RowDataPacket, ResultSetHeader } from 'mysql2';
 import { createHash } from 'crypto';
+import { resolvePropensityForOrchestrator } from '@/app/utils/propensity/prior';
 
 export type CanvassStatus =
   | 'not_contacted'
@@ -357,6 +358,17 @@ export class PersonRepo {
 /** Map API shape with effective (door-confirmed) party for coloring. */
 export function toMapPerson(row: PersonRecordRow) {
   const effectiveParty = (row.canvass_party || row.party || '').trim() || null;
+  // P1 propensity prior — recomputed read-layer (not a stored score).
+  // Orchestrator must use propensity.blended, never propensity.priorP0.
+  const propensity = resolvePropensityForOrchestrator({
+    party: row.party,
+    canvassParty: row.canvass_party,
+    voterStatus: row.voter_status,
+    district: row.district,
+    zip: row.zip,
+    state: row.state,
+  });
+
   return {
     id: row.id,
     clusterKey: row.cluster_key,
@@ -381,5 +393,14 @@ export function toMapPerson(row: PersonRecordRow) {
     canvassNotes: row.canvass_notes,
     lat: Number(row.latitude),
     lng: Number(row.longitude),
+    /** Cold-start propensity read (P1). Prefer `blended` for decisions. */
+    propensity: {
+      blended: propensity.blended,
+      priorWeight: propensity.priorWeight,
+      phase: propensity.phase,
+      // Audit-only prior snapshot — not for targeting
+      priorP0: propensity.prior.p0,
+      priorFormula: propensity.prior.formulaVersion,
+    },
   };
 }
