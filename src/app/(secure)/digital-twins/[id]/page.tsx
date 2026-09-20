@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -23,6 +23,10 @@ import {
   User
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
+import {
+  Voter360Panel,
+  type TwinTrackingPayload,
+} from '@/app/components/voter-360-panel';
 
 interface DigitalTwinDetail {
   agentToken: string;
@@ -54,6 +58,25 @@ interface DigitalTwinDetail {
   }>;
 }
 
+function demographicsFromTwinRecord(twin: any): DigitalTwinDetail['demographics'] {
+  const base = twin?.base_profile;
+  const profile = typeof base === 'string' ? (() => { try { return JSON.parse(base); } catch { return {}; } })() : (base || {});
+  const demo = profile.demographics || {};
+  return {
+    name: demo.name,
+    email: twin?.email || demo.email,
+    age: demo.age,
+    gender: demo.gender,
+    location: demo.location,
+    occupation: demo.occupation,
+    education: demo.education,
+    income: demo.income,
+    politicalViews: demo.politicalViews || demo.political_views,
+    interests: typeof demo.interests === 'string' ? demo.interests : undefined,
+    ethnicity: demo.ethnicity,
+  };
+}
+
 export default function DigitalTwinDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -62,6 +85,33 @@ export default function DigitalTwinDetailPage() {
   const [twin, setTwin] = useState<DigitalTwinDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [tracking, setTracking] = useState<TwinTrackingPayload | null>(null);
+  const [trackingLoading, setTrackingLoading] = useState(true);
+  const [trackingError, setTrackingError] = useState<string | null>(null);
+
+  const fetchTracking = useCallback(async (agentToken: string) => {
+    setTrackingLoading(true);
+    setTrackingError(null);
+    try {
+      const res = await fetch(`/api/digital-twin/${encodeURIComponent(agentToken)}/tracking`);
+      const data = await res.json();
+      if (!data.status) {
+        throw new Error(data.message || 'Failed to load voter tracking');
+      }
+      setTracking({
+        linked: !!data.linked,
+        personId: data.personId ?? null,
+        disclaimer: data.disclaimer || '',
+        timeline: data.timeline || [],
+        state: data.state,
+      });
+    } catch (err) {
+      setTracking(null);
+      setTrackingError(err instanceof Error ? err.message : 'Failed to load Voter 360');
+    } finally {
+      setTrackingLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     fetchTwinDetail();
@@ -69,32 +119,51 @@ export default function DigitalTwinDetailPage() {
 
   const fetchTwinDetail = async () => {
     try {
-      // First get the twin details
-      const twinResponse = await fetch('/api/digital-twins/search', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify({ query: '', topK: 100 })
-      });
-      
-      const twinData = await twinResponse.json();
-      if (!twinData.status) {
-        throw new Error('Failed to fetch twin data');
+      setLoading(true);
+      setError(null);
+
+      let foundTwin: any = null;
+
+      // Prefer user-scoped search (Pinecone), then fall back to DB twin record
+      try {
+        const twinResponse = await fetch('/api/digital-twins/search', {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          },
+          body: JSON.stringify({ query: '', topK: 100 })
+        });
+        const twinData = await twinResponse.json();
+        if (twinData.status && Array.isArray(twinData.results)) {
+          foundTwin = twinData.results.find((t: any) => t.agentToken === twinId);
+        }
+      } catch {
+        /* fall through to DB */
       }
 
-      // Find the specific twin by ID (assuming ID is the agentToken)
-      const foundTwin = twinData.results.find((t: any) => t.agentToken === twinId);
       if (!foundTwin) {
-        throw new Error('Voter profile not found');
+        const dbRes = await fetch(`/api/digital-twin/${encodeURIComponent(twinId)}`);
+        const dbData = await dbRes.json();
+        if (!dbData.status || !dbData.twin) {
+          throw new Error('Voter profile not found');
+        }
+        const t = dbData.twin;
+        foundTwin = {
+          agentToken: t.agent_token || twinId,
+          score: 1,
+          demographics: demographicsFromTwinRecord(t),
+          principles: null,
+          surveyTitle: 'Voter profile',
+          createdAt: t.created_at || new Date().toISOString(),
+        };
       }
 
       // Get all surveys this voter profile has participated in
       const surveysResponse = await fetch(`/api/digital-twin/${foundTwin.agentToken}/responses`);
       const surveysData = await surveysResponse.json();
       
-      let surveys = [];
+      let surveys: DigitalTwinDetail['surveys'] = [];
       if (surveysData.status && surveysData.surveys) {
         surveys = surveysData.surveys.map((survey: any) => ({
           id: survey.id,
@@ -108,20 +177,11 @@ export default function DigitalTwinDetailPage() {
       }
       
       // If no surveys found via the API, fall back to the survey that created this twin
-      if (surveys.length === 0) {
-        const fallbackSurveysResponse = await fetch('/api/surveys', {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-          }
-        });
-        
-        const fallbackSurveysData = await fallbackSurveysResponse.json();
-        const matchingSurvey = fallbackSurveysData.surveys?.find((s: any) => s.title === foundTwin.surveyTitle);
-        
+      if (surveys.length === 0 && foundTwin.surveyTitle) {
         surveys = [{
-          id: matchingSurvey?.id || 0,
+          id: 0,
           title: foundTwin.surveyTitle,
-          description: matchingSurvey?.description || `Survey response that created this voter profile`,
+          description: `Survey response that created this voter profile`,
           status: 'completed',
           created_at: foundTwin.createdAt,
           response_count: 1,
@@ -131,12 +191,15 @@ export default function DigitalTwinDetailPage() {
       
       const twinDetail: DigitalTwinDetail = {
         ...foundTwin,
-        surveys: surveys
+        surveys
       };
       
       setTwin(twinDetail);
+      // Fire VT1/VT2 projection load
+      void fetchTracking(foundTwin.agentToken);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load voter profile');
+      setTrackingLoading(false);
     } finally {
       setLoading(false);
     }
@@ -259,14 +322,24 @@ export default function DigitalTwinDetailPage() {
                       <Calendar className="h-4 w-4" />
                       Created {formatDistanceToNow(new Date(twin.createdAt), { addSuffix: true })}
                     </div>
-                    <Badge variant="outline">
-                      Score: {twin.score.toFixed(2)}
-                    </Badge>
+                    {typeof twin.score === 'number' && (
+                      <Badge variant="outline">
+                        Score: {twin.score.toFixed(2)}
+                      </Badge>
+                    )}
                   </div>
                 </div>
               </div>
             </CardHeader>
           </Card>
+
+          {/* VT4 — Voter 360 (timeline + current state + change history) */}
+          <Voter360Panel
+            tracking={tracking}
+            loading={trackingLoading}
+            error={trackingError}
+            onRetry={() => twin?.agentToken && fetchTracking(twin.agentToken)}
+          />
 
           {/* Demographics */}
           <Card>
@@ -431,7 +504,9 @@ export default function DigitalTwinDetailPage() {
                           </TableCell>
                           <TableCell className="text-muted-foreground max-w-sm">
                             <div className="truncate" title={survey.description}>
-                              {survey.description.length > 80 ? survey.description.substring(0, 80) + '...' : survey.description}
+                              {(survey.description || '').length > 80
+                                ? (survey.description || '').substring(0, 80) + '...'
+                                : survey.description || '—'}
                             </div>
                           </TableCell>
                         </TableRow>
@@ -458,4 +533,4 @@ export default function DigitalTwinDetailPage() {
       </div>
     </div>
   );
-} 
+}
