@@ -3,6 +3,10 @@ import { PersonRepo, toMapPerson } from '@/app/utils/database/person-repo';
 import { PropensityRepo } from '@/app/utils/database/propensity-repo';
 import { ensurePrimaryOrgId } from '@/app/api/dashboard/persons/org';
 import type { PropensityTier } from '@/app/utils/propensity/config';
+import {
+  queryVoters,
+  type TrackedAttributeFilter,
+} from '@/app/utils/services/voter-query';
 
 export const runtime = 'nodejs';
 
@@ -15,7 +19,76 @@ function csvList(v: string | null): string[] | undefined {
   return parts.length ? parts : undefined;
 }
 
-/** GET /api/dashboard/persons — filtered household pins for the map (D2 + P3 tier). */
+function truthy(v: string | null): boolean {
+  return v === '1' || v === 'true';
+}
+
+/** Build VT3 tracked filters from map/query search params. */
+function trackedFromSearchParams(sp: URLSearchParams): TrackedAttributeFilter[] {
+  const tracked: TrackedAttributeFilter[] = [];
+
+  const issue = sp.get('issue') || sp.get('issueKey');
+  const issueEquals = sp.get('issueEquals') || sp.get('issueValue');
+  if (issue || issueEquals || truthy(sp.get('issueChanged')) || sp.get('issueWas') || sp.get('issueChangedSince')) {
+    tracked.push({
+      issue: issue || undefined,
+      category: 'issue',
+      equals: issueEquals || undefined,
+      changed: truthy(sp.get('issueChanged')) || undefined,
+      was: sp.get('issueWas') || undefined,
+      changedSince: sp.get('issueChangedSince') || undefined,
+    });
+  }
+
+  if (truthy(sp.get('hasDonated'))) {
+    tracked.push({ hasDonated: true, category: 'donation' });
+  }
+
+  const partyEquals = sp.get('confirmedParty') || sp.get('partisanship');
+  if (partyEquals || truthy(sp.get('partisanshipChanged'))) {
+    tracked.push({
+      key: 'partisanship:confirmed',
+      category: 'partisanship',
+      equals: partyEquals || undefined,
+      changed: truthy(sp.get('partisanshipChanged')) || undefined,
+      was: sp.get('partisanshipWas') || undefined,
+    });
+  }
+
+  const engagement = sp.get('engagement') || sp.get('contactability');
+  if (engagement) {
+    tracked.push({
+      key: 'engagement:contactability',
+      category: 'engagement',
+      equals: engagement,
+    });
+  }
+
+  // Raw JSON escape hatch: tracked=[{...}]
+  const raw = sp.get('tracked');
+  if (raw) {
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        for (const item of parsed) {
+          if (item && typeof item === 'object') tracked.push(item as TrackedAttributeFilter);
+        }
+      }
+    } catch {
+      /* ignore malformed */
+    }
+  }
+
+  return tracked;
+}
+
+/**
+ * GET /api/dashboard/persons — filtered household pins (D2 + P3 + VT3 tracked attrs).
+ *
+ * Collation/D2: party, ageBucket, minAge, gender, district, zip, …
+ * VT3 tracked: issue / issueEquals / issueChanged / issueWas / hasDonated /
+ *              confirmedParty / engagement — composed with D2 in one query.
+ */
 export async function GET(request: NextRequest) {
   try {
     const userId = request.headers.get('x-user-id');
@@ -31,10 +104,20 @@ export async function GET(request: NextRequest) {
       t === 'hot' || t === 'warm' || t === 'cold'
     );
 
-    const people = await PersonRepo.listForMap({
+    const tracked = trackedFromSearchParams(sp);
+    const useVt3 = tracked.length > 0 || truthy(sp.get('includeState'));
+
+    const baseFilters = {
       organizationId: orgId,
       party: csvList(sp.get('party')),
       ageBucket: csvList(sp.get('ageBucket')),
+      minAgeYears: sp.get('minAge') || sp.get('minAgeYears')
+        ? Number(sp.get('minAge') || sp.get('minAgeYears'))
+        : undefined,
+      maxAgeYears: sp.get('maxAge') || sp.get('maxAgeYears')
+        ? Number(sp.get('maxAge') || sp.get('maxAgeYears'))
+        : undefined,
+      gender: csvList(sp.get('gender')),
       voterStatus: csvList(sp.get('voterStatus')),
       district: csvList(sp.get('district')),
       zip: csvList(sp.get('zip')),
@@ -42,16 +125,18 @@ export async function GET(request: NextRequest) {
       ownerOccupied:
         sp.get('ownerOccupied') == null
           ? null
-          : sp.get('ownerOccupied') === '1' || sp.get('ownerOccupied') === 'true',
+          : truthy(sp.get('ownerOccupied')),
       minConfidence: sp.get('minConfidence') ? Number(sp.get('minConfidence')) : undefined,
       propensityTier,
-      excludeSuppressed:
-        sp.get('excludeSuppressed') === '1' || sp.get('excludeSuppressed') === 'true',
+      excludeSuppressed: truthy(sp.get('excludeSuppressed')),
       includeFenceLabels: csvList(sp.get('includeArea') || sp.get('includeAreas')),
       includeFenceIds: csvList(sp.get('includeFenceIds'))?.map(Number).filter(Number.isFinite),
       excludeFenceLabels: csvList(sp.get('excludeArea') || sp.get('excludeAreas')),
+      requireCoordinates: sp.get('requireCoordinates') == null
+        ? true
+        : truthy(sp.get('requireCoordinates')),
       limit: sp.get('limit') ? Number(sp.get('limit')) : 5000,
-    });
+    };
 
     // Enrich from materialized view when available
     const stored = await PropensityRepo.listByOrg(orgId, { limit: 5000 });
@@ -70,16 +155,95 @@ export async function GET(request: NextRequest) {
       ])
     );
 
+    if (!useVt3) {
+      const people = await PersonRepo.listForMap(baseFilters);
+      return NextResponse.json({
+        status: true,
+        organizationId: orgId,
+        count: people.length,
+        people: people.map((p) => toMapPerson(p, byId.get(p.id) || null)),
+        filters: {
+          tier: propensityTier || [],
+          excludeSuppressed: truthy(sp.get('excludeSuppressed')),
+          includeArea: csvList(sp.get('includeArea') || sp.get('includeAreas')) || [],
+          gender: baseFilters.gender || [],
+          minAgeYears: baseFilters.minAgeYears ?? null,
+        },
+      });
+    }
+
+    // VT3 path: D2 + collation + tracked attribute / change-state rollup
+    const result = await queryVoters({
+      ...baseFilters,
+      tracked,
+      hasDonated: truthy(sp.get('hasDonated')),
+      includeState: true,
+      candidateLimit: baseFilters.limit,
+      // Selection queries may include non-geocoded records when explicitly asked
+      requireCoordinates: baseFilters.requireCoordinates,
+    });
+
     return NextResponse.json({
       status: true,
       organizationId: orgId,
-      count: people.length,
-      people: people.map((p) => toMapPerson(p, byId.get(p.id) || null)),
+      count: result.count,
+      candidateCount: result.candidateCount,
+      people: result.people.map((hit) => ({
+        ...toMapPerson(hit.person, byId.get(hit.person.id) || null),
+        matchedAttributes: hit.matchedAttributes.map((a) => ({
+          key: a.key,
+          label: a.label,
+          category: a.category,
+          current: a.current,
+          asOf: a.asOf,
+          changeSummary: a.changeSummary,
+          historyLength: a.history.length,
+        })),
+        state: hit.state
+          ? {
+              computedAt: hit.state.computedAt,
+              issuePositions: hit.state.issuePositions.map((a) => ({
+                key: a.key,
+                label: a.label,
+                current: a.current,
+                asOf: a.asOf,
+                changeSummary: a.changeSummary,
+              })),
+              partisanship: hit.state.partisanship
+                ? {
+                    current: hit.state.partisanship.current,
+                    changeSummary: hit.state.partisanship.changeSummary,
+                  }
+                : null,
+              donationStatus: hit.state.donationStatus
+                ? {
+                    current: hit.state.donationStatus.current,
+                    changeSummary: hit.state.donationStatus.changeSummary,
+                  }
+                : null,
+              engagement: hit.state.engagement
+                ? {
+                    current: hit.state.engagement.current,
+                    changeSummary: hit.state.engagement.changeSummary,
+                  }
+                : null,
+              lastSurvey: hit.state.lastSurvey
+                ? {
+                    current: hit.state.lastSurvey.current,
+                    changeSummary: hit.state.lastSurvey.changeSummary,
+                  }
+                : null,
+            }
+          : null,
+      })),
       filters: {
         tier: propensityTier || [],
-        excludeSuppressed:
-          sp.get('excludeSuppressed') === '1' || sp.get('excludeSuppressed') === 'true',
+        excludeSuppressed: truthy(sp.get('excludeSuppressed')),
         includeArea: csvList(sp.get('includeArea') || sp.get('includeAreas')) || [],
+        gender: baseFilters.gender || [],
+        minAgeYears: baseFilters.minAgeYears ?? null,
+        tracked,
+        hasDonated: truthy(sp.get('hasDonated')),
       },
     });
   } catch (error) {

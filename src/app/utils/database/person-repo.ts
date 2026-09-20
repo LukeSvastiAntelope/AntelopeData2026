@@ -67,6 +67,12 @@ export type PersonMapFilters = {
   organizationId?: number | null;
   party?: string[];
   ageBucket?: string[];
+  /** Collation: minimum age_years (inclusive), e.g. 35 for "35+" */
+  minAgeYears?: number;
+  /** Collation: maximum age_years (inclusive) */
+  maxAgeYears?: number;
+  /** Collation: gender codes / labels (F, M, woman, …) — normalized in SQL */
+  gender?: string[];
   voterStatus?: string[];
   district?: string[];
   zip?: string[];
@@ -82,8 +88,47 @@ export type PersonMapFilters = {
   excludeFenceIds?: number[];
   excludeFenceLabels?: string[];
   bbox?: { west: number; south: number; east: number; north: number };
+  /**
+   * When false, include person_records without lat/lng (selection / VT3 query).
+   * Default true preserves D2 map pin behavior.
+   */
+  requireCoordinates?: boolean;
+  /**
+   * VT3 SQL pre-narrow: person has a fundraising/donor-tagged source row.
+   * Exact donation status still comes from the VT2 rollup when querying.
+   */
+  hasDonatedSource?: boolean;
   limit?: number;
 };
+
+/** Map free-text gender filters onto stored codes (person_records.gender). */
+export function expandGenderFilterValues(raw: string[]): string[] {
+  const out = new Set<string>();
+  for (const v of raw) {
+    const t = String(v || '')
+      .trim()
+      .toLowerCase();
+    if (!t) continue;
+    out.add(t);
+    if (['f', 'female', 'woman', 'women', 'w'].includes(t)) {
+      out.add('f');
+      out.add('female');
+      out.add('woman');
+      out.add('w');
+    } else if (['m', 'male', 'man', 'men'].includes(t)) {
+      out.add('m');
+      out.add('male');
+      out.add('man');
+    } else if (['nb', 'nonbinary', 'non-binary', 'x', 'other'].includes(t)) {
+      out.add('nb');
+      out.add('nonbinary');
+      out.add('non-binary');
+      out.add('x');
+      out.add('other');
+    }
+  }
+  return [...out];
+}
 
 export type PersonUpsertInput = {
   clusterKey: string;
@@ -125,12 +170,12 @@ function ageBucketFromYears(age: number | null): string | null {
 export class PersonRepo {
   static async listForMap(filters: PersonMapFilters = {}): Promise<PersonRecordRow[]> {
     const sql = await openSql();
-    const where: string[] = [
-      'pr.latitude IS NOT NULL',
-      'pr.longitude IS NOT NULL',
-      'pr.merged_into_person_id IS NULL',
-    ];
+    const where: string[] = ['pr.merged_into_person_id IS NULL'];
     const params: unknown[] = [];
+
+    if (filters.requireCoordinates !== false) {
+      where.push('pr.latitude IS NOT NULL', 'pr.longitude IS NOT NULL');
+    }
 
     if (filters.organizationId != null) {
       where.push('pr.organization_id = ?');
@@ -146,6 +191,33 @@ export class PersonRepo {
     if (filters.ageBucket?.length) {
       where.push(`pr.age_bucket IN (${filters.ageBucket.map(() => '?').join(',')})`);
       params.push(...filters.ageBucket);
+    }
+    if (filters.minAgeYears != null && Number.isFinite(filters.minAgeYears)) {
+      where.push('pr.age_years >= ?');
+      params.push(filters.minAgeYears);
+    }
+    if (filters.maxAgeYears != null && Number.isFinite(filters.maxAgeYears)) {
+      where.push('pr.age_years <= ?');
+      params.push(filters.maxAgeYears);
+    }
+    if (filters.gender?.length) {
+      const genders = expandGenderFilterValues(filters.gender);
+      where.push(
+        `LOWER(TRIM(pr.gender)) IN (${genders.map(() => '?').join(',')})`
+      );
+      params.push(...genders);
+    }
+    if (filters.hasDonatedSource) {
+      where.push(
+        `EXISTS (
+           SELECT 1 FROM person_source_rows psr
+           WHERE psr.person_record_id = pr.id
+             AND (
+               psr.source_name REGEXP 'fund|donor|donation|fec|contribute|gift'
+               OR CAST(psr.payload AS CHAR) REGEXP '"amount"|"donation"|"gift"'
+             )
+         )`
+      );
     }
     if (filters.voterStatus?.length) {
       where.push(`pr.voter_status IN (${filters.voterStatus.map(() => '?').join(',')})`);
