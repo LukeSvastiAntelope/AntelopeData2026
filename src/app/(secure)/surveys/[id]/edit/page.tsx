@@ -140,6 +140,7 @@ const EditSurveyPage = () => {
     video: false,
   })
   const [atAutonomy, setAtAutonomy] = useState<'propose' | 'auto'>('propose')
+  const [atFullAutoSend, setAtFullAutoSend] = useState(false)
   const [atResponseCount, setAtResponseCount] = useState(0)
   const [atFiredCount, setAtFiredCount] = useState(0)
   const [atLastFiredAt, setAtLastFiredAt] = useState<string | null>(null)
@@ -299,6 +300,7 @@ const EditSurveyPage = () => {
             video: acts.includes('video'),
           })
           setAtAutonomy(data.config.autonomy === 'auto' ? 'auto' : 'propose')
+          setAtFullAutoSend(Boolean(data.config.fullAutoSend))
           setAtFiredCount(Number(data.config.firedCount) || 0)
           setAtLastFiredAt(data.config.lastFiredAt || null)
           setAtResponseCount(Number(data.responseCount) || 0)
@@ -334,6 +336,7 @@ const EditSurveyPage = () => {
           threshold: atThreshold,
           actions: actions.length ? actions : ['analytics'],
           autonomy: atAutonomy,
+          fullAutoSend: atFullAutoSend,
         }),
       })
       const data = await res.json()
@@ -946,7 +949,10 @@ const EditSurveyPage = () => {
               </CardTitle>
               <CardDescription>
                 When responses cross the threshold, run analytics → postable insight once per crossing.
-                Newsletter / video drafts attach in a later step; autonomy controls approval vs end-to-end send.
+                Newsletter / video drafts are staged for approval with a small-sample disclaimer on thin
+                findings. Autonomy follows the command-point dial: propose waits at the gate; auto owns
+                the chain within limits and posts a recommendation — public send still needs the
+                executor gate unless you explicitly opt into full-auto send.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -990,11 +996,33 @@ const EditSurveyPage = () => {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="propose">propose — stage for approval</SelectItem>
-                      <SelectItem value="auto">auto — agent owns end-to-end</SelectItem>
+                      <SelectItem value="auto">auto — agent owns chain + recommends</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
               </div>
+
+              {atAutonomy === 'auto' && (
+                <div className="rounded-md border border-amber-500/40 bg-amber-500/5 px-3 py-2 space-y-2">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="atFullAuto"
+                      checked={atFullAutoSend}
+                      onCheckedChange={(checked) => setAtFullAutoSend(checked as boolean)}
+                      disabled={!atEnabled}
+                    />
+                    <Label htmlFor="atFullAuto" className="cursor-pointer text-sm">
+                      Full-auto send (explicit opt-in)
+                    </Label>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    Without this, auto still stages public sends at the human gate — the executor
+                    will not silently promote approval-tier tools. Enabling runs{' '}
+                    <code className="text-[10px]">executeApprovedTool</code> for opted video/email
+                    drafts within the fatigue budget.
+                  </p>
+                </div>
+              )}
 
               <div className="space-y-2">
                 <Label>Actions on fire</Label>

@@ -15,6 +15,8 @@ export type SurveyAutotrigger = {
   threshold: number;
   actions: AutotriggerAction[];
   autonomy: AutotriggerAutonomy;
+  /** Explicit opt-in to run approval-tier sends via executeApprovedTool. */
+  fullAutoSend: boolean;
   lastFiredAt: string | null;
   lastFiredResponseCount: number;
   firedCount: number;
@@ -60,6 +62,7 @@ function mapRow(r: any): SurveyAutotrigger {
     threshold: Math.max(1, Number(r.threshold) || 20),
     actions: parseActions(r.actions),
     autonomy: r.autonomy === 'auto' ? 'auto' : 'propose',
+    fullAutoSend: Boolean(r.full_auto_send),
     lastFiredAt: r.last_fired_at ? new Date(r.last_fired_at).toISOString() : null,
     lastFiredResponseCount: Number(r.last_fired_response_count || 0),
     firedCount: Number(r.fired_count || 0),
@@ -85,8 +88,8 @@ export class SurveyAutotriggerRepo {
     const db = await openSql();
     try {
       await db.execute(
-        `INSERT INTO survey_autotrigger (survey_id, enabled, threshold, actions, autonomy)
-         VALUES (?, 0, 20, ?, 'propose')`,
+        `INSERT INTO survey_autotrigger (survey_id, enabled, threshold, actions, autonomy, full_auto_send)
+         VALUES (?, 0, 20, ?, 'propose', 0)`,
         [surveyId, JSON.stringify(DEFAULT_ACTIONS)]
       );
     } catch (e: any) {
@@ -105,6 +108,7 @@ export class SurveyAutotriggerRepo {
       threshold?: number;
       actions?: AutotriggerAction[];
       autonomy?: AutotriggerAutonomy;
+      fullAutoSend?: boolean;
     }
   ): Promise<SurveyAutotrigger> {
     await this.ensure(surveyId);
@@ -113,13 +117,21 @@ export class SurveyAutotriggerRepo {
     const threshold = Math.max(1, Math.min(100000, patch.threshold ?? current.threshold));
     const actions = patch.actions?.length ? patch.actions : current.actions;
     const autonomy = patch.autonomy ?? current.autonomy;
+    const fullAutoSend = patch.fullAutoSend ?? current.fullAutoSend;
     const db = await openSql();
     await db.execute(
       `UPDATE survey_autotrigger
-       SET enabled = ?, threshold = ?, actions = ?, autonomy = ?,
+       SET enabled = ?, threshold = ?, actions = ?, autonomy = ?, full_auto_send = ?,
            updated_at = CURRENT_TIMESTAMP
        WHERE survey_id = ?`,
-      [enabled ? 1 : 0, threshold, JSON.stringify(actions), autonomy, surveyId]
+      [
+        enabled ? 1 : 0,
+        threshold,
+        JSON.stringify(actions),
+        autonomy,
+        fullAutoSend ? 1 : 0,
+        surveyId,
+      ]
     );
     return (await this.getBySurveyId(surveyId))!;
   }
@@ -275,6 +287,23 @@ export class SurveyAutotriggerRepo {
     const [rows] = await db.execute<RowDataPacket[]>(
       `SELECT COUNT(*) AS c FROM survey_responses WHERE survey_id = ?`,
       [surveyId]
+    );
+    return Number(rows[0]?.c || 0);
+  }
+
+  /** AT3 spam guard: how many autotrigger.fired events for this org in the window. */
+  static async countOrgFiresInWindow(
+    organizationId: number,
+    windowDays: number
+  ): Promise<number> {
+    const db = await openSql();
+    const days = Math.max(1, windowDays);
+    const [rows] = await db.execute<RowDataPacket[]>(
+      `SELECT COUNT(*) AS c FROM survey_autotrigger_events
+       WHERE organization_id = ?
+         AND event_type = 'autotrigger.fired'
+         AND created_at >= DATE_SUB(NOW(), INTERVAL ? DAY)`,
+      [organizationId, days]
     );
     return Number(rows[0]?.c || 0);
   }

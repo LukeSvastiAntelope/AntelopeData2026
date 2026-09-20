@@ -20,6 +20,7 @@ import {
   type FindingDraftSource,
   type StagedDraftResult,
 } from '@/app/utils/services/autotrigger-outputs';
+import { applyAutotriggerAutonomy } from '@/app/utils/services/autotrigger-autonomy';
 import type { RowDataPacket } from 'mysql2';
 
 export type FireAutotriggerOptions = {
@@ -29,6 +30,8 @@ export type FireAutotriggerOptions = {
   skipOutputs?: boolean;
   /** Template drafts + mock video URL (smoke). */
   mockOutputs?: boolean;
+  /** AT3: do not executeApprovedTool even if full_auto_send. */
+  dryRunAutonomy?: boolean;
   /** Source tag for the event result payload. */
   source?: 'ingest' | 'scheduler' | 'manual' | 'smoke';
 };
@@ -43,6 +46,13 @@ export type FireAutotriggerResult = {
   analyticsOk?: boolean;
   insightOk?: boolean;
   drafts?: StagedDraftResult[];
+  autonomy?: {
+    mode: string;
+    recommendationAction: string | null;
+    recommendationStagedId: number | null;
+    fullAutoApplied: boolean;
+    sendsExecuted: number;
+  };
   summary?: string;
 };
 
@@ -127,6 +137,8 @@ export async function maybeFireSurveyAutotrigger(
   let drafts: StagedDraftResult[] = [];
   let insightCandidates: Record<string, unknown>[] = [];
   let insightTotal = responseCount;
+  let pickedFinding: FindingDraftSource | null = null;
+  let autonomyMeta: FireAutotriggerResult['autonomy'];
 
   if (!options.skipChain) {
     try {
@@ -165,15 +177,11 @@ export async function maybeFireSurveyAutotrigger(
     insightOk = true;
   }
 
-  // AT2: newsletter / video drafts from publishable or thin (directional) finding
-  const wantOutputs =
-    !options.skipOutputs &&
-    (cfg.actions.includes('newsletter') || cfg.actions.includes('video'));
-
-  if (wantOutputs) {
+  // Resolve a finding for AT2/AT3 (publishable preferred, else thin directional)
+  if (!options.skipOutputs) {
     try {
       let directionalOnly: ComputedContrast[] = [];
-      if (!insightCandidates.length) {
+      if (!insightCandidates.length || cfg.actions.includes('newsletter') || cfg.actions.includes('video')) {
         try {
           const scan = await scanPostableInsights({
             surveyId,
@@ -181,7 +189,6 @@ export async function maybeFireSurveyAutotrigger(
           });
           directionalOnly = scan.directionalOnly;
           insightTotal = scan.totalResponses;
-          // If scan found publishable but tool returned none (e.g. skipChain), use them
           if (!insightCandidates.length && scan.publishable.length) {
             insightCandidates = scan.publishable.map((c) => ({
               claim: contrastToFinding(c, scan.totalResponses).claim,
@@ -199,39 +206,80 @@ export async function maybeFireSurveyAutotrigger(
           }
         } catch (e) {
           console.warn(
-            '[autotrigger] scan for AT2 outputs failed (non-fatal):',
+            '[autotrigger] scan for outputs failed (non-fatal):',
             e instanceof Error ? e.message : e
           );
         }
       }
 
-      const finding = pickFindingForOutputs({
+      pickedFinding = pickFindingForOutputs({
         candidates: insightCandidates,
         directionalOnly,
         totalResponses: insightTotal,
       });
 
-      if (finding) {
-        const out = await generateAndStageAutotriggerOutputs({
-          surveyId,
-          surveyTitle: owner.title,
-          userId: owner.userId,
-          organizationId: owner.organizationId,
-          actions: cfg.actions,
-          finding,
-          options: {
-            mockOutputs: options.mockOutputs,
-            skipVideoGenerate: options.mockOutputs,
-          },
-        });
-        drafts = out.drafts;
-        if (drafts.length) {
-          summary = `${summary}\nAT2 staged ${drafts.map((d) => d.kind).join(', ')}`;
+      // AT2: newsletter / video drafts when configured
+      if (
+        pickedFinding &&
+        (cfg.actions.includes('newsletter') || cfg.actions.includes('video'))
+      ) {
+        try {
+          const out = await generateAndStageAutotriggerOutputs({
+            surveyId,
+            surveyTitle: owner.title,
+            userId: owner.userId,
+            organizationId: owner.organizationId,
+            actions: cfg.actions,
+            finding: pickedFinding,
+            options: {
+              mockOutputs: options.mockOutputs,
+              skipVideoGenerate: options.mockOutputs,
+            },
+          });
+          drafts = out.drafts;
+          if (drafts.length) {
+            summary = `${summary}\nAT2 staged ${drafts.map((d) => d.kind).join(', ')}`;
+          }
+        } catch (e) {
+          console.error(
+            `[autotrigger] AT2 outputs failed survey=${surveyId}:`,
+            e instanceof Error ? e.message : e
+          );
+        }
+      }
+
+      // AT3: autonomy + recommendation (+ optional full-auto send)
+      if (pickedFinding) {
+        try {
+          const autonomy = await applyAutotriggerAutonomy({
+            surveyId,
+            surveyTitle: owner.title,
+            userId: owner.userId,
+            organizationId: owner.organizationId,
+            surveyAutonomy: cfg.autonomy,
+            fullAutoSend: cfg.fullAutoSend,
+            finding: pickedFinding,
+            drafts,
+            dryRun: Boolean(options.dryRunAutonomy || options.mockOutputs),
+          });
+          autonomyMeta = {
+            mode: autonomy.mode,
+            recommendationAction: autonomy.recommendationAction,
+            recommendationStagedId: autonomy.recommendationStagedId,
+            fullAutoApplied: autonomy.fullAutoApplied,
+            sendsExecuted: autonomy.sendsExecuted.filter((s) => s.ok).length,
+          };
+          summary = `${summary}\nAT3 ${autonomy.mode}: ${autonomy.recommendationAction || 'n/a'}`;
+        } catch (e) {
+          console.error(
+            `[autotrigger] AT3 autonomy failed survey=${surveyId}:`,
+            e instanceof Error ? e.message : e
+          );
         }
       }
     } catch (e) {
       console.error(
-        `[autotrigger] AT2 outputs failed survey=${surveyId}:`,
+        `[autotrigger] output/autonomy path failed survey=${surveyId}:`,
         e instanceof Error ? e.message : e
       );
     }
@@ -256,13 +304,15 @@ export async function maybeFireSurveyAutotrigger(
         stagedActionId: d.stagedActionId,
         disclaimerApplied: d.disclaimerApplied,
       })),
+      autonomy: autonomyMeta || null,
+      fullAutoSend: cfg.fullAutoSend,
       summary: summary.slice(0, 2000),
       firedCount: cfg.firedCount,
     },
   });
 
   console.log(
-    `[autotrigger] fired survey=${surveyId} band=${band} count=${responseCount} event=#${eventId} drafts=${drafts.length} source=${options.source || 'ingest'}`
+    `[autotrigger] fired survey=${surveyId} band=${band} count=${responseCount} event=#${eventId} drafts=${drafts.length} autonomy=${autonomyMeta?.mode || 'n/a'} source=${options.source || 'ingest'}`
   );
 
   return {
@@ -274,6 +324,7 @@ export async function maybeFireSurveyAutotrigger(
     analyticsOk,
     insightOk,
     drafts,
+    autonomy: autonomyMeta,
     summary,
   };
 }

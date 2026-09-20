@@ -73,6 +73,7 @@ export async function PUT(
       threshold?: number;
       actions?: AutotriggerAction[];
       autonomy?: AutotriggerAutonomy;
+      fullAutoSend?: boolean;
     } = {};
     if (typeof body.enabled === 'boolean') patch.enabled = body.enabled;
     if (body.threshold != null) patch.threshold = Number(body.threshold);
@@ -85,6 +86,9 @@ export async function PUT(
     }
     if (body.autonomy === 'propose' || body.autonomy === 'auto') {
       patch.autonomy = body.autonomy;
+    }
+    if (typeof body.fullAutoSend === 'boolean') {
+      patch.fullAutoSend = body.fullAutoSend;
     }
 
     const config = await SurveyAutotriggerRepo.upsert(surveyId, patch);

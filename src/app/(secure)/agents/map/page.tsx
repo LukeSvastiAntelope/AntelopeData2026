@@ -719,8 +719,11 @@ export default function AgentMapPage() {
                                   </Badge>
                                 </div>
                                 <p className="text-muted-foreground mt-0.5">
-                                  ≥{t.threshold} · {t.autonomy} · {t.responseCount} responses · fired{' '}
-                                  {t.firedCount}
+                                  ≥{t.threshold} · {t.autonomy}
+                                  {(t as { fullAutoSend?: boolean }).fullAutoSend
+                                    ? '+full-auto'
+                                    : ''}{' '}
+                                  · {t.responseCount} responses · fired {t.firedCount}
                                   {t.lastFiredAt ? ` · ${fmtWhen(t.lastFiredAt)}` : ''}
                                 </p>
                                 <p className="text-muted-foreground">
