@@ -1,12 +1,18 @@
 /**
- * MT2 — Tailored outbound draft generation.
+ * MT2 / MT3 — Tailored outbound draft generation + thin-segment discipline.
  *
  * Tailoring inputs = segment observed attributes + survey-stated issue
  * positions from #2. Never invent a position the segment did not state.
  * Message tailoring only — not who/when to send (propensity quarantine).
+ * Thin segments (n < THIN_SEGMENT_THRESHOLD) get coarse copy + small-sample
+ * disclaimer baked in — never over-fit a message to a handful of people.
  */
 
 import { createCompletion } from '@/app/utils/services/ai-service';
+import {
+  SMALL_SAMPLE_DISCLAIMER,
+  bakeDisclaimerIntoText,
+} from '@/app/utils/services/autotrigger-outputs';
 import {
   resolveVoterSegment,
   type ResolvedVoterSegment,
@@ -21,6 +27,11 @@ export const OUTBOUND_FORMATS: OutboundFormat[] = [
   'sms',
   'ad_copy',
 ];
+
+/** Below this live membership, tailor coarsely and bake in the small-sample caveat. */
+export const THIN_SEGMENT_THRESHOLD = 20;
+
+export { SMALL_SAMPLE_DISCLAIMER };
 
 export type StatedIssuePosition = {
   label: string;
@@ -37,6 +48,8 @@ export type SegmentTailoringContext = {
   segmentName: string;
   segmentSource: 'preset' | 'saved';
   voterCount: number;
+  /** True when n is below THIN_SEGMENT_THRESHOLD — coarse tailor + disclaimer */
+  thinSegment: boolean;
   /** Collation / map facts (gender, age, homeowner, …) — not issue positions */
   observedAttributes: string[];
   /** Only survey-stated issue positions aggregated from the live set */
@@ -53,6 +66,8 @@ export type OutboundDraft = {
   groundedIn: Array<{ label: string; value: string }>;
   /** True when we refused to invent issue claims */
   honest: boolean;
+  /** True when small-sample disclaimer was baked into body */
+  smallSampleDisclaimerApplied: boolean;
 };
 
 export type DraftOutboundResult = {
@@ -65,6 +80,12 @@ export type DraftOutboundResult = {
 const TAILORING_DISCLAIMER =
   'Drafts tailored to observed segment attributes and survey-stated positions only. Not a persuasion score; send still requires loop + approval.';
 
+const THIN_TAILORING_DISCLAIMER =
+  'Thin segment — coarse message only (no over-fit). Small-sample disclaimer baked into copy. Send still requires loop + approval; who/when stays with propensity quarantine.';
+
+export function isThinSegment(voterCount: number): boolean {
+  return voterCount > 0 && voterCount < THIN_SEGMENT_THRESHOLD;
+}
 function formatLabel(f: OutboundFormat): string {
   switch (f) {
     case 'letter':
@@ -172,16 +193,43 @@ export function observedAttributeLines(
 export function buildTailoringContext(
   resolved: ResolvedVoterSegment
 ): SegmentTailoringContext {
+  const thin = isThinSegment(resolved.count);
+  const stated = aggregateStatedPositions(resolved);
+  // Thin segments: keep only the dominant stated position — don't over-fit niches.
+  const statedPositions = thin ? stated.slice(0, 1) : stated;
   return {
     segmentId: resolved.id,
     segmentName: resolved.name,
     segmentSource: resolved.source,
     voterCount: resolved.count,
+    thinSegment: thin,
     observedAttributes: observedAttributeLines(resolved.definition, resolved),
-    statedPositions: aggregateStatedPositions(resolved),
+    statedPositions,
     definition: resolved.definition,
-    disclaimer: TAILORING_DISCLAIMER,
+    disclaimer: thin ? THIN_TAILORING_DISCLAIMER : TAILORING_DISCLAIMER,
   };
+}
+
+/** Bake small-sample disclaimer into every draft body when the segment is thin. */
+export function applyThinSegmentDiscipline(
+  drafts: OutboundDraft[],
+  thin: boolean
+): OutboundDraft[] {
+  if (!thin) {
+    return drafts.map((d) => ({
+      ...d,
+      smallSampleDisclaimerApplied: Boolean(d.smallSampleDisclaimerApplied),
+    }));
+  }
+  return drafts.map((d) => {
+    const placement = d.format === 'sms' || d.format === 'ad_copy' ? 'caption' : 'newsletter';
+    const body = bakeDisclaimerIntoText(d.body, true, placement);
+    return {
+      ...d,
+      body,
+      smallSampleDisclaimerApplied: true,
+    };
+  });
 }
 
 function pickModel(): string | null {
@@ -205,10 +253,14 @@ export function fallbackDrafts(
   return formats.map((format) => {
     let body: string;
     if (top) {
-      const issueLine = `You told us ${top.label.toLowerCase()} is “${top.value}.”`;
+      const issueLine = ctx.thinSegment
+        ? `Neighbors in this group raised ${top.label.toLowerCase()} (“${top.value}”).`
+        : `You told us ${top.label.toLowerCase()} is “${top.value}.”`;
       switch (format) {
         case 'sms':
-          body = `${issueLine} Here’s how we’re addressing it — reply YES for details.`;
+          body = ctx.thinSegment
+            ? `${issueLine} More on our plan soon — reply YES for details.`
+            : `${issueLine} Here’s how we’re addressing it — reply YES for details.`;
           break;
         case 'email':
           body = [
@@ -216,7 +268,9 @@ export function fallbackDrafts(
             ``,
             `Hello,`,
             ``,
-            `${issueLine} This note is for neighbors who shared that view — we are not guessing.`,
+            ctx.thinSegment
+              ? `${issueLine} This is a broad note for a small observed group — not a hyper-personalized pitch.`
+              : `${issueLine} This note is for neighbors who shared that view — we are not guessing.`,
             ``,
             `We’ll keep you posted on concrete next steps. Thank you for taking the time to tell us.`,
             ``,
@@ -225,8 +279,10 @@ export function fallbackDrafts(
           break;
         case 'ad_copy':
           body = [
-            `Headline: You said ${top.label.toLowerCase()} matters`,
-            `Body: For neighbors who called it “${top.value}” — here’s our plan. No invented concerns.`,
+            `Headline: ${top.label} matters here`,
+            ctx.thinSegment
+              ? `Body: Broad civic note for neighbors who called it “${top.value}.”`
+              : `Body: For neighbors who called it “${top.value}” — here’s our plan. No invented concerns.`,
             `CTA: Learn more`,
           ].join('\n');
           break;
@@ -237,7 +293,9 @@ export function fallbackDrafts(
             ``,
             `${issueLine}`,
             ``,
-            `I’m writing specifically to people in “${ctx.segmentName}” (${who || 'observed attributes'}) who shared that position on our survey — not because a model guessed your views.`,
+            ctx.thinSegment
+              ? `I’m writing a short, general note to people in “${ctx.segmentName}” — a small group, so this stays high-level rather than over-fitted.`
+              : `I’m writing specifically to people in “${ctx.segmentName}” (${who || 'observed attributes'}) who shared that position on our survey — not because a model guessed your views.`,
             ``,
             `If you’d like a deeper briefing, reply or visit our site. Grateful for your voice.`,
             ``,
@@ -292,10 +350,13 @@ export function fallbackDrafts(
 
     return {
       format,
-      title: `${formatLabel(format)} · ${ctx.segmentName}`,
+      title: `${formatLabel(format)} · ${ctx.segmentName}${
+        ctx.thinSegment ? ' (coarse · thin segment)' : ''
+      }`,
       body,
       groundedIn,
       honest: true,
+      smallSampleDisclaimerApplied: false,
     };
   });
 }
@@ -306,10 +367,11 @@ async function llmDrafts(
   goal: string | null,
   model: string
 ): Promise<OutboundDraft[]> {
+  const positionCap = ctx.thinSegment ? 1 : 8;
   const statedBlock =
     ctx.statedPositions.length > 0
       ? ctx.statedPositions
-          .slice(0, 8)
+          .slice(0, positionCap)
           .map(
             (p) =>
               `- ${p.label}: “${p.value}” (n=${p.count}${
@@ -319,9 +381,18 @@ async function llmDrafts(
           .join('\n')
       : '(none — segment has no survey-stated issue positions)';
 
+  const thinRules = ctx.thinSegment
+    ? `
+THIN SEGMENT (n=${ctx.voterCount} < ${THIN_SEGMENT_THRESHOLD}):
+- Tailor COARSELY — one broad civic message, not a hyper-specific pitch for a handful of people.
+- Use at most one stated position; prefer demographic framing when unsure.
+- Do NOT invent individualized hooks, names, or micro-claims.
+- Do NOT include a small-sample disclaimer — that is appended separately.`
+    : '';
+
   const completion = await createCompletion({
     model,
-    temperature: 0.35,
+    temperature: ctx.thinSegment ? 0.25 : 0.35,
     maxTokens: 2800,
     messages: [
       {
@@ -336,13 +407,15 @@ HARD RULES (honest tailoring):
 - Never claim "you care about X" unless X is in stated positions.
 - Never invent poll numbers, endorsements, or donation amounts.
 - Microtargeting = message tailoring for this segment, not who to target.
-- Match each requested format's length guidance.`,
+- Match each requested format's length guidance.${thinRules}`,
       },
       {
         role: 'user',
         content: [
           `Segment: ${ctx.segmentName} (${ctx.segmentId}, ${ctx.segmentSource})`,
-          `Voter count (live): ${ctx.voterCount}`,
+          `Voter count (live): ${ctx.voterCount}${
+            ctx.thinSegment ? ' — THIN; coarse tailor only' : ''
+          }`,
           `Observed attributes:`,
           ...ctx.observedAttributes.map((l) => `- ${l}`),
           ``,
@@ -405,10 +478,16 @@ HARD RULES (honest tailoring):
 
     out.push({
       format,
-      title: String(d.title || `${formatLabel(format)} · ${ctx.segmentName}`).slice(0, 200),
+      title: String(
+        d.title ||
+          `${formatLabel(format)} · ${ctx.segmentName}${
+            ctx.thinSegment ? ' (coarse · thin segment)' : ''
+          }`
+      ).slice(0, 200),
       body: String(d.body || '').trim().slice(0, format === 'sms' ? 500 : 6000),
       groundedIn: honestGrounded,
       honest: true,
+      smallSampleDisclaimerApplied: false,
     });
   }
 
@@ -455,7 +534,10 @@ export async function draftOutboundForSegment(
   if (!model) {
     return {
       context,
-      drafts: fallbackDrafts(context, formats),
+      drafts: applyThinSegmentDiscipline(
+        fallbackDrafts(context, formats),
+        context.thinSegment
+      ),
       modelUsed: null,
       usedFallback: true,
     };
@@ -468,12 +550,20 @@ export async function draftOutboundForSegment(
       opts.goal ? String(opts.goal) : null,
       model
     );
-    return { context, drafts, modelUsed: model, usedFallback: false };
+    return {
+      context,
+      drafts: applyThinSegmentDiscipline(drafts, context.thinSegment),
+      modelUsed: model,
+      usedFallback: false,
+    };
   } catch (err) {
     console.warn('[draft-outbound] LLM failed, using fallback:', err);
     return {
       context,
-      drafts: fallbackDrafts(context, formats),
+      drafts: applyThinSegmentDiscipline(
+        fallbackDrafts(context, formats),
+        context.thinSegment
+      ),
       modelUsed: model,
       usedFallback: true,
     };

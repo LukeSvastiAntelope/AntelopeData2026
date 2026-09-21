@@ -390,6 +390,53 @@ export async function approveStagedAction(params: {
   const toolName = String(staged.payload.tool || staged.toolName);
   const input = (staged.payload.input || {}) as Record<string, unknown>;
 
+  // Review-only cards (AT2 newsletter drafts, MT3 letter/ad, held sends without contacts)
+  if (
+    staged.payload.reviewOnly === true ||
+    toolName === 'outbound_review' ||
+    toolName === 'draft_newsletter'
+  ) {
+    const updated = await ConsultantRepo.updateStagedAction(staged.id, {
+      status: 'approved',
+      resultSummary:
+        'Marked reviewed. No public send ran from this review-only card.',
+      resultData: { reviewOnly: true, implemented: true },
+    });
+    const messages = [
+      ...conversation.messages,
+      {
+        role: 'assistant' as const,
+        content:
+          'Reviewed. This card was review-only — nothing was sent or posted. Use an approval-tier send/post tool when you are ready to distribute.',
+        meta: {
+          kind: 'tool_result' as const,
+          toolName,
+          risk: 'approval' as const,
+          stagedActionId: staged.id,
+          implemented: true,
+        },
+        createdAt: new Date().toISOString(),
+      },
+    ];
+    await ConsultantRepo.saveMessages(conversation.id, params.userId, messages);
+    const refreshed = await ConsultantRepo.getConversationById(
+      conversation.id,
+      params.userId
+    );
+    return {
+      staged: updated!,
+      conversation: refreshed!,
+      execution: {
+        ok: true,
+        status: 'executed',
+        tool: toolName,
+        risk: 'approval',
+        summary: 'Review-only card approved — no send executed.',
+        data: { reviewOnly: true, implemented: true },
+      },
+    };
+  }
+
   const { executeApprovedTool } = await import('@/app/utils/services/tools');
   const execution = await executeApprovedTool(
     { name: toolName, input },

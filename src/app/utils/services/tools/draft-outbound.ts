@@ -105,7 +105,11 @@ export const draftOutboundTool: CampaignTool<Input> = {
         `### Tailored outbound drafts`,
         '',
         `- Segment: **${result.context.segmentName}** (\`${result.context.segmentId}\`)`,
-        `- Live voters: ${result.context.voterCount}`,
+        `- Live voters: ${result.context.voterCount}${
+          result.context.thinSegment
+            ? ' (thin — coarse tailor + small-sample disclaimer)'
+            : ''
+        }`,
         `- Model: ${result.modelUsed || 'fallback templates'}${
           result.usedFallback ? ' (fallback)' : ''
         }`,
@@ -122,6 +126,7 @@ export const draftOutboundTool: CampaignTool<Input> = {
         drafts: result.drafts,
         modelUsed: result.modelUsed,
         usedFallback: result.usedFallback,
+        thinSegment: result.context.thinSegment,
       },
     };
   },
