@@ -59,6 +59,7 @@ export const AGENT_REGISTRY: Record<AgentId, AgentRegistryEntry> = {
       'assign_turf',
       'record_turf_stop',
       'read_propensity',
+      'stage_outbound_send',
       // Advisory / situation helpers (pre-registry)
       'read_campaign_brief',
       'propose_baseline_survey',

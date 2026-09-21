@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import Link from 'next/link'
 import { SidebarTrigger } from '@/components/ui/sidebar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -15,11 +16,12 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
-import { Loader2, Send, Sparkles, ShieldAlert } from 'lucide-react'
+import { Loader2, Send, Sparkles, ShieldAlert, Wand2, Bot } from 'lucide-react'
 import {
   StagedActionCard,
   type StagedActionCardModel,
 } from '@/components/consultant/staged-action-card'
+import { cn } from '@/lib/utils'
 
 type CatalogItem = {
   id: string
@@ -27,6 +29,13 @@ type CatalogItem = {
   description: string | null
   source: 'preset' | 'saved'
   category?: string
+}
+
+type GoalTemplate = {
+  id: string
+  label: string
+  description: string
+  starterGoal: string
 }
 
 type Draft = {
@@ -70,13 +79,23 @@ type StageResult = {
 
 const ALL_FORMATS = ['letter', 'email', 'sms', 'ad_copy'] as const
 
+const STEPS = [
+  { n: 1, label: 'Segment' },
+  { n: 2, label: 'Generate' },
+  { n: 3, label: 'Review' },
+  { n: 4, label: 'Send (gated)' },
+] as const
+
 export default function OutboundPage() {
   const [catalog, setCatalog] = useState<CatalogItem[]>([])
+  const [templates, setTemplates] = useState<GoalTemplate[]>([])
   const [segmentId, setSegmentId] = useState<string>('')
   const [formats, setFormats] = useState<string[]>(['letter', 'email', 'sms', 'ad_copy'])
   const [goal, setGoal] = useState('')
+  const [assistNote, setAssistNote] = useState<string | null>(null)
   const [loadingCatalog, setLoadingCatalog] = useState(true)
   const [generating, setGenerating] = useState(false)
+  const [assisting, setAssisting] = useState(false)
   const [stagingFormat, setStagingFormat] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<DraftResponse | null>(null)
@@ -84,11 +103,22 @@ export default function OutboundPage() {
   const [stageNotes, setStageNotes] = useState<StageResult[]>([])
   const [busyStagedId, setBusyStagedId] = useState<number | null>(null)
 
+  const activeStep = stagedCards.some((c) => c.status === 'pending')
+    ? 4
+    : result?.drafts?.length
+      ? 3
+      : segmentId
+        ? 2
+        : 1
+
   const loadCatalog = useCallback(async () => {
     setLoadingCatalog(true)
     try {
-      const res = await fetch('/api/outbound/draft')
-      const data = await res.json()
+      const [draftRes, assistRes] = await Promise.all([
+        fetch('/api/outbound/draft'),
+        fetch('/api/outbound/prompt-assist'),
+      ])
+      const data = await draftRes.json()
       if (!data.status) throw new Error(data.message || 'Failed to load segments')
       const items = (data.catalog || []) as CatalogItem[]
       setCatalog(items)
@@ -97,6 +127,11 @@ export default function OutboundPage() {
         items.find((c) => c.category === 'tracked') ||
         items[0]
       if (preferred) setSegmentId(preferred.id)
+
+      const assistData = await assistRes.json().catch(() => ({}))
+      if (assistData.status && Array.isArray(assistData.templates)) {
+        setTemplates(assistData.templates as GoalTemplate[])
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load')
     } finally {
@@ -112,6 +147,43 @@ export default function OutboundPage() {
     setFormats((prev) =>
       prev.includes(f) ? prev.filter((x) => x !== f) : [...prev, f]
     )
+  }
+
+  const applyTemplate = (id: string) => {
+    const t = templates.find((x) => x.id === id)
+    if (t?.starterGoal) {
+      setGoal(t.starterGoal)
+      setAssistNote(null)
+    }
+  }
+
+  const assistGoal = async () => {
+    if (!goal.trim()) {
+      setError('Enter a rough goal first, then Assist')
+      return
+    }
+    setAssisting(true)
+    setError(null)
+    try {
+      const selected = catalog.find((c) => c.id === segmentId)
+      const res = await fetch('/api/outbound/prompt-assist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          plainDescription: goal.trim(),
+          segmentName: selected?.name,
+          formats,
+        }),
+      })
+      const data = await res.json()
+      if (!data.status) throw new Error(data.message || 'Assist failed')
+      setGoal(String(data.goal || goal))
+      setAssistNote(String(data.explanation || 'Goal sharpened for drafting.'))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Assist failed')
+    } finally {
+      setAssisting(false)
+    }
   }
 
   const generate = async () => {
@@ -160,7 +232,6 @@ export default function OutboundPage() {
           segmentId,
           draft,
           context: result.context,
-          // Public send never one-shots — fullAutoSend stays off from this UI
           fullAutoSend: false,
         }),
       })
@@ -221,7 +292,6 @@ export default function OutboundPage() {
         method: 'POST',
       })
       if (!res.ok) {
-        // Soft-fail: mark local dismiss even if route missing shape
         const data = await res.json().catch(() => ({}))
         if (!data.status && !data.ok) {
           throw new Error(data.message || 'Dismiss failed')
@@ -243,36 +313,59 @@ export default function OutboundPage() {
     <div className="flex-1 p-2 w-full bg-background">
       <div className="mx-auto rounded-lg bg-card text-card-foreground shadow-lg">
         <div className="px-6 py-4">
-          <div className="flex items-center">
+          <div className="flex items-center flex-wrap gap-2">
             <SidebarTrigger className="-ml-0.5 h-5 w-5 text-muted-foreground hover:text-foreground" />
             <div className="h-4 border-l border-border mx-4" />
             <h1 className="text-base font-medium text-card-foreground flex items-center gap-2">
               <Send className="h-4 w-4" />
               Outbound
             </h1>
-            <Badge variant="secondary" className="ml-3">
-              Message tailoring
+            <Badge variant="secondary" className="ml-1">
+              Microtargeting
             </Badge>
+            <div className="flex-1" />
+            <Button variant="ghost" size="sm" asChild>
+              <Link href="/agents/campaign-consultant" className="gap-1.5">
+                <Bot className="h-3.5 w-3.5" />
+                Ask consultant
+              </Link>
+            </Button>
           </div>
         </div>
         <div className="border-b border-border" />
 
         <div className="p-6 space-y-6 max-w-4xl">
-          <div className="space-y-2">
-            <h2 className="text-2xl font-semibold">Segment → tailored drafts</h2>
+          <div className="space-y-3">
+            <h2 className="text-2xl font-semibold">Segment → draft → review → gated send</h2>
             <p className="text-muted-foreground text-sm">
-              Pick a live segment defined by observed attributes and survey-stated positions.
-              Drafts tailor the message — they do not choose who to contact. Public send uses the
-              same Auto-Post approval cards as every other outreach; who/when stays with the
-              propensity loop.
+              Tailor the message from observed attributes and survey-stated positions. Who to
+              contact stays with the propensity loop. Public send uses the same Auto-Post
+              approval cards as every other outreach — never a one-shot fire.
             </p>
+            <ol className="flex flex-wrap gap-2">
+              {STEPS.map((s) => (
+                <li
+                  key={s.n}
+                  className={cn(
+                    'text-xs px-2.5 py-1 rounded-md border',
+                    activeStep === s.n
+                      ? 'border-foreground/40 bg-muted font-medium'
+                      : activeStep > s.n
+                        ? 'border-border text-muted-foreground'
+                        : 'border-dashed border-border text-muted-foreground/70'
+                  )}
+                >
+                  {s.n}. {s.label}
+                </li>
+              ))}
+            </ol>
           </div>
 
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
                 <Sparkles className="h-4 w-4" />
-                Generate drafts
+                1–2 · Segment & generate
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -318,7 +411,23 @@ export default function OutboundPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="goal">Goal / CTA (optional)</Label>
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <Label htmlFor="goal">Goal / CTA (optional)</Label>
+                  {templates.length > 0 && (
+                    <Select onValueChange={applyTemplate}>
+                      <SelectTrigger className="w-[180px] h-8 text-xs">
+                        <SelectValue placeholder="Goal template" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {templates.map((t) => (
+                          <SelectItem key={t.id} value={t.id}>
+                            {t.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                </div>
                 <Textarea
                   id="goal"
                   value={goal}
@@ -326,6 +435,25 @@ export default function OutboundPage() {
                   placeholder="e.g. Invite to town hall on public safety plan"
                   rows={2}
                 />
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={assisting || !goal.trim()}
+                    onClick={() => void assistGoal()}
+                  >
+                    {assisting ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
+                    ) : (
+                      <Wand2 className="h-3.5 w-3.5 mr-1.5" />
+                    )}
+                    Assist goal
+                  </Button>
+                  {assistNote && (
+                    <p className="text-xs text-muted-foreground flex-1">{assistNote}</p>
+                  )}
+                </div>
               </div>
 
               {error && <p className="text-sm text-destructive">{error}</p>}
@@ -346,7 +474,7 @@ export default function OutboundPage() {
           {result?.context && (
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-base">Tailoring context</CardTitle>
+                <CardTitle className="text-base">3 · Review tailoring context</CardTitle>
                 <p className="text-xs text-muted-foreground">{result.context.disclaimer}</p>
               </CardHeader>
               <CardContent className="space-y-3 text-sm">
@@ -392,7 +520,7 @@ export default function OutboundPage() {
             <div className="space-y-3">
               <div className="flex items-center gap-2 text-sm font-medium">
                 <ShieldAlert className="h-4 w-4 text-amber-600" />
-                Staged for approval (same gate as Auto-Post)
+                4 · Staged for approval (same gate as Auto-Post)
               </div>
               {stageNotes[0]?.recipients?.note && (
                 <p className="text-xs text-muted-foreground">{stageNotes[0].recipients.note}</p>

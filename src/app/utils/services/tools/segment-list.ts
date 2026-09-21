@@ -88,7 +88,7 @@ function shouldUseTrackedPath(input: Input): boolean {
 export const segmentListTool: CampaignTool<Input> = {
   name: 'segment_list',
   description:
-    'Build a segmented voter list from a named preset/saved segment or ad-hoc filters. Tracked-attribute segments (e.g. women 35+ public-security=major) resolve live from person records + survey-stated positions — never a persuasion score. Legacy party/turnout presets still use geocoded turf queries. Subtracts DNC when requested.',
+    'Resolve a live voter segment from observed map + survey-stated attributes (never persuasion scores). Use before draft_outbound when the candidate names an audience (e.g. women 35+ public security). Returns membership for message-tailoring context — not a send list. Tracked presets resolve via person records + voter-state; legacy party/turnout presets use turf/geo.',
   inputSchema: {
     type: 'object',
     properties: {

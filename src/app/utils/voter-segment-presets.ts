@@ -325,3 +325,44 @@ export function getPresetsByCategory(
 export function getPresetById(id: string): VoterSegmentPreset | undefined {
   return VOTER_SEGMENT_PRESETS.find((p) => p.id === id);
 }
+
+/**
+ * Resolve a natural-language audience hint to a tracked preset id.
+ * Used by draft_outbound so the consultant can say "women 35+ public security letter".
+ * Never invents persuasion scores — only matches observed-attribute presets.
+ */
+export function resolveSegmentHint(hint: string | null | undefined): string | null {
+  const raw = String(hint || '').trim();
+  if (!raw) return null;
+  const exact = getPresetById(raw);
+  if (exact) return exact.id;
+
+  const h = raw.toLowerCase().replace(/[_-]+/g, ' ');
+  const byName = VOTER_SEGMENT_PRESETS.find((p) => p.name.toLowerCase() === h);
+  if (byName) return byName.id;
+
+  const scored = VOTER_SEGMENT_PRESETS.map((p) => {
+    const hay = `${p.id} ${p.name} ${p.description}`.toLowerCase();
+    let score = 0;
+    const tokens = h.split(/[^a-z0-9+]+/).filter((t) => t.length > 1);
+    for (const t of tokens) {
+      if (hay.includes(t)) score += t.length >= 4 ? 2 : 1;
+    }
+    // Prefer tracked presets when the hint mentions issues / demographics we track
+    if (p.category === 'tracked') score += 1;
+    if (/homeowner/.test(h) && /homeowner/.test(hay)) score += 3;
+    if (/public.?secur/.test(h) && /public.?secur/.test(hay)) score += 4;
+    if (/women|woman/.test(h) && /women|woman/.test(hay)) score += 2;
+    if (/35/.test(h) && /35/.test(hay)) score += 2;
+    if (/donor/.test(h) && /donor/.test(hay)) score += 3;
+    return { id: p.id, score };
+  }).sort((a, b) => b.score - a.score);
+
+  if (scored[0] && scored[0].score >= 5) return scored[0].id;
+  return null;
+}
+
+/** Tracked-attribute presets suitable for microtargeting message tailoring. */
+export function listTrackedSegmentPresets(): VoterSegmentPreset[] {
+  return VOTER_SEGMENT_PRESETS.filter((p) => p.category === 'tracked' && p.definition);
+}

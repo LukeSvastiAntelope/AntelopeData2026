@@ -124,4 +124,5 @@ export type CampaignToolName =
   | 'list_turf_addresses'
   | 'assign_turf'
   | 'record_turf_stop'
-  | 'read_propensity';
+  | 'read_propensity'
+  | 'stage_outbound_send';

@@ -22,6 +22,7 @@ import { listTurfAddressesTool } from './list-turf-addresses';
 import { assignTurfTool } from './assign-turf';
 import { recordTurfStopTool } from './record-turf-stop';
 import { readPropensityTool } from './read-propensity';
+import { stageOutboundSendTool } from './stage-outbound-send';
 
 /**
  * Canonical shared tool registry.
@@ -51,6 +52,7 @@ export const TOOL_REGISTRY: Record<CampaignToolName, CampaignTool> = {
   assign_turf: assignTurfTool,
   record_turf_stop: recordTurfStopTool,
   read_propensity: readPropensityTool,
+  stage_outbound_send: stageOutboundSendTool,
 };
 
 const AUTO_TOOLS: CampaignToolName[] = [
@@ -80,6 +82,7 @@ const APPROVAL_TOOLS: CampaignToolName[] = [
   'charge_or_fundraise',
   'generate_and_post_video',
   'propose_cycle_action',
+  'stage_outbound_send',
 ];
 
 export function getTool(name: string): CampaignTool | undefined {

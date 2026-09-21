@@ -4,10 +4,16 @@ import {
   type OutboundFormat,
 } from '@/app/utils/services/outbound-draft-service';
 import type { VoterSegmentDefinition } from '@/app/utils/services/voter-segments';
+import {
+  listTrackedSegmentPresets,
+  resolveSegmentHint,
+} from '@/app/utils/voter-segment-presets';
 import type { CampaignTool } from './types';
 
 type Input = {
   segmentId?: string;
+  /** Natural-language audience, e.g. "women 35+ public security" */
+  audience?: string;
   definition?: VoterSegmentDefinition;
   formats?: string[];
   goal?: string;
@@ -16,14 +22,25 @@ type Input = {
   mock?: boolean;
 };
 
+const TRACKED_PRESET_HINT = listTrackedSegmentPresets()
+  .map((p) => `\`${p.id}\``)
+  .join(', ');
+
 /**
  * draft_outbound — tailored drafts for a live tracked-attribute segment.
- * Uses stated survey positions only; never invents issue concerns.
+ * Private / reversible (risk: auto). Send stays behind stage_outbound_send /
+ * send_sms / send_email (approval) or /outbound Stage for approval.
  */
 export const draftOutboundTool: CampaignTool<Input> = {
   name: 'draft_outbound',
-  description:
-    'Generate tailored outbound drafts (letter, email, SMS, ad copy) for a named segment. Tailoring uses observed map attributes + survey-stated issue positions from voter tracking — never invents a position the segment did not state. Message tailoring only; does not send.',
+  description: [
+    'Generate tailored outbound drafts (letter, email, SMS, ad copy) for a live observed-attribute segment.',
+    'Example: draft a public-security letter for women 35+ → segmentId `women-35-homeowners-public-security` or audience "women 35 homeowners public security", formats ["letter"].',
+    'Uses survey-stated positions only — never invents concerns. Message tailoring only; does not choose who to contact or send.',
+    'If unsure of segmentId, call segment_list first or pass audience. Tracked presets:',
+    TRACKED_PRESET_HINT + '.',
+    'Thin segments get coarse copy + small-sample disclaimer. To send SMS/email afterward, call stage_outbound_send (approval) or use /outbound.',
+  ].join(' '),
   inputSchema: {
     type: 'object',
     properties: {
@@ -31,6 +48,11 @@ export const draftOutboundTool: CampaignTool<Input> = {
         type: 'string',
         description:
           'Preset or saved segment id (e.g. women-35-homeowners-public-security)',
+      },
+      audience: {
+        type: 'string',
+        description:
+          'Natural-language audience hint when segmentId unknown (e.g. "women 35+ public security")',
       },
       definition: {
         type: 'object',
@@ -59,8 +81,13 @@ export const draftOutboundTool: CampaignTool<Input> = {
   risk: 'auto',
   async execute(input, ctx) {
     if (!ctx.organizationId) throw new Error('organizationId required in tool context');
-    if (!input.segmentId && !input.definition) {
-      throw new Error('segmentId or definition is required');
+
+    const fromAudience = input.audience ? resolveSegmentHint(input.audience) : null;
+    const segmentId = input.segmentId || fromAudience || null;
+    if (!segmentId && !input.definition) {
+      throw new Error(
+        'segmentId, audience, or definition is required. Try segment_list or audience e.g. "women 35+ public security".'
+      );
     }
 
     const formats = (input.formats || [])
@@ -69,7 +96,7 @@ export const draftOutboundTool: CampaignTool<Input> = {
 
     const result = await draftOutboundForSegment({
       organizationId: ctx.organizationId,
-      segmentId: input.segmentId,
+      segmentId,
       definition: input.definition,
       formats: formats.length ? formats : undefined,
       goal: input.goal,
@@ -94,9 +121,14 @@ export const draftOutboundTool: CampaignTool<Input> = {
         return [
           `#### ${d.title}`,
           `_Grounded in: ${ground}_`,
+          d.smallSampleDisclaimerApplied
+            ? '_Small-sample disclaimer baked in (thin segment)._'
+            : null,
           '',
           d.body.slice(0, 500) + (d.body.length > 500 ? '…' : ''),
-        ].join('\n');
+        ]
+          .filter(Boolean)
+          .join('\n');
       })
       .join('\n\n');
 
@@ -105,6 +137,9 @@ export const draftOutboundTool: CampaignTool<Input> = {
         `### Tailored outbound drafts`,
         '',
         `- Segment: **${result.context.segmentName}** (\`${result.context.segmentId}\`)`,
+        fromAudience && !input.segmentId
+          ? `- Resolved audience “${input.audience}” → \`${fromAudience}\``
+          : null,
         `- Live voters: ${result.context.voterCount}${
           result.context.thinSegment
             ? ' (thin — coarse tailor + small-sample disclaimer)'
@@ -119,7 +154,11 @@ export const draftOutboundTool: CampaignTool<Input> = {
         posPreview,
         '',
         draftPreview,
-      ].join('\n'),
+        '',
+        '_Private draft only. To send SMS/email: `stage_outbound_send` (approval) or /outbound → Stage for approval. Who/when stays with propensity quarantine._',
+      ]
+        .filter(Boolean)
+        .join('\n'),
       data: {
         implemented: true,
         context: result.context,
@@ -127,6 +166,8 @@ export const draftOutboundTool: CampaignTool<Input> = {
         modelUsed: result.modelUsed,
         usedFallback: result.usedFallback,
         thinSegment: result.context.thinSegment,
+        resolvedFromAudience: fromAudience && !input.segmentId ? fromAudience : null,
+        nextStep: 'stage_outbound_send or /outbound Stage for approval',
       },
     };
   },
