@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { openSql } from '@/app/utils/database/db';
-import { getMailchimpCreds, sendSurveyEmailCampaign } from '@/app/utils/services/mailchimp';
+import {
+  isResendConfigured,
+  sendCandidateEmail,
+} from '@/app/utils/services/email';
+import type { RowDataPacket } from 'mysql2';
 
 export const runtime = 'nodejs';
 export const maxDuration = 120;
@@ -8,9 +12,8 @@ export const maxDuration = 120;
 /**
  * POST /api/surveys/[id]/email
  *
- * Send survey invitations via Mailchimp (mass email). Falls back to
- * returning the formatted message for manual send when Mailchimp isn't
- * connected, matching the SMS/WhatsApp routes' UX.
+ * Send survey invitations via Antelope platform email (Resend).
+ * Candidate never leaves Antelope or logs into Resend.
  *
  * Body:
  *  - emails: string[]
@@ -55,6 +58,17 @@ export async function POST(
       );
     }
 
+    if (!isResendConfigured()) {
+      return NextResponse.json(
+        {
+          status: false,
+          message:
+            'Platform email is not configured on the server (RESEND_API_KEY). Contact Antelope support.',
+        },
+        { status: 503 }
+      );
+    }
+
     const db = await openSql();
     const [surveys]: any = await db.execute(
       'SELECT id, slug, title FROM surveys WHERE id = ? AND created_by = ?',
@@ -63,6 +77,22 @@ export async function POST(
     if (!surveys || surveys.length === 0) {
       return NextResponse.json({ status: false, message: 'Survey not found' }, { status: 404 });
     }
+
+    const [users] = await db.execute<RowDataPacket[]>(
+      `SELECT email, display_name FROM users WHERE id = ? LIMIT 1`,
+      [userId]
+    );
+    const user = users[0];
+    const userEmail = user?.email != null ? String(user.email).trim() : '';
+    const displayName =
+      (user?.display_name != null && String(user.display_name).trim()) ||
+      userEmail.split('@')[0] ||
+      'Campaign';
+    const localPart =
+      (userEmail.split('@')[0] || displayName)
+        .toLowerCase()
+        .replace(/[^a-z0-9._+-]+/g, '-')
+        .slice(0, 40) || 'campaign';
 
     const survey = surveys[0];
     const baseUrl =
@@ -80,32 +110,24 @@ export async function POST(
       <p style="margin-top:24px"><a href="${surveyUrl}" style="background:#111;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;display:inline-block">Take the survey</a></p>
     </div>`;
 
-    const creds = await getMailchimpCreds(userId);
-    if (!creds) {
-      return NextResponse.json({
-        status: true,
-        sent: false,
-        reason: 'mailchimp_not_configured',
-        message: 'Mailchimp is not connected. Connect it under Channels, or copy the message below and send it manually.',
-        formattedMessage,
-        surveyUrl,
-        emails: cleanEmails,
-      });
-    }
-
-    const { campaignId, summary } = await sendSurveyEmailCampaign({
-      creds,
-      emails: cleanEmails,
+    const result = await sendCandidateEmail({
+      fromName: displayName,
+      localPart,
+      replyTo: userEmail || null,
+      to: cleanEmails,
       subject,
       html,
-      campaignTitle: `${survey.title} — survey invite`,
+      headers: {
+        'X-Antelope-Survey-Id': String(surveyId),
+      },
     });
 
     return NextResponse.json({
       status: true,
-      sent: true,
-      summary: { total: summary.total, sent: summary.added, failed: summary.failed },
-      campaignId,
+      sent: result.sent > 0,
+      provider: result.provider,
+      from: result.from,
+      summary: { total: result.total, sent: result.sent, failed: result.failed },
       surveyUrl,
       formattedMessage,
     });
