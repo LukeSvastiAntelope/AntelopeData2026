@@ -1,10 +1,13 @@
 /**
- * P2 — Recipient list helpers for in-Antelope email send.
+ * P2/P3 — Recipient list helpers for in-Antelope email send.
  * Parse paste / spreadsheet rows, validate, dedupe, drop suppression matches.
+ * P3: also drops candidate-scoped email_suppressions (user_id) so one
+ * candidate's unsub/bounce never affects another.
  * Server-safe (no browser APIs).
  */
 
 import { openSql } from '@/app/utils/database/db';
+import { EmailSuppressionRepo } from '@/app/utils/database/email-send-repo';
 import type { RowDataPacket } from 'mysql2';
 
 export const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/i;
@@ -118,11 +121,14 @@ export async function loadSuppressedEmails(
 }
 
 /**
- * Full prepare: validate → dedupe → drop suppressed.
+ * Full prepare: validate → dedupe → drop org DNC + candidate-scoped suppressions.
+ * Pass userId so unsub / hard bounce / complaint for this candidate are honored.
  */
 export async function prepareRecipientList(opts: {
   organizationId: number;
   raw: string[];
+  /** Candidate (users.id) — required for per-candidate email_suppressions. */
+  userId?: number | null;
   skipSuppression?: boolean;
 }): Promise<PreparedEmailList> {
   const base = validateAndDedupeEmails(opts.raw);
@@ -135,6 +141,11 @@ export async function prepareRecipientList(opts: {
   }
 
   const suppressedSet = await loadSuppressedEmails(opts.organizationId);
+  if (opts.userId != null && Number.isFinite(opts.userId) && opts.userId > 0) {
+    const candidateSet = await EmailSuppressionRepo.loadSet(opts.userId);
+    for (const e of candidateSet) suppressedSet.add(e);
+  }
+
   const suppressed: string[] = [];
   const emails: string[] = [];
   for (const e of base.emails) {

@@ -6,7 +6,7 @@
  * Candidate never leaves Antelope; no connect-account step.
  */
 
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import * as XLSX from 'xlsx'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
@@ -26,6 +26,8 @@ import {
   Check,
   FileSpreadsheet,
   Loader2,
+  Mail,
+  RefreshCw,
   Send,
   Sparkles,
   Upload,
@@ -80,6 +82,7 @@ type CatalogItem = {
 
 type Receipt = {
   id: string
+  sendId?: number
   provider: string
   from: string
   subject: string
@@ -92,11 +95,55 @@ type Receipt = {
     duplicateCount: number
     suppressedCount: number
   }
+  canSpam?: boolean
   messageIds?: string[]
+  recipients?: Array<{ email: string; status: string; providerMessageId: string | null }>
+}
+
+type RecentSend = {
+  id: number
+  subject: string
+  from: string
+  provider: string
+  receiptId: string | null
+  createdAt: string
+  recipients: Array<{
+    id: number
+    email: string
+    status: string
+    providerMessageId: string | null
+    lastEventAt: string | null
+  }>
+}
+
+type EmailStreamEvent = {
+  id: number
+  sendId: number | null
+  email: string | null
+  eventType: string
+  createdAt: string
+}
+
+type SuppressionRow = {
+  id: number
+  email: string
+  reason: string
+  source: string
+  createdAt: string
 }
 
 type Props = {
   segmentCatalog?: CatalogItem[]
+}
+
+function statusBadgeVariant(
+  status: string
+): 'default' | 'secondary' | 'destructive' | 'outline' {
+  if (status === 'bounced' || status === 'complained' || status === 'failed') {
+    return 'destructive'
+  }
+  if (status === 'opened' || status === 'delivered') return 'default'
+  return 'secondary'
 }
 
 export function OutboundEmailSendPanel({ segmentCatalog = [] }: Props) {
@@ -111,12 +158,36 @@ export function OutboundEmailSendPanel({ segmentCatalog = [] }: Props) {
   const [segmentId, setSegmentId] = useState<string>('')
   const [receipt, setReceipt] = useState<Receipt | null>(null)
   const [prepareNote, setPrepareNote] = useState<string | null>(null)
+  const [recentSends, setRecentSends] = useState<RecentSend[]>([])
+  const [streamEvents, setStreamEvents] = useState<EmailStreamEvent[]>([])
+  const [suppressions, setSuppressions] = useState<SuppressionRow[]>([])
+  const [loadingResults, setLoadingResults] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
   const typedCount = emailInput
     .split(/[\n,;]+/)
     .map((n) => n.trim())
     .filter(Boolean).length
+
+  const loadResults = useCallback(async () => {
+    setLoadingResults(true)
+    try {
+      const res = await fetch('/api/outbound/email/results')
+      const data = await res.json()
+      if (!data.status) return
+      setRecentSends(Array.isArray(data.sends) ? data.sends : [])
+      setStreamEvents(Array.isArray(data.events) ? data.events : [])
+      setSuppressions(Array.isArray(data.suppressions) ? data.suppressions : [])
+    } catch {
+      /* ignore — panel still usable offline */
+    } finally {
+      setLoadingResults(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    void loadResults()
+  }, [loadResults])
 
   const handleFile = useCallback(async (file: File) => {
     try {
@@ -266,12 +337,13 @@ export function OutboundEmailSendPanel({ segmentCatalog = [] }: Props) {
       toast.success(
         `Sent to ${data.receipt?.summary?.sent ?? 0} of ${data.receipt?.summary?.total ?? 0}`
       )
+      void loadResults()
     } catch {
       toast.error('Send request failed')
     } finally {
       setSending(false)
     }
-  }, [emailInput, subject, body])
+  }, [emailInput, subject, body, loadResults])
 
   const tracked = segmentCatalog.filter(
     (c) => c.category === 'tracked' || c.source === 'saved'
@@ -470,6 +542,11 @@ export function OutboundEmailSendPanel({ segmentCatalog = [] }: Props) {
             <div className="flex items-center gap-2 text-sm font-medium text-green-800 dark:text-green-300">
               <Check className="h-4 w-4" />
               Receipt — emails sent from Antelope
+              {receipt.canSpam ? (
+                <Badge variant="outline" className="ml-1 text-[10px]">
+                  CAN-SPAM
+                </Badge>
+              ) : null}
             </div>
             <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-xs text-muted-foreground">
               <div>
@@ -500,8 +577,119 @@ export function OutboundEmailSendPanel({ segmentCatalog = [] }: Props) {
                 <dd className="inline">{new Date(receipt.sentAt).toLocaleString()}</dd>
               </div>
             </dl>
+            {receipt.recipients && receipt.recipients.length > 0 && (
+              <ul className="mt-2 space-y-1 border-t border-border/60 pt-2">
+                {receipt.recipients.slice(0, 20).map((r) => (
+                  <li
+                    key={r.email}
+                    className="flex items-center justify-between gap-2 text-xs"
+                  >
+                    <span className="font-mono truncate">{r.email}</span>
+                    <Badge variant={statusBadgeVariant(r.status)}>{r.status}</Badge>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         )}
+
+        {/* P3 — Delivery status + event stream + suppressions */}
+        <div className="rounded-lg border border-border p-4 space-y-4">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <div className="flex items-center gap-2">
+              <Mail className="h-4 w-4" />
+              <h3 className="text-sm font-medium">Delivery status</h3>
+            </div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              disabled={loadingResults}
+              onClick={() => void loadResults()}
+            >
+              {loadingResults ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
+              ) : (
+                <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+              )}
+              Refresh
+            </Button>
+          </div>
+
+          {recentSends.length === 0 ? (
+            <p className="text-xs text-muted-foreground">
+              No sends yet. After you send, per-recipient delivered / opened / bounced status
+              appears here.
+            </p>
+          ) : (
+            <div className="space-y-3 max-h-72 overflow-y-auto">
+              {recentSends.map((s) => (
+                <div key={s.id} className="rounded-md border border-border/80 p-3 space-y-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium truncate">{s.subject}</p>
+                      <p className="text-[11px] text-muted-foreground">
+                        {new Date(s.createdAt).toLocaleString()} · {s.from}
+                      </p>
+                    </div>
+                    <Badge variant="outline" className="shrink-0">
+                      {s.recipients.length} rcpt
+                    </Badge>
+                  </div>
+                  <ul className="space-y-1">
+                    {s.recipients.slice(0, 30).map((r) => (
+                      <li
+                        key={r.id}
+                        className="flex items-center justify-between gap-2 text-xs"
+                      >
+                        <span className="font-mono truncate">{r.email}</span>
+                        <Badge variant={statusBadgeVariant(r.status)}>{r.status}</Badge>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {streamEvents.length > 0 && (
+            <div className="space-y-1.5 border-t border-border pt-3">
+              <p className="text-xs font-medium text-foreground">Event stream</p>
+              <ul className="space-y-1 max-h-40 overflow-y-auto">
+                {streamEvents.slice(0, 25).map((ev) => (
+                  <li key={ev.id} className="text-[11px] text-muted-foreground flex gap-2">
+                    <span className="shrink-0 tabular-nums">
+                      {new Date(ev.createdAt).toLocaleString()}
+                    </span>
+                    <span className="font-medium text-foreground">{ev.eventType}</span>
+                    {ev.email ? <span className="font-mono truncate">{ev.email}</span> : null}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {suppressions.length > 0 && (
+            <div className="space-y-1.5 border-t border-border pt-3">
+              <p className="text-xs font-medium text-foreground">
+                Suppression list (this candidate only)
+              </p>
+              <ul className="space-y-1 max-h-32 overflow-y-auto">
+                {suppressions.slice(0, 40).map((s) => (
+                  <li
+                    key={s.id}
+                    className="text-[11px] flex items-center justify-between gap-2"
+                  >
+                    <span className="font-mono truncate">{s.email}</span>
+                    <span className="text-muted-foreground shrink-0">
+                      {s.reason} · {s.source}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
       </CardContent>
     </Card>
   )

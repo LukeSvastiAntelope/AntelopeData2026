@@ -40,6 +40,8 @@ const publicRoutes = [
     '/api/cron/loop-propose', // H2 loop proposer platform cron
     '/api/cron/autotrigger-poll', // AT1 survey auto-trigger backstop
     '/api/channels/telegram/webhook', // Telegram webhook must be public
+    '/api/webhooks/resend', // Resend delivery / bounce / complaint webhook
+    '/api/email/unsubscribe', // CAN-SPAM one-click unsubscribe (public)
     // Local testing: allow direct access to Google Sheets import endpoints;
     // the handlers themselves still require 'x-user-id' header.
     '/api/surveys/import/google-sheets',

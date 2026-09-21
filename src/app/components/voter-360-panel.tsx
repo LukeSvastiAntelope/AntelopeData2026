@@ -81,6 +81,8 @@ function sourceBadge(source: string): string {
     fundraising: 'Fundraising',
     person_source_rows: 'Source',
     turf_stop_outcomes: 'Turf',
+    email_send_recipients: 'Email',
+    email_events: 'Email',
   };
   return map[source] || source;
 }

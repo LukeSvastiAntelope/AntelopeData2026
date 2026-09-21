@@ -28,6 +28,16 @@ export {
   validateAndDedupeEmails,
 } from './recipient-list';
 export type { PreparedEmailList } from './recipient-list';
+export {
+  appBaseUrl,
+  buildCanSpamHeaders,
+  buildCompliantMessage,
+  buildUnsubscribePageUrl,
+  buildUnsubscribeUrl,
+  getPhysicalAddress,
+  injectCanSpamFooter,
+} from './compliance';
+export type { CompliantMessage } from './compliance';
 
 export const EMAIL_SEND_DOMAIN =
   process.env.EMAIL_SEND_DOMAIN?.trim() || 'send.antelopedata.org';

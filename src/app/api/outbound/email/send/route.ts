@@ -2,12 +2,18 @@ import { NextRequest, NextResponse } from 'next/server';
 import { ensurePrimaryOrgId } from '@/app/api/dashboard/persons/org';
 import { openSql } from '@/app/utils/database/db';
 import {
+  EmailEventRepo,
+  EmailSendRepo,
+} from '@/app/utils/database/email-send-repo';
+import {
   EMAIL_SEND_MAX_RECIPIENTS,
   prepareRecipientList,
 } from '@/app/utils/services/email/recipient-list';
 import {
+  buildCandidateFrom,
+  buildCompliantMessage,
+  getEmailProvider,
   isResendConfigured,
-  sendCandidateEmail,
 } from '@/app/utils/services/email';
 import type { RowDataPacket } from 'mysql2';
 
@@ -18,8 +24,8 @@ export const maxDuration = 300;
  * POST /api/outbound/email/send
  *
  * In-Antelope platform send (Resend). Candidate never leaves the app.
- * Body: { emails: string[], subject, html | body, fromName?, replyTo? }
- * Returns a receipt — no external redirect / connect step.
+ * P3: every message gets CAN-SPAM footer + one-click unsub; candidate
+ * suppressions checked first; send + per-recipient status persisted.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -83,8 +89,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Allow plain text body — wrap as simple HTML paragraphs
-    const html = /<[a-z][\s\S]*>/i.test(htmlRaw)
+    const htmlBase = /<[a-z][\s\S]*>/i.test(htmlRaw)
       ? htmlRaw
       : `<div style="font-family:sans-serif;font-size:15px;line-height:1.6;color:#111;max-width:560px;margin:0 auto">${htmlRaw
           .split(/\n{2,}/)
@@ -93,6 +98,7 @@ export async function POST(request: NextRequest) {
 
     const prepared = await prepareRecipientList({
       organizationId: orgId,
+      userId,
       raw: rawEmails,
     });
 
@@ -133,28 +139,116 @@ export async function POST(request: NextRequest) {
         .replace(/[^a-z0-9._+-]+/g, '-')
         .slice(0, 40) || 'campaign';
 
-    const result = await sendCandidateEmail({
+    const { from, replyTo } = buildCandidateFrom({
       fromName: displayName.slice(0, 80),
       localPart,
       replyTo: String(body?.replyTo || userEmail || '').trim() || null,
-      to: prepared.emails,
+    });
+
+    const physicalAddress =
+      typeof body?.physicalAddress === 'string' ? body.physicalAddress : null;
+
+    const receiptId = `rcpt_${Date.now()}_${userId}`;
+    const sendId = await EmailSendRepo.createSend({
+      userId,
+      organizationId: orgId,
       subject,
-      html,
-      headers: {
-        'X-Antelope-Outbound': 'p2-in-app-send',
+      fromAddress: from,
+      provider: getEmailProvider().name,
+      receiptId,
+      summary: {
+        total: prepared.emails.length,
+        prepared: {
+          rawCount: prepared.rawCount,
+          invalidCount: prepared.invalidCount,
+          duplicateCount: prepared.duplicateCount,
+          suppressedCount: prepared.suppressedCount,
+        },
       },
     });
 
+    const provider = getEmailProvider();
+    let sent = 0;
+    let failed = 0;
+    const messageIds: string[] = [];
+    const recipientStatuses: Array<{
+      email: string;
+      status: string;
+      providerMessageId: string | null;
+    }> = [];
+
+    // One provider call per recipient so each gets a unique unsub URL + message id
+    for (const email of prepared.emails) {
+      const compliant = buildCompliantMessage({
+        html: htmlBase,
+        userId,
+        email,
+        sendId,
+        fromName: displayName,
+        physicalAddress,
+        extraHeaders: {
+          'X-Antelope-Outbound': 'p3-compliant-send',
+          'X-Antelope-Send-Id': String(sendId),
+        },
+      });
+
+      const result = await provider.send({
+        from,
+        to: [email],
+        subject,
+        html: compliant.html,
+        replyTo,
+        headers: compliant.headers,
+      });
+
+      const ok = result.status === 'sent' || result.status === 'queued';
+      if (ok) sent += 1;
+      else failed += 1;
+      if (result.id) messageIds.push(result.id);
+
+      const recipientId = await EmailSendRepo.addRecipient({
+        sendId,
+        userId,
+        organizationId: orgId,
+        email,
+        providerMessageId: result.id || null,
+        status: ok ? 'sent' : 'failed',
+        unsubTokenHash: compliant.unsubscribeTokenHash,
+      });
+
+      await EmailEventRepo.record({
+        userId,
+        organizationId: orgId,
+        sendId,
+        recipientId,
+        email,
+        eventType: ok ? 'email.sent' : 'email.failed',
+        providerMessageId: result.id || null,
+        payload: {
+          error: result.error || null,
+          from,
+          subject,
+        },
+      });
+
+      recipientStatuses.push({
+        email,
+        status: ok ? 'sent' : 'failed',
+        providerMessageId: result.id || null,
+      });
+    }
+
     const receipt = {
-      id: `rcpt_${Date.now()}_${result.results.find((r) => r.id)?.id?.slice(0, 8) || 'ok'}`,
-      provider: result.provider,
-      from: result.from,
+      id: receiptId,
+      sendId,
+      provider: provider.name,
+      from,
       subject,
       sentAt: new Date().toISOString(),
       summary: {
-        total: result.total,
-        sent: result.sent,
-        failed: result.failed,
+        total: prepared.emails.length,
+        sent,
+        failed,
       },
       prepared: {
         rawCount: prepared.rawCount,
@@ -163,16 +257,14 @@ export async function POST(request: NextRequest) {
         duplicateCount: prepared.duplicateCount,
         suppressedCount: prepared.suppressedCount,
       },
-      /** First few provider message ids for support */
-      messageIds: result.results
-        .filter((r) => r.id)
-        .slice(0, 10)
-        .map((r) => r.id),
+      canSpam: true,
+      messageIds: messageIds.slice(0, 10),
+      recipients: recipientStatuses.slice(0, 100),
     };
 
     return NextResponse.json({
       status: true,
-      sent: result.sent > 0,
+      sent: sent > 0,
       receipt,
     });
   } catch (error) {

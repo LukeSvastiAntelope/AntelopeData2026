@@ -23,7 +23,9 @@ export type TimelineEvent = {
     | 'contact_list_entries'
     | 'contact_suppression'
     | 'person_merge_audit'
-    | 'fundraising';
+    | 'fundraising'
+    | 'email_events'
+    | 'email_send_recipients';
   type: string;
   summary: string;
   payload: Record<string, unknown>;
@@ -581,6 +583,63 @@ export async function voterTimeline(personId: number): Promise<TimelineEvent[]> 
           voterFileId: r.voter_file_id,
           responderAgentId:
             r.responder_agent_id != null ? Number(r.responder_agent_id) : null,
+        },
+      });
+    }
+  }
+
+  // ── email_send_recipients + email_events (P3 platform outbound) ─────
+  if (emails.length && (await tableExists(db, 'email_send_recipients'))) {
+    const ph = emails.map(() => '?').join(',');
+    const [rcpts] = await db.execute<RowDataPacket[]>(
+      `SELECT id, send_id, user_id, email, provider_message_id, status,
+              last_event_at, created_at
+       FROM email_send_recipients
+       WHERE LOWER(email) IN (${ph})
+       ORDER BY created_at DESC
+       LIMIT 200`,
+      emails
+    );
+    for (const r of rcpts) {
+      pushEvent(events, {
+        ts: toIso(r.last_event_at) || toIso(r.created_at)!,
+        source: 'email_send_recipients',
+        type: `email.${String(r.status || 'sent')}`,
+        summary: `Email ${r.status || 'sent'} → ${r.email}`,
+        payload: {
+          recipientId: Number(r.id),
+          sendId: Number(r.send_id),
+          userId: Number(r.user_id),
+          email: r.email,
+          providerMessageId: r.provider_message_id,
+          status: r.status,
+        },
+      });
+    }
+  }
+
+  if (emails.length && (await tableExists(db, 'email_events'))) {
+    const ph = emails.map(() => '?').join(',');
+    const [evRows] = await db.execute<RowDataPacket[]>(
+      `SELECT id, send_id, email, event_type, provider_message_id, created_at
+       FROM email_events
+       WHERE LOWER(email) IN (${ph})
+       ORDER BY created_at DESC
+       LIMIT 200`,
+      emails
+    );
+    for (const r of evRows) {
+      pushEvent(events, {
+        ts: toIso(r.created_at)!,
+        source: 'email_events',
+        type: String(r.event_type || 'email.event'),
+        summary: `Email event: ${r.event_type}${r.email ? ` (${r.email})` : ''}`,
+        payload: {
+          eventId: Number(r.id),
+          sendId: r.send_id != null ? Number(r.send_id) : null,
+          email: r.email,
+          eventType: r.event_type,
+          providerMessageId: r.provider_message_id,
         },
       });
     }

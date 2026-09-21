@@ -36,6 +36,7 @@ export async function POST(request: NextRequest) {
 
     const prepared = await prepareRecipientList({
       organizationId: orgId,
+      userId: Number(userId),
       raw,
     });
 
