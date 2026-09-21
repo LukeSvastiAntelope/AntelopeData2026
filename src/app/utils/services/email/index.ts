@@ -20,6 +20,14 @@ import {
 
 export type { EmailProvider, EmailSendRequest, EmailSendResult, EmailBulkSummary };
 export { isResendConfigured, ResendEmailProvider };
+export {
+  EMAIL_SEND_MAX_RECIPIENTS,
+  extractEmailsFromRows,
+  parseEmailPaste,
+  prepareRecipientList,
+  validateAndDedupeEmails,
+} from './recipient-list';
+export type { PreparedEmailList } from './recipient-list';
 
 export const EMAIL_SEND_DOMAIN =
   process.env.EMAIL_SEND_DOMAIN?.trim() || 'send.antelopedata.org';

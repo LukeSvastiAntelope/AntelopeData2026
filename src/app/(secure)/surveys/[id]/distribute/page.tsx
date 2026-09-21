@@ -499,7 +499,9 @@ function EmailPanel({ surveyId, surveyTitle, ready, senderFrom }: EmailPanelProp
           campaignId: data.campaignId,
         })
         if (data.sent) {
-          toast.success(`Sent to ${data.summary.sent} recipient${data.summary.sent === 1 ? '' : 's'} via Mailchimp`)
+          toast.success(
+            `Sent to ${data.summary.sent} recipient${data.summary.sent === 1 ? '' : 's'}`
+          )
         }
       } else {
         toast.error(data.message || 'Email failed')
@@ -528,27 +530,30 @@ function EmailPanel({ surveyId, surveyTitle, ready, senderFrom }: EmailPanelProp
         <div className="flex items-start justify-between gap-3">
           <div>
             <CardTitle>Email Distribution</CardTitle>
-            <CardDescription>Send survey invitations via Mailchimp</CardDescription>
+            <CardDescription>
+              Send survey invitations via Antelope platform email — no external login
+            </CardDescription>
           </div>
           {ready === true ? (
             <Badge className="bg-green-100 text-green-700 hover:bg-green-100">
-              <Check className="h-3 w-3 mr-1" /> Connected{senderFrom ? ` · ${senderFrom}` : ''}
+              <Check className="h-3 w-3 mr-1" /> Ready{senderFrom ? ` · ${senderFrom}` : ''}
             </Badge>
           ) : ready === false ? (
-            <Badge variant="secondary" className="text-amber-700 bg-amber-100 hover:bg-amber-100">
-              Not connected
+            <Badge variant="secondary">
+              Platform email
             </Badge>
           ) : null}
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
         {ready === false && (
-          <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-            Mailchimp isn&apos;t connected yet.{' '}
-            <a href="/channels/new?provider=email" className="underline font-medium">
-              Connect your Mailchimp account
+          <div className="rounded-lg border border-border bg-muted/40 p-3 text-sm text-muted-foreground">
+            Platform email sends through Antelope&apos;s Resend account. You never leave this page or
+            connect an external mailbox. Prefer{' '}
+            <a href="/outbound" className="underline font-medium text-foreground">
+              Outbound → Send email
             </a>{' '}
-            to send mass survey invites — or copy the message below and send manually.
+            for general blasts.
           </div>
         )}
 

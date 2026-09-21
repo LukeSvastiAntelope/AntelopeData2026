@@ -21,6 +21,7 @@ import {
   StagedActionCard,
   type StagedActionCardModel,
 } from '@/components/consultant/staged-action-card'
+import { OutboundEmailSendPanel } from '@/components/outbound/email-send-panel'
 import { cn } from '@/lib/utils'
 
 type CatalogItem = {
@@ -336,11 +337,21 @@ export default function OutboundPage() {
 
         <div className="p-6 space-y-6 max-w-4xl">
           <div className="space-y-3">
-            <h2 className="text-2xl font-semibold">Segment → draft → review → gated send</h2>
+            <h2 className="text-2xl font-semibold">Outbound email &amp; message tailoring</h2>
             <p className="text-muted-foreground text-sm">
-              Tailor the message from observed attributes and survey-stated positions. Who to
-              contact stays with the propensity loop. Public send uses the same Auto-Post
-              approval cards as every other outreach — never a one-shot fire.
+              Send email entirely inside Antelope (platform Resend — no external login). Optionally
+              tailor copy from a live segment first; who to email still comes from your uploaded
+              list (suppression list is honored at send).
+            </p>
+          </div>
+
+          <OutboundEmailSendPanel segmentCatalog={catalog} />
+
+          <div className="border-t border-border pt-6 space-y-3">
+            <h3 className="text-lg font-semibold">Segment drafts (review / stage)</h3>
+            <p className="text-muted-foreground text-sm">
+              Generate letter / SMS / ad drafts for a segment, then stage SMS/email at the approval
+              gate when you want the propensity loop to own who/when.
             </p>
             <ol className="flex flex-wrap gap-2">
               {STEPS.map((s) => (

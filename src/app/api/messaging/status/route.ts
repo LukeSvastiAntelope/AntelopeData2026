@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getTwilioStatus } from '@/app/utils/services/twilio';
-import { getMailchimpCreds } from '@/app/utils/services/mailchimp';
+import { isResendConfigured, EMAIL_SEND_DOMAIN } from '@/app/utils/services/email';
 
 export const runtime = 'nodejs';
 
@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ status: false, message: 'Unauthorized' }, { status: 401 });
   }
   const s = getTwilioStatus();
-  const mailchimp = await getMailchimpCreds(userId).catch(() => null);
+  const emailConfigured = isResendConfigured();
   return NextResponse.json({
     status: true,
     authConfigured: s.authConfigured,
@@ -20,7 +20,8 @@ export async function GET(request: NextRequest) {
     // Reveal only the sender numbers (public-facing), never the keys.
     smsFrom: s.smsFrom,
     whatsappFrom: s.whatsappFrom,
-    emailConfigured: !!mailchimp,
-    emailFrom: mailchimp?.fromEmail || null,
+    emailConfigured,
+    emailFrom: emailConfigured ? EMAIL_SEND_DOMAIN : null,
+    emailProvider: emailConfigured ? 'resend' : null,
   });
 }
