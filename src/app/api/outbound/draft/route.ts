@@ -7,6 +7,7 @@ import {
 } from '@/app/utils/services/outbound-draft-service';
 import type { VoterSegmentDefinition } from '@/app/utils/services/voter-segments';
 import { listSegmentCatalog } from '@/app/utils/services/voter-segments';
+import { resolveSegmentHint } from '@/app/utils/voter-segment-presets';
 
 export const runtime = 'nodejs';
 export const maxDuration = 120;
@@ -25,7 +26,7 @@ export async function GET(request: NextRequest) {
       formats: OUTBOUND_FORMATS,
       catalog,
       disclaimer:
-        'Drafts use survey-stated positions only — never invented concerns. Send is not included here.',
+        'Drafts use survey-stated positions only — never invented concerns. Send goes through the approval gate on /outbound or stage_outbound_send.',
     });
   } catch (error) {
     console.error('[outbound/draft GET]', error);
@@ -38,7 +39,7 @@ export async function GET(request: NextRequest) {
 
 /**
  * POST /api/outbound/draft
- * Body: { segmentId?, definition?, formats?, goal?, mock? }
+ * Body: { segmentId?, audience?, definition?, formats?, goal?, mock? }
  */
 export async function POST(request: NextRequest) {
   try {
@@ -48,11 +49,12 @@ export async function POST(request: NextRequest) {
     }
     const orgId = await ensurePrimaryOrgId(userId);
     const body = await request.json().catch(() => ({}));
-    const segmentId = body?.segmentId ? String(body.segmentId) : null;
+    const fromAudience = body?.audience ? resolveSegmentHint(String(body.audience)) : null;
+    const segmentId = body?.segmentId ? String(body.segmentId) : fromAudience;
     const definition = (body?.definition || undefined) as VoterSegmentDefinition | undefined;
     if (!segmentId && !definition) {
       return NextResponse.json(
-        { status: false, message: 'segmentId or definition required' },
+        { status: false, message: 'segmentId, audience, or definition required' },
         { status: 400 }
       );
     }
@@ -76,6 +78,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       status: true,
       organizationId: orgId,
+      resolvedFromAudience: fromAudience && !body?.segmentId ? fromAudience : null,
       ...result,
     });
   } catch (error) {

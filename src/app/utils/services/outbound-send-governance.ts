@@ -413,8 +413,8 @@ export async function stageOutboundDraftSend(params: {
     stagedActionId: staged.id,
   });
 
-  // Autonomy dial: propose/manual always hold; auto only when opted in
-  if (!allowFullAuto || autonomy === 'manual' || autonomy === 'propose') {
+  // Autonomy dial: hold unless fullAutoSend opted in under auto_within_limits
+  if (!allowFullAuto) {
     return {
       format,
       toolName: toolResult.tool,
