@@ -6,17 +6,29 @@ import {
   type TurfFilters,
 } from '@/app/utils/database/turf-repo';
 import { getPresetById } from '@/app/utils/voter-segment-presets';
+import {
+  isTrackedAttributePreset,
+  resolveVoterSegment,
+  type VoterSegmentDefinition,
+} from '@/app/utils/services/voter-segments';
 import type { CampaignTool } from './types';
 
 type Input = {
   segmentId?: string;
   filters?: Record<string, unknown>;
+  /** MT1: ad-hoc live definition (map + tracked attributes) */
+  definition?: VoterSegmentDefinition;
   listId?: number;
   includeAreas?: string[];
   excludeAreas?: string[];
   excludeSuppressed?: boolean;
   excludeContacted?: boolean;
   limit?: number;
+  /**
+   * Force person_records + tracked resolve (default: auto when preset/definition
+   * has tracked attrs or demographic map filters).
+   */
+  mode?: 'auto' | 'tracked' | 'turf';
 };
 
 function filtersFromAdHoc(raw: Record<string, unknown> | undefined): TurfFilters {
@@ -56,24 +68,43 @@ function filtersFromAdHoc(raw: Record<string, unknown> | undefined): TurfFilters
   };
 }
 
+function shouldUseTrackedPath(input: Input): boolean {
+  if (input.mode === 'tracked') return true;
+  if (input.mode === 'turf') return false;
+  if (input.definition && Object.keys(input.definition).length) return true;
+  if (input.segmentId && isTrackedAttributePreset(input.segmentId)) return true;
+  // Saved segments (unknown preset id) also resolve via tracked path
+  if (input.segmentId && !getPresetById(input.segmentId)) return true;
+  return false;
+}
+
 /**
- * segment_list — materialize a filtered voter/address list (G2).
- * Uses the same layered turf query as build_turf (without saving).
+ * segment_list — materialize a filtered voter list.
+ *
+ * MT1: when the segment is defined by map + tracked attributes, resolves a
+ * *live* person_records set via queryVoters (recomputed). Legacy party/turnout
+ * presets still use the turf/voter_geo spatial path.
  */
 export const segmentListTool: CampaignTool<Input> = {
   name: 'segment_list',
   description:
-    'Build a segmented voter/address list from a preset (e.g. likely-dem), ad-hoc filters, and optional geofence include/exclude. Subtracts do-not-contact by default. Returns addresses from voter_geo via the spatial turf query — does not fabricate lists.',
+    'Build a segmented voter list from a named preset/saved segment or ad-hoc filters. Tracked-attribute segments (e.g. women 35+ public-security=major) resolve live from person records + survey-stated positions — never a persuasion score. Legacy party/turnout presets still use geocoded turf queries. Subtracts DNC when requested.',
   inputSchema: {
     type: 'object',
     properties: {
       segmentId: {
         type: 'string',
-        description: 'Preset id: likely-dem, base-democrats, likely-voters, swing-voters, …',
+        description:
+          'Preset or saved segment id (e.g. women-35-homeowners-public-security, observed-donors, likely-dem)',
       },
       filters: {
         type: 'object',
-        description: 'Ad-hoc filters: party, minPartisanScore, maxTurnoutScore, zip, …',
+        description: 'Legacy turf filters: party, minPartisanScore, zip, …',
+      },
+      definition: {
+        type: 'object',
+        description:
+          'MT1 live definition: gender, minAgeYears, ownerOccupied, tracked[], hasDonated, …',
       },
       listId: {
         type: 'number',
@@ -91,6 +122,10 @@ export const segmentListTool: CampaignTool<Input> = {
       excludeSuppressed: { type: 'boolean' },
       excludeContacted: { type: 'boolean' },
       limit: { type: 'number' },
+      mode: {
+        type: 'string',
+        enum: ['auto', 'tracked', 'turf'],
+      },
     },
     additionalProperties: false,
   },
@@ -98,6 +133,88 @@ export const segmentListTool: CampaignTool<Input> = {
   async execute(input, ctx) {
     if (!ctx.organizationId) throw new Error('organizationId required in tool context');
 
+    if (shouldUseTrackedPath(input)) {
+      const def: VoterSegmentDefinition = {
+        ...(input.definition || {}),
+        includeFenceLabels: input.includeAreas ?? input.definition?.includeFenceLabels,
+        excludeFenceLabels: input.excludeAreas ?? input.definition?.excludeFenceLabels,
+        excludeSuppressed:
+          input.excludeSuppressed !== undefined
+            ? input.excludeSuppressed
+            : input.definition?.excludeSuppressed,
+        limit: input.limit ?? input.definition?.limit,
+      };
+
+      const resolved = await resolveVoterSegment({
+        organizationId: ctx.organizationId,
+        segmentId: input.segmentId,
+        definition: Object.keys(def).length ? def : undefined,
+        limit: input.limit,
+      });
+
+      const preview = resolved.people
+        .slice(0, 25)
+        .map((h) => {
+          const name =
+            [h.person.first_name, h.person.last_name].filter(Boolean).join(' ') ||
+            `person #${h.personId}`;
+          const matched = h.matchedAttributes
+            .slice(0, 2)
+            .map((a) => `${a.label}=${a.current}`)
+            .join('; ');
+          return `- ${name}${matched ? ` · ${matched}` : ''}`;
+        })
+        .join('\n');
+
+      return {
+        summary: [
+          `### Segment list (live tracked attributes)`,
+          '',
+          `- Segment: ${resolved.name} (\`${resolved.id}\`, ${resolved.source})`,
+          `- Count: ${resolved.count} (from ${resolved.candidateCount} map candidates)`,
+          `- ${resolved.disclaimer}`,
+          '',
+          preview || '_No matching person records._',
+          resolved.count > 25 ? `\n_…and ${resolved.count - 25} more_` : '',
+        ]
+          .filter(Boolean)
+          .join('\n'),
+        data: {
+          implemented: true,
+          mode: 'tracked',
+          segmentId: resolved.id,
+          segmentName: resolved.name,
+          source: resolved.source,
+          listId: input.listId ?? null,
+          count: resolved.count,
+          candidateCount: resolved.candidateCount,
+          definition: resolved.definition,
+          disclaimer: resolved.disclaimer,
+          people: resolved.people.map((h) => ({
+            personId: h.personId,
+            firstName: h.person.first_name,
+            lastName: h.person.last_name,
+            email: h.person.email,
+            phone: h.person.phone,
+            gender: h.person.gender,
+            ageYears: h.person.age_years,
+            party: h.person.canvass_party || h.person.party,
+            ownerOccupied: h.person.owner_occupied,
+            zip: h.person.zip,
+            latitude: h.person.latitude,
+            longitude: h.person.longitude,
+            matchedAttributes: h.matchedAttributes.map((a) => ({
+              key: a.key,
+              label: a.label,
+              current: a.current,
+              changeSummary: a.changeSummary,
+            })),
+          })),
+        },
+      };
+    }
+
+    // Legacy turf / voter_geo path
     const preset = input.segmentId ? getPresetById(input.segmentId) : undefined;
     const fromSegment = filtersFromSegmentId(input.segmentId);
     const filters = mergeFilters(fromSegment, filtersFromAdHoc(input.filters));
@@ -133,6 +250,7 @@ export const segmentListTool: CampaignTool<Input> = {
         .join('\n'),
       data: {
         implemented: true,
+        mode: 'turf',
         segmentId: input.segmentId ?? null,
         presetName: preset?.name ?? null,
         listId: input.listId ?? null,
