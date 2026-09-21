@@ -24,6 +24,12 @@ export { isResendConfigured, ResendEmailProvider };
 export const EMAIL_SEND_DOMAIN =
   process.env.EMAIL_SEND_DOMAIN?.trim() || 'send.antelopedata.org';
 
+/**
+ * Note: From addresses use EMAIL_SEND_DOMAIN (default send.antelopedata.org).
+ * The domain must be verified in the platform Resend account. Override via
+ * env when using a different verified domain (e.g. antelopedata.org).
+ */
+
 /** Max recipients we accept in one API call before chunking/queueing. */
 export const EMAIL_QUEUE_CHUNK = RESEND_MAX_BATCH;
 
