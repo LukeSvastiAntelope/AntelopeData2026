@@ -1479,6 +1479,9 @@ export default function DashboardMap({
       return
     }
     const handler = (e: any) => {
+      // Own the click while drawing — block other layer handlers from treating this as a select/zoom
+      e.originalEvent?.preventDefault?.()
+      e.originalEvent?.stopPropagation?.()
       geofenceVertexRef.current?.(e.lngLat.lng, e.lngLat.lat)
     }
     map.on('click', handler)
