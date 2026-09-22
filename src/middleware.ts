@@ -57,6 +57,8 @@ const publicRoutes = [
     '/api/garrys-list/answer',
     '/api/garrys-list/results',
     '/api/garrys-list/survey',
+    // Candidate website public render (Sites S2) — live-on-publish at /s/<slug>
+    '/s/:slug*',
 ]
 
 // Use an edge-safe config to create an auth middleware wrapper.
@@ -80,9 +82,11 @@ export default auth((req) => {
     });
 
     const isGetPredictionApiRoute = path.startsWith('/api/getPrediction/');
+    // Candidate campaign sites — always public (live-on-publish)
+    const isPublicSiteRoute = path === '/s' || path.startsWith('/s/');
 
     // Allow public routes
-    if (isPublicApiRoute || isGetPredictionApiRoute) {
+    if (isPublicApiRoute || isGetPredictionApiRoute || isPublicSiteRoute) {
         return NextResponse.next();
     }
 
@@ -200,6 +204,7 @@ export const config = {
         '/spread/:path*',
         '/outbound/:path*',
         '/targeting/:path*',
+        '/s/:path*',
         '/logout'
     ],
 };
