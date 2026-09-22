@@ -130,3 +130,5 @@ TWILIO_HANDOFF.md
 # Video generation job store
 .data/
 public/uploads/
+# Private upload root (StorageProvider / LocalPrivateStorage)
+var/uploads/
