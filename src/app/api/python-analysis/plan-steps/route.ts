@@ -28,6 +28,8 @@ interface StepPlanningRequest {
     question?: string;
     timestamp?: string;
   }>;
+  /** Multi-dataset tray: every named Pyodide frame currently loaded */
+  loadedFramesPrompt?: string;
 }
 
 interface AnalysisStep {
@@ -77,6 +79,9 @@ export async function POST(req: NextRequest) {
             })
             .join('\n\n')}`
         : '';
+    const multiFrames = request.loadedFramesPrompt?.trim()
+      ? `\n\n${request.loadedFramesPrompt.trim()}`
+      : '';
     
     const systemPrompt = `You are an expert data analysis strategist. Your job is to create a dynamic, adaptive analysis plan.
 
@@ -88,6 +93,7 @@ ANALYSIS CONTEXT:
 - Codebook available: ${request.datasetInfo.codebook_mappings ? 'YES - Question text and value labels available' : 'NO - Raw data only'}
 ${richBundle}
 ${historyExtra}
+${multiFrames}
 
 ${grainBlock}
 

@@ -48,6 +48,8 @@ interface AnalysisContext {
     question?: string;
     timestamp?: string;
   }>;
+  /** Multi-dataset: prompt block describing every named Pyodide frame */
+  loaded_frames_prompt?: string;
 }
 
 interface AgentState {
@@ -78,6 +80,7 @@ export function useAnalysisAgent() {
     extras?: {
       analyticsContextPrompt?: string;
       priorHistory?: AnalysisContext['prior_history'];
+      loadedFramesPrompt?: string;
     }
   ) => {
     const sessionId = `session-${Date.now()}`;
@@ -100,6 +103,7 @@ export function useAnalysisAgent() {
         gaps_identified: [],
         analytics_context_prompt: extras?.analyticsContextPrompt,
         prior_history: extras?.priorHistory,
+        loaded_frames_prompt: extras?.loadedFramesPrompt,
       },
       error_count: 0,
       start_time: new Date(),
@@ -148,6 +152,7 @@ export function useAnalysisAgent() {
           currentFindings: state.context.key_findings,
           analyticsContextPrompt: state.context.analytics_context_prompt,
           analysisHistory,
+          loadedFramesPrompt: state.context.loaded_frames_prompt,
         })
       });
 

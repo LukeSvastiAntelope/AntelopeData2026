@@ -57,7 +57,8 @@ export function useAnalysisContext() {
     error: null
   });
 
-  const loadDataset = useCallback(async (file: File): Promise<Dataset> => {
+  /** Parse a file into a Dataset without replacing currentDataset (multi-frame tray). */
+  const parseDatasetFile = useCallback(async (file: File): Promise<Dataset> => {
     try {
       const ext = '.' + (file.name.split('.').pop() || '').toLowerCase();
 
@@ -224,30 +225,46 @@ export function useAnalysisContext() {
         }
       }
 
+      console.log('Dataset parsed:', dataset);
+      return dataset;
+    } catch (error) {
+      console.error('Failed to parse dataset:', error);
+      throw error;
+    }
+  }, []);
+
+  const loadDataset = useCallback(async (file: File): Promise<Dataset> => {
+    try {
+      const dataset = await parseDatasetFile(file);
       setCurrentDataset(dataset);
-      
-      // Reset execution state
       setExecutionState({
         currentCode: '',
         results: [],
         isExecuting: false,
         error: null
       });
-
       console.log('Dataset loaded:', dataset);
-      return dataset; // Return the loaded dataset
+      return dataset;
     } catch (error) {
       console.error('Failed to load dataset:', error);
       setExecutionState(prev => ({
         ...prev,
         error: `Failed to load dataset: ${error}`
       }));
-      throw error; // Re-throw the error so caller can handle it
+      throw error;
     }
+  }, [parseDatasetFile]);
+
+  const setDataset = useCallback((dataset: Dataset | null) => {
+    setCurrentDataset(dataset);
   }, []);
 
-  const executeCode = useCallback(async (code: string, pyodide: any) => {
-    if (!currentDataset) {
+  const executeCode = useCallback(async (
+    code: string,
+    pyodide: any,
+    frames?: import('../utils/named-datasets').AnalysisFrame[]
+  ) => {
+    if (!currentDataset && !(frames && frames.length)) {
       setExecutionState(prev => ({
         ...prev,
         error: 'No dataset loaded'
@@ -263,27 +280,25 @@ export function useAnalysisContext() {
         currentCode: code
       }));
 
-      // Load data into Python if not already loaded
-      if (!pyodide.globals.get('df')) {
+      // Multi-frame path: load all named dataframes (primary → df)
+      if (frames && frames.length > 0) {
+        const { loadNamedFramesIntoPyodide } = await import('../utils/named-datasets');
+        loadNamedFramesIntoPyodide(pyodide, frames);
+      } else if (!pyodide.globals.get('df') && currentDataset) {
         const dataJson = JSON.stringify({
           columns: currentDataset.columns,
           data: currentDataset.data
         });
-        
+        pyodide.globals.set('__antelope_data_json__', dataJson);
         pyodide.runPython(`
           import json
           import pandas as pd
-          
-          # Load the dataset
-          data_json = '''${dataJson}'''
-          data_dict = json.loads(data_json)
+          data_dict = json.loads(__antelope_data_json__)
           df = pd.DataFrame(data_dict['data'], columns=data_dict['columns'])
-          
-          # Try to convert numeric columns
           for col in df.columns:
             try:
               df[col] = pd.to_numeric(df[col])
-            except:
+            except Exception:
               pass
         `);
       }
@@ -672,6 +687,8 @@ print("\\nSuggestion: Try a simpler question or check if the variables exist in 
     analysisHistory,
     executionState,
     loadDataset,
+    parseDatasetFile,
+    setDataset,
     executeCode,
     addAnalysis,
     applyCodebook,

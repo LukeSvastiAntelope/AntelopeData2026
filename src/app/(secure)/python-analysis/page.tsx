@@ -1,18 +1,35 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
-import { Upload, MessageCircle, Code, PlayCircle, Plus, Download, Save } from 'lucide-react';
+import { Upload, MessageCircle, Code, PlayCircle, Plus, Download, Save, FileText } from 'lucide-react';
 import { FileUpload } from './components/FileUpload';
 import { ConversationView } from './components/ConversationView';
 import { ChatInput } from './components/ChatInput';
 import { SurveyLoader } from './components/SurveyLoader';
 import { CodebookUpload } from './components/CodebookUpload';
+import { DatasetTray } from './components/DatasetTray';
+import { AnalysisGeoMap } from './components/AnalysisGeoMap';
 import { usePyodide } from './hooks/usePyodide';
 import { useAnalysisContext } from './hooks/useAnalysisContext';
 import { useAnalysisAgent } from './hooks/useAnalysisAgent';
 import { packagePythonAnalysisRun } from '@/app/utils/services/python-analysis-report';
+import {
+  type AnalysisFrame,
+  type DatasetSourceCatalogItem,
+  suggestFrameName,
+  loadNamedFramesIntoPyodide,
+  formatLoadedFramesForPrompt,
+} from './utils/named-datasets';
+import {
+  captureAllRegisteredMaps,
+  figuresToPackagedMaps,
+} from './utils/capture-map';
+import {
+  exportCombinedReportPdf,
+  type ExportableFigure,
+} from './utils/export-pdf';
 import toast from 'react-hot-toast';
 import Link from 'next/link';
 
@@ -59,6 +76,8 @@ export default function PythonAnalysisPage() {
   const [savingReport, setSavingReport] = useState(false);
   const [lastSavedReportId, setLastSavedReportId] = useState<string | null>(null);
   const [analyticsContextPrompt, setAnalyticsContextPrompt] = useState<string | null>(null);
+  const [analysisFrames, setAnalysisFrames] = useState<AnalysisFrame[]>([]);
+  const [localUploadSources, setLocalUploadSources] = useState<DatasetSourceCatalogItem[]>([]);
   const processedStepsRef = useRef<Set<string>>(new Set());
   const lastStatusRef = useRef<string>('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -69,6 +88,8 @@ export default function PythonAnalysisPage() {
     analysisHistory, 
     executionState,
     loadDataset,
+    parseDatasetFile,
+    setDataset,
     executeCode,
     addAnalysis,
     applyCodebook,
@@ -82,6 +103,29 @@ export default function PythonAnalysisPage() {
     pauseAgent,
     resumeAgent
   } = useAnalysisAgent();
+
+  const surveyIdForTray = (() => {
+    const fromFrame = analysisFrames.find((f) => f.surveyId)?.surveyId;
+    if (fromFrame) return fromFrame;
+    const sid = currentDataset ? (currentDataset as any).surveyId : null;
+    return sid != null ? Number(sid) : null;
+  })();
+
+  const handleFramesChange = useCallback(
+    (frames: AnalysisFrame[]) => {
+      setAnalysisFrames(frames);
+      const primary = frames.find((f) => f.isPrimary) || frames[0] || null;
+      setDataset(primary?.dataset ?? null);
+      if (pyodide && frames.length) {
+        try {
+          loadNamedFramesIntoPyodide(pyodide, frames);
+        } catch (e) {
+          console.warn('[python-analysis] multi-frame load failed:', e);
+        }
+      }
+    },
+    [pyodide, setDataset]
+  );
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -183,6 +227,9 @@ __antelope_csv
     }
     setSavingReport(true);
     try {
+      const mapFigures = await captureAllRegisteredMaps();
+      const packagedMaps = figuresToPackagedMaps(mapFigures);
+
       const packaged = packagePythonAnalysisRun({
         sessionId: agentState.session_id,
         question: agentState.context.question,
@@ -211,7 +258,7 @@ __antelope_csv
           agentState.start_time instanceof Date
             ? agentState.start_time.getTime()
             : new Date(agentState.start_time).getTime(),
-        maps: [],
+        maps: packagedMaps,
       });
 
       const res = await fetch('/api/reports/save', {
@@ -230,7 +277,7 @@ __antelope_csv
         {
           id: `report-saved-${Date.now()}`,
           type: 'system',
-          content: `💾 **Saved as Report** — [Open report](/reports/${data.reportId})\n\nSynthesis, figures, dataset metadata, and significance floors (N≥80 / cell≥25) were persisted.`,
+          content: `💾 **Saved as Report** — [Open report](/reports/${data.reportId})\n\nSynthesis, figures${packagedMaps.length ? `, ${packagedMaps.length} map(s)` : ''}, dataset metadata, and significance floors (N≥80 / cell≥25) were persisted.`,
           timestamp: new Date(),
         },
       ]);
@@ -247,6 +294,55 @@ __antelope_csv
       ]);
     } finally {
       setSavingReport(false);
+    }
+  };
+
+  /** Combined PDF: narrative + chart plots + map canvas captures */
+  const handleExportCombinedPdf = async () => {
+    setExporting(true);
+    try {
+      const chartFigures: ExportableFigure[] = [];
+      if (agentState?.executed_steps) {
+        for (const step of agentState.executed_steps) {
+          const plots = (step as { plots?: string[] }).plots || [];
+          plots.forEach((png, i) => {
+            if (!png) return;
+            chartFigures.push({
+              pngBase64: png,
+              label: step.step?.description
+                ? `${step.step.description}${plots.length > 1 ? ` (${i + 1})` : ''}`
+                : `Chart ${chartFigures.length + 1}`,
+              kind: 'chart',
+            });
+          });
+        }
+      }
+      const mapFigures = await captureAllRegisteredMaps();
+      const all = [...chartFigures, ...mapFigures];
+      if (!all.length) {
+        toast.error('No charts or maps to export yet.');
+        return;
+      }
+      const synthesis =
+        agentState?.context.key_findings
+          .find((f) => f.startsWith('FINAL SYNTHESIS:'))
+          ?.replace(/^FINAL SYNTHESIS:\s*/, '') ||
+        agentState?.context.key_findings.slice(0, 5).join('\n') ||
+        messages
+          .filter((m) => m.type === 'assistant')
+          .slice(-3)
+          .map((m) => m.content)
+          .join('\n\n')
+          .slice(0, 6000) ||
+        'Python analysis report';
+      await exportCombinedReportPdf(all, synthesis);
+      toast.success(
+        `Exported PDF (${chartFigures.length} chart${chartFigures.length === 1 ? '' : 's'}, ${mapFigures.length} map${mapFigures.length === 1 ? '' : 's'})`
+      );
+    } catch (e: any) {
+      toast.error(e?.message || 'PDF export failed');
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -268,6 +364,31 @@ __antelope_csv
       const loadedDataset = await loadDataset(file);
       // CSV/file uploads are not survey-backed — clear rich campaign bundle
       setAnalyticsContextPrompt(null);
+
+      const uploadId = `upload-${Date.now()}`;
+      const frameName = suggestFrameName('upload', {
+        existingNames: analysisFrames.map((f) => f.frameName),
+      });
+      const uploadSource: DatasetSourceCatalogItem = {
+        id: uploadId,
+        kind: 'upload',
+        label: file.name,
+        subtitle: 'Local upload',
+        rowEstimate: loadedDataset.shape?.[0],
+        localDataset: loadedDataset,
+      };
+      setLocalUploadSources((prev) => [...prev, uploadSource]);
+      handleFramesChange([
+        ...analysisFrames.filter((f) => f.id !== uploadId),
+        {
+          id: uploadId,
+          kind: 'upload',
+          label: file.name,
+          frameName,
+          dataset: loadedDataset,
+          isPrimary: analysisFrames.length === 0,
+        },
+      ]);
 
       // Add success message with dataset info using the returned dataset
       let codebookSuggestion = '';
@@ -456,6 +577,27 @@ __antelope_csv
           console.warn('[python-analysis] analytics-context fetch failed:', ctxErr);
           setAnalyticsContextPrompt(null);
         }
+
+        const sid = Number(surveyData.surveyId);
+        const frameId = `survey-${sid}`;
+        const frameName = suggestFrameName('survey', {
+          surveyId: sid,
+          existingNames: analysisFrames.map((f) => f.frameName),
+        });
+        handleFramesChange([
+          ...analysisFrames
+            .filter((f) => f.id !== frameId)
+            .map((f) => ({ ...f, isPrimary: false })),
+          {
+            id: frameId,
+            kind: 'survey',
+            label: surveyData.name || `Survey #${sid}`,
+            frameName,
+            dataset: loadedDataset,
+            surveyId: sid,
+            isPrimary: true,
+          },
+        ]);
       } else {
         setAnalyticsContextPrompt(null);
       }
@@ -513,19 +655,41 @@ __antelope_csv
         question: h.query,
         timestamp: h.timestamp instanceof Date ? h.timestamp.toISOString() : String(h.timestamp || ''),
       }));
+      const framesForRun =
+        analysisFrames.length > 0
+          ? analysisFrames
+          : currentDataset
+            ? [
+                {
+                  id: 'primary',
+                  kind: 'upload' as const,
+                  label: currentDataset.name,
+                  frameName: 'df',
+                  dataset: currentDataset,
+                  isPrimary: true,
+                },
+              ]
+            : [];
+      if (pyodide && framesForRun.length) {
+        loadNamedFramesIntoPyodide(pyodide, framesForRun);
+      }
+      const loadedFramesPrompt = formatLoadedFramesForPrompt(framesForRun);
+      const primaryDs =
+        framesForRun.find((f) => f.isPrimary)?.dataset || currentDataset!;
       const { sessionId, initialState } = await initializeAgent(
         question,
         {
-          columns: currentDataset.columns,
-          types: currentDataset.dtypes,
+          columns: primaryDs.columns,
+          types: primaryDs.dtypes,
           // Keep full frame for Pyodide; plan/code routes slice head for the model
-          sample_data: currentDataset.data,
-          row_count: currentDataset.shape?.[0] ?? currentDataset.data?.length,
-          codebook_mappings: currentDataset.codebookMappings,
+          sample_data: primaryDs.data,
+          row_count: primaryDs.shape?.[0] ?? primaryDs.data?.length,
+          codebook_mappings: primaryDs.codebookMappings,
         },
         {
           analyticsContextPrompt: analyticsContextPrompt || undefined,
           priorHistory,
+          loadedFramesPrompt: loadedFramesPrompt || undefined,
         }
       );
       console.log('✅ Agent initialized with session:', sessionId);
@@ -965,6 +1129,16 @@ __antelope_csv
                     <Button
                       size="sm"
                       variant="outline"
+                      onClick={() => void handleExportCombinedPdf()}
+                      disabled={exporting}
+                      title="Narrative + charts + maps"
+                    >
+                      <FileText className="h-4 w-4 mr-2" />
+                      {exporting ? 'Exporting…' : 'Export PDF'}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
                       onClick={handleSaveAsReport}
                       disabled={agentState?.status !== 'completed' || savingReport}
                       title={
@@ -1009,12 +1183,12 @@ __antelope_csv
                     <p>{pyodideError}</p>
                   </div>
                 </div>
-              ) : !currentDataset ? (
-                <div className="flex-1 flex items-center justify-center">
+              ) : !currentDataset && analysisFrames.length === 0 ? (
+                <div className="flex-1 flex flex-col items-center justify-center gap-4 px-2">
                   <div className="text-center space-y-4 max-w-lg">
                     <h2 className="text-xl font-semibold">Upload your data</h2>
                     <p className="text-muted-foreground text-sm">
-                      CSV file or database survey for Python analysis
+                      CSV or survey first — then drag voter file / prior surveys into the tray
                     </p>
                     
                     <div className="grid grid-rows-2 gap-4">
@@ -1036,9 +1210,37 @@ __antelope_csv
                       </div>
                     )}
                   </div>
+                  <div className="w-full max-w-4xl">
+                    <DatasetTray
+                      surveyId={surveyIdForTray}
+                      localUploads={localUploadSources}
+                      analysisFrames={analysisFrames}
+                      onFramesChange={handleFramesChange}
+                      parseFile={parseDatasetFile}
+                      disabled={pyodideLoading || !pyodide || agentRunning}
+                    />
+                  </div>
                 </div>
               ) : (
                 <>
+                  <DatasetTray
+                    surveyId={surveyIdForTray}
+                    localUploads={localUploadSources}
+                    analysisFrames={analysisFrames}
+                    onFramesChange={handleFramesChange}
+                    parseFile={parseDatasetFile}
+                    disabled={pyodideLoading || !pyodide || agentRunning}
+                  />
+
+                  <AnalysisGeoMap
+                    surveyId={surveyIdForTray}
+                    label={
+                      surveyIdForTray
+                        ? 'Survey geography map'
+                        : 'Campaign geography map'
+                    }
+                  />
+
                   {/* Agent Control Panel */}
                   {currentDataset && pyodide && (
                     <div className="mx-6 mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
