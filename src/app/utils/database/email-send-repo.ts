@@ -71,6 +71,7 @@ export async function ensureEmailTables(): Promise<void> {
           last_event_at TIMESTAMP NULL,
           created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
           updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          UNIQUE KEY uq_email_rcpt_send_email (send_id, email),
           KEY idx_email_rcpt_send (send_id),
           KEY idx_email_rcpt_user (user_id, created_at),
           KEY idx_email_rcpt_provider (provider_message_id),
@@ -268,10 +269,18 @@ export const EmailSendRepo = {
   }): Promise<number> {
     await ensureEmailTables();
     const db = await openSql();
+    // Idempotent on UNIQUE (send_id, email). LAST_INSERT_ID(id) returns the
+    // existing row id on update so callers always get a usable recipient id.
     const [result] = await db.execute<ResultSetHeader>(
       `INSERT INTO email_send_recipients
          (send_id, user_id, organization_id, email, provider_message_id, status, unsub_token_hash, last_event_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+       ON DUPLICATE KEY UPDATE
+         id = LAST_INSERT_ID(id),
+         provider_message_id = COALESCE(VALUES(provider_message_id), provider_message_id),
+         status = VALUES(status),
+         unsub_token_hash = VALUES(unsub_token_hash),
+         last_event_at = CURRENT_TIMESTAMP`,
       [
         params.sendId,
         params.userId,
@@ -283,6 +292,69 @@ export const EmailSendRepo = {
       ]
     );
     return Number(result.insertId);
+  },
+
+  /**
+   * Emails already accepted by the provider for this send (skip on resume).
+   */
+  async loadSentEmails(sendId: number): Promise<Set<string>> {
+    await ensureEmailTables();
+    const db = await openSql();
+    const [rows] = await db.execute<RowDataPacket[]>(
+      `SELECT email FROM email_send_recipients
+       WHERE send_id = ?
+         AND status IN ('sent', 'queued')`,
+      [sendId]
+    );
+    return new Set(rows.map((r) => String(r.email).toLowerCase()));
+  },
+
+  /**
+   * Load a send only when it belongs to this user + org (resume guard).
+   */
+  async getOwnedSend(
+    sendId: number,
+    userId: number,
+    organizationId: number
+  ): Promise<{
+    id: number;
+    userId: number;
+    organizationId: number;
+    subject: string;
+    fromAddress: string;
+    provider: string;
+    receiptId: string | null;
+    summary: Record<string, unknown>;
+    createdAt: string;
+  } | null> {
+    await ensureEmailTables();
+    const db = await openSql();
+    const [rows] = await db.execute<RowDataPacket[]>(
+      `SELECT id, user_id, organization_id, subject, from_address, provider,
+              receipt_id, summary_json, created_at
+       FROM email_sends
+       WHERE id = ? AND user_id = ? AND organization_id = ?
+       LIMIT 1`,
+      [sendId, userId, organizationId]
+    );
+    const row = rows[0];
+    if (!row) return null;
+    return {
+      id: Number(row.id),
+      userId: Number(row.user_id),
+      organizationId: Number(row.organization_id),
+      subject: String(row.subject),
+      fromAddress: String(row.from_address),
+      provider: String(row.provider),
+      receiptId: row.receipt_id != null ? String(row.receipt_id) : null,
+      summary:
+        typeof row.summary_json === 'string'
+          ? JSON.parse(row.summary_json)
+          : (row.summary_json as Record<string, unknown>) || {},
+      createdAt: row.created_at
+        ? new Date(row.created_at).toISOString()
+        : new Date().toISOString(),
+    };
   },
 
   async updateRecipientByProviderId(params: {
