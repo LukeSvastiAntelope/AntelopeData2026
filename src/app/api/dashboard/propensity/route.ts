@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireUserId } from '@/app/utils/auth/require-user';
 import { PropensityRepo } from '@/app/utils/database/propensity-repo';
 import { ensurePrimaryOrgId } from '@/app/api/dashboard/persons/org';
 import type { PropensityTier } from '@/app/utils/propensity/config';
@@ -24,10 +25,9 @@ function parseTiers(v: string | null): PropensityTier[] | undefined {
 /** GET /api/dashboard/propensity — funnel + who-to-work + optional tier list. */
 export async function GET(request: NextRequest) {
   try {
-    const userId = request.headers.get('x-user-id');
-    if (!userId) {
-      return NextResponse.json({ status: false, message: 'Unauthorized' }, { status: 401 });
-    }
+    const auth = requireUserId(request);
+    if (typeof auth !== 'string') return auth;
+    const userId = Number(auth);
     const orgId = await ensurePrimaryOrgId(userId);
     const sp = request.nextUrl.searchParams;
     const tier = parseTiers(sp.get('tier'));
@@ -79,10 +79,9 @@ export async function GET(request: NextRequest) {
 /** POST /api/dashboard/propensity — refresh materialized view for org (or one person). */
 export async function POST(request: NextRequest) {
   try {
-    const userId = request.headers.get('x-user-id');
-    if (!userId) {
-      return NextResponse.json({ status: false, message: 'Unauthorized' }, { status: 401 });
-    }
+    const auth = requireUserId(request);
+    if (typeof auth !== 'string') return auth;
+    const userId = Number(auth);
     const orgId = await ensurePrimaryOrgId(userId);
     const body = await request.json().catch(() => ({}));
 

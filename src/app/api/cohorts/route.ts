@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireUserId } from '@/app/utils/auth/require-user';
 import { CohortRepo } from "@/app/utils/database/cohort-repo";
 import { UserRepo } from "@/app/utils/database/user-repo";
 
@@ -6,8 +7,9 @@ import { UserRepo } from "@/app/utils/database/user-repo";
 export async function GET(req: NextRequest) {
   try {
     // Middleware is expected to set these headers
-    const userIdHeader = req.headers.get("x-user-id");
-    const userId = userIdHeader ? parseInt(userIdHeader, 10) : null;
+    const auth = requireUserId(req);
+    if (typeof auth !== 'string') return auth;
+    const userId = parseInt(auth, 10);
 
     if (!userId) {
       return NextResponse.json({ status: false, message: "Unauthorized" }, { status: 401 });
@@ -39,8 +41,8 @@ export async function POST(req: NextRequest) {
     }
 
     // In a real secure route we'd read from JWT; for now allow header override or default user 1
-    const userIdHeader = req.headers.get('x-user-id');
-    const createdBy = userIdHeader ? parseInt(userIdHeader, 10) : 1;
+    const auth = requireUserId(req);
+    const createdBy = typeof auth === 'string' ? parseInt(auth, 10) : 1;
 
     const id = await CohortRepo.createCohort({ name, description, filter, visibility, createdBy, surveyId });
 

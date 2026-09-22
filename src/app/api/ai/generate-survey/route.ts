@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireUserId } from '@/app/utils/auth/require-user';
 import OpenAI from 'openai';
 import Anthropic from '@anthropic-ai/sdk';
 import { GPT_MODELS } from '@/app/utils/const';
@@ -273,7 +274,11 @@ export async function POST(req: NextRequest) {
     console.log('Generating survey using AI...');
     const requestId = getRequestId();
     try {
-        let userId = req.headers.get('x-user-id')?.trim() || '';
+        let userId = '';
+        {
+            const authResult = requireUserId(req);
+            if (typeof authResult === 'string') userId = authResult;
+        }
         if (!userId) {
             const session = await auth();
             const sid = session?.user && 'id' in session.user ? (session.user as { id?: string }).id : undefined;

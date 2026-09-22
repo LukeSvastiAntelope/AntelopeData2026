@@ -1,15 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { requireUserId } from '@/app/utils/auth/require-user';
 import { openSql as getMySQLConnection } from '@/app/utils/database/db'
 import { RowDataPacket } from 'mysql2/promise'
 
 export async function GET(request: NextRequest) {
   try {
     // Get user ID from the request (set by middleware)
-    const userId = request.headers.get('x-user-id')
-    
-    if (!userId) {
-      return NextResponse.json({ error: 'User not authenticated' }, { status: 401 })
-    }
+    const auth = requireUserId(request)
+    if (typeof auth !== 'string') return auth
+    const userId = auth
 
     const db = await getMySQLConnection()
     

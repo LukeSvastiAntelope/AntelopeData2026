@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireUserId } from '@/app/utils/auth/require-user';
 import { SurveyRepo } from "@/app/utils/database/survey-repo";
 
 // POST /api/surveys/[id]/campaign - Manage survey campaign status
@@ -17,12 +18,9 @@ export async function POST(
         }
 
         // Get user ID from headers (set by middleware)
-        const userId = req.headers.get('x-user-id');
-        if (!userId) {
-            return NextResponse.json({ 
-                error: 'Unauthorized' 
-            }, { status: 401 });
-        }
+        const auth = requireUserId(req);
+    if (typeof auth !== 'string') return auth;
+    const userId = Number(auth);
 
         const body = await req.json();
         const { action, reason, campaignStartAt, campaignEndAt } = body;
@@ -98,12 +96,9 @@ export async function GET(
         }
 
         // Get user ID from headers (set by middleware)
-        const userId = req.headers.get('x-user-id');
-        if (!userId) {
-            return NextResponse.json({ 
-                error: 'Unauthorized' 
-            }, { status: 401 });
-        }
+        const auth = requireUserId(req);
+    if (typeof auth !== 'string') return auth;
+    const userId = Number(auth);
 
         // Get survey with campaign details
         const campaign = await SurveyRepo.getCampaignStatus(surveyId, parseInt(userId));

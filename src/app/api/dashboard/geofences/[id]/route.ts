@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireUserId } from '@/app/utils/auth/require-user';
 import { GeofenceRepo, addressesInFence } from '@/app/utils/database/geo-repo';
 import { ensurePrimaryOrgId } from '@/app/api/dashboard/persons/org';
 
@@ -10,10 +11,9 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const userId = request.headers.get('x-user-id');
-    if (!userId) {
-      return NextResponse.json({ status: false, message: 'Unauthorized' }, { status: 401 });
-    }
+    const auth = requireUserId(request);
+    if (typeof auth !== 'string') return auth;
+    const userId = Number(auth);
     const orgId = await ensurePrimaryOrgId(userId);
     const { id: idRaw } = await params;
     const id = Number(idRaw);
@@ -53,10 +53,9 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const userId = request.headers.get('x-user-id');
-    if (!userId) {
-      return NextResponse.json({ status: false, message: 'Unauthorized' }, { status: 401 });
-    }
+    const auth = requireUserId(request);
+    if (typeof auth !== 'string') return auth;
+    const userId = Number(auth);
     const orgId = await ensurePrimaryOrgId(userId);
     const { id: idRaw } = await params;
     const id = Number(idRaw);
@@ -99,10 +98,9 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const userId = _request.headers.get('x-user-id');
-    if (!userId) {
-      return NextResponse.json({ status: false, message: 'Unauthorized' }, { status: 401 });
-    }
+    const auth = requireUserId(_request);
+    if (typeof auth !== 'string') return auth;
+    const userId = Number(auth);
     const orgId = await ensurePrimaryOrgId(userId);
     const { id: idRaw } = await params;
     const id = Number(idRaw);

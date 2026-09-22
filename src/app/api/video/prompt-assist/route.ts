@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireUserId } from '@/app/utils/auth/require-user';
 import { auth } from '@/auth';
 import {
   assistVideoPrompt,
@@ -16,8 +17,8 @@ async function resolveUserId(req: NextRequest): Promise<number | null> {
   if (session?.user?.id && Number.isFinite(Number(session.user.id))) {
     return Number(session.user.id);
   }
-  const header = req.headers.get('x-user-id');
-  if (header && Number.isFinite(Number(header))) return Number(header);
+  const authResult = requireUserId(req);
+  if (typeof authResult === 'string' && Number.isFinite(Number(authResult))) return Number(authResult);
   return null;
 }
 

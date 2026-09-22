@@ -1,17 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireUserId } from '@/app/utils/auth/require-user';
 import { DigitalTwinService } from "@/app/utils/services/digital-twin-service";
 
 // POST /api/digital-twins/search - Find similar digital twins
 export async function POST(req: NextRequest) {
     try {
         // CRITICAL SECURITY: Get user ID from middleware to ensure user can only access their own digital twins
-        const userId = req.headers.get('x-user-id');
-        if (!userId) {
-            return NextResponse.json({ 
-                status: false, 
-                message: 'Authentication required' 
-            }, { status: 401 });
-        }
+        const auth = requireUserId(req);
+    if (typeof auth !== 'string') return auth;
+    const userId = Number(auth);
 
         console.log('🔍 Digital twins search - User ID:', userId);
 

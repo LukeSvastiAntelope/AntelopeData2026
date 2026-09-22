@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireUserId } from '@/app/utils/auth/require-user';
 import { getConnection } from '../../../../utils/database/db';
 
 /**
@@ -13,11 +14,9 @@ export async function POST(
 ) {
   try {
     const { id: orgId } = await params;
-    const userId = request.headers.get('x-user-id');
-
-    if (!userId) {
-      return NextResponse.json({ status: false, message: 'Unauthorized' }, { status: 401 });
-    }
+    const auth = requireUserId(request);
+    if (typeof auth !== 'string') return auth;
+    const userId = Number(auth);
 
     const db = await getConnection();
 
@@ -112,11 +111,9 @@ export async function PATCH(
 ) {
   try {
     const { id: orgId } = await params;
-    const currentUserId = request.headers.get('x-user-id');
-
-    if (!currentUserId) {
-      return NextResponse.json({ status: false, message: 'Unauthorized' }, { status: 401 });
-    }
+    const auth = requireUserId(request);
+    if (typeof auth !== 'string') return auth;
+    const currentUserId = auth;
 
     const db = await getConnection();
 

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireUserId } from '@/app/utils/auth/require-user';
 import { SurveyRepo } from "@/app/utils/database/survey-repo";
 import { openSql as getMySQLConnection } from "@/app/utils/database/db";
 import { DigitalTwinService } from "@/app/utils/services/digital-twin-service";
@@ -10,10 +11,9 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const userId = req.headers.get('x-user-id');
-    if (!userId) {
-      return NextResponse.json({ status: false, message: 'Authentication required' }, { status: 401 });
-    }
+    const auth = requireUserId(req);
+    if (typeof auth !== 'string') return auth;
+    const userId = Number(auth);
 
     const { id } = await params;
     const surveyId = parseInt(id, 10);

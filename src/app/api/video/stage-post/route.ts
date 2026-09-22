@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireUserId } from '@/app/utils/auth/require-user';
 import { auth } from '@/auth';
 import { ConsultantRepo } from '@/app/utils/database/consultant-repo';
 import { executeTool } from '@/app/utils/services/tools/executor';
@@ -17,8 +18,8 @@ export async function POST(req: NextRequest) {
     const session = await auth();
     let userId = session?.user?.id ? Number(session.user.id) : NaN;
     if (!Number.isFinite(userId)) {
-      const header = req.headers.get('x-user-id');
-      userId = header ? Number(header) : NaN;
+      const authResult = requireUserId(req);
+      userId = typeof authResult === 'string' ? Number(authResult) : NaN;
     }
     if (!Number.isFinite(userId) || userId <= 0) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

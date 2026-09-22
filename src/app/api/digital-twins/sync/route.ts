@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireUserId } from '@/app/utils/auth/require-user';
 import { openSql as getMySQLConnection } from '@/app/utils/database/db';
 import { DigitalTwinService } from "@/app/utils/services/digital-twin-service";
 import { RowDataPacket } from 'mysql2/promise';
@@ -7,13 +8,14 @@ import { RowDataPacket } from 'mysql2/promise';
 export async function POST(req: NextRequest) {
     try {
         // Get user info from middleware
-        const userId = req.headers.get('x-user-id');
+        const auth = requireUserId(req);
         const userRole = req.headers.get('x-user-role');
         
         // Only allow admin users to run sync
-        if (!userId || userRole !== 'admin') {
+        if (typeof auth !== 'string' || userRole !== 'admin') {
             return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
         }
+        const userId = auth;
         
         console.log('🔄 Starting digital twins sync process...');
         
@@ -139,13 +141,14 @@ export async function POST(req: NextRequest) {
 export async function GET(req: NextRequest) {
     try {
         // Get user info from middleware
-        const userId = req.headers.get('x-user-id');
+        const auth = requireUserId(req);
         const userRole = req.headers.get('x-user-role');
         
         // Only allow admin users to check sync status
-        if (!userId || userRole !== 'admin') {
+        if (typeof auth !== 'string' || userRole !== 'admin') {
             return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
         }
+        const userId = auth;
         
         const db = await getMySQLConnection();
         

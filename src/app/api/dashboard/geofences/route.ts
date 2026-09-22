@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireUserId } from '@/app/utils/auth/require-user';
 import { GeofenceRepo } from '@/app/utils/database/geo-repo';
 import { ensurePrimaryOrgId } from '@/app/api/dashboard/persons/org';
 import type { GeofencePurpose, GeofenceType } from '@/app/utils/database/geo-repo';
@@ -8,10 +9,9 @@ export const runtime = 'nodejs';
 /** GET /api/dashboard/geofences — list saved fences for the campaign org. */
 export async function GET(request: NextRequest) {
   try {
-    const userId = request.headers.get('x-user-id');
-    if (!userId) {
-      return NextResponse.json({ status: false, message: 'Unauthorized' }, { status: 401 });
-    }
+    const auth = requireUserId(request);
+    if (typeof auth !== 'string') return auth;
+    const userId = Number(auth);
     const orgId = await ensurePrimaryOrgId(userId);
     const fences = await GeofenceRepo.list(orgId);
     return NextResponse.json({ status: true, organizationId: orgId, fences });
@@ -31,10 +31,9 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
-    const userId = request.headers.get('x-user-id');
-    if (!userId) {
-      return NextResponse.json({ status: false, message: 'Unauthorized' }, { status: 401 });
-    }
+    const auth = requireUserId(request);
+    if (typeof auth !== 'string') return auth;
+    const userId = Number(auth);
     const orgId = await ensurePrimaryOrgId(userId);
     const body = await request.json();
     const label = String(body.label || '').trim();

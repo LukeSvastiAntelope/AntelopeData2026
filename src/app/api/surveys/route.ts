@@ -1,14 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireUserId } from '@/app/utils/auth/require-user';
 import { SurveyRepo } from "@/app/utils/database/survey-repo";
 import { verifyConfirmationToken } from "@/app/utils/api/token";
 
 // GET /api/surveys - surveys created by current user + featured examples
 export async function GET(req: NextRequest) {
-  const userIdHeader = req.headers.get('x-user-id');
-  if (!userIdHeader) {
-    return NextResponse.json({ status:false, message:'Unauthorized' }, { status:401 });
-  }
-  const userId = Number(userIdHeader);
+  const auth = requireUserId(req);
+  if (typeof auth !== 'string') return auth;
+  const userId = Number(auth);
   console.log('Fetching surveys for user ID:', userId);
   
   try {
@@ -140,13 +139,9 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
     try {
         // Get user ID from the request (set by middleware)
-        const userId = req.headers.get('x-user-id');
-        
-        if (!userId) {
-            return NextResponse.json({ 
-                error: 'User not authenticated' 
-            }, { status: 401 });
-        }
+        const auth = requireUserId(req);
+        if (typeof auth !== 'string') return auth;
+        const userId = Number(auth);
 
         const body = await req.json();
         

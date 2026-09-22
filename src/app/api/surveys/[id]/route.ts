@@ -1,16 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireUserId } from '@/app/utils/auth/require-user';
 import { SurveyRepo } from "@/app/utils/database/survey-repo";
 
 // GET /api/surveys/[id] - Get specific survey by ID
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
-        const userId = req.headers.get('x-user-id');
-        
-        if (!userId) {
-            return NextResponse.json({ 
-                error: 'User not authenticated' 
-            }, { status: 401 });
-        }
+        const auth = requireUserId(req);
+    if (typeof auth !== 'string') return auth;
+    const userId = Number(auth);
 
         const { id } = await params;
         const surveyId = parseInt(id);
@@ -47,13 +44,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 // PUT /api/surveys/[id] - Update specific survey
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
-        const userId = req.headers.get('x-user-id');
-        
-        if (!userId) {
-            return NextResponse.json({ 
-                error: 'User not authenticated' 
-            }, { status: 401 });
-        }
+        const auth = requireUserId(req);
+    if (typeof auth !== 'string') return auth;
+    const userId = Number(auth);
 
         const { id } = await params;
         const surveyId = parseInt(id);

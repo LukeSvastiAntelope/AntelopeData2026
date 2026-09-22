@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { requireUserId } from '@/app/utils/auth/require-user';
 import { openSql } from '@/app/utils/database/db'
 
 export const runtime = 'nodejs'
@@ -20,22 +21,9 @@ export const maxDuration = 120
  */
 
 export async function GET(req: NextRequest) {
-  const userId = req.headers.get('x-user-id')
-  if (!userId) return NextResponse.json({ status: false, message: 'Unauthorized' }, { status: 401 })
-
-  const db = await openSql()
-  const [rows]: any = await db.execute(
-    `SELECT id, name, description, source_file, filter_prompt, contact_count, created_at
-     FROM contact_lists WHERE user_id = ? ORDER BY created_at DESC`,
-    [userId]
-  )
-
-  return NextResponse.json({ status: true, lists: rows || [] })
-}
-
-export async function POST(req: NextRequest) {
-  const userId = req.headers.get('x-user-id')
-  if (!userId) return NextResponse.json({ status: false, message: 'Unauthorized' }, { status: 401 })
+  const auth = requireUserId(req);
+  if (typeof auth !== 'string') return auth;
+  const userId = Number(auth);
 
   const body = await req.json().catch(() => null)
   if (!body) return NextResponse.json({ status: false, message: 'Invalid JSON body' }, { status: 400 })

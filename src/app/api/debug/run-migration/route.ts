@@ -1,13 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { requireUserId } from '@/app/utils/auth/require-user';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
   // Security: Only allow in development or with admin auth
-  const userIdHeader = req.headers.get('x-user-id')
-  if (!userIdHeader) {
-    return NextResponse.json({ error: 'Unauthorized - Admin only' }, { status: 401 })
-  }
+  const auth = requireUserId(req)
+  if (typeof auth !== 'string') return auth
 
   try {
     const { openSql } = await import('@/app/utils/database/db')

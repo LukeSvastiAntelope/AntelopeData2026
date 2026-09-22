@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireUserId } from '@/app/utils/auth/require-user';
 import { SurveyRepo } from '@/app/utils/database/survey-repo';
 import { openSql as getMySQLConnection } from '@/app/utils/database/db';
 import type { RowDataPacket } from 'mysql2/promise';
@@ -9,13 +10,10 @@ export async function GET(
 ) {
   try {
     // Auth – user ID should be attached by middleware
-    const userIdHeader = request.headers.get('x-user-id');
-    console.log('🔍 Data API Debug - Auth header:', userIdHeader);
-    
-    if (!userIdHeader) {
-      return NextResponse.json({ error: 'User not authenticated' }, { status: 401 });
-    }
-    const userId = parseInt(userIdHeader);
+    const auth = requireUserId(request);
+    if (typeof auth !== 'string') return auth;
+    const userId = parseInt(auth);
+    console.log('🔍 Data API Debug - Auth header:', auth);
 
     const { id: surveyId } = await params;
     const surveyIdNum = parseInt(surveyId);

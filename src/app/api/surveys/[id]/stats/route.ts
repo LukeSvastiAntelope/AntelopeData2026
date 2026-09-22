@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { requireUserId } from '@/app/utils/auth/require-user';
 import { openSql } from '@/app/utils/database/db'
 
 export async function GET(
@@ -6,11 +7,9 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const userIdHeader = request.headers.get('x-user-id')
-    if (!userIdHeader) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-    const userId = parseInt(userIdHeader)
+    const auth = requireUserId(request)
+    if (typeof auth !== 'string') return auth
+    const userId = parseInt(auth)
     const { id } = await params
     const surveyId = parseInt(id)
     if (isNaN(surveyId)) {

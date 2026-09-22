@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireUserId } from '@/app/utils/auth/require-user';
 import { openSql as getMySQLConnection } from '@/app/utils/database/db';
 import type { RowDataPacket } from 'mysql2/promise';
 
@@ -50,16 +51,13 @@ export async function POST(
 ) {
   try {
     const { id: surveyId } = await params;
-    const userIdHeader = request.headers.get('x-user-id');
-    
+    const auth = requireUserId(request);
+    if (typeof auth !== 'string') return auth;
+
     console.log('🎯 Targeted Data API - Survey ID:', surveyId);
-    console.log('🎯 Targeted Data API - User ID:', userIdHeader);
+    console.log('🎯 Targeted Data API - User ID:', auth);
 
-    if (!userIdHeader) {
-      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
-    }
-
-    const userId = parseInt(userIdHeader);
+    const userId = parseInt(auth);
     const surveyIdNum = parseInt(surveyId);
 
     // Parse request body

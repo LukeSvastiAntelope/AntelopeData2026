@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireUserId } from '@/app/utils/auth/require-user';
 import { auth } from '@/auth';
 import { runProposerPass } from '@/app/utils/services/loop/proposer';
 
@@ -9,16 +10,18 @@ import { runProposerPass } from '@/app/utils/services/loop/proposer';
 export async function POST(req: NextRequest) {
   try {
     const session = await auth();
-    const userId = session?.user?.id ? Number(session.user.id) : NaN;
+    let userId = session?.user?.id ? Number(session.user.id) : NaN;
+    let headerUserId: string | null = null;
     if (!Number.isFinite(userId) || userId <= 0) {
-      const headerId = req.headers.get('x-user-id');
-      if (!headerId || !Number.isFinite(Number(headerId))) {
+      const authResult = requireUserId(req);
+      if (typeof authResult !== 'string' || !Number.isFinite(Number(authResult))) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
       }
+      headerUserId = authResult;
     }
     const effectiveUserId = Number.isFinite(userId) && userId > 0
       ? userId
-      : Number(req.headers.get('x-user-id'));
+      : Number(headerUserId);
 
     const body = await req.json().catch(() => ({}));
     const orgId = Number(body.orgId ?? body.organizationId);

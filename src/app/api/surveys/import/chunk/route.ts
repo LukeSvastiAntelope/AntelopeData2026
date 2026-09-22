@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireUserId } from '@/app/utils/auth/require-user';
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
 import { promises as fs } from 'fs';
@@ -140,10 +141,9 @@ async function cleanupChunks(userId: string, fileName: string): Promise<void> {
 // POST endpoint for processing chunks
 export async function POST(req: NextRequest) {
   try {
-    const userIdHeader = req.headers.get('x-user-id');
-    if (!userIdHeader) {
-      return NextResponse.json({ status: false, message: 'Unauthorized' }, { status: 401 });
-    }
+    const auth = requireUserId(req);
+    if (typeof auth !== 'string') return auth;
+    const userId = Number(auth);
 
     const formData = await req.formData();
     const file = formData.get('file') as File;
@@ -286,10 +286,9 @@ export async function POST(req: NextRequest) {
 // GET endpoint for checking chunk status
 export async function GET(req: NextRequest) {
   try {
-    const userIdHeader = req.headers.get('x-user-id');
-    if (!userIdHeader) {
-      return NextResponse.json({ status: false, message: 'Unauthorized' }, { status: 401 });
-    }
+    const auth = requireUserId(req);
+    if (typeof auth !== 'string') return auth;
+    const userId = Number(auth);
 
     const { searchParams } = new URL(req.url);
     const fileName = searchParams.get('fileName');

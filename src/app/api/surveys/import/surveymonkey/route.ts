@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireUserId } from '@/app/utils/auth/require-user';
 
 interface SurveyMonkeyImportRequest {
   surveyId: string;
@@ -75,10 +76,9 @@ const detectSurveyMonkeyDemographics = (question: any): { field: string; confide
 // Preview endpoint - GET request to preview SurveyMonkey survey
 export async function GET(req: NextRequest) {
   try {
-    const userIdHeader = req.headers.get('x-user-id');
-    if (!userIdHeader) {
-      return NextResponse.json({ status: false, message: 'Unauthorized' }, { status: 401 });
-    }
+    const auth = requireUserId(req);
+    if (typeof auth !== 'string') return auth;
+    const userId = Number(auth);
 
     const { searchParams } = new URL(req.url);
     const surveyId = searchParams.get('surveyId');
@@ -203,10 +203,9 @@ export async function GET(req: NextRequest) {
 // Import execution endpoint - POST request to import SurveyMonkey data
 export async function POST(req: NextRequest) {
   try {
-    const userIdHeader = req.headers.get('x-user-id');
-    if (!userIdHeader) {
-      return NextResponse.json({ status: false, message: 'Unauthorized' }, { status: 401 });
-    }
+    const auth = requireUserId(req);
+    if (typeof auth !== 'string') return auth;
+    const userId = Number(auth);
     const userId = parseInt(userIdHeader);
 
     const {

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { requireUserId } from '@/app/utils/auth/require-user';
 import { SurveyRepo } from '@/app/utils/database/survey-repo'
 
 export async function GET(
@@ -7,11 +8,9 @@ export async function GET(
 ) {
   try {
     // Get user ID from the request (set by middleware)
-    const userId = request.headers.get('x-user-id')
-    
-    if (!userId) {
-      return NextResponse.json({ error: 'User not authenticated' }, { status: 401 })
-    }
+    const auth = requireUserId(request)
+    if (typeof auth !== 'string') return auth
+    const userId = auth
 
     const { id } = await params
     const surveyId = parseInt(id)

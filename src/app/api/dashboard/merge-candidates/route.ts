@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireUserId } from '@/app/utils/auth/require-user';
 import { openSql } from '@/app/utils/database/db';
 import { ensurePrimaryOrgId } from '@/app/api/dashboard/persons/org';
 import type { PoolConnection } from 'mysql2/promise';
@@ -9,10 +10,9 @@ export const runtime = 'nodejs';
 /** GET /api/dashboard/merge-candidates — pending fuzzy-match review queue (FM3). */
 export async function GET(request: NextRequest) {
   try {
-    const userId = request.headers.get('x-user-id');
-    if (!userId) {
-      return NextResponse.json({ status: false, message: 'Unauthorized' }, { status: 401 });
-    }
+    const auth = requireUserId(request);
+    if (typeof auth !== 'string') return auth;
+    const userId = Number(auth);
     const orgId = await ensurePrimaryOrgId(userId);
     const status = request.nextUrl.searchParams.get('status') || 'pending';
     const limit = Math.min(
@@ -52,10 +52,9 @@ export async function GET(request: NextRequest) {
  */
 export async function PATCH(request: NextRequest) {
   try {
-    const userId = request.headers.get('x-user-id');
-    if (!userId) {
-      return NextResponse.json({ status: false, message: 'Unauthorized' }, { status: 401 });
-    }
+    const auth = requireUserId(request);
+    if (typeof auth !== 'string') return auth;
+    const userId = Number(auth);
     const orgId = await ensurePrimaryOrgId(userId);
     const body = await request.json();
     const id = Number(body.id);

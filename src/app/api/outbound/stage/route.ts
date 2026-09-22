@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireUserId } from '@/app/utils/auth/require-user';
 import { ensurePrimaryOrgId } from '@/app/api/dashboard/persons/org';
 import {
   OUTBOUND_FORMATS,
@@ -18,11 +19,9 @@ export const maxDuration = 60;
  */
 export async function POST(request: NextRequest) {
   try {
-    const userIdHeader = request.headers.get('x-user-id');
-    if (!userIdHeader) {
-      return NextResponse.json({ status: false, message: 'Unauthorized' }, { status: 401 });
-    }
-    const userId = Number(userIdHeader);
+    const auth = requireUserId(request);
+    if (typeof auth !== 'string') return auth;
+    const userId = Number(auth);
     if (!Number.isFinite(userId) || userId <= 0) {
       return NextResponse.json({ status: false, message: 'Unauthorized' }, { status: 401 });
     }

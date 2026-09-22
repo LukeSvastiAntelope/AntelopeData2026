@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireUserId } from '@/app/utils/auth/require-user';
 import { openSql } from '@/app/utils/database/db';
 
 // Import the schema analysis functions
@@ -133,10 +134,9 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const userIdHeader = request.headers.get('x-user-id');
-    if (!userIdHeader) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const auth = requireUserId(request);
+    if (typeof auth !== 'string') return auth;
+    const userId = Number(auth);
     const userId = parseInt(userIdHeader);
 
     const resolvedParams = await params;
@@ -431,10 +431,9 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const userIdHeader = request.headers.get('x-user-id');
-    if (!userIdHeader) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const auth = requireUserId(request);
+    if (typeof auth !== 'string') return auth;
+    const userId = Number(auth);
     const userId = parseInt(userIdHeader);
 
     const resolvedParams = await params;

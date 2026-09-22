@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireUserId } from '@/app/utils/auth/require-user';
 import {
   assistOutboundGoal,
   OUTBOUND_GOAL_TEMPLATES,
@@ -20,10 +21,9 @@ export async function GET() {
  */
 export async function POST(request: NextRequest) {
   try {
-    const userId = request.headers.get('x-user-id');
-    if (!userId) {
-      return NextResponse.json({ status: false, message: 'Unauthorized' }, { status: 401 });
-    }
+    const auth = requireUserId(request);
+    if (typeof auth !== 'string') return auth;
+    const userId = Number(auth);
     const body = await request.json().catch(() => ({}));
     const plainDescription = String(
       body?.plainDescription || body?.goal || body?.prompt || ''

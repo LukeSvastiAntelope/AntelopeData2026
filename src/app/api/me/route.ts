@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireUserId } from '@/app/utils/auth/require-user';
 import { UserRepo } from '@/app/utils/database/user-repo';
 import { getConnection } from '@/app/utils/database/db';
 
@@ -10,13 +11,9 @@ import { getConnection } from '@/app/utils/database/db';
  */
 export async function GET(req: NextRequest) {
   try {
-    const userId = req.headers.get('x-user-id');
-    if (!userId) {
-      return NextResponse.json(
-        { status: false, message: 'Not authenticated' },
-        { status: 401 }
-      );
-    }
+    const auth = requireUserId(req);
+    if (typeof auth !== 'string') return auth;
+    const userId = auth;
 
     // Fetch user
     const user = await UserRepo.getUserById(userId);

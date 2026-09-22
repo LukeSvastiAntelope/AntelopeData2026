@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireUserId } from '@/app/utils/auth/require-user';
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
 import { detectVoterFileFormat } from '@/app/utils/voter-file-schema';
@@ -15,13 +16,9 @@ export const maxDuration = 120;
  */
 export async function POST(req: NextRequest) {
   try {
-    const userId = req.headers.get('x-user-id');
-    if (!userId) {
-      return NextResponse.json(
-        { status: false, message: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
+    const auth = requireUserId(req);
+    if (typeof auth !== 'string') return auth;
+    const userId = auth;
 
     const formData = await req.formData();
     const file = formData.get('file') as File;

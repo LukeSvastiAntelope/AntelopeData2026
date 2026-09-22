@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireUserId } from '@/app/utils/auth/require-user';
 import { openSql as getMySQLConnection } from '@/app/utils/database/db';
 import { DigitalTwinService } from "@/app/utils/services/digital-twin-service";
 import { RowDataPacket } from 'mysql2/promise';
@@ -6,11 +7,9 @@ import { RowDataPacket } from 'mysql2/promise';
 // GET /api/debug/digital-twins-status - Debug endpoint to check digital twins status
 export async function GET(req: NextRequest) {
     try {
-        const userId = req.headers.get('x-user-id');
-        
-        if (!userId) {
-            return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
-        }
+        const auth = requireUserId(req);
+    if (typeof auth !== 'string') return auth;
+    const userId = Number(auth);
         
         console.log('🔍 Debug: Current user ID:', userId);
         

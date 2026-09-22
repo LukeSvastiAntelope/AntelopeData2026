@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireUserId } from '@/app/utils/auth/require-user';
 import { SurveyAutotriggerRepo } from '@/app/utils/database/survey-autotrigger-repo';
 import { openSql } from '@/app/utils/database/db';
 import type { RowDataPacket } from 'mysql2';
@@ -11,10 +12,9 @@ export const runtime = 'nodejs';
  */
 export async function GET(request: NextRequest) {
   try {
-    const userId = request.headers.get('x-user-id');
-    if (!userId) {
-      return NextResponse.json({ status: false, message: 'Unauthorized' }, { status: 401 });
-    }
+    const auth = requireUserId(request);
+    if (typeof auth !== 'string') return auth;
+    const userId = Number(auth);
     const db = await openSql();
     const [orgRows] = await db.execute<RowDataPacket[]>(
       `SELECT organization_id FROM organization_members

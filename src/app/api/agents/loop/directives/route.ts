@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireUserId } from '@/app/utils/auth/require-user';
 import { auth } from '@/auth';
 import { AgentSituationService } from '@/app/utils/services/agent-situation-service';
 
@@ -12,8 +13,8 @@ export async function POST(req: NextRequest) {
     const session = await auth();
     let userId = session?.user?.id ? Number(session.user.id) : NaN;
     if (!Number.isFinite(userId) || userId <= 0) {
-      const headerId = req.headers.get('x-user-id');
-      userId = headerId ? Number(headerId) : NaN;
+      const authResult = requireUserId(req);
+      userId = typeof authResult === 'string' ? Number(authResult) : NaN;
     }
     if (!Number.isFinite(userId) || userId <= 0) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

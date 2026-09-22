@@ -1,5 +1,6 @@
 // AI Analytics API - Generate and retrieve AI-powered survey analytics
 import { NextRequest, NextResponse } from 'next/server';
+import { requireUserId } from '@/app/utils/auth/require-user';
 import { AIAnalyticsOrchestrator, AIAnalyticsConfig } from '@/app/utils/services/ai-analytics-orchestrator';
 import { getAllModels } from '@/app/utils/models';
 import { openSql } from '@/app/utils/database/db';
@@ -166,9 +167,9 @@ export async function POST(
     };
 
     // H1 write-back identity (middleware injects x-user-id)
-    const userIdHeader = request.headers.get('x-user-id');
-    if (userIdHeader && Number.isFinite(Number(userIdHeader))) {
-      config.userId = Number(userIdHeader);
+    const auth = requireUserId(request);
+    if (typeof auth === 'string' && Number.isFinite(Number(auth))) {
+      config.userId = Number(auth);
     }
     if (body.organizationId !== undefined && Number.isFinite(Number(body.organizationId))) {
       config.organizationId = Number(body.organizationId);

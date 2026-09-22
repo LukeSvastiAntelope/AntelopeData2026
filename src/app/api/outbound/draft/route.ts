@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireUserId } from '@/app/utils/auth/require-user';
 import { ensurePrimaryOrgId } from '@/app/api/dashboard/persons/org';
 import {
   draftOutboundForSegment,
@@ -15,10 +16,9 @@ export const maxDuration = 120;
 /** GET /api/outbound/draft — list formats + segment catalog for the UI. */
 export async function GET(request: NextRequest) {
   try {
-    const userId = request.headers.get('x-user-id');
-    if (!userId) {
-      return NextResponse.json({ status: false, message: 'Unauthorized' }, { status: 401 });
-    }
+    const auth = requireUserId(request);
+    if (typeof auth !== 'string') return auth;
+    const userId = Number(auth);
     const orgId = await ensurePrimaryOrgId(userId);
     const catalog = await listSegmentCatalog(orgId);
     return NextResponse.json({
@@ -43,10 +43,9 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
-    const userId = request.headers.get('x-user-id');
-    if (!userId) {
-      return NextResponse.json({ status: false, message: 'Unauthorized' }, { status: 401 });
-    }
+    const auth = requireUserId(request);
+    if (typeof auth !== 'string') return auth;
+    const userId = Number(auth);
     const orgId = await ensurePrimaryOrgId(userId);
     const body = await request.json().catch(() => ({}));
     const fromAudience = body?.audience ? resolveSegmentHint(String(body.audience)) : null;

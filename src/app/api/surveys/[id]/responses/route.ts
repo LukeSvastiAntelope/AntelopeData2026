@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { requireUserId } from '@/app/utils/auth/require-user';
 import { SurveyRepo } from '@/app/utils/database/survey-repo'
 
 // GET /api/surveys/[id]/responses?page=1&limit=20
@@ -8,11 +9,9 @@ export async function GET(
 ) {
   try {
     // Auth – user ID should be attached by middleware
-    const userIdHeader = request.headers.get('x-user-id')
-    if (!userIdHeader) {
-      return NextResponse.json({ error: 'User not authenticated' }, { status: 401 })
-    }
-    const userId = parseInt(userIdHeader)
+    const auth = requireUserId(request)
+    if (typeof auth !== 'string') return auth
+    const userId = parseInt(auth)
 
     // Survey ID
     const { id } = await params

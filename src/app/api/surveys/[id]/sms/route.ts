@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireUserId } from '@/app/utils/auth/require-user';
 import { openSql } from '@/app/utils/database/db';
 import { getTwilioStatus, sendMessages, normalizePhone } from '@/app/utils/services/twilio';
 
@@ -23,11 +24,9 @@ export async function POST(
 ) {
   try {
     const { id: surveyId } = await params;
-    const userId = request.headers.get('x-user-id');
-
-    if (!userId) {
-      return NextResponse.json({ status: false, message: 'Unauthorized' }, { status: 401 });
-    }
+    const auth = requireUserId(request);
+    if (typeof auth !== 'string') return auth;
+    const userId = Number(auth);
 
     const body = await request.json();
     const { phoneNumbers, message: customMessage, mode = 'default' } = body as {

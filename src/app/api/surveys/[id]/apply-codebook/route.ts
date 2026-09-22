@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireUserId } from '@/app/utils/auth/require-user';
 import { CodebookParser, type CodebookParseResult } from '@/app/utils/survey/codebook-parser';
 import { openSql } from '@/app/utils/database/db';
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
-    const userIdHeader = req.headers.get('x-user-id');
-    if (!userIdHeader) {
-      return NextResponse.json({ status: false, message: 'Unauthorized' }, { status: 401 });
-    }
+    const auth = requireUserId(req);
+    if (typeof auth !== 'string') return auth;
+    const userId = Number(auth);
 
     const surveyId = parseInt(id);
     const formData = await req.formData();

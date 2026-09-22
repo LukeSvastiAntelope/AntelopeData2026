@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireUserId } from '@/app/utils/auth/require-user';
 import { openSql as getMySQLConnection } from '@/app/utils/database/db';
 import { DigitalTwinService } from "@/app/utils/services/digital-twin-service";
 import { RowDataPacket } from 'mysql2/promise';
@@ -7,13 +8,13 @@ import { RowDataPacket } from 'mysql2/promise';
 export async function POST(req: NextRequest) {
     try {
         // Get user info from middleware
-        const userId = req.headers.get('x-user-id');
-        const userRole = req.headers.get('x-user-role');
+        const auth = requireUserId(req);
         
         // Only allow admin users to run migration (or for now, any authenticated user for testing)
-        if (!userId) {
+        if (typeof auth !== 'string') {
             return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
         }
+        const userId = auth;
         
         console.log('🔄 Starting digital twins ownership migration...');
         

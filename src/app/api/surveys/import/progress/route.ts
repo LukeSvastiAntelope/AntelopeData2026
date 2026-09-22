@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireUserId } from '@/app/utils/auth/require-user';
 
 // In-memory progress tracking (in production, use Redis or database)
 const progressStore = new Map<string, {
@@ -11,10 +12,9 @@ const progressStore = new Map<string, {
 
 export async function GET(req: NextRequest) {
   try {
-    const userIdHeader = req.headers.get('x-user-id');
-    if (!userIdHeader) {
-      return NextResponse.json({ status: false, message: 'Unauthorized' }, { status: 401 });
-    }
+    const auth = requireUserId(req);
+    if (typeof auth !== 'string') return auth;
+    const userId = Number(auth);
 
     const { searchParams } = new URL(req.url);
     const progressId = searchParams.get('id');
@@ -51,10 +51,9 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const userIdHeader = req.headers.get('x-user-id');
-    if (!userIdHeader) {
-      return NextResponse.json({ status: false, message: 'Unauthorized' }, { status: 401 });
-    }
+    const auth = requireUserId(req);
+    if (typeof auth !== 'string') return auth;
+    const userId = Number(auth);
 
     const { progressId, status, progress, message, result, error } = await req.json();
     

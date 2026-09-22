@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireUserId } from '@/app/utils/auth/require-user';
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
 import { promises as fs } from 'fs';
@@ -143,10 +144,9 @@ function parseCSV(buffer: Buffer, opts?: { tolerantForChunk?: boolean }): Promis
 // Main import preview endpoint
 export async function POST(req: NextRequest) {
   try {
-    const userIdHeader = req.headers.get('x-user-id');
-    if (!userIdHeader) {
-      return NextResponse.json({ status: false, message: 'Unauthorized' }, { status: 401 });
-    }
+    const auth = requireUserId(req);
+    if (typeof auth !== 'string') return auth;
+    const userId = Number(auth);
 
     const formData = await req.formData();
     const file = formData.get('file') as File;

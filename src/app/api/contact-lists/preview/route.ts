@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { requireUserId } from '@/app/utils/auth/require-user';
 import Papa from 'papaparse'
 import * as XLSX from 'xlsx'
 import OpenAI from 'openai'
@@ -113,8 +114,9 @@ If all rows pass, return all indices. If none pass, return [].`
 }
 
 export async function POST(req: NextRequest) {
-  const userId = req.headers.get('x-user-id')
-  if (!userId) return NextResponse.json({ status: false, message: 'Unauthorized' }, { status: 401 })
+  const auth = requireUserId(req);
+  if (typeof auth !== 'string') return auth;
+  const userId = Number(auth);
 
   try {
     const formData = await req.formData()

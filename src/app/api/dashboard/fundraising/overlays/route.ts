@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { requireUserId } from '@/app/utils/auth/require-user';
 import { getConnection } from '@/app/utils/database/db'
 
 export const runtime = 'nodejs'
@@ -18,57 +19,9 @@ async function getPrimaryOrgId(db: any, userId: string): Promise<number | null> 
 
 export async function GET(request: NextRequest) {
   try {
-    const userId = request.headers.get('x-user-id')
-    if (!userId) return NextResponse.json({ status: false, message: 'Unauthorized' }, { status: 401 })
-
-    const db = await getConnection()
-    const orgId = await getPrimaryOrgId(db, userId)
-    if (!orgId) return NextResponse.json({ status: true, overlays: [] })
-
-    const [rows]: any = await db.execute(
-      `SELECT dmo.id, dmo.overlay_type, dmo.report_id, dmo.enabled_metrics, dmo.status,
-              r.title, r.summary, r.report_type, r.completed_at, r.metadata
-       FROM dashboard_map_overlays dmo
-       LEFT JOIN reports r ON r.id = dmo.report_id
-       WHERE dmo.organization_id = ?
-       ORDER BY dmo.updated_at DESC`,
-      [orgId]
-    )
-
-    const overlays = (rows || []).map((r: any) => {
-      let enabledMetrics: any = null
-      try { enabledMetrics = r.enabled_metrics ? JSON.parse(r.enabled_metrics) : null } catch { enabledMetrics = r.enabled_metrics }
-      let meta: any = null
-      try { meta = r.metadata ? JSON.parse(r.metadata) : null } catch { meta = r.metadata }
-      return {
-        id: r.id,
-        overlayType: r.overlay_type,
-        status: r.status,
-        report: r.report_id
-          ? {
-              id: r.report_id,
-              title: r.title,
-              summary: r.summary,
-              reportType: r.report_type,
-              completedAt: r.completed_at,
-              metadata: meta,
-            }
-          : null,
-        enabledMetrics,
-      }
-    })
-
-    return NextResponse.json({ status: true, overlays })
-  } catch (e) {
-    console.error('dashboard fundraising overlays GET error:', e)
-    return NextResponse.json({ status: false, message: 'Failed' }, { status: 500 })
-  }
-}
-
-export async function POST(request: NextRequest) {
-  try {
-    const userId = request.headers.get('x-user-id')
-    if (!userId) return NextResponse.json({ status: false, message: 'Unauthorized' }, { status: 401 })
+    const auth = requireUserId(request);
+  if (typeof auth !== 'string') return auth;
+  const userId = Number(auth);
 
     const body = await request.json()
     const {

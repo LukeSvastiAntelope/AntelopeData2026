@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireUserId } from '@/app/utils/auth/require-user';
 import {
   SurveyAutotriggerRepo,
   type AutotriggerAction,
@@ -29,7 +30,9 @@ export async function GET(
     if (!Number.isFinite(surveyId)) {
       return NextResponse.json({ status: false, message: 'Invalid id' }, { status: 400 });
     }
-    const access = await requireSurveyAccess(surveyId, request.headers.get('x-user-id'));
+    const auth = requireUserId(request);
+    if (typeof auth !== 'string') return auth;
+    const access = await requireSurveyAccess(surveyId, auth);
     if ('error' in access && access.error) return access.error;
 
     const config = await SurveyAutotriggerRepo.ensure(surveyId);
@@ -64,7 +67,9 @@ export async function PUT(
     if (!Number.isFinite(surveyId)) {
       return NextResponse.json({ status: false, message: 'Invalid id' }, { status: 400 });
     }
-    const access = await requireSurveyAccess(surveyId, request.headers.get('x-user-id'));
+    const auth = requireUserId(request);
+    if (typeof auth !== 'string') return auth;
+    const access = await requireSurveyAccess(surveyId, auth);
     if ('error' in access && access.error) return access.error;
 
     const body = await request.json().catch(() => ({}));

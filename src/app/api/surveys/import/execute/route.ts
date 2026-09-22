@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireUserId } from '@/app/utils/auth/require-user';
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
 import { SurveyRepo } from "@/app/utils/database/survey-repo";
@@ -270,10 +271,9 @@ function collectChoiceOptions(data: any[], mappings: ColumnMapping[]): Map<strin
 
 export async function POST(req: NextRequest) {
   try {
-    const userIdHeader = req.headers.get('x-user-id');
-    if (!userIdHeader) {
-      return NextResponse.json({ status: false, message: 'Unauthorized' }, { status: 401 });
-    }
+    const auth = requireUserId(req);
+    if (typeof auth !== 'string') return auth;
+    const userId = Number(auth);
     const userId = parseInt(userIdHeader);
 
     const formData = await req.formData();
