@@ -8,7 +8,7 @@ import { mkdtempSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
 import path from 'path';
 import { LocalPrivateStorage, resolveWithinRoot } from '../src/app/utils/services/storage/local-private-storage';
-import { mediaKeyFromPathSegments } from '../src/app/api/media/[...path]/route';
+import { mediaKeyFromPathSegments } from '../src/app/utils/services/storage/serve-owned-media';
 
 function assert(cond: boolean, msg: string) {
   if (!cond) throw new Error(msg);

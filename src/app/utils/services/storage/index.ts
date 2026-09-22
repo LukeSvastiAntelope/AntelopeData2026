@@ -29,6 +29,8 @@ export function getStorageProvider(): StorageProvider {
   return getLocalPrivateStorage();
 }
 
+export { serveOwnedMedia, mediaKeyFromPathSegments } from './serve-owned-media';
+
 /** Sanitize user id for use as the first key segment (tenant scope). */
 export function sanitizeStorageUserId(userId: string | number): string {
   return String(userId).replace(/[^a-zA-Z0-9_-]/g, '');

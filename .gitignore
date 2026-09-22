@@ -132,3 +132,6 @@ TWILIO_HANDOFF.md
 public/uploads/
 # Private upload root (StorageProvider / LocalPrivateStorage)
 var/uploads/
+# Upload migration manifests (scripts/migrate-uploads-to-private.ts)
+var/upload-migration-manifest-*.json
+var/

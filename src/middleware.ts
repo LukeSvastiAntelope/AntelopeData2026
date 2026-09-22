@@ -107,8 +107,12 @@ export default auth((req) => {
         return NextResponse.next();
     }
 
-    // Protect API routes that require authentication
-    if (path.startsWith('/api/') && !isPublicApiRoute && !isGetPredictionApiRoute) {
+    // Protect API routes + legacy /uploads compat (must inject x-user-id)
+    if (
+      (path.startsWith('/api/') || path.startsWith('/uploads/')) &&
+      !isPublicApiRoute &&
+      !isGetPredictionApiRoute
+    ) {
         if (!session) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
@@ -175,6 +179,7 @@ export const config = {
     matcher: [
         // Match all API routes and protected pages (must cover every path in protectedPages)
         '/api/:path*',
+        '/uploads/:path*',
         '/cohort-chat/:path*',
         '/surveys/:path*',
         '/create/:path*',
