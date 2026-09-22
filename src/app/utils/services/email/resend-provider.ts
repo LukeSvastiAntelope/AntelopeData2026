@@ -19,6 +19,12 @@ export const RESEND_MAX_TO_PER_REQUEST = 50;
 /** Resend batch endpoint cap. */
 export const RESEND_MAX_BATCH = 100;
 
+/** Self-throttle between batch chunks (~10 req/s team limit → ≥110ms). */
+const BATCH_CHUNK_SPACING_MS = 110;
+
+/** Max 429 retries per chunk before failing that chunk. */
+const BATCH_429_MAX_TRIES = 5;
+
 function requireApiKey(): string {
   const key = process.env.RESEND_API_KEY?.trim();
   if (!key) {
@@ -35,6 +41,10 @@ function requireApiKey(): string {
 
 function normalizeTo(to: string[]): string[] {
   return [...new Set(to.map((e) => String(e).trim().toLowerCase()).filter(Boolean))];
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, Math.max(0, ms)));
 }
 
 async function resendFetch(
@@ -67,6 +77,45 @@ function buildPayload(req: EmailSendRequest, to: string[]) {
     payload.headers = req.headers;
   }
   return payload;
+}
+
+/**
+ * Parse Retry-After (seconds) or ratelimit-reset (unix seconds / delta).
+ * Caps wait at 30s.
+ */
+function retryWaitMs(res: Response, attempt: number, backoffMs: number): number {
+  const retryAfter = res.headers.get('retry-after');
+  if (retryAfter) {
+    const secs = Number(retryAfter);
+    if (Number.isFinite(secs) && secs >= 0) {
+      return Math.min(Math.max(secs * 1000, 100), 30_000);
+    }
+  }
+  const reset = res.headers.get('ratelimit-reset');
+  if (reset) {
+    const n = Number(reset);
+    if (Number.isFinite(n) && n > 0) {
+      // Absolute unix timestamp vs relative seconds
+      const wait =
+        n > 1_000_000_000 ? Math.max(0, n * 1000 - Date.now()) : n * 1000;
+      if (wait > 0) return Math.min(wait, 30_000);
+    }
+  }
+  // Exponential backoff: 1s → 2s → 4s … cap 30s
+  void attempt;
+  return Math.min(backoffMs, 30_000);
+}
+
+function failedResults(
+  messages: EmailSendRequest[],
+  error: string
+): EmailSendResult[] {
+  return messages.map((m) => ({
+    id: '',
+    status: 'failed' as const,
+    error,
+    to: normalizeTo(m.to),
+  }));
 }
 
 export class ResendEmailProvider implements EmailProvider {
@@ -115,6 +164,107 @@ export class ResendEmailProvider implements EmailProvider {
     }
 
     return this.sendOne(apiKey, req, recipients);
+  }
+
+  /**
+   * POST /emails/batch — up to RESEND_MAX_BATCH distinct messages per request.
+   * Chunks larger inputs; retries 429 with Retry-After / exponential backoff.
+   * Results align 1:1 with input order.
+   */
+  async sendBatch(messages: EmailSendRequest[]): Promise<EmailSendResult[]> {
+    if (!messages.length) return [];
+    const apiKey = requireApiKey();
+    const out: EmailSendResult[] = [];
+
+    for (let i = 0; i < messages.length; i += RESEND_MAX_BATCH) {
+      const chunk = messages.slice(i, i + RESEND_MAX_BATCH);
+      const chunkResults = await this.sendBatchChunk(apiKey, chunk);
+      out.push(...chunkResults);
+
+      // Self-throttle between chunks (not after the last)
+      if (i + RESEND_MAX_BATCH < messages.length) {
+        await sleep(BATCH_CHUNK_SPACING_MS);
+      }
+    }
+
+    return out;
+  }
+
+  private async sendBatchChunk(
+    apiKey: string,
+    chunk: EmailSendRequest[]
+  ): Promise<EmailSendResult[]> {
+    const payloads = chunk.map((req) => {
+      const to = normalizeTo(req.to);
+      return buildPayload(req, to.length ? to : req.to);
+    });
+
+    let backoffMs = 1000;
+    for (let attempt = 1; attempt <= BATCH_429_MAX_TRIES; attempt++) {
+      let res: Response;
+      try {
+        res = await resendFetch('/emails/batch', {
+          apiKey,
+          method: 'POST',
+          body: JSON.stringify(payloads),
+        });
+      } catch (e) {
+        return failedResults(
+          chunk,
+          e instanceof Error ? e.message : 'Resend batch request failed'
+        );
+      }
+
+      if (res.status === 429) {
+        if (attempt >= BATCH_429_MAX_TRIES) {
+          return failedResults(chunk, 'rate limited (max retries exceeded)');
+        }
+        const wait = retryWaitMs(res, attempt, backoffMs);
+        await sleep(wait);
+        backoffMs = Math.min(backoffMs * 2, 30_000);
+        continue;
+      }
+
+      const body = (await res.json().catch(() => ({}))) as {
+        data?: Array<{ id?: string } | null>;
+        message?: string;
+        name?: string;
+      };
+
+      if (!res.ok) {
+        return failedResults(
+          chunk,
+          body.message || body.name || `Resend batch HTTP ${res.status}`
+        );
+      }
+
+      const data = Array.isArray(body.data) ? body.data : [];
+      const results: EmailSendResult[] = chunk.map((req, idx) => {
+        const entry = data[idx];
+        const id = entry && entry.id ? String(entry.id) : '';
+        const to = normalizeTo(req.to);
+        if (!id) {
+          return {
+            id: '',
+            status: 'failed' as const,
+            error: 'batch entry missing id',
+            to,
+          };
+        }
+        return { id, status: 'sent' as const, to };
+      });
+
+      // If Resend is near the limit, pause before the next chunk caller continues
+      const remaining = Number(res.headers.get('ratelimit-remaining'));
+      if (Number.isFinite(remaining) && remaining <= 1) {
+        await sleep(1000);
+      }
+
+      return results;
+    }
+
+    // Unreachable — loop returns on success or max tries
+    return failedResults(chunk, 'rate limited (max retries exceeded)');
   }
 
   private async sendOne(

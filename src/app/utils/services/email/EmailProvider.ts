@@ -43,4 +43,11 @@ export interface EmailProvider {
    * Providers may split internally to respect per-request caps.
    */
   send(req: EmailSendRequest): Promise<EmailSendResult>;
+  /**
+   * Send up to RESEND_MAX_BATCH distinct messages in one request.
+   * Each entry is its own message (own to/subject/html/headers) so
+   * per-recipient unsub URLs and message ids are preserved.
+   * Results are returned in the SAME ORDER as `messages`.
+   */
+  sendBatch(messages: EmailSendRequest[]): Promise<EmailSendResult[]>;
 }
