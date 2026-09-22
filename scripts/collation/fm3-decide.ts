@@ -14,6 +14,11 @@
 import { openSql, closePool } from '../../src/app/utils/database/db';
 import type { PoolConnection } from 'mysql2/promise';
 import { autoMergePersons } from '../../src/app/utils/database/person-merge';
+import {
+  assertValidFm3Thresholds,
+  decideFm3Match,
+  getFm3Thresholds,
+} from '../../src/app/utils/database/fm3-thresholds';
 
 require('dotenv').config({ path: '.env.local' });
 require('dotenv').config();
@@ -32,18 +37,14 @@ async function main() {
   const orgId = Number(arg('org', process.env.SMOKE_ORG_ID || '1'));
   if (!Number.isFinite(orgId) || orgId <= 0) throw new Error('--org required');
 
-  const autoMin = Number(
-    arg('auto-min', process.env.FM3_AUTO_MERGE_MIN || '0.92')
-  );
-  const reviewMin = Number(
-    arg('review-min', process.env.FM3_REVIEW_MIN || '0.78')
-  );
-  if (!(autoMin > reviewMin) || reviewMin < 0 || autoMin > 1) {
-    throw new Error('Require 0 <= review-min < auto-min <= 1 (defaults 0.78 < 0.92)');
-  }
+  const defaults = getFm3Thresholds();
+  const autoMin = Number(arg('auto-min', String(defaults.autoMergeMin)));
+  const reviewMin = Number(arg('review-min', String(defaults.reviewMin)));
+  assertValidFm3Thresholds({ autoMergeMin: autoMin, reviewMin });
   const dryRun = hasFlag('dry-run');
   const limit = Math.min(Math.max(Number(arg('limit', '5000')), 1), 50000);
   const runId = arg('run-id');
+  const thresholds = { autoMergeMin: autoMin, reviewMin };
 
   const sql = await openSql();
   const where = [
@@ -84,12 +85,9 @@ async function main() {
 
   for (const c of candidates) {
     const score = Number(c.score);
-    if (!Number.isFinite(score)) {
-      rejected++;
-      continue;
-    }
+    const decision = decideFm3Match(score, thresholds);
 
-    if (score >= autoMin) {
+    if (decision === 'auto_merge') {
       if (dryRun) {
         console.log(
           `[dry-run] auto-merge ${c.left_person_id}+${c.right_person_id} score=${score}`
@@ -138,7 +136,7 @@ async function main() {
       continue;
     }
 
-    if (score >= reviewMin) {
+    if (decision === 'review') {
       if (dryRun) {
         console.log(
           `[dry-run] review ${c.left_person_id}+${c.right_person_id} score=${score}`

@@ -165,6 +165,31 @@ export function benjaminiHochberg(pValues: number[]): number[] {
   return corrected;
 }
 
+/** True when total N is below the publish floor (scan short-circuits). */
+export function isBelowTotalResponseFloor(
+  totalResponses: number,
+  thresholds: PostableInsightThresholds = POSTABLE_INSIGHT_THRESHOLDS
+): boolean {
+  return totalResponses < thresholds.minTotalResponses;
+}
+
+/**
+ * Exact publish gate applied after BH correction in scanPostableInsights.
+ * Cell size, alpha, and absolute-effect floors must all clear.
+ */
+export function contrastPassesPublishGate(
+  c: { nA: number; nB: number; absoluteEffect: number },
+  pCorrected: number,
+  thresholds: PostableInsightThresholds = POSTABLE_INSIGHT_THRESHOLDS
+): boolean {
+  return (
+    c.nA >= thresholds.minCellSize &&
+    c.nB >= thresholds.minCellSize &&
+    pCorrected < thresholds.alpha &&
+    c.absoluteEffect >= thresholds.minAbsoluteEffect
+  );
+}
+
 type LoadedRow = {
   responseId: number;
   groups: Record<string, string>;
@@ -268,7 +293,7 @@ export async function scanPostableInsights(params: {
     insufficientDataMessage: msg,
   });
 
-  if (totalResponses < thresholds.minTotalResponses) {
+  if (isBelowTotalResponseFloor(totalResponses, thresholds)) {
     return empty(
       `${totalResponses} responses — not enough to publish a subgroup claim yet (need ≥${thresholds.minTotalResponses}). Collect more responses or keep findings private.`,
       true
@@ -534,11 +559,7 @@ export async function scanPostableInsights(params: {
 
   scanned.forEach((c, idx) => {
     const pCorrected = corrected[idx];
-    const passes =
-      c.nA >= thresholds.minCellSize &&
-      c.nB >= thresholds.minCellSize &&
-      pCorrected < thresholds.alpha &&
-      c.absoluteEffect >= thresholds.minAbsoluteEffect;
+    const passes = contrastPassesPublishGate(c, pCorrected, thresholds);
     const full: ComputedContrast = {
       ...c,
       pCorrected,

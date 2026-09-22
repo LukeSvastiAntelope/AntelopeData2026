@@ -40,6 +40,61 @@ export type AutotriggerEvent = {
 
 const DEFAULT_ACTIONS: AutotriggerAction[] = ['analytics'];
 
+/**
+ * Response-count band for fire-once semantics: floor(count / threshold).
+ * Matches the SQL predicate in tryClaimFire.
+ */
+export function autotriggerResponseBand(
+  responseCount: number,
+  threshold: number
+): number {
+  return Math.floor(responseCount / Math.max(threshold, 1));
+}
+
+export type BandClaimResult =
+  | { ok: true; band: number }
+  | { ok: false; reason: 'below_threshold' | 'already_fired_this_band' };
+
+/**
+ * Pure band claim — same predicate as the atomic UPDATE in tryClaimFire.
+ * Use with an in-memory store in tests; production uses the DB race.
+ */
+export function tryClaimFireBand(params: {
+  responseCount: number;
+  threshold: number;
+  lastFiredResponseCount: number;
+}): BandClaimResult {
+  const { responseCount, threshold, lastFiredResponseCount } = params;
+  if (responseCount < threshold) {
+    return { ok: false, reason: 'below_threshold' };
+  }
+  const band = autotriggerResponseBand(responseCount, threshold);
+  const lastBand = autotriggerResponseBand(lastFiredResponseCount, threshold);
+  if (band <= lastBand) {
+    return { ok: false, reason: 'already_fired_this_band' };
+  }
+  return { ok: true, band };
+}
+
+/** In-memory claim store for tests (no live DB). */
+export type InMemoryBandClaimStore = { lastFiredResponseCount: number };
+
+export function claimFireOnceInMemory(
+  store: InMemoryBandClaimStore,
+  responseCount: number,
+  threshold: number
+): BandClaimResult {
+  const result = tryClaimFireBand({
+    responseCount,
+    threshold,
+    lastFiredResponseCount: store.lastFiredResponseCount,
+  });
+  if (result.ok) {
+    store.lastFiredResponseCount = responseCount;
+  }
+  return result;
+}
+
 function parseActions(raw: unknown): AutotriggerAction[] {
   try {
     const arr = typeof raw === 'string' ? JSON.parse(raw) : raw;
@@ -148,10 +203,12 @@ export class SurveyAutotriggerRepo {
     const config = await this.getBySurveyId(surveyId);
     if (!config || !config.enabled) return null;
     const threshold = config.threshold;
-    if (responseCount < threshold) return null;
-    const band = Math.floor(responseCount / threshold);
-    const lastBand = Math.floor(config.lastFiredResponseCount / threshold);
-    if (band <= lastBand) return null;
+    const preview = tryClaimFireBand({
+      responseCount,
+      threshold,
+      lastFiredResponseCount: config.lastFiredResponseCount,
+    });
+    if (!preview.ok) return null;
 
     const db = await openSql();
     const [result] = await db.execute<ResultSetHeader>(
@@ -169,7 +226,7 @@ export class SurveyAutotriggerRepo {
     if (!result.affectedRows) return null;
     const updated = await this.getBySurveyId(surveyId);
     if (!updated) return null;
-    return { config: updated, band };
+    return { config: updated, band: preview.band };
   }
 
   static async emitEvent(params: {

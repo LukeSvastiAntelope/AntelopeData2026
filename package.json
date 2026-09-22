@@ -15,7 +15,12 @@
     "collation:fm1": "npx tsx --tsconfig tsconfig.json -r dotenv/config scripts/collation/fm1-blocking.ts",
     "collation:fm2": "npx tsx --tsconfig tsconfig.json -r dotenv/config scripts/collation/fm2-score.ts",
     "collation:fm3": "npx tsx --tsconfig tsconfig.json -r dotenv/config scripts/collation/fm3-decide.ts",
-    "collation:fm4": "npx tsx --tsconfig tsconfig.json -r dotenv/config scripts/collation/fm4-writeback.ts"
+    "collation:fm4": "npx tsx --tsconfig tsconfig.json -r dotenv/config scripts/collation/fm4-writeback.ts",
+    "test:quarantine": "npx tsx --tsconfig tsconfig.json scripts/propensity/test-quarantine.ts",
+    "test:significance": "npx tsx --tsconfig tsconfig.json scripts/analytics/test-significance-gate.ts",
+    "test:autotrigger": "npx tsx --tsconfig tsconfig.json scripts/analytics/test-autotrigger-fire-once.ts",
+    "test:merge": "npx tsx --tsconfig tsconfig.json scripts/collation/test-merge-thresholds.ts",
+    "test:invariants": "yarn test:quarantine && yarn test:significance && yarn test:autotrigger && yarn test:merge"
    },
    "dependencies": {
       "@anthropic-ai/sdk": "^0.54.0",
