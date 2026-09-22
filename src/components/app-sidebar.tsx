@@ -109,6 +109,7 @@ const WORKFLOW_STAGES: WorkflowStage[] = [
     number: 2,
     title: 'Know',
     items: [
+      // /voter-file — primary voter-file upload/import surface (confirmed page renders)
       { title: 'Voter Files', href: '/voter-file', icon: FileUp },
       { title: 'Voter Profiles', href: '/digital-twins', icon: Brain },
     ],
@@ -148,6 +149,9 @@ const WORKFLOW_STAGES: WorkflowStage[] = [
   },
 ]
 
+// Account tray — ops pages outside the numbered workflow spine.
+// /volunteer-staff, /compliance, /team are intentionally linked here (not direct-link-only);
+// each has a (secure) page that renders. Do not remove without leaving a direct-link-only note.
 const ACCOUNT_ITEMS: NavItem[] = [
   { title: 'Volunteer/Staff', href: '/volunteer-staff', icon: ClipboardList },
   { title: 'Compliance', href: '/compliance', icon: Scale },
