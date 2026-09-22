@@ -326,6 +326,9 @@ export default function DashboardMap({
   const [fundraisingOverlays, setFundraisingOverlays] = useState<any[]>([])
   const geofenceVertexRef = useRef<((lng: number, lat: number) => void) | undefined>(undefined)
   geofenceVertexRef.current = geofencing?.onDrawVertex
+  /** When true, suppress district/state click zoom — geofence draw owns the click. */
+  const geofenceDrawingRef = useRef(false)
+  geofenceDrawingRef.current = Boolean(geofencing?.drawMode && geofencing?.onDrawVertex)
 
   // -----------------------------------------------------------------------
   // Data fetching
@@ -869,6 +872,8 @@ export default function DashboardMap({
         setHoveredStateName(null)
       })
       map.on('click', 'state-political-fills', (e: any) => {
+        // Drawing a geofence: vertex clicks must not zoom to the whole state
+        if (geofenceDrawingRef.current) return
         if (e.features?.length) {
           const feature = e.features[0]
           if (feature.geometry?.type === 'MultiPolygon' || feature.geometry?.type === 'Polygon') {
@@ -907,6 +912,8 @@ export default function DashboardMap({
         setHoveredDistrict(null)
       })
       map.on('click', 'district-fills', (e: any) => {
+        // Drawing a geofence: vertex clicks must not zoom to the whole district
+        if (geofenceDrawingRef.current) return
         if (e.features?.length) {
           const feature = e.features[0]
           const props = feature.properties || {}
