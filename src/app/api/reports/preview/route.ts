@@ -1,51 +1,60 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/auth';
-import { ReportGenerationService } from '@/app/utils/services/report-generation-service';
+/**
+ * POST /api/reports/preview — preview a packaged python-analysis run.
+ * No stubbed ReportGenerationService analysis — returns the client package as-is.
+ */
 
-export const maxDuration = 300; // 5 minutes for comprehensive reports
+import { NextRequest, NextResponse } from 'next/server';
+import { requireUserId } from '@/app/utils/auth/require-user';
+import { assertPackagedAnalysisReport } from '@/app/utils/services/python-analysis-report';
+
+export const maxDuration = 60;
 
 export async function POST(req: NextRequest) {
   try {
-    console.log('🔍 Report preview generation started');
-    
-    // Authenticate request
-    const session = await auth();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-    
+    const auth = requireUserId(req);
+    if (typeof auth !== 'string') return auth;
+
     const body = await req.json();
-    const { surveyId, cohortId, query, reportType, complexity = 0.5 } = body;
-    
-    if (!query || !reportType) {
-      return NextResponse.json({ 
-        error: "Missing required fields: query and reportType" 
-      }, { status: 400 });
+
+    if (body?.metadata?.source === 'python-analysis' || body?.packaged) {
+      const packaged = assertPackagedAnalysisReport(body.packaged || body);
+      return NextResponse.json({
+        success: true,
+        preview: {
+          title: packaged.title,
+          sections: packaged.sections,
+          metadata: packaged.metadata,
+        },
+      });
     }
-    
-    const reportService = new ReportGenerationService();
-    
-    const preview = await reportService.generateReportPreview({
-      userId: session.user.id,
-      surveyId,
-      cohortId,
-      query,
-      reportType,
-      tokenBudget: 6000,
-      complexity
-    });
-    
-    console.log(`✅ Report preview generated successfully`);
-    
-    return NextResponse.json({
-      success: true,
-      preview
-    });
-    
+
+    // Legacy: accept already-built sections for preview without regenerating
+    const { title, query, reportType, sections, metadata } = body || {};
+    if (sections && Array.isArray(sections) && sections.length > 0) {
+      return NextResponse.json({
+        success: true,
+        preview: {
+          title:
+            title ||
+            `Report: ${String(query || '').slice(0, 50)}`,
+          sections,
+          metadata: metadata || { source: 'client-sections' },
+        },
+      });
+    }
+
+    return NextResponse.json(
+      {
+        error:
+          'Preview requires a packaged python-analysis run (metadata.source=python-analysis) or prebuilt sections. Server-side stubbed analysis has been retired.',
+      },
+      { status: 400 }
+    );
   } catch (error) {
-    console.error('❌ Report preview generation failed:', error);
-    return NextResponse.json({ 
-      error: error instanceof Error ? error.message : 'Unknown error' 
-    }, { status: 500 });
+    console.error('❌ Report preview failed:', error);
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Unknown error' },
+      { status: 500 }
+    );
   }
-} 
+}

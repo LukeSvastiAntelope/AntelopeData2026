@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
-import { Upload, MessageCircle, Code, PlayCircle, Plus, Download } from 'lucide-react';
+import { Upload, MessageCircle, Code, PlayCircle, Plus, Download, Save } from 'lucide-react';
 import { FileUpload } from './components/FileUpload';
 import { ConversationView } from './components/ConversationView';
 import { ChatInput } from './components/ChatInput';
@@ -12,6 +12,9 @@ import { CodebookUpload } from './components/CodebookUpload';
 import { usePyodide } from './hooks/usePyodide';
 import { useAnalysisContext } from './hooks/useAnalysisContext';
 import { useAnalysisAgent } from './hooks/useAnalysisAgent';
+import { packagePythonAnalysisRun } from '@/app/utils/services/python-analysis-report';
+import toast from 'react-hot-toast';
+import Link from 'next/link';
 
 interface AnalysisMessage {
   id: string;
@@ -53,6 +56,8 @@ export default function PythonAnalysisPage() {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [savingReport, setSavingReport] = useState(false);
+  const [lastSavedReportId, setLastSavedReportId] = useState<string | null>(null);
   const processedStepsRef = useRef<Set<string>>(new Set());
   const lastStatusRef = useRef<string>('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -166,6 +171,81 @@ __antelope_csv
       }]);
     } finally {
       setExporting(false);
+    }
+  };
+
+  /** Persist the completed python-analysis run as a shareable Report (no server stubs). */
+  const handleSaveAsReport = async () => {
+    if (!agentState || agentState.status !== 'completed') {
+      toast.error('Finish an analysis run before saving a report.');
+      return;
+    }
+    setSavingReport(true);
+    try {
+      const packaged = packagePythonAnalysisRun({
+        sessionId: agentState.session_id,
+        question: agentState.context.question,
+        keyFindings: agentState.context.key_findings,
+        executedSteps: agentState.executed_steps.map((s) => ({
+          id: s.id,
+          description: s.step?.description,
+          output: s.output,
+          success: s.success,
+          insights: s.insights,
+          plots: (s as { plots?: string[] }).plots,
+          execution_time_ms: s.execution_time_ms,
+        })),
+        dataset: currentDataset
+          ? {
+              name: currentDataset.name,
+              rows: currentDataset.shape?.[0],
+              columns: agentState.context.dataset_info?.columns,
+              columnTypes: agentState.context.dataset_info?.types,
+            }
+          : {
+              columns: agentState.context.dataset_info?.columns,
+              columnTypes: agentState.context.dataset_info?.types,
+            },
+        startTimeMs:
+          agentState.start_time instanceof Date
+            ? agentState.start_time.getTime()
+            : new Date(agentState.start_time).getTime(),
+        maps: [],
+      });
+
+      const res = await fetch('/api/reports/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(packaged),
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.success) {
+        throw new Error(data?.error || 'Save failed');
+      }
+      setLastSavedReportId(data.reportId);
+      toast.success('Report saved');
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `report-saved-${Date.now()}`,
+          type: 'system',
+          content: `💾 **Saved as Report** — [Open report](/reports/${data.reportId})\n\nSynthesis, figures, dataset metadata, and significance floors (N≥80 / cell≥25) were persisted.`,
+          timestamp: new Date(),
+        },
+      ]);
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to save report');
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `report-save-error-${Date.now()}`,
+          type: 'error',
+          content: `❌ **Save as Report failed**: ${e?.message || e}`,
+          timestamp: new Date(),
+        },
+      ]);
+    } finally {
+      setSavingReport(false);
     }
   };
 
@@ -812,6 +892,25 @@ __antelope_csv
                       <Download className="h-4 w-4 mr-2" />
                       Export Word
                     </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={handleSaveAsReport}
+                      disabled={agentState?.status !== 'completed' || savingReport}
+                      title={
+                        agentState?.status === 'completed'
+                          ? 'Save this analysis run as a shareable Report'
+                          : 'Complete an analysis run to save as a Report'
+                      }
+                    >
+                      <Save className="h-4 w-4 mr-2" />
+                      {savingReport ? 'Saving…' : 'Save as Report'}
+                    </Button>
+                    {lastSavedReportId && (
+                      <Button size="sm" variant="ghost" asChild>
+                        <Link href={`/reports/${lastSavedReportId}`}>Open report</Link>
+                      </Button>
+                    )}
                   </>
                 )}
                 {!currentDataset && (
@@ -917,6 +1016,16 @@ __antelope_csv
                             className="text-xs"
                           >
                             ▶️ Resume Agent
+                          </Button>
+                        ) : agentState?.status === 'completed' ? (
+                          <Button
+                            size="sm"
+                            onClick={handleSaveAsReport}
+                            className="text-xs"
+                            disabled={savingReport}
+                          >
+                            <Save className="h-3 w-3 mr-1" />
+                            {savingReport ? 'Saving…' : 'Save as Report'}
                           </Button>
                         ) : (
                           <Button 

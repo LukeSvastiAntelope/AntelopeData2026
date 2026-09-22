@@ -253,6 +253,64 @@ export class ReportStorageService {
     console.log('Report embeddings creation not yet implemented');
   }
   
+  /**
+   * Persist a pre-packaged python-analysis run (no server-side analysis).
+   * Sections + significance metadata come from the client agent path.
+   */
+  async persistPackagedReport(
+    userId: string,
+    packaged: {
+      title: string;
+      query: string;
+      reportType: CreateReportParams['reportType'];
+      surveyId?: number;
+      cohortId?: number;
+      complexity?: number;
+      sections: ReportSection[];
+      metadata: Record<string, unknown>;
+    }
+  ): Promise<string> {
+    const reportId = await this.createReport({
+      userId,
+      surveyId: packaged.surveyId,
+      cohortId: packaged.cohortId,
+      query: packaged.query,
+      reportType: packaged.reportType,
+      title: packaged.title,
+      complexity: packaged.complexity,
+    });
+
+    for (const section of packaged.sections) {
+      await this.storeReportSection(reportId, section);
+    }
+
+    const summarySource =
+      packaged.sections.find((s) => s.type === 'executive_summary')?.content ||
+      packaged.sections[0]?.content ||
+      '';
+    const tokenUsage =
+      typeof packaged.metadata.tokenUsage === 'number'
+        ? packaged.metadata.tokenUsage
+        : packaged.sections.reduce(
+            (total, s) => total + Math.ceil((s.content || '').length / 4),
+            0
+          );
+    const processingTimeMs =
+      typeof packaged.metadata.processingTimeMs === 'number'
+        ? packaged.metadata.processingTimeMs
+        : 0;
+
+    await this.updateReportStatus(reportId, 'completed', {
+      summary: summarySource.slice(0, 500) + (summarySource.length > 500 ? '...' : ''),
+      tokenUsage,
+      completedAt: new Date(),
+      processingTimeMs,
+      metadata: packaged.metadata,
+    });
+
+    return reportId;
+  }
+
   // Chunk content for embeddings
   private chunkContent(content: string, chunkSize: number = 1000): string[] {
     const chunks: string[] = [];
