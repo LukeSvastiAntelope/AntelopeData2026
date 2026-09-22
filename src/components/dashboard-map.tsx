@@ -381,6 +381,7 @@ export default function DashboardMap({
     let cancelled = false
     let mapInstance: any = null
     let unregisterCapture: (() => void) | undefined
+    let resizeCleanup: (() => void) | undefined
 
     const init = async () => {
       // 1. Load CSS from CDN and WAIT for it (critical for canvas sizing)
@@ -427,6 +428,33 @@ export default function DashboardMap({
       )
       map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'bottom-right')
 
+      // Keep canvas in sync with container size (sidebar/panel toggle, layout settle, window resize).
+      // MapLibre does not auto-detect container changes after init.
+      let rafId = 0
+      let resizeDisposed = false
+      const doResize = () => {
+        if (resizeDisposed || cancelled) return
+        cancelAnimationFrame(rafId)
+        rafId = requestAnimationFrame(() => {
+          if (resizeDisposed || cancelled || !mapRef.current) return
+          try {
+            map.resize()
+          } catch {
+            /* map may already be removed */
+          }
+        })
+      }
+      map.once('load', doResize)
+      const ro = new ResizeObserver(doResize)
+      if (containerRef.current) ro.observe(containerRef.current)
+      window.addEventListener('resize', doResize)
+      resizeCleanup = () => {
+        resizeDisposed = true
+        ro.disconnect()
+        window.removeEventListener('resize', doResize)
+        cancelAnimationFrame(rafId)
+      }
+
       map.on('error', (e: any) => {
         console.error('[DashboardMap] error:', e?.error || e)
         if (!cancelled && status === 'loading') {
@@ -437,7 +465,6 @@ export default function DashboardMap({
 
       map.on('load', () => {
         if (cancelled) return
-        map.resize()
         setStatus('ready')
 
         // ---- State boundaries ----
@@ -1033,6 +1060,7 @@ export default function DashboardMap({
     return () => {
       cancelled = true
       clearTimeout(timeout)
+      resizeCleanup?.()
       unregisterCapture?.()
       if (mapInstance) { mapInstance.remove(); mapInstance = null }
       mapRef.current = null
