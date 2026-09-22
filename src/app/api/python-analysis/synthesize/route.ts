@@ -16,6 +16,8 @@ interface SynthesisRequest {
     timestamp: Date;
   }>;
   keyFindings: string[];
+  /** Formatted buildAnalyticsContext for campaign-aware synthesis */
+  analyticsContextPrompt?: string;
 }
 
 export async function POST(req: NextRequest) {
@@ -26,8 +28,12 @@ export async function POST(req: NextRequest) {
     }
 
     const request: SynthesisRequest = await req.json();
+    const richBundle = request.analyticsContextPrompt?.trim()
+      ? `\n\nCAMPAIGN / SURVEY CONTEXT:\n${request.analyticsContextPrompt}`
+      : '';
     
     const systemPrompt = `You are an expert survey analyst and data scientist specializing in extracting meaningful insights from survey responses. Your role is to help users understand their survey data through comprehensive analysis and clear communication.
+${richBundle}
 
 CORE PRINCIPLES:
 • Always ground your analysis in the actual computed results from the analysis steps below — never invent numbers.

@@ -58,6 +58,7 @@ export default function PythonAnalysisPage() {
   const [exporting, setExporting] = useState(false);
   const [savingReport, setSavingReport] = useState(false);
   const [lastSavedReportId, setLastSavedReportId] = useState<string | null>(null);
+  const [analyticsContextPrompt, setAnalyticsContextPrompt] = useState<string | null>(null);
   const processedStepsRef = useRef<Set<string>>(new Set());
   const lastStatusRef = useRef<string>('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -265,7 +266,9 @@ __antelope_csv
 
     try {
       const loadedDataset = await loadDataset(file);
-      
+      // CSV/file uploads are not survey-backed — clear rich campaign bundle
+      setAnalyticsContextPrompt(null);
+
       // Add success message with dataset info using the returned dataset
       let codebookSuggestion = '';
       if (loadedDataset?.autoCodebookApplied) {
@@ -433,6 +436,28 @@ __antelope_csv
         (loadedDataset as any).surveyMetadata = codebook;
         // Mark this as having built-in codebook (database schema)
         loadedDataset.codebookMappings = codebook.codebookMappings || [];
+
+        // Rich bundle for plan/code prompts (survey intent, voter file, district, org, prior surveys)
+        try {
+          const ctxRes = await fetch(
+            `/api/python-analysis/analytics-context?surveyId=${surveyData.surveyId}`
+          );
+          if (ctxRes.ok) {
+            const ctxData = await ctxRes.json();
+            if (ctxData?.promptBlock) {
+              setAnalyticsContextPrompt(String(ctxData.promptBlock));
+            } else {
+              setAnalyticsContextPrompt(null);
+            }
+          } else {
+            setAnalyticsContextPrompt(null);
+          }
+        } catch (ctxErr) {
+          console.warn('[python-analysis] analytics-context fetch failed:', ctxErr);
+          setAnalyticsContextPrompt(null);
+        }
+      } else {
+        setAnalyticsContextPrompt(null);
       }
 
       // Add success message
@@ -477,14 +502,32 @@ __antelope_csv
       };
       setMessages(prev => [...prev, userMessage]);
 
-      // Initialize the autonomous agent
+      // Initialize the autonomous agent (prior steps + synthesis for multi-turn continuity)
       console.log('🤖 Initializing autonomous analysis agent...');
-      const { sessionId, initialState } = await initializeAgent(question, {
-        columns: currentDataset.columns,
-        types: currentDataset.dtypes,
-        sample_data: currentDataset.data, // Use full dataset instead of sampleData
-        codebook_mappings: currentDataset.codebookMappings
-      });
+      const priorHistory = (analysisHistory || []).slice(0, 8).map((h) => ({
+        code: h.code || '',
+        output: (h.results || [])
+          .map((r) => (typeof r.content === 'string' ? r.content : JSON.stringify(r.content)))
+          .join('\n')
+          .slice(0, 2000),
+        question: h.query,
+        timestamp: h.timestamp instanceof Date ? h.timestamp.toISOString() : String(h.timestamp || ''),
+      }));
+      const { sessionId, initialState } = await initializeAgent(
+        question,
+        {
+          columns: currentDataset.columns,
+          types: currentDataset.dtypes,
+          // Keep full frame for Pyodide; plan/code routes slice head for the model
+          sample_data: currentDataset.data,
+          row_count: currentDataset.shape?.[0] ?? currentDataset.data?.length,
+          codebook_mappings: currentDataset.codebookMappings,
+        },
+        {
+          analyticsContextPrompt: analyticsContextPrompt || undefined,
+          priorHistory,
+        }
+      );
       console.log('✅ Agent initialized with session:', sessionId);
 
       // Add agent status message with enhanced codebook context
@@ -602,21 +645,32 @@ __antelope_csv
 
           // Final synthesis - always show when completed, even if synthesis failed
           if (updatedState.status === 'completed') {
+            const doneKey = `completed-${updatedState.session_id}`;
+            if (processedStepsRef.current.has(doneKey)) {
+              return;
+            }
+            processedStepsRef.current.add(doneKey);
+
             console.log('🎯 Analysis completed, checking for synthesis...');
             const finalSynthesis = updatedState.context.key_findings.find(f => f.startsWith('FINAL SYNTHESIS:'));
+            const synthesisText = finalSynthesis
+              ? finalSynthesis.replace('FINAL SYNTHESIS: ', '')
+              : updatedState.context.key_findings
+                  .filter((f) => !f.startsWith('FINAL SYNTHESIS:'))
+                  .slice(0, 5)
+                  .join('\n');
             
             if (finalSynthesis) {
               console.log('✅ Found synthesis, displaying...');
               const synthesisMessage: AnalysisMessage = {
                 id: `synthesis-${Date.now()}`,
                 type: 'assistant',
-                content: `🎯 **Analysis Complete**\n\n${finalSynthesis.replace('FINAL SYNTHESIS: ', '')}\n\n**📊 Summary:**\n- Total Steps Executed: ${updatedState.executed_steps.length}\n- Key Insights Found: ${updatedState.context.key_findings.length - 1}\n- Analysis Duration: ${Math.round((Date.now() - updatedState.start_time.getTime()) / 1000)}s`,
+                content: `🎯 **Analysis Complete**\n\n${synthesisText}\n\n**📊 Summary:**\n- Total Steps Executed: ${updatedState.executed_steps.length}\n- Key Insights Found: ${updatedState.context.key_findings.length - 1}\n- Analysis Duration: ${Math.round((Date.now() - updatedState.start_time.getTime()) / 1000)}s`,
                 timestamp: new Date()
               };
               setMessages(prev => [...prev, synthesisMessage]);
             } else {
               console.log('⚠️ No synthesis found, showing summary of insights...');
-              // Fallback: show insights summary if no synthesis was generated
               const nonSynthesisFindings = updatedState.context.key_findings.filter(f => !f.startsWith('FINAL SYNTHESIS:'));
               const synthesisMessage: AnalysisMessage = {
                 id: `synthesis-${Date.now()}`,
@@ -626,6 +680,22 @@ __antelope_csv
               };
               setMessages(prev => [...prev, synthesisMessage]);
             }
+
+            // Persist for next-turn continuity (AnalysisChat / plan-steps prior history)
+            const lastStep = updatedState.executed_steps[updatedState.executed_steps.length - 1];
+            addAnalysis({
+              id: `agent-${updatedState.session_id}`,
+              query: updatedState.context.question,
+              code: lastStep?.code || '',
+              results: [
+                {
+                  type: 'text',
+                  content: synthesisText || 'Analysis completed',
+                  timestamp: new Date(),
+                },
+              ],
+              timestamp: new Date(),
+            });
           }
         }, initialState);
         console.log('✅ runAutonomousAnalysis completed');

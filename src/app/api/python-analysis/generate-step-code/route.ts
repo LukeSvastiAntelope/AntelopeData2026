@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { createCompletion } from '@/app/utils/services/ai-service';
+import { formatDatasetGrainForPrompt } from '@/app/utils/services/dataset-grain';
 
 interface StepCodeRequest {
   step: {
@@ -17,6 +18,7 @@ interface StepCodeRequest {
       columns: string[];
       types: Record<string, string>;
       sample_data: any[];
+      row_count?: number;
       codebook_mappings?: Record<string, any>;
     };
     discovered_variables: Record<string, string[]>;
@@ -31,6 +33,7 @@ interface StepCodeRequest {
     success: boolean;
     insights: string[];
   }>;
+  analyticsContextPrompt?: string;
 }
 
 export async function POST(req: NextRequest) {
@@ -41,8 +44,23 @@ export async function POST(req: NextRequest) {
     }
 
     const request: StepCodeRequest = await req.json();
+    const grainBlock = formatDatasetGrainForPrompt({
+      columns: request.context.dataset_info.columns,
+      types: request.context.dataset_info.types,
+      sample_data: request.context.dataset_info.sample_data,
+      row_count:
+        request.context.dataset_info.row_count ??
+        request.context.dataset_info.sample_data?.length,
+      codebook_mappings: request.context.dataset_info.codebook_mappings,
+    });
+    const richBundle = request.analyticsContextPrompt?.trim()
+      ? `\n\nCAMPAIGN / SURVEY CONTEXT (buildAnalyticsContext):\n${request.analyticsContextPrompt}`
+      : '';
     
     const systemPrompt = `You are an expert Python data analyst. Generate focused, executable code for a specific analysis step.
+${richBundle}
+
+${grainBlock}
 
 PYODIDE REQUIREMENTS:
 - Use only: pandas, numpy, matplotlib (scipy sparingly)

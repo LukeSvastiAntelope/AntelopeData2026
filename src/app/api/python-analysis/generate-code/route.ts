@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { createCompletion } from '@/app/utils/services/ai-service';
+import { formatDatasetGrainForPrompt } from '@/app/utils/services/dataset-grain';
 
 interface CodeGenerationRequest {
   query: string;
@@ -8,15 +9,19 @@ interface CodeGenerationRequest {
     columns: string[];
     types: Record<string, string>;
     sampleData: any[];
+    rowCount?: number;
     codebookMappings?: Record<string, any>;
   };
   analysisHistory?: Array<{
     code: string;
     output: string;
     timestamp: string;
+    question?: string;
   }>;
   analysisType?: 'statistical' | 'exploratory' | 'visualization' | 'auto';
   model?: string;
+  /** Formatted buildAnalyticsContext block */
+  analyticsContextPrompt?: string;
 }
 
 interface CodeGenerationResponse {
@@ -69,10 +74,21 @@ function classifyAnalysisType(query: string, dataSchema: any): {
 }
 
 // Create survey-specific system prompt
-function createSurveyAnalysisPrompt(dataSchema: any): string {
-  const columnInfo = dataSchema.columns.map((col: string, idx: number) => 
-    `${col} (${dataSchema.types[col] || 'unknown'})`
-  ).join(', ');
+function createSurveyAnalysisPrompt(
+  dataSchema: CodeGenerationRequest['dataSchema'],
+  analyticsContextPrompt?: string
+): string {
+  const grain = formatDatasetGrainForPrompt({
+    columns: dataSchema.columns,
+    types: dataSchema.types,
+    sampleData: dataSchema.sampleData,
+    row_count: dataSchema.rowCount ?? dataSchema.sampleData?.length,
+    codebookMappings: dataSchema.codebookMappings,
+  });
+  const rich =
+    analyticsContextPrompt?.trim()
+      ? `\n\nCAMPAIGN / SURVEY CONTEXT (buildAnalyticsContext):\n${analyticsContextPrompt}`
+      : '';
 
   return `You are an expert data analyst specializing in survey research and statistical analysis. You have deep knowledge of:
 
@@ -82,15 +98,11 @@ function createSurveyAnalysisPrompt(dataSchema: any): string {
 - Cross-tabulation and correlation analysis
 - Data visualization best practices
 - Common survey biases and limitations
+${rich}
 
-You are helping analyze a dataset with the following structure:
-- Columns: ${columnInfo}
-- Sample size: ${dataSchema.sampleData.length} rows shown
-- Data types detected: ${JSON.stringify(dataSchema.types)}
+${grain}
 
-${dataSchema.codebookMappings ? `\n**CODEBOOK MAPPINGS:**\n${JSON.stringify(dataSchema.codebookMappings, null, 2)}\n` : ''}
-
-CRITICAL: You must approach each question with THOROUGH, ITERATIVE ANALYSIS like a senior researcher would:
+CRITICAL: You must approach each question with THOROUGH, ITERATIVE ANALYSIS like a senior researcher would. Plan against the real dataframe head and dtypes above — do not invent columns.
 
 ANALYTICAL APPROACH - STEP BY STEP:
 1. **STEP 1 - EXPLORE VARIABLES**: Start with simple exploration to find relevant variables. Generate SHORT, SIMPLE code that just explores and prints findings
@@ -107,9 +119,6 @@ CRITICAL FOR COMPLEX QUESTIONS:
 - Let the user guide the next step based on findings
 - Don't try to do comprehensive analysis in one code block
 
-EXAMPLE FOR "How does education influence healthcare opinions?":
-Generate code with ALL steps in sequence, each step clearly marked with print headers.
-
 TECHNICAL GUIDELINES:
 1. Always consider statistical significance for survey data
 2. Account for sample sizes when making claims
@@ -121,11 +130,7 @@ TECHNICAL GUIDELINES:
 8. IMPORTANT: Check if advanced packages are available before importing (e.g., try/except for seaborn)
 9. Fall back to matplotlib if seaborn is not available
 10. MATPLOTLIB PLOTS: Always end visualization code with plt.show() - plots will be automatically captured and displayed
-11. **CRITICAL - CODEBOOK USAGE**: When codebook information is provided above, you MUST use the exact value labels from the codebook, not make up your own labels. For example:
-    - If codebook shows "F_EDUCCAT: 1=Less than high school, 2=High school graduate, 3=Some college, 4=College graduate+", use EXACTLY those labels
-    - Create a mapping dictionary from the codebook: label_map = {'1': 'Less than high school', '2': 'High school graduate', ...}
-    - Use df['column'].map(label_map) to apply labels before visualization
-    - NEVER hardcode different labels like ['Less than HS', 'HS Graduate'] - use the exact codebook labels
+11. **CRITICAL - CODEBOOK USAGE**: When codebook information is provided above, you MUST use the exact value labels from the codebook, not make up your own labels.
 12. OUTPUT FORMATTING: For lists and dictionaries, use json.dumps() with indent=2 for readable output, or create formatted tables with pandas
 13. TABLE DISPLAY: When showing distributions, counts, or statistical results, display both the data values AND create nice tables using print(df.to_string()) or df.head() for better readability
 
@@ -135,18 +140,12 @@ PYODIDE COMPATIBILITY REQUIREMENTS:
 16. **SIMPLE AGGREGATIONS**: Use basic operations: df.value_counts(), df.groupby('col').size(), df.groupby('col').mean()
 17. **CORRELATIONS**: Use simple df.corr() - avoid complex statistical tests that might fail
 18. **ERROR HANDLING**: Always wrap operations in try/except blocks with print statements for debugging
-23. **VARIABLE EXPLORATION**: Before assuming variable names, always explore the dataset first with df.columns to find actual variable names
-24. **SEARCH PATTERNS**: Use multiple search patterns to find variables:
-    - Healthcare: df.columns[df.columns.str.contains('HEALTH|MEDICAL|CARE|HOSPITAL|DOCTOR|MEDICARE|MEDICAID', case=False)]
-    - Also try broader patterns and manually inspect column names for topic-related variables
-    - Look for question codes that might relate to topics (e.g., variables ending with topic indicators)
 19. **CROSS-TABS**: Use simple pd.crosstab(df['col1'], df['col2']) without complex parameters
 20. **VISUALIZATIONS**: Use basic matplotlib - plt.bar(), plt.plot(), plt.hist() - avoid complex seaborn
 21. **STRING HANDLING**: Avoid f-strings or complex string operations that might cause syntax errors. Use simple string concatenation or .format() method
-25. **INDENTATION**: Use simple 4-space indentation consistently. Avoid mixing tabs and spaces which can cause IndentationError in Pyodide
-26. **PYODIDE DEBUGGING**: Add print statements after each major step to help debug where execution fails
-27. **SIMPLE FIRST**: Start with very basic operations and build up complexity gradually
 22. **DEBUG FRIENDLY**: Add lots of print statements to show intermediate results and help with debugging
+23. **VARIABLE EXPLORATION**: Before assuming variable names, always explore the dataset first with df.columns to find actual variable names
+24. **REQUEST MORE GRAIN**: If the head is insufficient, print df.describe(), value_counts, or filtered slices — the full frame is loaded as df
 
 AVAILABLE PACKAGES: pandas, numpy, matplotlib, scipy are guaranteed. Seaborn may not be available.
 The dataset is available as 'df' in the Python environment.`;
@@ -156,15 +155,17 @@ The dataset is available as 'df' in the Python environment.`;
 function createUserPrompt(request: CodeGenerationRequest, analysisType: string): string {
   const analysisHistory = request.analysisHistory || [];
   const historyContext = analysisHistory.length > 0 
-    ? `\n\nPrevious analysis context:\n${analysisHistory.slice(-3).map(h => 
-        `Code: ${h.code}\nResult: ${h.output.slice(0, 200)}...`
+    ? `\n\nPrevious analysis context (continuity — reason with these prior steps + outputs):\n${analysisHistory.slice(-6).map((h, i) => 
+        `${i + 1}. ${h.question ? `Q: ${h.question}\n` : ''}Code: ${(h.code || '').slice(0, 500)}\nResult: ${(h.output || '').slice(0, 500)}`
       ).join('\n\n')}`
     : '';
+
+  const rowCount = request.dataSchema.rowCount ?? request.dataSchema.sampleData.length;
 
   return `Please generate Python code to answer this question: "${request.query}"
 
 Analysis type: ${analysisType}
-Dataset shape: ${request.dataSchema.sampleData.length} rows, ${request.dataSchema.columns.length} columns
+Dataset shape: ${rowCount} rows, ${request.dataSchema.columns.length} columns (full frame as df; head + dtype stats are in the system prompt)
 
 🔍 **CRITICAL**: For complex questions, generate MULTIPLE STEPS automatically like Julius AI:
 
@@ -188,9 +189,10 @@ Requirements:
 3. Add helpful comments explaining the analytical approach
 4. Consider survey methodology best practices
 5. **MANDATORY**: If codebook mappings are provided above, extract the exact value labels and use them in your code
-6. Create label mapping dictionaries directly from the codebook information (e.g., edu_labels = {'1': 'Less than high school', '2': 'High school graduate', ...})
+6. Create label mapping dictionaries directly from the codebook information
 7. Apply these mappings before any visualization or analysis to show meaningful labels instead of numeric codes
 8. Suggest specific follow-up analyses based on findings and gaps
+9. Plan against the real dataframe head — do not invent column names
 
 ${historyContext}
 
@@ -233,7 +235,10 @@ export async function POST(req: NextRequest) {
     console.log(`[PYTHON-ANALYSIS] Analysis type: ${analysisType}, Model: ${selectedModel}`);
 
     // Generate code using AI
-    const systemPrompt = createSurveyAnalysisPrompt(request.dataSchema);
+    const systemPrompt = createSurveyAnalysisPrompt(
+      request.dataSchema,
+      request.analyticsContextPrompt
+    );
     const userPrompt = createUserPrompt(request, analysisType);
 
     const completion = await createCompletion({

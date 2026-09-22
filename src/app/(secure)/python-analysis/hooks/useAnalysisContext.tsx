@@ -185,7 +185,14 @@ export function useAnalysisContext() {
         columns,
         shape: [data.length, columns.length],
         dtypes,
-        sampleData: data.slice(0, 5),
+        // Object rows for prompt grain (head); full frame stays as array-of-arrays in `data`
+        sampleData: data.slice(0, 15).map((row) => {
+          const obj: Record<string, unknown> = {};
+          columns.forEach((col, idx) => {
+            obj[col] = row[idx];
+          });
+          return obj;
+        }),
         suggestCodebook // Add this flag to indicate if codebook is recommended
       };
 

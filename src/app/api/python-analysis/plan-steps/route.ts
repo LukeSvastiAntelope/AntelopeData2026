@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { createCompletion } from '@/app/utils/services/ai-service';
+import { formatDatasetGrainForPrompt } from '@/app/utils/services/dataset-grain';
 
 interface StepPlanningRequest {
   question: string;
@@ -8,6 +9,7 @@ interface StepPlanningRequest {
     columns: string[];
     types: Record<string, string>;
     sample_data: any[];
+    row_count?: number;
     codebook_mappings?: Record<string, any>;
   };
   executedSteps: Array<{
@@ -17,6 +19,15 @@ interface StepPlanningRequest {
     insights: string[];
   }>;
   currentFindings: string[];
+  /** Formatted campaign/survey/voter/district bundle from buildAnalyticsContext */
+  analyticsContextPrompt?: string;
+  /** Prior chat/analysis turns for continuity (beyond executedSteps) */
+  analysisHistory?: Array<{
+    code?: string;
+    output?: string;
+    question?: string;
+    timestamp?: string;
+  }>;
 }
 
 interface AnalysisStep {
@@ -37,15 +48,48 @@ export async function POST(req: NextRequest) {
     }
 
     const request: StepPlanningRequest = await req.json();
+    const rowCount =
+      request.datasetInfo.row_count ??
+      request.datasetInfo.sample_data?.length ??
+      0;
+    const grainBlock = formatDatasetGrainForPrompt({
+      columns: request.datasetInfo.columns,
+      types: request.datasetInfo.types,
+      sample_data: request.datasetInfo.sample_data,
+      row_count: rowCount,
+      codebook_mappings: request.datasetInfo.codebook_mappings,
+    });
+    const richBundle =
+      request.analyticsContextPrompt?.trim()
+        ? `\n\nCAMPAIGN / SURVEY CONTEXT (from buildAnalyticsContext):\n${request.analyticsContextPrompt}`
+        : '';
+    const historyExtra =
+      request.analysisHistory && request.analysisHistory.length > 0
+        ? `\n\nPRIOR ANALYSIS HISTORY (continuity across turns):\n${request.analysisHistory
+            .slice(-6)
+            .map((h, i) => {
+              const q = h.question ? `Q: ${h.question}\n` : '';
+              const code = h.code ? `Code: ${(h.code || '').slice(0, 400)}\n` : '';
+              const out = h.output
+                ? `Result: ${(h.output || '').slice(0, 400)}`
+                : '';
+              return `${i + 1}. ${q}${code}${out}`;
+            })
+            .join('\n\n')}`
+        : '';
     
     const systemPrompt = `You are an expert data analysis strategist. Your job is to create a dynamic, adaptive analysis plan.
 
 ANALYSIS CONTEXT:
 - Question: "${request.question}"
-- Dataset: ${request.datasetInfo.columns.length} columns, ${request.datasetInfo.sample_data.length} sample rows
+- Dataset: ${request.datasetInfo.columns.length} columns, ${rowCount} rows (full frame available as df in Pyodide)
 - Previous steps completed: ${request.executedSteps.length}
 - Current findings: ${request.currentFindings.length} insights discovered
 - Codebook available: ${request.datasetInfo.codebook_mappings ? 'YES - Question text and value labels available' : 'NO - Raw data only'}
+${richBundle}
+${historyExtra}
+
+${grainBlock}
 
 ${request.datasetInfo.codebook_mappings ? `
 **CODEBOOK (column -> question text, type, options, multi-select indicator columns):**
@@ -76,6 +120,7 @@ PLANNING PRINCIPLES:
 3. **Progressive Complexity**: Start simple, then dive deeper
 4. **Gap Identification**: Look for missing pieces in current analysis
 5. **Insight-Driven**: Each step should aim to answer specific sub-questions
+6. **Plan against real grain**: Use the dataframe head + dtype stats above — do not invent columns
 
 CURRENT ANALYSIS STATE:
 ${request.executedSteps.length > 0 ? `

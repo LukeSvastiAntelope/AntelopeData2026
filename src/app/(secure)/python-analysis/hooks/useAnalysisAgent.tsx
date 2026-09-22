@@ -31,12 +31,23 @@ interface AnalysisContext {
     columns: string[];
     types: Record<string, string>;
     sample_data: any[];
+    /** True frame size when sample_data is a head */
+    row_count?: number;
     codebook_mappings?: Record<string, any>;
   };
   discovered_variables: Record<string, string[]>;
   key_findings: string[];
   current_hypothesis: string[];
   gaps_identified: string[];
+  /** Formatted buildAnalyticsContext for plan/code prompts */
+  analytics_context_prompt?: string;
+  /** Prior chat/agent turns (steps + synthesis) for continuity across questions */
+  prior_history?: Array<{
+    code?: string;
+    output?: string;
+    question?: string;
+    timestamp?: string;
+  }>;
 }
 
 interface AgentState {
@@ -63,7 +74,11 @@ export function useAnalysisAgent() {
   // Initialize new analysis session
   const initializeAgent = useCallback(async (
     question: string,
-    datasetInfo: AnalysisContext['dataset_info']
+    datasetInfo: AnalysisContext['dataset_info'],
+    extras?: {
+      analyticsContextPrompt?: string;
+      priorHistory?: AnalysisContext['prior_history'];
+    }
   ) => {
     const sessionId = `session-${Date.now()}`;
     
@@ -75,11 +90,16 @@ export function useAnalysisAgent() {
       executed_steps: [],
       context: {
         question,
-        dataset_info: datasetInfo,
+        dataset_info: {
+          ...datasetInfo,
+          row_count: datasetInfo.row_count ?? datasetInfo.sample_data?.length,
+        },
         discovered_variables: {},
         key_findings: [],
         current_hypothesis: [],
-        gaps_identified: []
+        gaps_identified: [],
+        analytics_context_prompt: extras?.analyticsContextPrompt,
+        prior_history: extras?.priorHistory,
       },
       error_count: 0,
       start_time: new Date(),
@@ -97,14 +117,37 @@ export function useAnalysisAgent() {
   // Dynamic Step Planner
   const planAnalysisSteps = useCallback(async (state: AgentState): Promise<AnalysisStep[]> => {
     try {
+      const fullRows = state.context.dataset_info.sample_data || [];
+      const rowCount = state.context.dataset_info.row_count ?? fullRows.length;
+      const head = fullRows.slice(0, 15);
+      const fromSteps = state.executed_steps.slice(-6).map((s) => ({
+        code: s.code,
+        output: s.output,
+        question: state.context.question,
+        timestamp: s.timestamp instanceof Date ? s.timestamp.toISOString() : String(s.timestamp),
+      }));
+      const fromPrior = (state.context.prior_history || []).slice(-6);
+      // Prefer in-session steps; still include prior-turn synthesis/history for continuity
+      const analysisHistory =
+        fromSteps.length > 0
+          ? [...fromPrior.slice(-3), ...fromSteps].slice(-8)
+          : fromPrior;
       const response = await fetch('/api/python-analysis/plan-steps', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           question: state.context.question,
-          datasetInfo: state.context.dataset_info,
+          datasetInfo: {
+            columns: state.context.dataset_info.columns,
+            types: state.context.dataset_info.types,
+            sample_data: head,
+            row_count: rowCount,
+            codebook_mappings: state.context.dataset_info.codebook_mappings,
+          },
           executedSteps: state.executed_steps,
-          currentFindings: state.context.key_findings
+          currentFindings: state.context.key_findings,
+          analyticsContextPrompt: state.context.analytics_context_prompt,
+          analysisHistory,
         })
       });
 
@@ -151,13 +194,23 @@ export function useAnalysisAgent() {
     context: AnalysisContext,
     executedSteps: ExecutedStep[]
   ): Promise<string> => {
+    const fullRows = context.dataset_info.sample_data || [];
+    const rowCount = context.dataset_info.row_count ?? fullRows.length;
     const response = await fetch('/api/python-analysis/generate-step-code', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         step,
-        context,
-        executedSteps: executedSteps.slice(-3) // Last 3 steps for context
+        context: {
+          ...context,
+          dataset_info: {
+            ...context.dataset_info,
+            sample_data: fullRows.slice(0, 15),
+            row_count: rowCount,
+          },
+        },
+        executedSteps: executedSteps.slice(-3),
+        analyticsContextPrompt: context.analytics_context_prompt,
       })
     });
 
@@ -506,7 +559,8 @@ exec_result
         body: JSON.stringify({
           question: state.context.question,
           executedSteps: state.executed_steps,
-          keyFindings: state.context.key_findings
+          keyFindings: state.context.key_findings,
+          analyticsContextPrompt: state.context.analytics_context_prompt,
         })
       });
 
