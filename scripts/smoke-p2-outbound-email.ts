@@ -6,16 +6,16 @@
 
 import { closePool, openSql } from '../src/app/utils/database/db';
 import {
-  extractEmailsFromRows,
-  parseEmailPaste,
-  prepareRecipientList,
-  validateAndDedupeEmails,
-} from '../src/app/utils/services/email/recipient-list';
-import {
   isResendConfigured,
-  sendCandidateEmail,
+  prepareRecipientList,
+  parseEmailPaste,
+  validateAndDedupeEmails,
+  extractEmailsFromRows,
+  buildCandidateFrom,
+  sendCompliantBulk,
 } from '../src/app/utils/services/email';
 import { ContactSuppressionRepo } from '../src/app/utils/database/turf-repo';
+import { EmailSendRepo, ensureEmailTables } from '../src/app/utils/database/email-send-repo';
 import type { ResultSetHeader, RowDataPacket } from 'mysql2';
 
 require('dotenv').config({ path: '.env.local' });
@@ -86,23 +86,57 @@ async function main() {
   assert(prepared.duplicateCount >= 1, 'dupes counted');
   assert(prepared.invalidCount >= 1, 'invalid counted');
 
-  // Real send (small) — same path as /api/outbound/email/send
-  const send = await sendCandidateEmail({
+  // Real send via shared sendCompliantBulk (same path as /api/outbound/email/send)
+  await ensureEmailTables();
+  const { from, replyTo } = buildCandidateFrom({
     fromName: 'Antelope P2 Smoke',
     localPart: 'p2-smoke',
     replyTo: 'noreply@antelopedata.org',
-    to: [to],
-    subject: `[Antelope P2] In-app send ${tag}`,
-    html: `<p>P2 outbound email smoke (${tag}). Uploaded-list path via EmailProvider.</p>`,
   });
-  assert(send.sent === 1, `sent=${send.sent} err=${send.results[0]?.error}`);
-  assert(send.from.includes('@'), 'from set');
+  const sendId = await EmailSendRepo.createSend({
+    userId,
+    organizationId: orgId,
+    subject: `[Antelope P2] In-app send ${tag}`,
+    fromAddress: from,
+    provider: 'resend',
+    receiptId: `rcpt_p2_${tag}`,
+    summary: { total: 1 },
+  });
+  const bulk = await sendCompliantBulk({
+    userId,
+    organizationId: orgId,
+    sendId,
+    from,
+    replyTo,
+    subject: `[Antelope P2] In-app send ${tag}`,
+    htmlBase: `<p>P2 outbound email smoke (${tag}). Uploaded-list path via EmailProvider.</p>`,
+    fromName: 'Antelope P2 Smoke',
+    emails: [to],
+  });
+  assert(bulk.summary.sent === 1, `sent=${bulk.summary.sent}`);
+  assert(bulk.from.includes('@'), 'from set');
+
+  // Idempotent resume — re-run same sendId → 0 new sends
+  const resume = await sendCompliantBulk({
+    userId,
+    organizationId: orgId,
+    sendId,
+    from,
+    replyTo,
+    subject: `[Antelope P2] In-app send ${tag}`,
+    htmlBase: `<p>P2 outbound email smoke (${tag}).</p>`,
+    fromName: 'Antelope P2 Smoke',
+    emails: [to],
+  });
+  assert(resume.summary.sent === 0, 'resume sends zero');
+  assert(resume.summary.skipped === 1, 'resume skips already-sent');
 
   const receipt = {
     id: `rcpt_${Date.now()}`,
-    provider: send.provider,
-    from: send.from,
-    summary: { total: send.total, sent: send.sent, failed: send.failed },
+    sendId,
+    provider: bulk.provider,
+    from: bulk.from,
+    summary: bulk.summary,
     prepared: {
       rawCount: prepared.rawCount,
       validCount: prepared.emails.length,
@@ -111,7 +145,7 @@ async function main() {
   };
 
   console.log(JSON.stringify({ ok: true, to, receipt }, null, 2));
-  console.log('PASS: P2 — prepare (dedupe/suppress) + in-app platform send receipt');
+  console.log('PASS: P2 — prepare + sendCompliantBulk + idempotent resume');
 
   try {
     await db.execute(`DELETE FROM contact_suppression WHERE person_record_id = ?`, [

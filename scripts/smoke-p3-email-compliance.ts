@@ -23,6 +23,7 @@ import {
   prepareRecipientList,
   buildCandidateFrom,
   getEmailProvider,
+  sendCompliantBulk,
 } from '../src/app/utils/services/email';
 import type { RowDataPacket } from 'mysql2';
 
@@ -231,46 +232,29 @@ async function main() {
   });
   assert(prepUnsub.emails.length === 0, 'unsub removes from future sends');
 
-  // Real compliant send (small)
-  const msg = buildCompliantMessage({
-    html: `<p>P3 compliance smoke (${tag}).</p>`,
-    userId: userA,
-    email: to,
-    fromName: 'Antelope P3 Smoke',
-  });
-  const provider = getEmailProvider();
-  const live = await provider.send({
-    from,
-    to: [to],
-    subject: `[Antelope P3] Compliance smoke ${tag}`,
-    html: msg.html,
-    replyTo: 'noreply@antelopedata.org',
-    headers: msg.headers,
-  });
-  assert(
-    live.status === 'sent' || live.status === 'queued',
-    `live send failed: ${live.error}`
-  );
-  assert(Boolean(live.id), 'provider message id');
-
+  // Real compliant send via shared helper
   const liveSendId = await EmailSendRepo.createSend({
     userId: userA,
     organizationId: orgId,
     subject: `[Antelope P3] Compliance smoke ${tag}`,
     fromAddress: from,
-    provider: provider.name,
+    provider: getEmailProvider().name,
     receiptId: `rcpt_live_${tag}`,
-    summary: { total: 1, sent: 1, failed: 0 },
+    summary: { total: 1, sent: 0, failed: 0 },
   });
-  await EmailSendRepo.addRecipient({
-    sendId: liveSendId,
+  const live = await sendCompliantBulk({
     userId: userA,
     organizationId: orgId,
-    email: to,
-    providerMessageId: live.id,
-    status: 'sent',
-    unsubTokenHash: msg.unsubscribeTokenHash,
+    sendId: liveSendId,
+    from,
+    replyTo: 'noreply@antelopedata.org',
+    subject: `[Antelope P3] Compliance smoke ${tag}`,
+    htmlBase: `<p>P3 compliance smoke (${tag}).</p>`,
+    fromName: 'Antelope P3 Smoke',
+    emails: [to],
   });
+  assert(live.summary.sent === 1, `live sent=${live.summary.sent}`);
+  assert(live.canSpam === true, 'canSpam');
 
   const recent = await EmailSendRepo.listRecentSends(userA, 5);
   assert(recent.some((s) => s.id === liveSendId || s.id === sendId), 'results list has sends');
@@ -283,8 +267,8 @@ async function main() {
       {
         ok: true,
         to,
-        liveMessageId: live.id,
-        sendId: liveSendId,
+        liveSendId,
+        liveSent: live.summary.sent,
         canSpam: true,
         physicalAddressSet: Boolean(addr),
         suppressionsForUserA: (await EmailSuppressionRepo.listForUser(userA, 10)).length,
