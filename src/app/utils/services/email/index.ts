@@ -38,6 +38,8 @@ export {
   injectCanSpamFooter,
 } from './compliance';
 export type { CompliantMessage } from './compliance';
+export { sendCompliantBulk } from './bulk-send';
+export type { CompliantBulkReceipt, SendCompliantBulkOpts } from './bulk-send';
 
 export const EMAIL_SEND_DOMAIN =
   process.env.EMAIL_SEND_DOMAIN?.trim() || 'send.antelopedata.org';
