@@ -8,6 +8,8 @@ export type ExportableFigure = {
   pngBase64: string;
   /** Used for filename stem */
   label?: string;
+  /** chart (matplotlib) vs map (MapLibre canvas capture) */
+  kind?: 'chart' | 'map';
 };
 
 function stripDataUrl(pngBase64: string): string {
@@ -124,7 +126,7 @@ export async function exportAllAsSeparatePdfs(
 }
 
 /**
- * Bonus: combined report with overview text + all figures.
+ * Combined report: narrative overview → chart figures → map figures.
  */
 export async function exportCombinedReportPdf(
   figures: ExportableFigure[],
@@ -152,18 +154,39 @@ export async function exportCombinedReportPdf(
     y += 12;
   }
 
-  for (let i = 0; i < figures.length; i++) {
-    const fig = figures[i];
+  const charts = figures.filter((f) => f.kind !== 'map');
+  const maps = figures.filter((f) => f.kind === 'map');
+  const ordered = [
+    ...charts.map((f, i) => ({
+      ...f,
+      label: f.label || `Chart ${i + 1}`,
+    })),
+    ...maps.map((f, i) => ({
+      ...f,
+      label: f.label || `Map ${i + 1}`,
+    })),
+  ];
+
+  for (let i = 0; i < ordered.length; i++) {
+    const fig = ordered[i];
     pdf.addPage();
-    const label = fig.label || `Figure ${i + 1}`;
+    const isMap = fig.kind === 'map';
+    const label = fig.label || (isMap ? `Map ${i + 1}` : `Figure ${i + 1}`);
     pdf.setFontSize(12);
     pdf.text(label, margin, margin);
+    if (isMap) {
+      pdf.setFontSize(9);
+      pdf.setTextColor(100);
+      pdf.text('Geospatial map (MapLibre snapshot)', margin, margin + 14);
+      pdf.setTextColor(0);
+    }
 
     const img = await loadImage(fig.pngBase64);
     const pxW = img.naturalWidth || img.width;
     const pxH = img.naturalHeight || img.height;
+    const topOffset = isMap ? 28 : 16;
     const maxW = pageW - margin * 2;
-    const maxH = pageH - margin * 2 - 20;
+    const maxH = pageH - margin * 2 - topOffset;
     const scale = Math.min(maxW / pxW, maxH / pxH);
     const drawW = pxW * scale;
     const drawH = pxH * scale;
@@ -171,7 +194,16 @@ export async function exportCombinedReportPdf(
     const dataUrl = fig.pngBase64.startsWith('data:')
       ? fig.pngBase64
       : `data:image/png;base64,${stripDataUrl(fig.pngBase64)}`;
-    pdf.addImage(dataUrl, 'PNG', margin, margin + 16, drawW, drawH, undefined, 'FAST');
+    pdf.addImage(
+      dataUrl,
+      'PNG',
+      margin,
+      margin + topOffset,
+      drawW,
+      drawH,
+      undefined,
+      'FAST'
+    );
   }
 
   pdf.save(`python-analysis-report-${Date.now()}.pdf`);

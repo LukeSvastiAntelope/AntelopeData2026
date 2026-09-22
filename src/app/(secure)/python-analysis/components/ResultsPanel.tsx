@@ -17,6 +17,8 @@ interface ResultsPanelProps {
   error: string | null;
   /** Optional overview/insights text for the combined report PDF */
   overviewText?: string;
+  /** MapLibre canvas captures (Analytics C4) — merged into combined PDF after charts */
+  mapFigures?: ExportableFigure[];
 }
 
 function figureLabel(result: AnalysisResult, figureIndex: number): string {
@@ -29,20 +31,22 @@ export function ResultsPanel({
   isExecuting,
   error,
   overviewText,
+  mapFigures = [],
 }: ResultsPanelProps) {
   const [busy, setBusy] = useState<string | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
 
   const figures: ExportableFigure[] = useMemo(() => {
     let figureIndex = 0;
-    return results
+    const charts = results
       .filter((r) => r.type === 'image' && r.content)
       .map((r) => {
         const label = figureLabel(r, figureIndex);
         figureIndex += 1;
-        return { pngBase64: r.content, label };
+        return { pngBase64: r.content, label, kind: 'chart' as const };
       });
-  }, [results]);
+    return [...charts, ...mapFigures.map((m) => ({ ...m, kind: 'map' as const }))];
+  }, [results, mapFigures]);
 
   const overviewFromResults = useMemo(() => {
     if (overviewText?.trim()) return overviewText.trim();

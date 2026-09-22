@@ -28,7 +28,7 @@ export type PackagedReportFigure = {
 
 export type PackagedReportMap = {
   id: string;
-  /** Data URL or serialized map snapshot — filled in Phase 4 */
+  /** PNG data URL from MapLibre canvas capture (Analytics C4) */
   dataUrl?: string;
   label?: string;
 };
@@ -206,9 +206,10 @@ export function packagePythonAnalysisRun(
     content: [
       'This report is the saved output of a **python-analysis** run:',
       '1. The agent planned analysis steps from the research question.',
-      '2. Python executed on the uploaded dataset in-browser (Pyodide).',
+      '2. Python executed on the uploaded dataset(s) in-browser (Pyodide).',
       '3. Figures and insights were extracted from successful steps.',
-      '4. A final synthesis was produced from gated findings.',
+      '4. Geospatial maps were captured from MapLibre canvases when available.',
+      '5. A final synthesis was produced from gated findings.',
       '',
       `Question: ${run.question}`,
       run.dataset?.name ? `Dataset: ${run.dataset.name}` : null,

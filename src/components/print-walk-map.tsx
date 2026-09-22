@@ -8,6 +8,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Loader2, Minus, Plus, Maximize2 } from 'lucide-react'
+import { registerMapForExport } from '@/app/(secure)/python-analysis/utils/capture-map'
 
 const MAPLIBRE_CSS_URL = 'https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css'
 
@@ -45,6 +46,7 @@ export default function PrintWalkMap({ stops, title }: Props) {
   useEffect(() => {
     let cancelled = false
     let mapInstance: any = null
+    let unregisterCapture: (() => void) | undefined
 
     const init = async () => {
       if (!document.getElementById('maplibre-gl-css')) {
@@ -70,10 +72,17 @@ export default function PrintWalkMap({ stops, title }: Props) {
         center: [-98.5, 39.8],
         zoom: 3.5,
         attributionControl: { compact: true },
+        // Required for canvas.toDataURL() PDF / report map capture (Analytics C4)
+        preserveDrawingBuffer: true,
       })
 
       mapInstance = map
       mapRef.current = map
+      unregisterCapture = registerMapForExport(
+        'print-walk-map',
+        () => mapRef.current,
+        'Walk sheet map'
+      )
       // Built-in zoom +/− (also mirrored by custom buttons for clarity)
       map.addControl(new maplibregl.NavigationControl({ showCompass: true }), 'top-right')
       map.addControl(new maplibregl.ScaleControl({ maxWidth: 120 }), 'bottom-left')
@@ -155,6 +164,7 @@ export default function PrintWalkMap({ stops, title }: Props) {
 
     return () => {
       cancelled = true
+      unregisterCapture?.()
       if (mapInstance) {
         mapInstance.remove()
         mapInstance = null

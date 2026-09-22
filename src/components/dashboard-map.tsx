@@ -8,6 +8,7 @@ import { PartyIcon, partyColor } from '@/components/party-icons'
 import type { GeofencePolygon, CanvassAddress } from '@/lib/geofencing'
 import { normalizeRing } from '@/lib/geofencing'
 import type { CustomMapPin } from '@/lib/custom-map-assistant'
+import { registerMapForExport } from '@/app/(secure)/python-analysis/utils/capture-map'
 
 // ---------------------------------------------------------------------------
 // State name <-> abbreviation lookups
@@ -379,6 +380,7 @@ export default function DashboardMap({
     if (!containerRef.current) return
     let cancelled = false
     let mapInstance: any = null
+    let unregisterCapture: (() => void) | undefined
 
     const init = async () => {
       // 1. Load CSS from CDN and WAIT for it (critical for canvas sizing)
@@ -412,10 +414,17 @@ export default function DashboardMap({
         center: [-98.5, 39.8],
         zoom: 3.5,
         attributionControl: false,
+        // Required for canvas.toDataURL() PDF / report map capture (Analytics C4)
+        preserveDrawingBuffer: true,
       })
 
       mapInstance = map
       mapRef.current = map
+      unregisterCapture = registerMapForExport(
+        'dashboard-map',
+        () => mapRef.current,
+        'Dashboard campaign map'
+      )
       map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'bottom-right')
 
       map.on('error', (e: any) => {
@@ -1024,6 +1033,7 @@ export default function DashboardMap({
     return () => {
       cancelled = true
       clearTimeout(timeout)
+      unregisterCapture?.()
       if (mapInstance) { mapInstance.remove(); mapInstance = null }
       mapRef.current = null
     }
