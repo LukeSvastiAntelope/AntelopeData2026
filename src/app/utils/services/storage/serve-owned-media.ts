@@ -5,11 +5,11 @@
 import { existsSync, statSync } from 'fs';
 import { Readable } from 'stream';
 import { NextRequest, NextResponse } from 'next/server';
+import { assertOwnership, requireUserId } from '@/app/utils/auth/require-user';
 import {
   defaultStorageRoot,
   getStorageProvider,
   resolveWithinRoot,
-  sanitizeStorageUserId,
 } from '@/app/utils/services/storage';
 
 /** Build logical storage key from catch-all path segments. */
@@ -27,14 +27,9 @@ export async function serveOwnedMedia(
   req: NextRequest,
   pathSegments: string[] | undefined
 ): Promise<NextResponse> {
-  const userIdHeader = req.headers.get('x-user-id');
-  if (!userIdHeader) {
-    return NextResponse.json({ status: false, message: 'Unauthorized' }, { status: 401 });
-  }
-  const callerId = sanitizeStorageUserId(userIdHeader);
-  if (!callerId) {
-    return NextResponse.json({ status: false, message: 'Unauthorized' }, { status: 401 });
-  }
+  const auth = requireUserId(req);
+  if (typeof auth !== 'string') return auth;
+  const callerId = auth;
 
   const key = mediaKeyFromPathSegments(pathSegments);
   if (!key) {
@@ -43,9 +38,8 @@ export async function serveOwnedMedia(
 
   // Ownership: first key segment must equal the caller's userId
   const ownerSegment = key.split('/')[0] || '';
-  if (ownerSegment !== callerId) {
-    return NextResponse.json({ status: false, message: 'Forbidden' }, { status: 403 });
-  }
+  const forbidden = assertOwnership(callerId, ownerSegment);
+  if (forbidden) return forbidden;
 
   const root = defaultStorageRoot();
   let absolute: string;

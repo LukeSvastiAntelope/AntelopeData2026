@@ -1,19 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { requireUserId } from '@/app/utils/auth/require-user'
 import {
   buildMediaKey,
   getStorageProvider,
   mediaMonthFolder,
   mediaObjectUrl,
-  sanitizeStorageUserId,
 } from '@/app/utils/services/storage'
 
 // POST /api/media/upload - authenticated authors upload images/videos
 export async function POST(req: NextRequest) {
   try {
-    const userIdHeader = req.headers.get('x-user-id')
-    if (!userIdHeader) {
-      return NextResponse.json({ status: false, message: 'Unauthorized' }, { status: 401 })
-    }
+    const auth = requireUserId(req)
+    if (typeof auth !== 'string') return auth
+    const safeUserId = auth
 
     const contentType = req.headers.get('content-type') || ''
     if (!contentType.includes('multipart/form-data')) {
@@ -48,11 +47,6 @@ export async function POST(req: NextRequest) {
     }
     if (mime.startsWith('video/') && size > maxVideoBytes) {
       return NextResponse.json({ status: false, message: 'Video too large (max 80MB)' }, { status: 413 })
-    }
-
-    const safeUserId = sanitizeStorageUserId(userIdHeader)
-    if (!safeUserId) {
-      return NextResponse.json({ status: false, message: 'Invalid user identifier' }, { status: 400 })
     }
 
     const original = file.name || 'upload'

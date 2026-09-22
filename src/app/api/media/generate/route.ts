@@ -1,21 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
 import OpenAI from 'openai'
+import { requireUserId } from '@/app/utils/auth/require-user'
 import {
   buildMediaKey,
   getStorageProvider,
   mediaMonthFolder,
   mediaObjectUrl,
-  sanitizeStorageUserId,
 } from '@/app/utils/services/storage'
 
 // POST /api/media/generate - generate an image via LLM image API and save via StorageProvider
 // Body: { prompt: string, size?: '512x512'|'1024x1024'|'256x256', format?: 'png'|'jpeg'|'webp' }
 export async function POST(req: NextRequest) {
   try {
-    const userIdHeader = req.headers.get('x-user-id')
-    if (!userIdHeader) {
-      return NextResponse.json({ status: false, message: 'Unauthorized' }, { status: 401 })
-    }
+    const auth = requireUserId(req)
+    if (typeof auth !== 'string') return auth
+    const safeUserId = auth
 
     if (!process.env.OPENAI_API_KEY) {
       return NextResponse.json({ status: false, message: 'OpenAI API key not configured' }, { status: 503 })
@@ -24,11 +23,6 @@ export async function POST(req: NextRequest) {
     const { prompt, size = '1024x1024', format = 'png' } = await req.json()
     if (!prompt || typeof prompt !== 'string') {
       return NextResponse.json({ status: false, message: 'Missing prompt' }, { status: 400 })
-    }
-
-    const safeUserId = sanitizeStorageUserId(userIdHeader)
-    if (!safeUserId) {
-      return NextResponse.json({ status: false, message: 'Invalid user identifier' }, { status: 400 })
     }
 
     const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY, timeout: 240000, maxRetries: 0 })
