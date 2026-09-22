@@ -9,12 +9,11 @@ import { tmpdir } from 'os';
 import path from 'path';
 import {
   buildMediaKey,
-  getStorageProvider,
   mediaMonthFolder,
   mediaObjectUrl,
   LocalPrivateStorage,
 } from '../src/app/utils/services/storage';
-import { listUserMediaAssets, toAbsoluteAssetUrl } from '../src/app/utils/services/video/asset-library';
+import { toAbsoluteAssetUrl } from '../src/app/utils/services/video/asset-library';
 
 function assert(cond: boolean, msg: string) {
   if (!cond) throw new Error(msg);
