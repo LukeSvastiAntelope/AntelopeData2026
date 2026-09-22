@@ -166,6 +166,7 @@ export default auth((req) => {
         '/spread',
         '/outbound',
         '/targeting',
+        '/website',
         // NOTE: '/blog', '/clients', '/about', '/pricing', '/contact' were moved
         // out of the (secure) route group to the public site — they are real
         // marketing pages and must be reachable without a session.
@@ -204,6 +205,7 @@ export const config = {
         '/spread/:path*',
         '/outbound/:path*',
         '/targeting/:path*',
+        '/website/:path*',
         '/s/:path*',
         '/logout'
     ],

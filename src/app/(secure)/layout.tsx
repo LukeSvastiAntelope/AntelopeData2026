@@ -6,7 +6,7 @@ import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { ConsultantDock } from "@/components/consultant/consultant-dock";
 
 // Nav item list lives in AppSidebar (src/components/app-sidebar.tsx), not here.
-// Reachability for /compliance, /team, /volunteer-staff, /voter-file is maintained there.
+// Reachability for /compliance, /team, /volunteer-staff, /voter-file, /website is maintained there.
 
 const SecureLayout = ({ children }: { children: React.ReactNode }) => {
     return (

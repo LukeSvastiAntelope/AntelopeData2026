@@ -52,6 +52,7 @@ import {
   Clapperboard,
   Crosshair,
   Network,
+  Globe,
 } from 'lucide-react'
 import LogoText from '@/components/logo-text'
 import LogoIcon from '@/components/logo-icon'
@@ -156,6 +157,8 @@ const ACCOUNT_ITEMS: NavItem[] = [
   { title: 'Volunteer/Staff', href: '/volunteer-staff', icon: ClipboardList },
   { title: 'Compliance', href: '/compliance', icon: Scale },
   { title: 'Team', href: '/team', icon: Building2 },
+  // Ops pages outside the numbered workflow spine — Website is a paid add-on
+  { title: 'Website', href: '/website', icon: Globe },
   { title: 'Settings', href: '/settings', icon: Settings },
   { title: 'Pricing', href: '/pricing', icon: DollarSign },
 ]
