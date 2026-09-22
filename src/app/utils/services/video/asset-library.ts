@@ -1,9 +1,14 @@
 /**
  * Shared asset pool for Spread video studio (generate + future clip mode).
+ * Backed by StorageProvider (private root) — URLs are authenticated /api/media/...
  */
 
-import { existsSync, readdirSync, statSync } from 'fs';
 import path from 'path';
+import {
+  getStorageProvider,
+  mediaObjectUrl,
+  sanitizeStorageUserId,
+} from '@/app/utils/services/storage';
 
 export type VideoLibraryAsset = {
   id: string;
@@ -14,10 +19,6 @@ export type VideoLibraryAsset = {
   sizeBytes: number;
 };
 
-function uploadsRoot(): string {
-  return path.resolve(process.cwd(), 'public', 'uploads');
-}
-
 function detectType(filename: string): 'image' | 'video' | null {
   const ext = path.extname(filename).toLowerCase();
   if (['.png', '.jpg', '.jpeg', '.webp', '.gif'].includes(ext)) return 'image';
@@ -26,67 +27,56 @@ function detectType(filename: string): 'image' | 'video' | null {
 }
 
 /**
- * List assets under public/uploads/{userId}/** for the shared pool.
+ * List assets under storage prefix `{userId}/**` for the shared pool.
  */
-export function listUserMediaAssets(
+export async function listUserMediaAssets(
   userId: number | string,
   opts?: { type?: 'image' | 'video' | 'all'; limit?: number }
-): VideoLibraryAsset[] {
-  const safeUserId = String(userId).replace(/[^a-zA-Z0-9_-]/g, '');
+): Promise<VideoLibraryAsset[]> {
+  const safeUserId = sanitizeStorageUserId(userId);
   if (!safeUserId) return [];
-  const userRoot = path.join(uploadsRoot(), safeUserId);
-  if (!existsSync(userRoot)) return [];
 
+  const objects = await getStorageProvider().list(safeUserId);
   const out: VideoLibraryAsset[] = [];
-  const walk = (dir: string) => {
-    let entries: string[] = [];
-    try {
-      entries = readdirSync(dir);
-    } catch {
-      return;
-    }
-    for (const entry of entries) {
-      const full = path.join(dir, entry);
-      let st;
-      try {
-        st = statSync(full);
-      } catch {
-        continue;
-      }
-      if (st.isDirectory()) {
-        walk(full);
-        continue;
-      }
-      const kind = detectType(entry);
-      if (!kind) continue;
-      if (opts?.type && opts.type !== 'all' && opts.type !== kind) continue;
-      const rel = path.relative(uploadsRoot(), full).split(path.sep).join('/');
-      out.push({
-        id: rel,
-        url: `/uploads/${rel}`,
-        type: kind,
-        name: entry,
-        createdAt: st.mtime.toISOString(),
-        sizeBytes: st.size,
-      });
-    }
-  };
-  walk(userRoot);
+  for (const obj of objects) {
+    const name = obj.key.split('/').pop() || obj.key;
+    const kind = detectType(name);
+    if (!kind) continue;
+    if (opts?.type && opts.type !== 'all' && opts.type !== kind) continue;
+    out.push({
+      id: obj.key,
+      url: mediaObjectUrl(obj.key),
+      type: kind,
+      name,
+      createdAt: new Date(0).toISOString(),
+      sizeBytes: obj.sizeBytes,
+    });
+  }
+
+  // Prefer newer keys (timestamp prefix in filename) by sorting key desc
   return out
-    .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))
+    .sort((a, b) => b.id.localeCompare(a.id))
     .slice(0, opts?.limit ?? 60);
 }
 
-/** Resolve an app-relative /uploads/... URL to an absolute URL for providers. */
+/**
+ * Resolve an app-relative media URL to an absolute URL for providers.
+ * Accepts legacy `/uploads/...` and current `/api/media/...`.
+ */
 export function toAbsoluteAssetUrl(url: string, appBase?: string): string {
   if (!url) return url;
   if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) {
     return url;
+  }
+  // Normalize legacy public path → authenticated serve path
+  let normalized = url;
+  if (normalized.startsWith('/uploads/')) {
+    normalized = `/api/media/${normalized.slice('/uploads/'.length)}`;
   }
   const base =
     appBase ||
     process.env.NEXT_PUBLIC_APP_URL ||
     process.env.AUTH_URL ||
     'http://localhost:3000';
-  return `${base.replace(/\/$/, '')}${url.startsWith('/') ? url : `/${url}`}`;
+  return `${base.replace(/\/$/, '')}${normalized.startsWith('/') ? normalized : `/${normalized}`}`;
 }

@@ -1,9 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import OpenAI from 'openai'
-import { createWriteStream, mkdirSync, existsSync } from 'fs'
-import path from 'path'
+import {
+  buildMediaKey,
+  getStorageProvider,
+  mediaMonthFolder,
+  mediaObjectUrl,
+  sanitizeStorageUserId,
+} from '@/app/utils/services/storage'
 
-// POST /api/media/generate - generate an image via LLM image API and save to uploads
+// POST /api/media/generate - generate an image via LLM image API and save via StorageProvider
 // Body: { prompt: string, size?: '512x512'|'1024x1024'|'256x256', format?: 'png'|'jpeg'|'webp' }
 export async function POST(req: NextRequest) {
   try {
@@ -19,6 +24,11 @@ export async function POST(req: NextRequest) {
     const { prompt, size = '1024x1024', format = 'png' } = await req.json()
     if (!prompt || typeof prompt !== 'string') {
       return NextResponse.json({ status: false, message: 'Missing prompt' }, { status: 400 })
+    }
+
+    const safeUserId = sanitizeStorageUserId(userIdHeader)
+    if (!safeUserId) {
+      return NextResponse.json({ status: false, message: 'Invalid user identifier' }, { status: 400 })
     }
 
     const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY, timeout: 240000, maxRetries: 0 })
@@ -50,32 +60,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ status: false, message: 'Image generation failed' }, { status: 502 })
     }
 
-    // Save to public/uploads like the normal upload route
-    const userId = userIdHeader
-    const now = new Date()
-    const folder = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`
-    const uploadsRoot = path.join(process.cwd(), 'public', 'uploads', userId, folder)
-    if (!existsSync(uploadsRoot)) {
-      mkdirSync(uploadsRoot, { recursive: true })
-    }
-
     const filename = `${Date.now()}_gen${ext}`
-    const filepath = path.join(uploadsRoot, filename)
-
-    await new Promise<void>((resolve, reject) => {
-      const stream = createWriteStream(filepath)
-      stream.on('error', reject)
-      stream.on('finish', () => resolve())
-      stream.write(buffer)
-      stream.end()
+    const key = buildMediaKey({
+      userId: safeUserId,
+      folder: mediaMonthFolder(),
+      filename,
     })
+    await getStorageProvider().put(key, buffer, mime)
 
-    const publicUrl = `/uploads/${userId}/${folder}/${filename}`
-    return NextResponse.json({ status: true, url: publicUrl, type: mime })
-  } catch (err:any) {
+    const url = mediaObjectUrl(key)
+    return NextResponse.json({ status: true, url, key, type: mime })
+  } catch (err: any) {
     console.error('Generate image error', err?.status || '', err?.message || err)
     return NextResponse.json({ status: false, message: 'Generate failed' }, { status: 500 })
   }
 }
-
-

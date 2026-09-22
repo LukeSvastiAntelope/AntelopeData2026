@@ -27,7 +27,7 @@ export const clipVideoTool: CampaignTool<Input> = {
     properties: {
       sourceUrl: {
         type: 'string',
-        description: 'Public URL or /uploads/... path to the long source video',
+        description: 'Public URL or /api/media/... path to the long source video',
       },
       provider: {
         type: 'string',

@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
     const typeParam = req.nextUrl.searchParams.get('type') || 'all';
     const type =
       typeParam === 'image' || typeParam === 'video' ? typeParam : 'all';
-    const assets = listUserMediaAssets(userId, { type, limit: 80 });
+    const assets = await listUserMediaAssets(userId, { type, limit: 80 });
     return NextResponse.json({ ok: true, assets });
   } catch (error) {
     console.error('[media/assets]', error);

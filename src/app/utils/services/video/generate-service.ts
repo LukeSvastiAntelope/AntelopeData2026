@@ -1,10 +1,8 @@
 /**
- * Orchestrates provider generate → poll → optional local mirror under public/uploads.
+ * Orchestrates provider generate → poll → optional local mirror via StorageProvider.
  */
 
 import { randomUUID } from 'crypto';
-import { createWriteStream, existsSync, mkdirSync } from 'fs';
-import path from 'path';
 import {
   getDefaultVideoProviderId,
   getVideoProvider,
@@ -19,6 +17,13 @@ import {
   saveVideoJob,
   type StoredVideoJob,
 } from '@/app/utils/services/video/job-store';
+import {
+  buildMediaKey,
+  getStorageProvider,
+  mediaMonthFolder,
+  mediaObjectUrl,
+  sanitizeStorageUserId,
+} from '@/app/utils/services/storage';
 
 async function mirrorRemoteVideo(
   remoteUrl: string,
@@ -31,21 +36,15 @@ async function mirrorRemoteVideo(
     clearTimeout(timer);
     if (!res.ok) return null;
     const buf = Buffer.from(await res.arrayBuffer());
-    const safeUserId = String(userId).replace(/[^a-zA-Z0-9_-]/g, '') || 'anon';
-    const now = new Date();
-    const folder = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-    const dir = path.resolve(process.cwd(), 'public', 'uploads', safeUserId, folder);
-    if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+    const safeUserId = sanitizeStorageUserId(userId) || 'anon';
     const filename = `video_${Date.now()}_${randomUUID().slice(0, 8)}.mp4`;
-    const filepath = path.join(dir, filename);
-    await new Promise<void>((resolve, reject) => {
-      const stream = createWriteStream(filepath);
-      stream.on('error', reject);
-      stream.on('finish', () => resolve());
-      stream.write(buf);
-      stream.end();
+    const key = buildMediaKey({
+      userId: safeUserId,
+      folder: mediaMonthFolder(),
+      filename,
     });
-    return `/uploads/${safeUserId}/${folder}/${filename}`;
+    await getStorageProvider().put(key, buf, 'video/mp4');
+    return mediaObjectUrl(key);
   } catch (error) {
     console.warn('[video] mirror failed (non-fatal):', error);
     return null;
