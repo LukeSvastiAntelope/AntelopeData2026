@@ -285,3 +285,30 @@ export const SITE_TEMPLATE_META: Record<
     description: 'Neighborly district feel — warm, approachable, local roots.',
   },
 };
+
+/** Slot paths that support "Write with AI" in the builder. */
+export type SiteAiSlotPath =
+  | 'hero.headline'
+  | 'hero.subheadline'
+  | 'about.body'
+  | 'issues.items'
+  | 'cta.headline'
+  | 'cta.body'
+  | 'endorsements.items';
+
+export const SITE_AI_SLOT_PATHS: SiteAiSlotPath[] = [
+  'hero.headline',
+  'hero.subheadline',
+  'about.body',
+  'issues.items',
+  'cta.headline',
+  'cta.body',
+  'endorsements.items',
+];
+
+export function isSiteAiSlotPath(value: unknown): value is SiteAiSlotPath {
+  return (
+    typeof value === 'string' &&
+    (SITE_AI_SLOT_PATHS as string[]).includes(value)
+  );
+}

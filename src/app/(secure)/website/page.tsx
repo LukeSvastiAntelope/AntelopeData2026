@@ -1,8 +1,8 @@
 'use client'
 
 /**
- * /website — Website add-on gate (Sites S3).
- * Not entitled → upsell. Entitled → builder shell (Phase 4 fills the editor).
+ * /website — Website add-on gate (S3) + builder (S4).
+ * Not entitled → upsell. Entitled → empty → gallery → split editor.
  */
 
 import { useCallback, useEffect, useState } from 'react'
@@ -11,13 +11,13 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
   Globe,
-  Check,
   Loader2,
   LayoutTemplate,
   Megaphone,
   Users,
   Sparkles,
 } from 'lucide-react'
+import { WebsiteBuilder } from '@/app/components/website/website-builder'
 
 type EntitlementState = {
   loading: boolean
@@ -119,8 +119,8 @@ export default function WebsitePage() {
               <Loader2 className="h-4 w-4 animate-spin" />
               Checking your campaign…
             </div>
-          ) : state.entitled ? (
-            <WebsiteBuilderPlaceholder />
+          ) : state.entitled && state.organizationId != null ? (
+            <WebsiteBuilder organizationId={state.organizationId} />
           ) : (
             <WebsiteUpsell
               onAdd={() => void handleAdd()}
@@ -231,19 +231,3 @@ function WebsiteUpsell({
   )
 }
 
-/** Phase 4 replaces this with the template gallery + split editor. */
-function WebsiteBuilderPlaceholder() {
-  return (
-    <div className="max-w-2xl mx-auto py-16 text-center space-y-4">
-      <div className="mx-auto w-12 h-12 rounded-full bg-muted flex items-center justify-center">
-        <Check className="h-5 w-5 text-muted-foreground" />
-      </div>
-      <h2 className="text-xl font-semibold tracking-tight">Website add-on is on</h2>
-      <p className="text-muted-foreground text-sm leading-relaxed">
-        Template gallery and the split editor land in the next phase. Your campaign can
-        publish to <code className="text-xs bg-muted px-1 rounded">/s/&lt;slug&gt;</code>{' '}
-        as soon as a site is created.
-      </p>
-    </div>
-  )
-}
