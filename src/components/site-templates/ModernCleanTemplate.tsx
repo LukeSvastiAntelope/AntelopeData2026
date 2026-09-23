@@ -12,11 +12,14 @@ import {
   SectionLabel,
   SiteShell,
 } from './shared';
+import { SiteCaptureBand } from './SiteCaptureForms';
 
 export function ModernCleanTemplate({
   content,
   theme,
   className,
+  siteSlug,
+  preview,
 }: SiteTemplateProps) {
   const { meta, branding, slots } = content;
   const heroPhoto = slots.hero.photoUrl || branding.heroImageUrl;
@@ -133,7 +136,7 @@ export function ModernCleanTemplate({
           )}
           <div className="mt-8 flex flex-wrap justify-center gap-3">
             <a
-              href={slots.cta.primaryHref || '#'}
+              href={slots.cta.primaryHref || '#signup'}
               className="inline-flex px-5 py-2.5 text-sm font-medium bg-white"
               style={{
                 color: 'var(--site-primary)',
@@ -143,13 +146,21 @@ export function ModernCleanTemplate({
               {slots.cta.primaryLabel}
             </a>
             {slots.cta.secondaryLabel && (
-              <SecondaryButton href={slots.cta.secondaryHref}>
+              <SecondaryButton href={slots.cta.secondaryHref || '#volunteer'}>
                 <span className="text-white border-white/40">{slots.cta.secondaryLabel}</span>
               </SecondaryButton>
             )}
           </div>
         </div>
       </section>
+
+      {siteSlug ? (
+        <SiteCaptureBand
+          siteSlug={siteSlug}
+          preview={preview}
+          candidateName={meta.candidateName}
+        />
+      ) : null}
 
       <FooterBlock content={content} />
     </SiteShell>

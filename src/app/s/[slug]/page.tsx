@@ -79,6 +79,7 @@ export default async function PublicSiteBySlugPage({ params }: PageProps) {
         templateId={site.templateId}
         content={site.content}
         theme={site.theme}
+        siteSlug={site.slug}
       />
     </main>
   )

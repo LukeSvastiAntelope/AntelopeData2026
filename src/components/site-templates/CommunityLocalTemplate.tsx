@@ -12,11 +12,14 @@ import {
   SectionLabel,
   SiteShell,
 } from './shared';
+import { SiteCaptureBand } from './SiteCaptureForms';
 
 export function CommunityLocalTemplate({
   content,
   theme,
   className,
+  siteSlug,
+  preview,
 }: SiteTemplateProps) {
   const { meta, branding, slots } = content;
   const heroPhoto = slots.hero.photoUrl || branding.heroImageUrl;
@@ -155,17 +158,25 @@ export function CommunityLocalTemplate({
             <p className="mt-3 opacity-80">{slots.cta.body}</p>
           )}
           <div className="mt-8 flex flex-wrap justify-center gap-3">
-            <PrimaryButton href={slots.cta.primaryHref}>
+            <PrimaryButton href={slots.cta.primaryHref || '#signup'}>
               {slots.cta.primaryLabel}
             </PrimaryButton>
             {slots.cta.secondaryLabel && (
-              <SecondaryButton href={slots.cta.secondaryHref}>
+              <SecondaryButton href={slots.cta.secondaryHref || '#volunteer'}>
                 {slots.cta.secondaryLabel}
               </SecondaryButton>
             )}
           </div>
         </div>
       </section>
+
+      {siteSlug ? (
+        <SiteCaptureBand
+          siteSlug={siteSlug}
+          preview={preview}
+          candidateName={meta.candidateName}
+        />
+      ) : null}
 
       <FooterBlock content={content} />
     </SiteShell>

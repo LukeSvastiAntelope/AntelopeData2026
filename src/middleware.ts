@@ -51,6 +51,8 @@ const publicRoutes = [
     '/api/public/district-brief', // Public district snapshot for campaign action kit
     '/api/optin', // Public SMS follow-up opt-in recording (reached from /optin page)
     '/api/contact', // Public contact form (works logged out; has its own rate limiting)
+    '/api/volunteer', // Sites S5 — thin public volunteer capture (tenant via siteSlug)
+    '/api/donate', // Sites S5 — fundraising intent capture (tenant via siteSlug)
     // Automation for Garry's List — the whole flow is explicitly "no log in required".
     '/api/garrys-list/parse',
     '/api/garrys-list/generate',

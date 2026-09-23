@@ -10,11 +10,14 @@ import { notFound } from 'next/navigation'
 import { SiteRepo } from '@/app/utils/database/site-repo'
 import {
   FooterBlock,
-  PrimaryButton,
   SecondaryButton,
   SectionLabel,
   SiteShell,
 } from '@/components/site-templates/shared'
+import {
+  SiteDonateForm,
+  SiteVolunteerForm,
+} from '@/components/site-templates/SiteCaptureForms'
 import type { SitePageKey, SiteRecord } from '@/app/utils/types/site'
 
 const ADDON_PAGES: SitePageKey[] = ['issues', 'events', 'volunteer', 'donate']
@@ -123,7 +126,7 @@ export default async function PublicSiteAddonPage({ params }: PageProps) {
             {page === 'events' && (
               <p className="opacity-80 leading-relaxed">
                 Campaign events will be listed here. Check back soon, or{' '}
-                <a href="/#signup" className="underline underline-offset-2">
+                <a href={`/s/${site.slug}#signup`} className="underline underline-offset-2">
                   sign up
                 </a>{' '}
                 for updates from {content.meta.candidateName}.
@@ -131,29 +134,29 @@ export default async function PublicSiteAddonPage({ params }: PageProps) {
             )}
 
             {page === 'volunteer' && (
-              <div className="space-y-6">
+              <div className="space-y-6 max-w-lg">
                 <p className="opacity-80 leading-relaxed">
                   {content.slots.cta.body ||
                     `Join ${content.meta.candidateName}'s volunteer team.`}
                 </p>
-                <PrimaryButton href={content.slots.cta.secondaryHref || '#volunteer'}>
-                  {content.slots.cta.secondaryLabel || 'Volunteer'}
-                </PrimaryButton>
+                <SiteVolunteerForm
+                  siteSlug={site.slug}
+                  candidateName={content.meta.candidateName}
+                />
               </div>
             )}
 
             {page === 'donate' && (
-              <div className="space-y-6">
+              <div className="space-y-6 max-w-lg">
                 <p className="opacity-80 leading-relaxed">
                   {content.slots.cta.body ||
                     `Chip in to support ${content.meta.candidateName} for ${content.meta.office}.`}
                 </p>
-                <div className="flex flex-wrap gap-3">
-                  <PrimaryButton href={content.slots.cta.primaryHref || '#donate'}>
-                    {content.slots.cta.primaryLabel || 'Donate'}
-                  </PrimaryButton>
-                  <SecondaryButton href={`/s/${site.slug}`}>Back to home</SecondaryButton>
-                </div>
+                <SiteDonateForm
+                  siteSlug={site.slug}
+                  candidateName={content.meta.candidateName}
+                />
+                <SecondaryButton href={`/s/${site.slug}`}>Back to home</SecondaryButton>
               </div>
             )}
           </div>

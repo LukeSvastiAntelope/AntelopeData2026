@@ -14,6 +14,13 @@ export type { SiteTemplateProps } from './shared';
 export { ClassicCivicTemplate } from './ClassicCivicTemplate';
 export { ModernCleanTemplate } from './ModernCleanTemplate';
 export { CommunityLocalTemplate } from './CommunityLocalTemplate';
+export {
+  SiteCaptureBand,
+  SiteSignupForm,
+  SiteContactForm,
+  SiteVolunteerForm,
+  SiteDonateForm,
+} from './SiteCaptureForms';
 
 export const SITE_TEMPLATES: Record<
   SiteTemplateId,

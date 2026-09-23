@@ -11,7 +11,9 @@ import type { SiteContent, SiteTheme } from '@/app/utils/types/site';
 export type SiteTemplateProps = {
   content: SiteContent;
   theme?: SiteTheme;
-  /** When true, hide interactive form stubs (editor chrome). */
+  /** Published site slug — required for live capture forms. */
+  siteSlug?: string;
+  /** When true, forms render disabled (builder live preview). */
   preview?: boolean;
   className?: string;
 };

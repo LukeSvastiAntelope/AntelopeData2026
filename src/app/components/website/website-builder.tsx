@@ -598,6 +598,7 @@ function SiteEditor({
                 templateId={templateId}
                 content={content}
                 theme={theme}
+                siteSlug={slug}
                 preview
               />
             </div>
