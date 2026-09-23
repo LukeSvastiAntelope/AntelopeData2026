@@ -39,6 +39,8 @@ import {
   type SiteTemplateId,
   type SiteTheme,
 } from '@/app/utils/types/site'
+import { platformSubdomainUrl } from '@/app/utils/site-host'
+import { ConnectDomainPanel } from '@/app/components/website/connect-domain-panel'
 
 type TemplateMeta = {
   id: SiteTemplateId
@@ -474,6 +476,7 @@ function SiteEditor({
   }
 
   const publicPath = `/s/${slug}`
+  const platformUrl = platformSubdomainUrl(slug)
   const isPublished = status === 'published'
 
   const pageEnabled = useMemo(() => {
@@ -517,14 +520,25 @@ function SiteEditor({
             </span>
           )}
           {isPublished && (
-            <Link
-              href={publicPath}
-              target="_blank"
-              className="text-xs text-primary inline-flex items-center gap-1 hover:underline"
-            >
-              {publicPath}
-              <ExternalLink className="h-3 w-3" />
-            </Link>
+            <>
+              <Link
+                href={publicPath}
+                target="_blank"
+                className="text-xs text-primary inline-flex items-center gap-1 hover:underline"
+              >
+                {publicPath}
+                <ExternalLink className="h-3 w-3" />
+              </Link>
+              <a
+                href={platformUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="text-xs text-muted-foreground inline-flex items-center gap-1 hover:underline"
+              >
+                {platformUrl.replace(/^https:\/\//, '')}
+                <ExternalLink className="h-3 w-3" />
+              </a>
+            </>
           )}
         </div>
 
@@ -1205,6 +1219,15 @@ function SiteEditor({
                 ))}
               </div>
             </section>
+
+            <Separator />
+
+            <ConnectDomainPanel
+              siteId={site.id}
+              organizationId={organizationId}
+              slug={slug}
+              published={isPublished}
+            />
 
             <Separator />
 

@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import NextAuth from 'next-auth'
 import { authConfig } from '@/auth.config'
+import {
+  isAppHost,
+  normalizeHost,
+  slugFromPlatformSubdomain,
+} from '@/app/utils/site-host'
 
 const publicRoutes = [
     '/api/signin',
@@ -25,6 +30,7 @@ const publicRoutes = [
     '/api/generateAgentProfile',
     '/api/generateAgentAvatar',
     '/api/public/surveys/:slug*',
+    '/api/public/site-domain', // Sites S6 — middleware custom-domain resolve
     '/api/image-proxy',
     '/api/scheduler/init', // Scheduler initialization
     '/api/admin/scheduler/stats', // Admin scheduler stats
@@ -70,7 +76,73 @@ const { auth } = NextAuth({
     providers: authConfig.providers || [],
 })
 
-export default auth((req) => {
+/**
+ * Sites S6 — rewrite tenant hosts to /s/<slug> without touching the dashboard host.
+ * - Platform: {slug}.antelopedata.org → /s/{slug}/…
+ * - Custom: verified host → lookup slug via /api/public/site-domain
+ */
+async function rewriteTenantHost(req: NextRequest): Promise<NextResponse | null> {
+    const host = normalizeHost(req.headers.get('host'));
+    if (!host || isAppHost(host)) return null;
+
+    const path = req.nextUrl.pathname;
+
+    // Pass through app infrastructure on tenant hosts (forms, assets, resolve API)
+    if (
+        path.startsWith('/api/') ||
+        path.startsWith('/_next/') ||
+        path.startsWith('/uploads/') ||
+        path === '/favicon.ico'
+    ) {
+        return null;
+    }
+
+    // Already on the canonical path — don't double-prefix
+    if (path === '/s' || path.startsWith('/s/')) {
+        return null;
+    }
+
+    let slug = slugFromPlatformSubdomain(host);
+
+    if (!slug) {
+        // Custom domain — resolve via apex (never call tenant host → loop)
+        try {
+            const appBase =
+                process.env.NEXT_PUBLIC_APP_URL ||
+                process.env.AUTH_URL ||
+                process.env.NEXTAUTH_URL ||
+                '';
+            if (!appBase) return null;
+            const lookup = new URL('/api/public/site-domain', appBase);
+            lookup.searchParams.set('host', host);
+            const res = await fetch(lookup.toString(), {
+                headers: { Accept: 'application/json' },
+                next: { revalidate: 30 },
+            } as RequestInit);
+            if (!res.ok) return null;
+            const data = (await res.json()) as { status?: boolean; slug?: string };
+            if (!data?.status || !data.slug) return null;
+            slug = data.slug;
+        } catch {
+            return null;
+        }
+    }
+
+    if (!slug) return null;
+
+    const url = req.nextUrl.clone();
+    const suffix = path === '/' ? '' : path;
+    url.pathname = `/s/${slug}${suffix}`;
+    const rewrite = NextResponse.rewrite(url);
+    rewrite.headers.set('x-site-slug', slug);
+    rewrite.headers.set('x-site-host', host);
+    return rewrite;
+}
+
+export default auth(async (req) => {
+    const tenant = await rewriteTenantHost(req);
+    if (tenant) return tenant;
+
     const path = req.nextUrl.pathname;
     const session = req.auth;
 
@@ -184,31 +256,10 @@ export default auth((req) => {
 
 export const config = {
     matcher: [
-        // Match all API routes and protected pages (must cover every path in protectedPages)
-        '/api/:path*',
-        '/uploads/:path*',
-        '/cohort-chat/:path*',
-        '/surveys/:path*',
-        '/create/:path*',
-        '/admin/:path*',
-        '/digital-twins/:path*',
-        '/profile/:path*',
-        '/auth/:path*',
-        '/voter-file/:path*',
-        '/team/:path*',
-        '/reports/:path*',
-        '/python-analysis/:path*',
-        '/channels/:path*',
-        '/dashboard/:path*',
-        '/fundraising/:path*',
-        '/compliance/:path*',
-        '/volunteer-staff/:path*',
-        '/agents/:path*',
-        '/spread/:path*',
-        '/outbound/:path*',
-        '/targeting/:path*',
-        '/website/:path*',
-        '/s/:path*',
-        '/logout'
+        /*
+         * Match all request paths except static assets.
+         * Sites S6 needs `/` on tenant hosts (subdomain / custom domain).
+         */
+        '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|txt|xml)$).*)',
     ],
 };
