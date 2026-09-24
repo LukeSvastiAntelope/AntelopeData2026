@@ -32,6 +32,7 @@ const publicRoutes = [
     '/api/public/surveys/:slug*',
     '/api/public/site-domain', // Sites S6 — middleware custom-domain resolve
     '/api/public/site-media/:slug*', // Storage V2 — public site images (local/CDN proxy)
+    '/api/public/walk/:slug*', // MiniVAN M2 — canvasser walk pull + sync (token-scoped)
     '/api/image-proxy',
     '/api/scheduler/init', // Scheduler initialization
     '/api/admin/scheduler/stats', // Admin scheduler stats
@@ -68,6 +69,8 @@ const publicRoutes = [
     '/api/garrys-list/survey',
     // Candidate website public render (Sites S2) — live-on-publish at /s/<slug>
     '/s/:slug*',
+    // MiniVAN M2 — canvasser walk PWA (scoped token, no login)
+    '/walk/:slug*',
 ]
 
 // Use an edge-safe config to create an auth middleware wrapper.
@@ -159,9 +162,11 @@ export default auth(async (req) => {
     const isGetPredictionApiRoute = path.startsWith('/api/getPrediction/');
     // Candidate campaign sites — always public (live-on-publish)
     const isPublicSiteRoute = path === '/s' || path.startsWith('/s/');
+    // MiniVAN walk PWA — token in path; no session
+    const isPublicWalkRoute = path === '/walk' || path.startsWith('/walk/');
 
     // Allow public routes
-    if (isPublicApiRoute || isGetPredictionApiRoute || isPublicSiteRoute) {
+    if (isPublicApiRoute || isGetPredictionApiRoute || isPublicSiteRoute || isPublicWalkRoute) {
         return NextResponse.next();
     }
 
@@ -242,6 +247,9 @@ export default auth(async (req) => {
         '/outbound',
         '/targeting',
         '/website',
+        '/turf',
+        '/assignments',
+        '/payroll',
         // NOTE: '/blog', '/clients', '/about', '/pricing', '/contact' were moved
         // out of the (secure) route group to the public site — they are real
         // marketing pages and must be reachable without a session.
