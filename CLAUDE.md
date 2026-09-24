@@ -37,6 +37,9 @@ Optional (feature-gated):
 - `STRIPE_SECRET_KEY` — Payments
 - `TELEGRAM_BOT_TOKEN` — Telegram channel integration
 - `SENDGRID_API_KEY` — Email sending
+- `STORAGE_PROVIDER` — object storage backend; set `vercel-blob` in prod (Vercel Blob). Omit / unset for local `LocalPrivateStorage` (default under `var/uploads`)
+- `BLOB_READ_WRITE_TOKEN` — Vercel Blob store token (required when `STORAGE_PROVIDER=vercel-blob`). **Never commit.** Keep only in `.env.local` / Vercel env
+- `UPLOAD_STORAGE_DIR` — optional local storage root override (LocalPrivateStorage)
 - `FAL_KEY` — Wan 2.2 video generation via fal.ai (default provider when set)
 - `VIDEO_GEN_PROVIDER` — Override default provider (`wan` | `higgsfield` | `kling` | `mock` | `comfyui`)
 - `HIGGSFIELD_API_KEY` / `KLING_API_KEY` — optional cinematic video tiers
@@ -45,6 +48,12 @@ Optional (feature-gated):
 - `OPUS_CLIP_API_KEY` / `OPUS_CLIP_ORG_ID` — Opus Clip long-form → shorts
 - `KLAP_API_KEY` — Klap long-form → shorts
 - `VIDEO_CLIP_PROVIDER` — Override default clipper (`opusclip` | `klap` | `mock`)
+
+Local → Blob migration (dev carry-over; prod local disk is ephemeral):
+```bash
+npx tsx --tsconfig tsconfig.json -r dotenv/config scripts/migrate-local-to-blob.ts
+```
+Writes an idempotent manifest under `var/local-to-blob-migration-manifest-*.json` (gitignored).
 
 ## Architecture
 

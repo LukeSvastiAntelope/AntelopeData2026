@@ -2,7 +2,8 @@
  * Platform storage facade — server-only.
  *
  * Files live outside public/ by default (LocalPrivateStorage → UPLOAD_STORAGE_DIR).
- * Prod on Vercel: STORAGE_PROVIDER=vercel-blob (+ BLOB_READ_WRITE_TOKEN from a Blob store).
+ * Prod on Vercel: STORAGE_PROVIDER=vercel-blob (+ BLOB_READ_WRITE_TOKEN from a Blob store;
+ * never commit the token). Local → Blob carry-over: scripts/migrate-local-to-blob.ts.
  * Swap providers here (mirror EmailProvider).
  */
 

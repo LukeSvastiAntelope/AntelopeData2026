@@ -36,7 +36,9 @@ Edit `.env.local`. **Required:**
 - **`MYSQL_HOST`**, **`MYSQL_PORT`**, **`MYSQL_USER`**, **`MYSQL_PASSWORD`**, **`MYSQL_DATABASE`**
 - **`NEXT_PUBLIC_APP_URL`** / **`PUBLIC_BASE_URL`** — e.g. `http://localhost:3000`
 
-For predictions and agent features you’ll also need **`OPENAI_API_KEY`** and **`PINECONE_API_KEY`**. See `.env.example` for all optional vars (Stripe, Telegram, SendGrid, etc.).
+**Object storage:** omit `STORAGE_PROVIDER` for local disk (`LocalPrivateStorage`, default `var/uploads`). In production on Vercel set `STORAGE_PROVIDER=vercel-blob` and `BLOB_READ_WRITE_TOKEN` from a Vercel Blob store — **never commit the token**. Optional local→Blob carry-over: `npx tsx --tsconfig tsconfig.json -r dotenv/config scripts/migrate-local-to-blob.ts`.
+
+For predictions and agent features you’ll also need **`OPENAI_API_KEY`** and **`PINECONE_API_KEY`**. See `.env.example` for all optional vars (Stripe, Telegram, SendGrid, storage, etc.).
 
 ### 3. Database
 

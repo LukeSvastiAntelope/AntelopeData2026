@@ -4,13 +4,14 @@ node_modules
 .next/
 out/
 
-# Environment files
+# Environment files (never commit secrets / tokens)
 .env
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
 .env*
+!.env.example
 
 # TypeScript build info
 *.tsbuildinfo
@@ -132,6 +133,7 @@ TWILIO_HANDOFF.md
 public/uploads/
 # Private upload root (StorageProvider / LocalPrivateStorage)
 var/uploads/
-# Upload migration manifests (scripts/migrate-uploads-to-private.ts)
+# Upload migration manifests
 var/upload-migration-manifest-*.json
+var/local-to-blob-migration-manifest-*.json
 var/
