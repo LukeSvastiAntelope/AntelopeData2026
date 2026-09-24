@@ -31,6 +31,7 @@ const publicRoutes = [
     '/api/generateAgentAvatar',
     '/api/public/surveys/:slug*',
     '/api/public/site-domain', // Sites S6 — middleware custom-domain resolve
+    '/api/public/site-media/:slug*', // Storage V2 — public site images (local/CDN proxy)
     '/api/image-proxy',
     '/api/scheduler/init', // Scheduler initialization
     '/api/admin/scheduler/stats', // Admin scheduler stats

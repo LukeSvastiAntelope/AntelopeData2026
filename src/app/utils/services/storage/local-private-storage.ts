@@ -18,7 +18,12 @@ import {
   readFileSync,
 } from 'fs';
 import path from 'path';
-import type { StorageProvider, StoredObject } from './StorageProvider';
+import type {
+  StorageProvider,
+  StoredObject,
+  StoragePutOptions,
+} from './StorageProvider';
+import { isSitePublicKey } from './StorageProvider';
 
 const META_SUFFIX = '.meta.json';
 
@@ -110,7 +115,11 @@ function toPosixKey(key: string): string {
     .replace(/\/+/g, '/');
 }
 
-type SidecarMeta = { contentType: string; sizeBytes: number };
+type SidecarMeta = {
+  contentType: string;
+  sizeBytes: number;
+  access?: 'private' | 'public';
+};
 
 function metaPathFor(filePath: string): string {
   return `${filePath}${META_SUFFIX}`;
@@ -149,9 +158,11 @@ export class LocalPrivateStorage implements StorageProvider {
   async put(
     key: string,
     data: Buffer | Uint8Array,
-    contentType: string
+    contentType: string,
+    options?: StoragePutOptions
   ): Promise<StoredObject> {
     const logicalKey = toPosixKey(key);
+    const access = options?.access === 'public' ? 'public' : 'private';
     const filepath = resolveWithinRoot(this.root, logicalKey);
     const dir = path.dirname(filepath);
     if (!existsSync(dir)) {
@@ -168,9 +179,18 @@ export class LocalPrivateStorage implements StorageProvider {
     });
 
     const ct = contentType || contentTypeFromExt(filepath);
-    writeSidecar(filepath, { contentType: ct, sizeBytes: buf.length });
+    writeSidecar(filepath, { contentType: ct, sizeBytes: buf.length, access });
 
-    return { key: logicalKey, contentType: ct, sizeBytes: buf.length };
+    const stored: StoredObject = {
+      key: logicalKey,
+      contentType: ct,
+      sizeBytes: buf.length,
+    };
+    // Local has no CDN — public site assets are served by /api/public/site-media
+    if (access === 'public' || isSitePublicKey(logicalKey)) {
+      stored.url = `/api/public/site-media/${logicalKey}`;
+    }
+    return stored;
   }
 
   async getStream(key: string): Promise<{

@@ -7,7 +7,7 @@
  *
  * Token: BLOB_READ_WRITE_TOKEN (injected by Vercel Blob store).
  * Access: private by default (owned media via /api/media). Public site images
- * can opt into public blobs in a later phase without changing this contract.
+ * use `put(..., { access: 'public' })` and return the Blob CDN URL.
  */
 
 import {
@@ -18,7 +18,11 @@ import {
   get,
   BlobNotFoundError,
 } from '@vercel/blob';
-import type { StorageProvider, StoredObject } from './StorageProvider';
+import type {
+  StorageProvider,
+  StoredObject,
+  StoragePutOptions,
+} from './StorageProvider';
 
 function toPosixKey(key: string): string {
   return String(key || '')
@@ -70,37 +74,38 @@ function blobToken(): string {
   return token;
 }
 
-function defaultBlobAccess(): 'private' | 'public' {
-  const raw = (process.env.BLOB_DEFAULT_ACCESS || 'private').trim().toLowerCase();
-  return raw === 'public' ? 'public' : 'private';
-}
-
 export class VercelBlobStorage implements StorageProvider {
   readonly name = 'vercel-blob';
 
   async put(
     key: string,
     data: Buffer | Uint8Array,
-    contentType: string
+    contentType: string,
+    options?: StoragePutOptions
   ): Promise<StoredObject> {
     const logicalKey = sanitizeBlobKey(toPosixKey(key));
+    const access = options?.access === 'public' ? 'public' : 'private';
     const buf = Buffer.isBuffer(data) ? data : Buffer.from(data);
     const ct = contentType || 'application/octet-stream';
     const token = blobToken();
 
     const result = await put(logicalKey, buf, {
-      access: defaultBlobAccess(),
+      access,
       addRandomSuffix: false,
       allowOverwrite: true,
       contentType: ct,
       token,
     });
 
-    return {
+    const stored: StoredObject = {
       key: result.pathname || logicalKey,
       contentType: result.contentType || ct,
       sizeBytes: buf.length,
     };
+    if (access === 'public' && result.url) {
+      stored.url = result.url;
+    }
+    return stored;
   }
 
   async getStream(key: string): Promise<{
@@ -115,26 +120,30 @@ export class VercelBlobStorage implements StorageProvider {
       return null;
     }
 
-    try {
-      const result = await get(logicalKey, {
-        access: defaultBlobAccess(),
-        token: blobToken(),
-      });
-      if (!result || result.statusCode !== 200 || !result.stream) {
-        return null;
+    // Private media first (owned /api/media path); fall back to public for
+    // rare cross-reads of site assets via the same key.
+    for (const access of ['private', 'public'] as const) {
+      try {
+        const result = await get(logicalKey, {
+          access,
+          token: blobToken(),
+        });
+        if (!result || result.statusCode !== 200 || !result.stream) {
+          continue;
+        }
+        return {
+          stream: result.stream,
+          contentType: result.blob.contentType || 'application/octet-stream',
+          sizeBytes: Number(result.blob.size) || 0,
+        };
+      } catch (err) {
+        if (err instanceof BlobNotFoundError) continue;
+        const msg = err instanceof Error ? err.message : String(err);
+        if (/not found|404/i.test(msg)) continue;
+        throw err;
       }
-      return {
-        stream: result.stream,
-        contentType: result.blob.contentType || 'application/octet-stream',
-        sizeBytes: Number(result.blob.size) || 0,
-      };
-    } catch (err) {
-      if (err instanceof BlobNotFoundError) return null;
-      // Older / alternate not-found shapes
-      const msg = err instanceof Error ? err.message : String(err);
-      if (/not found|404/i.test(msg)) return null;
-      throw err;
     }
+    return null;
   }
 
   async exists(key: string): Promise<boolean> {
@@ -169,7 +178,6 @@ export class VercelBlobStorage implements StorageProvider {
 
   async list(prefix: string): Promise<StoredObject[]> {
     const logicalPrefix = toPosixKey(prefix);
-    // Empty prefix lists the whole store (mirrors LocalPrivateStorage listing root)
     let safePrefix = '';
     if (logicalPrefix) {
       try {
@@ -196,10 +204,10 @@ export class VercelBlobStorage implements StorageProvider {
         out.push({
           key: pathname.replace(/^\/+/, ''),
           contentType:
-            // list blobs may not always include contentType on all SDK versions
             (blob as { contentType?: string }).contentType ||
             contentTypeFromPath(pathname),
           sizeBytes: Number(blob.size) || 0,
+          url: blob.url || undefined,
         });
       }
       cursor = page.hasMore ? page.cursor : undefined;

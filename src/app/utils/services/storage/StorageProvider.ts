@@ -7,6 +7,17 @@ export type StoredObject = {
   key: string;
   contentType: string;
   sizeBytes: number;
+  /**
+   * Public CDN (or public proxy) URL when the object was stored with
+   * `access: 'public'`. Omitted for private objects — clients must use
+   * `/api/media/...` via mediaObjectUrl(key) instead.
+   */
+  url?: string;
+};
+
+export type StoragePutOptions = {
+  /** Default: private (owned media). Public = published-site assets. */
+  access?: 'private' | 'public';
 };
 
 /**
@@ -21,7 +32,8 @@ export interface StorageProvider {
   put(
     key: string,
     data: Buffer | Uint8Array,
-    contentType: string
+    contentType: string,
+    options?: StoragePutOptions
   ): Promise<StoredObject>;
   getStream(key: string): Promise<{
     stream: ReadableStream | NodeJS.ReadableStream;
@@ -31,4 +43,16 @@ export interface StorageProvider {
   exists(key: string): Promise<boolean>;
   delete(key: string): Promise<void>;
   list(prefix: string): Promise<StoredObject[]>;
+}
+
+/** Folder segment marking published-site assets (public Blob / public proxy). */
+export const SITE_PUBLIC_FOLDER = 'site-public';
+
+export function isSitePublicKey(key: string): boolean {
+  const parts = String(key || '')
+    .replace(/\\/g, '/')
+    .replace(/^\/+/, '')
+    .split('/');
+  // `${userId}/site-public/...`
+  return parts.length >= 3 && parts[1] === SITE_PUBLIC_FOLDER;
 }

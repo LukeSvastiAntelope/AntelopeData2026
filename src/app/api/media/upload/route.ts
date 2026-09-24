@@ -5,9 +5,21 @@ import {
   getStorageProvider,
   mediaMonthFolder,
   mediaObjectUrl,
+  SITE_PUBLIC_FOLDER,
 } from '@/app/utils/services/storage'
 
-// POST /api/media/upload - authenticated authors upload images/videos
+/**
+ * POST /api/media/upload — authenticated authors upload images/videos.
+ *
+ * Form fields:
+ * - file (required)
+ * - purpose = "site" → public site asset (Blob CDN URL / public proxy)
+ * - access = "public" → same as purpose=site
+ * - siteId (optional) — folded into the key folder for site assets
+ *
+ * Default: private → url is `/api/media/...` (ownership-proxied). Never returns
+ * a raw private Blob URL to the client.
+ */
 export async function POST(req: NextRequest) {
   try {
     const auth = requireUserId(req)
@@ -25,15 +37,22 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ status: false, message: 'Missing file' }, { status: 400 })
     }
 
-    const allowed = [
-      'image/png',
-      'image/jpeg',
-      'image/webp',
-      'image/gif',
-      'video/mp4',
-      'video/webm',
-      'video/quicktime',
-    ]
+    const purpose = String(formData.get('purpose') || '').trim().toLowerCase()
+    const accessField = String(formData.get('access') || '').trim().toLowerCase()
+    const isPublicSiteAsset =
+      purpose === 'site' || accessField === 'public'
+
+    const allowed = isPublicSiteAsset
+      ? ['image/png', 'image/jpeg', 'image/webp', 'image/gif']
+      : [
+          'image/png',
+          'image/jpeg',
+          'image/webp',
+          'image/gif',
+          'video/mp4',
+          'video/webm',
+          'video/quicktime',
+        ]
     const mime = file.type || ''
     if (!allowed.includes(mime)) {
       return NextResponse.json({ status: false, message: 'Unsupported file type' }, { status: 415 })
@@ -70,15 +89,37 @@ export async function POST(req: NextRequest) {
                     : '')
     const base = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
     const filename = `${base}${ext}`
-    const folder = mediaMonthFolder()
+
+    let folder = mediaMonthFolder()
+    if (isPublicSiteAsset) {
+      const siteIdRaw = String(formData.get('siteId') || '').trim()
+      const siteSeg = siteIdRaw.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 32)
+      folder = siteSeg
+        ? `${SITE_PUBLIC_FOLDER}/${siteSeg}`
+        : SITE_PUBLIC_FOLDER
+    }
+
     const key = buildMediaKey({ userId: safeUserId, folder, filename })
 
     const arrayBuffer = await file.arrayBuffer()
     const buffer = Buffer.from(arrayBuffer)
-    await getStorageProvider().put(key, buffer, mime)
+    const stored = await getStorageProvider().put(key, buffer, mime, {
+      access: isPublicSiteAsset ? 'public' : 'private',
+    })
 
-    const url = mediaObjectUrl(key)
-    return NextResponse.json({ status: true, url, key, type: mime })
+    // Private: always the ownership-proxied /api/media URL (never raw Blob URL).
+    // Public site: Blob CDN URL (or local /api/public/site-media proxy).
+    const url = isPublicSiteAsset
+      ? stored.url || `/api/public/site-media/${stored.key}`
+      : mediaObjectUrl(stored.key)
+
+    return NextResponse.json({
+      status: true,
+      url,
+      key: stored.key,
+      type: mime,
+      access: isPublicSiteAsset ? 'public' : 'private',
+    })
   } catch (err) {
     console.error('Upload error', err)
     return NextResponse.json({ status: false, message: 'Upload failed' }, { status: 500 })

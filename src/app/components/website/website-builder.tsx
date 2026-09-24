@@ -19,6 +19,7 @@ import {
   Trash2,
   Check,
   Save,
+  Upload,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -751,15 +752,15 @@ function SiteEditor({
                   }
                 />
               </div>
-              <Field
-                label="Hero photo URL"
+              <HeroPhotoField
+                siteId={site.id}
                 value={content.slots.hero.photoUrl || ''}
-                onChange={(v) =>
+                onChange={(url) =>
                   updateContent({
                     ...content,
                     slots: {
                       ...content.slots,
-                      hero: { ...content.slots.hero, photoUrl: v || null },
+                      hero: { ...content.slots.hero, photoUrl: url || null },
                     },
                   })
                 }
@@ -1250,6 +1251,90 @@ function SiteEditor({
           </div>
         </div>
       </div>
+    </div>
+  )
+}
+
+function HeroPhotoField({
+  siteId,
+  value,
+  onChange,
+}: {
+  siteId: number
+  value: string
+  onChange: (url: string) => void
+}) {
+  const [uploading, setUploading] = useState(false)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  const handleUpload = async (file: File | null | undefined) => {
+    if (!file) return
+    setUploading(true)
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      fd.append('purpose', 'site')
+      fd.append('siteId', String(siteId))
+      const res = await fetch('/api/media/upload', { method: 'POST', body: fd })
+      const data = await res.json()
+      if (!res.ok || !data.status || !data.url) {
+        throw new Error(data.message || 'Upload failed')
+      }
+      onChange(String(data.url))
+      toast.success('Hero photo uploaded')
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Upload failed')
+    } finally {
+      setUploading(false)
+      if (inputRef.current) inputRef.current.value = ''
+    }
+  }
+
+  return (
+    <div className="space-y-1.5">
+      <Label className="text-xs">Hero photo</Label>
+      <div className="flex flex-wrap gap-2">
+        <Input
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="CDN URL or upload below"
+          className="h-9 text-sm flex-1 min-w-[12rem]"
+        />
+        <input
+          ref={inputRef}
+          type="file"
+          accept="image/png,image/jpeg,image/webp,image/gif"
+          className="hidden"
+          onChange={(e) => void handleUpload(e.target.files?.[0])}
+        />
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          className="h-9 shrink-0"
+          disabled={uploading}
+          onClick={() => inputRef.current?.click()}
+        >
+          {uploading ? (
+            <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+          ) : (
+            <Upload className="h-3.5 w-3.5 mr-1.5" />
+          )}
+          {uploading ? 'Uploading…' : 'Upload'}
+        </Button>
+      </div>
+      <p className="text-[11px] text-muted-foreground">
+        Uploads as a public site asset (Blob CDN in prod; local public proxy in
+        dev).
+      </p>
+      {value ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={value}
+          alt="Hero preview"
+          className="mt-1 h-24 w-auto max-w-full rounded-md border border-border object-cover"
+        />
+      ) : null}
     </div>
   )
 }

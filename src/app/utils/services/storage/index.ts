@@ -6,7 +6,11 @@
  * Swap providers here (mirror EmailProvider).
  */
 
-import type { StorageProvider, StoredObject } from './StorageProvider';
+import type {
+  StorageProvider,
+  StoredObject,
+  StoragePutOptions,
+} from './StorageProvider';
 import {
   LocalPrivateStorage,
   defaultStorageRoot,
@@ -19,7 +23,11 @@ import {
   sanitizeBlobKey,
 } from './vercel-blob-storage';
 
-export type { StorageProvider, StoredObject };
+export type { StorageProvider, StoredObject, StoragePutOptions };
+export {
+  SITE_PUBLIC_FOLDER,
+  isSitePublicKey,
+} from './StorageProvider';
 export {
   LocalPrivateStorage,
   defaultStorageRoot,
