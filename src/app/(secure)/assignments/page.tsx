@@ -30,7 +30,12 @@ import {
   Ban,
   Copy,
   ExternalLink,
+  Radio,
 } from 'lucide-react'
+import {
+  useCanvassProgress,
+  TurfProgressDetails,
+} from '@/app/components/ground-game/use-canvass-progress'
 
 type TurfAssignment = {
   id: number
@@ -74,6 +79,30 @@ export default function AssignmentsPage() {
   const [shareBusy, setShareBusy] = useState<number | null>(null)
   const [sharePanel, setSharePanel] = useState<SharePanel | null>(null)
   const [tokenLists, setTokenLists] = useState<Record<number, WalkTokenMeta[]>>({})
+
+  const {
+    data: liveProgress,
+    live,
+    bump,
+    byTurfId,
+  } = useCanvassProgress({ enabled: true, intervalMs: 5000 })
+
+  // Merge live coverage into the turf list as outcomes sync in
+  useEffect(() => {
+    if (!liveProgress?.turfs?.length) return
+    setTurfs((prev) => {
+      if (!prev.length) return prev
+      let changed = false
+      const next = prev.map((t) => {
+        const p = liveProgress.turfs.find((x) => x.turfId === t.id)
+        if (!p) return t
+        if ((t.contacted_count || 0) === p.contactedCount) return t
+        changed = true
+        return { ...t, contacted_count: p.contactedCount }
+      })
+      return changed ? next : prev
+    })
+  }, [liveProgress])
 
   const memberLabel = useCallback(
     (userId: number | null) => {
@@ -279,16 +308,39 @@ export default function AssignmentsPage() {
         <div className="p-6 space-y-6">
           <p className="text-sm text-muted-foreground max-w-2xl">
             Assign a saved turf to a canvasser, then Share a scoped Walk link (or QR).
-            No app install — they Add to Home Screen. Links expire and can be revoked.
+            No app install — they Add to Home Screen. Coverage and outcomes refresh as
+            walkers sync back.
           </p>
 
-          <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
+          <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
             <Badge variant="secondary">
               {summary.assigned}/{summary.total} turfs assigned
             </Badge>
             <Badge variant="outline">
               {summary.contacted}/{summary.doors} doors contacted
             </Badge>
+            <span
+              className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 ${
+                live
+                  ? 'border-teal-500/40 bg-teal-500/10 text-teal-800 dark:text-teal-200'
+                  : 'border-border bg-muted/40'
+              }`}
+              title={
+                liveProgress?.asOf
+                  ? `Last poll ${new Date(liveProgress.asOf).toLocaleTimeString()}`
+                  : 'Polling canvass sync…'
+              }
+            >
+              <Radio
+                className={`h-3 w-3 ${live ? 'text-teal-600 animate-pulse' : ''}`}
+              />
+              {live ? 'Live' : 'Connecting…'}
+              {bump > 0 ? (
+                <span className="tabular-nums text-[10px] opacity-80">
+                  · +{bump} sync
+                </span>
+              ) : null}
+            </span>
           </div>
 
           {sharePanel && (
@@ -374,7 +426,10 @@ export default function AssignmentsPage() {
           ) : (
             <ul className="space-y-3">
               {turfs.map((t) => {
-                const pct = coveragePct(t)
+                const progress = byTurfId(t.id)
+                const pct = progress?.coveragePct ?? coveragePct(t)
+                const contacted =
+                  progress?.contactedCount ?? t.contacted_count ?? 0
                 const draft =
                   assignDraft[t.id] ??
                   (t.assigned_to != null ? String(t.assigned_to) : '')
@@ -395,19 +450,23 @@ export default function AssignmentsPage() {
                         </p>
                       </div>
                       <div className="text-right shrink-0">
-                        <p className="text-lg font-semibold tabular-nums">{pct}%</p>
+                        <p className="text-lg font-semibold tabular-nums transition-colors">
+                          {pct}%
+                        </p>
                         <p className="text-[10px] text-muted-foreground">
-                          coverage ({t.contacted_count || 0}/{t.address_count})
+                          coverage ({contacted}/{t.address_count})
                         </p>
                       </div>
                     </div>
 
                     <div className="h-1.5 rounded-full bg-muted overflow-hidden">
                       <div
-                        className="h-full bg-teal-600/80 transition-[width]"
+                        className="h-full bg-teal-600/80 transition-[width] duration-500"
                         style={{ width: `${pct}%` }}
                       />
                     </div>
+
+                    <TurfProgressDetails progress={progress} />
 
                     <div className="flex flex-col sm:flex-row sm:items-end gap-2">
                       <div className="flex-1 space-y-1.5 min-w-0">

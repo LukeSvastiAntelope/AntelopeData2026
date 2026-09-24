@@ -849,6 +849,150 @@ export class TurfRepo {
   }
 
   /**
+   * MiniVAN M4 — live progress snapshot for Ground Game managers.
+   * Coverage, outcome breakdown, last sync timestamps (walk token + contacts).
+   */
+  static async liveProgress(organizationId: number): Promise<{
+    asOf: string;
+    maxContactId: number;
+    turfs: Array<{
+      turfId: number;
+      label: string;
+      addressCount: number;
+      assignedTo: number | null;
+      contactedCount: number;
+      coveragePct: number;
+      outcomes: Record<string, number>;
+      lastOutcomeAt: string | null;
+      lastContactAt: string | null;
+      lastTokenSyncAt: string | null;
+      lastSyncedAt: string | null;
+      canvasserLastSyncedAt: string | null;
+    }>;
+  }> {
+    const sql = await openSql();
+    const turfs = await this.list(organizationId);
+
+    const [outcomeRows] = await sql.execute(
+      `SELECT o.turf_id, o.status, COUNT(*) AS cnt, MAX(o.recorded_at) AS last_at
+       FROM turf_stop_outcomes o
+       INNER JOIN turfs t ON t.id = o.turf_id
+       WHERE t.organization_id = ?
+         AND o.status IS NOT NULL
+         AND o.status <> 'not_contacted'
+       GROUP BY o.turf_id, o.status`,
+      [organizationId]
+    );
+
+    const [contactAgg] = await sql.execute(
+      `SELECT turf_id, MAX(recorded_at) AS last_at, MAX(id) AS max_id
+       FROM canvass_contacts
+       WHERE organization_id = ? AND turf_id IS NOT NULL
+       GROUP BY turf_id`,
+      [organizationId]
+    );
+
+    const [tokenAgg] = await sql.execute(
+      `SELECT turf_id, canvasser_user_id, MAX(last_used_at) AS last_at
+       FROM walk_tokens
+       WHERE organization_id = ?
+         AND revoked_at IS NULL
+         AND last_used_at IS NOT NULL
+       GROUP BY turf_id, canvasser_user_id`,
+      [organizationId]
+    );
+
+    const outcomesByTurf = new Map<number, Record<string, number>>();
+    const lastOutcomeByTurf = new Map<number, Date>();
+    for (const r of outcomeRows as any[]) {
+      const tid = Number(r.turf_id);
+      const status = String(r.status || 'unknown');
+      const bag = outcomesByTurf.get(tid) || {};
+      bag[status] = (bag[status] || 0) + (Number(r.cnt) || 0);
+      outcomesByTurf.set(tid, bag);
+      const last = r.last_at ? new Date(r.last_at) : null;
+      if (last && !Number.isNaN(last.getTime())) {
+        const prev = lastOutcomeByTurf.get(tid);
+        if (!prev || last > prev) lastOutcomeByTurf.set(tid, last);
+      }
+    }
+
+    const lastContactByTurf = new Map<number, Date>();
+    let maxContactId = 0;
+    for (const r of contactAgg as any[]) {
+      const tid = Number(r.turf_id);
+      const last = r.last_at ? new Date(r.last_at) : null;
+      if (last && !Number.isNaN(last.getTime())) {
+        lastContactByTurf.set(tid, last);
+      }
+      const mid = Number(r.max_id) || 0;
+      if (mid > maxContactId) maxContactId = mid;
+    }
+
+    const lastTokenByTurf = new Map<number, Date>();
+    const lastTokenByCanvasserTurf = new Map<string, Date>();
+    for (const r of tokenAgg as any[]) {
+      const tid = Number(r.turf_id);
+      const uid = Number(r.canvasser_user_id);
+      const last = r.last_at ? new Date(r.last_at) : null;
+      if (!last || Number.isNaN(last.getTime())) continue;
+      const prev = lastTokenByTurf.get(tid);
+      if (!prev || last > prev) lastTokenByTurf.set(tid, last);
+      lastTokenByCanvasserTurf.set(`${tid}:${uid}`, last);
+    }
+
+    const toIso = (d: Date | null | undefined) =>
+      d && !Number.isNaN(d.getTime()) ? d.toISOString() : null;
+
+    const latest = (...dates: Array<Date | null | undefined>) => {
+      let best: Date | null = null;
+      for (const d of dates) {
+        if (!d || Number.isNaN(d.getTime())) continue;
+        if (!best || d > best) best = d;
+      }
+      return best;
+    };
+
+    return {
+      asOf: new Date().toISOString(),
+      maxContactId,
+      turfs: turfs.map((t) => {
+        const outcomes = outcomesByTurf.get(t.id) || {};
+        const contactedCount = Object.values(outcomes).reduce(
+          (s, n) => s + n,
+          0
+        );
+        const addressCount = Number(t.address_count) || 0;
+        const coveragePct = addressCount
+          ? Math.min(100, Math.round((contactedCount / addressCount) * 100))
+          : 0;
+        const lastOutcome = lastOutcomeByTurf.get(t.id) || null;
+        const lastContact = lastContactByTurf.get(t.id) || null;
+        const lastToken = lastTokenByTurf.get(t.id) || null;
+        const canvasserSync =
+          t.assigned_to != null
+            ? lastTokenByCanvasserTurf.get(`${t.id}:${t.assigned_to}`) || null
+            : null;
+        const lastSynced = latest(lastOutcome, lastContact, lastToken);
+        return {
+          turfId: t.id,
+          label: t.label,
+          addressCount,
+          assignedTo: t.assigned_to,
+          contactedCount,
+          coveragePct,
+          outcomes,
+          lastOutcomeAt: toIso(lastOutcome),
+          lastContactAt: toIso(lastContact),
+          lastTokenSyncAt: toIso(lastToken),
+          lastSyncedAt: toIso(lastSynced),
+          canvasserLastSyncedAt: toIso(canvasserSync || lastSynced),
+        };
+      }),
+    };
+  }
+
+  /**
    * G3 — record a door outcome:
    * 1) append-only canvass_contacts (full trail)
    * 2) upsert turf_stop_outcomes (current-status rollup)

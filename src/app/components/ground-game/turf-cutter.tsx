@@ -28,6 +28,10 @@ import { Label } from '@/components/ui/label'
 import type { GeofencePolygon } from '@/lib/geofencing'
 import { classifyAddresses, normalizeRing } from '@/lib/geofencing'
 import type { TurfStopPin } from '@/components/dashboard-map'
+import {
+  useCanvassProgress,
+  TurfProgressDetails,
+} from '@/app/components/ground-game/use-canvass-progress'
 
 const DashboardMap = dynamic(() => import('@/components/dashboard-map'), {
   ssr: false,
@@ -74,6 +78,11 @@ export function TurfCutter() {
   const [buildBusy, setBuildBusy] = useState(false)
   const [renameId, setRenameId] = useState<number | null>(null)
   const [renameValue, setRenameValue] = useState('')
+
+  const { live, byTurfId, bump } = useCanvassProgress({
+    enabled: true,
+    intervalMs: 5000,
+  })
 
   const classified = useMemo(
     () => classifyAddresses(geofenceAddressRows, geofences),
@@ -612,15 +621,25 @@ export function TurfCutter() {
         <section className="rounded-lg border border-border p-3 space-y-2">
           <div className="flex items-center justify-between gap-2">
             <h2 className="text-sm font-semibold">Saved turfs</h2>
-            <Button
-              size="sm"
-              variant="outline"
-              className="h-7 text-[10px]"
-              disabled={turfLoading}
-              onClick={() => void loadTurfList()}
-            >
-              Refresh
-            </Button>
+            <div className="flex items-center gap-2">
+              <span
+                className={`text-[10px] ${
+                  live ? 'text-teal-700 dark:text-teal-300' : 'text-muted-foreground'
+                }`}
+                title="Coverage updates as canvassers sync"
+              >
+                {live ? (bump > 0 ? `Live · +${bump}` : 'Live') : '…'}
+              </span>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 text-[10px]"
+                disabled={turfLoading}
+                onClick={() => void loadTurfList()}
+              >
+                Refresh
+              </Button>
+            </div>
           </div>
           {turfList.length === 0 ? (
             <p className="text-[11px] text-muted-foreground italic">
@@ -628,7 +647,10 @@ export function TurfCutter() {
             </p>
           ) : (
             <ul className="space-y-1.5">
-              {turfList.map((t) => (
+              {turfList.map((t) => {
+                const progress = byTurfId(t.id)
+                const pct = progress?.coveragePct ?? 0
+                return (
                 <li
                   key={t.id}
                   className={`rounded border px-2 py-1.5 space-y-1 ${
@@ -674,6 +696,9 @@ export function TurfCutter() {
                           {t.assigned_to
                             ? ` · assigned #${t.assigned_to}`
                             : ' · unassigned'}
+                          {progress
+                            ? ` · ${pct}% covered (${progress.contactedCount})`
+                            : ''}
                         </p>
                       </button>
                       <div className="flex shrink-0 gap-0.5">
@@ -700,6 +725,17 @@ export function TurfCutter() {
                         </Button>
                       </div>
                     </div>
+                  )}
+                  {progress && progress.contactedCount > 0 && (
+                    <>
+                      <div className="h-1 rounded-full bg-muted overflow-hidden">
+                        <div
+                          className="h-full bg-teal-600/80 transition-[width] duration-500"
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                      <TurfProgressDetails progress={progress} compact />
+                    </>
                   )}
                   <div className="flex flex-wrap gap-1">
                     <Button
@@ -741,7 +777,8 @@ export function TurfCutter() {
                     </Button>
                   </div>
                 </li>
-              ))}
+                )
+              })}
             </ul>
           )}
 

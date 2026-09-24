@@ -29,7 +29,7 @@ export default function TurfPage() {
         <div className="p-6">
           <p className="text-sm text-muted-foreground mb-4 max-w-2xl">
             Cut walkable turf on the map, build door lists from saved geofences, and
-            hand them off on Assignments. Paper walk sheets still print from here.
+            hand them off on Assignments. Coverage climbs here as walkers sync outcomes.
           </p>
           <TurfCutter />
         </div>
