@@ -97,8 +97,23 @@ export async function PATCH(
       return NextResponse.json({ status: true, turf });
     }
 
+    if (typeof body.label === 'string' && body.label.trim()) {
+      try {
+        const turf = await TurfRepo.rename(id, orgId, body.label);
+        if (!turf) {
+          return NextResponse.json({ status: false, message: 'Not found' }, { status: 404 });
+        }
+        return NextResponse.json({ status: true, turf });
+      } catch (e) {
+        return NextResponse.json(
+          { status: false, message: e instanceof Error ? e.message : 'Rename failed' },
+          { status: 400 }
+        );
+      }
+    }
+
     return NextResponse.json(
-      { status: false, message: 'Provide assignedTo/unassign or voterGeoId+status' },
+      { status: false, message: 'Provide assignedTo/unassign, label, or voterGeoId+status' },
       { status: 400 }
     );
   } catch (error) {

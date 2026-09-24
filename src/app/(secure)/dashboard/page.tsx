@@ -415,10 +415,8 @@ export default function DashboardPage() {
   }, [])
 
   useEffect(() => {
-    if (layers.geofencing) {
-      void loadSavedGeofences()
-    }
-  }, [layers.geofencing, loadSavedGeofences])
+    void loadSavedGeofences()
+  }, [loadSavedGeofences])
 
   const queryAddressesInFence = async (fence: GeofencePolygon) => {
     if (!fence.dbId && !/^\d+$/.test(fence.id)) {
@@ -1047,8 +1045,8 @@ export default function DashboardPage() {
           personPins={layers.persons ? personPins : null}
           personHeatmap={personHeatmap}
           personColorMode={personColorMode}
-          turfStops={layers.turf ? turfStops : null}
-          geofencing={geofencingMapProps}
+          turfStops={null}
+          geofencing={null}
           onDistrictSelect={(district) => {
             setSelectedDistrict(district)
             loadDistrictIntel(district.districtCode)
@@ -1068,96 +1066,8 @@ export default function DashboardPage() {
             setRightPanelOpen(true)
           }}
         />
-        {selectedTurfStop && (
-          <div
-            style={{
-              position: 'absolute',
-              left: '50%',
-              bottom: 20,
-              transform: 'translateX(-50%)',
-              zIndex: 30,
-              width: 'min(420px, calc(100% - 24px))',
-            }}
-            className="rounded-xl border border-teal-500/30 bg-background/95 backdrop-blur-md shadow-2xl p-3 space-y-2"
-          >
-            <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0">
-                <p className="text-sm font-semibold truncate">
-                  #{selectedTurfStop.sortOrder} · {selectedTurfStop.label}
-                </p>
-                <p className="text-[11px] text-muted-foreground truncate">
-                  {activeTurfLabel || 'Turf'} · {selectedTurfStop.canvassStatus || 'not_contacted'} ·{' '}
-                  <span className="font-medium text-foreground">
-                    {selectedTurfStop.party || 'unknown lean'}
-                  </span>
-                </p>
-              </div>
-              <button
-                type="button"
-                className="shrink-0 rounded-md p-1 text-muted-foreground hover:bg-muted"
-                onClick={() => setSelectedTurfStopId(null)}
-                aria-label="Close turf stop"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-            <p className="text-[11px] text-muted-foreground">
-              Field stop — append-only contact log + current-status rollup. DNC request
-              suppresses this voter everywhere.
-            </p>
-            <div className="grid grid-cols-2 gap-2">
-              {(
-                [
-                  { party: 'Democrat', className: 'bg-blue-600 hover:bg-blue-700 text-white' },
-                  { party: 'Republican', className: 'bg-red-600 hover:bg-red-700 text-white' },
-                  { party: 'Independent', className: 'bg-amber-500 hover:bg-amber-600 text-white' },
-                  { party: 'Unaffiliated', className: 'bg-slate-600 hover:bg-slate-700 text-white' },
-                ] as const
-              ).map(({ party, className }) => (
-                <Button
-                  key={party}
-                  type="button"
-                  size="sm"
-                  disabled={confirmBusy}
-                  className={`h-10 text-xs font-semibold ${className}`}
-                  onClick={() => void confirmTurfStopAtDoor(party, 'supporter')}
-                >
-                  {confirmBusy && confirmParty === party ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  ) : null}
-                  {party}
-                </Button>
-              ))}
-            </div>
-            <div className="flex flex-wrap gap-1.5">
-              {(
-                [
-                  ['lean_support', 'Lean support'],
-                  ['undecided', 'Undecided'],
-                  ['lean_against', 'Lean against'],
-                  ['not_home', 'Not home'],
-                  ['moved', 'Moved'],
-                  ['wrong_address', 'Wrong address'],
-                  ['refused', 'Refused'],
-                  ['dnc_request', 'DNC'],
-                ] as const
-              ).map(([status, label]) => (
-                <Button
-                  key={status}
-                  type="button"
-                  size="sm"
-                  variant={status === 'dnc_request' ? 'destructive' : 'outline'}
-                  disabled={confirmBusy}
-                  className="h-7 text-[10px]"
-                  onClick={() => void confirmTurfStopAtDoor(confirmParty, status)}
-                >
-                  {label}
-                </Button>
-              ))}
-            </div>
-          </div>
-        )}
-        {selectedPerson && !selectedTurfStop && (
+        {selectedPerson && (
+
           <div
             style={{
               position: 'absolute',
@@ -1283,19 +1193,12 @@ export default function DashboardPage() {
                   setLayers((prev) => ({ ...prev, persons: next }))
                   if (next) void loadPersons()
                 }} />
-                <LayerToggle icon={<Fence className="h-3 w-3" />} label="Geofencing" active={layers.geofencing} colorClass="text-cyan-400" activeBg="bg-cyan-500/10 border-cyan-500/20" onClick={() => toggleLayer('geofencing')} />
-                <LayerToggle
-                  icon={<Route className="h-3 w-3" />}
-                  label="Turf walk"
-                  active={layers.turf}
-                  colorClass="text-teal-400"
-                  activeBg="bg-teal-500/10 border-teal-500/20"
-                  onClick={() => {
-                    const next = !layers.turf
-                    setLayers((prev) => ({ ...prev, turf: next }))
-                    if (next) void loadTurfList()
-                  }}
-                />
+                <Button asChild size="sm" variant="outline" className="h-7 text-[10px] w-full justify-start gap-1.5 border-teal-500/30 text-teal-700 dark:text-teal-300">
+                  <Link href="/turf">
+                    <Route className="h-3 w-3" />
+                    Ground Game — Turf & Assignments
+                  </Link>
+                </Button>
               </div>
             </Section>
 
@@ -1538,296 +1441,25 @@ export default function DashboardPage() {
               )}
             </div>
 
-            {layers.geofencing && (
-              <Section title="Canvass geofencing" defaultOpen>
-                <div className="space-y-2 text-[10px] text-muted-foreground">
-                  <p>
-                    Draw green <span className="text-emerald-500 font-medium">include</span> or red{' '}
-                    <span className="text-red-500 font-medium">exclude</span> zones. Client preview highlights instantly;
-                    Finish saves to MySQL for authoritative spatial queries (and the{' '}
-                    <code className="text-[9px]">addresses_in_area</code> tool).
-                  </p>
-                  <div className="flex items-center gap-1.5">
-                    <Label htmlFor="geofence-label" className="text-[10px] shrink-0">
-                      Label
-                    </Label>
-                    <Input
-                      id="geofence-label"
-                      value={geofenceLabelDraft}
-                      onChange={(e) => setGeofenceLabelDraft(e.target.value)}
-                      placeholder="Area A"
-                      className="h-7 text-[11px]"
-                    />
-                  </div>
-                  <div className="flex flex-wrap gap-1">
-                    <Button
-                      size="sm"
-                      variant={geofenceDrawMode === 'include' ? 'default' : 'outline'}
-                      className="h-7 text-[10px] px-2"
-                      onClick={() => {
-                        setGeofenceDrawMode('include')
-                        setGeofenceDraftVertices([])
-                        toast.success('Include zone: click the map to add corners, then Finish.')
-                      }}
-                    >
-                      Draw include
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant={geofenceDrawMode === 'exclude' ? 'destructive' : 'outline'}
-                      className="h-7 text-[10px] px-2"
-                      onClick={() => {
-                        setGeofenceDrawMode('exclude')
-                        setGeofenceDraftVertices([])
-                        toast.success('Exclude zone: click the map to add corners, then Finish.')
-                      }}
-                    >
-                      Draw exclude
-                    </Button>
-                  </div>
-                  <div className="flex flex-wrap gap-1">
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      className="h-7 text-[10px] px-2 gap-0.5"
-                      onClick={finishGeofencePolygon}
-                      disabled={!geofenceDrawMode || geofenceDraftVertices.length < 3 || geofenceSaving}
-                    >
-                      {geofenceSaving ? (
-                        <Loader2 className="h-3 w-3 animate-spin" />
-                      ) : (
-                        <Check className="h-3 w-3" />
-                      )}
-                      Finish & save
-                    </Button>
-                    <Button size="sm" variant="ghost" className="h-7 text-[10px] px-2 gap-0.5" onClick={cancelGeofenceDraft}>
-                      <X className="h-3 w-3" /> Cancel
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-7 text-[10px] px-2"
-                      onClick={() => void loadSavedGeofences()}
-                    >
-                      Load saved
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-7 text-[10px] px-2"
-                      onClick={() => {
-                        if (!confirm('Clear map zones? (Does not delete saved fences)')) return
-                        setGeofences([])
-                        setGeofenceDraftVertices([])
-                        setGeofenceDrawMode(null)
-                        setGeofenceQueryCount(null)
-                      }}
-                    >
-                      Clear zones
-                    </Button>
-                  </div>
-                  {geofences.length > 0 && (
-                    <div className="rounded border border-border/60 bg-muted/20 px-2 py-1.5 space-y-1">
-                      <p className="font-medium text-foreground text-[10px]">Saved fences</p>
-                      {geofences.map((f) => (
-                        <div key={f.id} className="flex items-center justify-between gap-1">
-                          <span className="truncate text-[10px]">
-                            {f.label || f.id}
-                            {f.mode === 'exclude' ? ' (exclude)' : ''}
-                            {!f.dbId && !/^\d+$/.test(f.id) ? ' · unsaved' : ''}
-                          </span>
-                          <Button
-                            size="sm"
-                            variant="secondary"
-                            className="h-6 text-[9px] px-1.5 shrink-0"
-                            disabled={geofenceQueryBusy || (!f.dbId && !/^\d+$/.test(f.id))}
-                            onClick={() => void queryAddressesInFence(f)}
-                          >
-                            {geofenceQueryBusy ? (
-                              <Loader2 className="h-3 w-3 animate-spin" />
-                            ) : (
-                              'Query DB'
-                            )}
-                          </Button>
-                        </div>
-                      ))}
-                      {geofenceQueryCount != null && (
-                        <p className="text-[10px] text-cyan-600 dark:text-cyan-400">
-                          Last spatial query: {geofenceQueryCount} addresses
-                        </p>
-                      )}
-                    </div>
-                  )}
-                  <p className="text-[9px] pt-1 border-t border-border/50">
-                    Preview rules: exclude wins. With include zones, only addresses inside an include (and not in exclude)
-                    are “canvass”. DB Query uses ST_Contains on voter_geo — not the client classifier.
-                  </p>
-                  <label className="flex items-center justify-center gap-1.5 w-full px-2 py-1.5 rounded border border-dashed border-border text-[11px] cursor-pointer hover:bg-muted/50">
-                    <Upload className="h-3 w-3" />
-                    Register CSV (lat/lng)
-                    <input
-                      type="file"
-                      accept=".csv"
-                      className="sr-only"
-                      onChange={async (e) => {
-                        const file = e.target.files?.[0]
-                        if (!file) return
-                        setGeofenceCsvLoading(true)
-                        try {
-                          const text = await file.text()
-                          const lines = text.split(/\r?\n/).filter(Boolean)
-                          if (lines.length < 2) {
-                            toast.error('CSV needs a header row and data rows.')
-                            return
-                          }
-                          const header = lines[0].split(',').map((h) => h.trim().replace(/^"|"$/g, ''))
-                          const latCol =
-                            header.find((h) => /^(lat|latitude)$/i.test(h.trim())) ||
-                            header.find((h) => /\blat(itude)?\b/i.test(h)) ||
-                            ''
-                          const lngCol =
-                            header.find((h) => /^(lng|lon|longitude|long)$/i.test(h.trim())) ||
-                            header.find((h) => /\b(lng|lon|longitude)\b/i.test(h)) ||
-                            ''
-                          if (!latCol || !lngCol) {
-                            toast.error('Could not find latitude/longitude columns (try lat, latitude, lng, longitude).')
-                            return
-                          }
-                          const labelCol = header.find((h) => /address|street|line1|addr/i.test(h)) || header[0]
-                          const out: { id: string; lng: number; lat: number; label?: string }[] = []
-                          for (let i = 1; i < lines.length; i++) {
-                            const vals = lines[i].match(/("([^"]*)")|([^,]+)/g)?.map((s) => (s?.startsWith('"') ? s.slice(1, -1) : s?.trim() ?? '')) ?? lines[i].split(',')
-                            const row: Record<string, string> = {}
-                            header.forEach((h, j) => {
-                              row[h] = vals[j] ?? ''
-                            })
-                            const lat = parseFloat(String(row[latCol] ?? '').replace(/,/g, ''))
-                            const lng = parseFloat(String(row[lngCol] ?? '').replace(/,/g, ''))
-                            if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue
-                            out.push({
-                              id: `row-${i}`,
-                              lat,
-                              lng,
-                              label: row[labelCol] || undefined,
-                            })
-                          }
-                          setGeofenceAddressRows(out)
-                          toast.success(`Loaded ${out.length} addresses with coordinates.`)
-                        } catch {
-                          toast.error('Failed to parse CSV.')
-                        } finally {
-                          setGeofenceCsvLoading(false)
-                          e.target.value = ''
-                        }
-                      }}
-                    />
-                  </label>
-                  {geofenceCsvLoading && (
-                    <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
-                      <Loader2 className="h-3 w-3 animate-spin" /> Parsing…
-                    </div>
-                  )}
-                  {geofenceStats.total > 0 && (
-                    <div className="rounded border border-border/60 bg-muted/20 px-2 py-1.5 text-[10px] space-y-0.5">
-                      <p className="font-medium text-foreground">Addresses vs fences</p>
-                      <p>
-                        <span className="text-emerald-600 dark:text-emerald-400">Canvass {geofenceStats.canvass}</span>
-                        {' · '}
-                        <span className="text-red-600 dark:text-red-400">Skip {geofenceStats.skip}</span>
-                        {geofenceStats.neutral > 0 && (
-                          <>
-                            {' · '}
-                            <span className="text-slate-500">Neutral {geofenceStats.neutral}</span>
-                          </>
-                        )}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </Section>
-            )}
-
-            {layers.turf && (
-              <Section title="Turf walk-list" defaultOpen>
-                <div className="space-y-2 text-[10px] text-muted-foreground">
-                  <p>
-                    Load a saved turf (from <code className="text-[9px]">build_turf</code>) as numbered field
-                    stops. Assign yourself, knock, record outcomes.
-                  </p>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="w-full h-7 text-[10px]"
-                    disabled={turfLoading}
-                    onClick={() => void loadTurfList()}
-                  >
-                    {turfLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Route className="h-3 w-3" />}
-                    Refresh turfs
+            <Section title="Ground Game" defaultOpen>
+              <div className="space-y-2 text-[10px] text-muted-foreground">
+                <p>
+                  Turf cutting, walk lists, and canvasser assignments moved to the{' '}
+                  <span className="font-medium text-foreground">Ground Game</span> sidebar group.
+                </p>
+                <div className="flex flex-wrap gap-1">
+                  <Button asChild size="sm" variant="secondary" className="h-7 text-[10px]">
+                    <Link href="/turf">Open Turf</Link>
                   </Button>
-                  {turfList.length === 0 ? (
-                    <p className="text-[10px] italic">No saved turfs yet. Build one via consultant or API.</p>
-                  ) : (
-                    <div className="space-y-1 max-h-40 overflow-y-auto">
-                      {turfList.map((t) => (
-                        <div
-                          key={t.id}
-                          className={`flex items-center justify-between gap-1 rounded border px-1.5 py-1 ${
-                            activeTurfId === t.id ? 'border-teal-500/50 bg-teal-500/10' : 'border-border/60'
-                          }`}
-                        >
-                          <button
-                            type="button"
-                            className="min-w-0 text-left truncate text-[10px] text-foreground"
-                            onClick={() => void loadTurfStops(t.id)}
-                          >
-                            {t.label}
-                            <span className="text-muted-foreground"> · {t.address_count}</span>
-                          </button>
-                          <Button
-                            size="sm"
-                            variant="secondary"
-                            className="h-6 text-[9px] px-1.5 shrink-0"
-                            disabled={turfLoading}
-                            onClick={() => void loadTurfStops(t.id)}
-                          >
-                            Load
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  {activeTurfId && (
-                    <div className="rounded border border-border/60 bg-muted/20 px-2 py-1.5 space-y-1.5">
-                      <p className="font-medium text-foreground text-[10px]">
-                        Active: {activeTurfLabel} · {turfStops.length} stops
-                      </p>
-                      <div className="flex flex-wrap gap-1">
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          className="h-7 text-[10px]"
-                          onClick={() => void assignActiveTurfToMe()}
-                        >
-                          Assign to me
-                        </Button>
-                        <Button asChild size="sm" variant="outline" className="h-7 text-[10px]">
-                          <Link href={`/dashboard/print-map?turfId=${activeTurfId}`}>
-                            <Printer className="h-3 w-3" />
-                            Print walk sheet
-                          </Link>
-                        </Button>
-                      </div>
-                      <p className="text-[9px]">
-                        Done:{' '}
-                        {turfStops.filter((s) => s.canvassStatus && s.canvassStatus !== 'not_contacted').length}
-                        {' / '}
-                        {turfStops.length}
-                      </p>
-                    </div>
-                  )}
+                  <Button asChild size="sm" variant="outline" className="h-7 text-[10px]">
+                    <Link href="/assignments">Assignments</Link>
+                  </Button>
+                  <Button asChild size="sm" variant="ghost" className="h-7 text-[10px]">
+                    <Link href="/payroll">Payroll</Link>
+                  </Button>
                 </div>
-              </Section>
-            )}
+              </div>
+            </Section>
 
             {(layers.political || layers.districts) && (
               <Section title="Legend">

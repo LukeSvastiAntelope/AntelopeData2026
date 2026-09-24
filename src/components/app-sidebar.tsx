@@ -53,6 +53,9 @@ import {
   Crosshair,
   Network,
   Globe,
+  MapPinned,
+  ClipboardCheck,
+  Banknote,
 } from 'lucide-react'
 import LogoText from '@/components/logo-text'
 import LogoIcon from '@/components/logo-icon'
@@ -161,6 +164,13 @@ const ACCOUNT_ITEMS: NavItem[] = [
   { title: 'Website', href: '/website', icon: Globe },
   { title: 'Settings', href: '/settings', icon: Settings },
   { title: 'Pricing', href: '/pricing', icon: DollarSign },
+]
+
+/** MiniVAN / ground game — peer of Workflow & Account (construction-op + volunteer suite slot in later). */
+const GROUND_GAME_ITEMS: NavItem[] = [
+  { title: 'Turf', href: '/turf', icon: MapPinned },
+  { title: 'Assignments', href: '/assignments', icon: ClipboardCheck },
+  { title: 'Payroll', href: '/payroll', icon: Banknote },
 ]
 
 const RESOURCE_ITEMS: NavItem[] = [
@@ -387,6 +397,34 @@ export function AppSidebar({ className, collapsible = 'offcanvas', ...props }: S
                 )
               })}
             </TooltipProvider>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarSeparator className="mx-4" />
+
+        {/* Ground Game — MiniVAN manager surface (Walk PWA is shared from Assignments) */}
+        <SidebarGroup className="px-4">
+          <SidebarGroupLabel>Ground Game</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {GROUND_GAME_ITEMS.map((item) => (
+                <SidebarMenuItem key={item.href}>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={pathMatches(pathname, item.href)}
+                    tooltip={item.title}
+                  >
+                    <Link
+                      href={item.href}
+                      className="flex items-center gap-2 px-4 py-2 text-sidebar-foreground"
+                    >
+                      <item.icon className="h-4 w-4 text-sidebar-foreground group-data-[collapsible=offcanvas]:hidden" />
+                      <span className="text-sidebar-foreground">{item.title}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
 

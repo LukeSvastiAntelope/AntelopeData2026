@@ -12,7 +12,7 @@ import { ensurePrimaryOrgId } from '@/app/api/dashboard/persons/org';
 
 export const runtime = 'nodejs';
 
-/** GET /api/dashboard/turfs — list saved turfs (optional ?assignedTo=me|<userId>). */
+/** GET /api/dashboard/turfs — list saved turfs (optional ?assignedTo=me|<userId>, ?coverage=1). */
 export async function GET(request: NextRequest) {
   try {
     const auth = requireUserId(request);
@@ -33,6 +33,18 @@ export async function GET(request: NextRequest) {
       turfs = await TurfRepo.listByAssignee(orgId, assignedTo);
     } else {
       turfs = await TurfRepo.list(orgId);
+    }
+
+    if (request.nextUrl.searchParams.get('coverage') === '1') {
+      const coverage = await TurfRepo.coverageCounts(orgId);
+      return NextResponse.json({
+        status: true,
+        organizationId: orgId,
+        turfs: turfs.map((t) => ({
+          ...t,
+          contacted_count: coverage.get(t.id) || 0,
+        })),
+      });
     }
     return NextResponse.json({ status: true, organizationId: orgId, turfs });
   } catch (error) {

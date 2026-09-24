@@ -801,6 +801,53 @@ export class TurfRepo {
     return this.getById(id, organizationId);
   }
 
+  /** Rename a turf (label must be unique within the org). */
+  static async rename(
+    id: number,
+    organizationId: number,
+    label: string
+  ): Promise<TurfRow | null> {
+    const trimmed = String(label || '').trim();
+    if (!trimmed) throw new Error('label is required');
+    const clash = await this.getByLabel(trimmed, organizationId);
+    if (clash && clash.id !== id) {
+      throw new Error(`A turf named “${trimmed}” already exists`);
+    }
+    const sql = await openSql();
+    const [result] = await sql.execute<ResultSetHeader>(
+      `UPDATE turfs SET label = ?, updated_at = CURRENT_TIMESTAMP
+       WHERE id = ? AND organization_id = ?`,
+      [trimmed, id, organizationId]
+    );
+    if (!result.affectedRows) return null;
+    return this.getById(id, organizationId);
+  }
+
+  /**
+   * Contacted-door counts per turf (for Assignments coverage %).
+   * Counts turf_stop_outcomes whose status is not not_contacted.
+   */
+  static async coverageCounts(
+    organizationId: number
+  ): Promise<Map<number, number>> {
+    const sql = await openSql();
+    const [rows] = await sql.execute(
+      `SELECT o.turf_id AS turf_id, COUNT(*) AS contacted
+       FROM turf_stop_outcomes o
+       INNER JOIN turfs t ON t.id = o.turf_id
+       WHERE t.organization_id = ?
+         AND o.status IS NOT NULL
+         AND o.status <> 'not_contacted'
+       GROUP BY o.turf_id`,
+      [organizationId]
+    );
+    const map = new Map<number, number>();
+    for (const r of rows as any[]) {
+      map.set(Number(r.turf_id), Number(r.contacted) || 0);
+    }
+    return map;
+  }
+
   /**
    * G3 — record a door outcome:
    * 1) append-only canvass_contacts (full trail)
