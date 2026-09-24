@@ -1,8 +1,9 @@
 /**
  * Platform storage facade — server-only.
  *
- * Files live outside public/ (LocalPrivateStorage → UPLOAD_STORAGE_DIR).
- * Swap providers by changing getStorageProvider() (mirror EmailProvider).
+ * Files live outside public/ by default (LocalPrivateStorage → UPLOAD_STORAGE_DIR).
+ * Prod on Vercel: STORAGE_PROVIDER=vercel-blob (+ BLOB_READ_WRITE_TOKEN from a Blob store).
+ * Swap providers here (mirror EmailProvider).
  */
 
 import type { StorageProvider, StoredObject } from './StorageProvider';
@@ -12,6 +13,11 @@ import {
   getLocalPrivateStorage,
   resolveWithinRoot,
 } from './local-private-storage';
+import {
+  VercelBlobStorage,
+  getVercelBlobStorage,
+  sanitizeBlobKey,
+} from './vercel-blob-storage';
 
 export type { StorageProvider, StoredObject };
 export {
@@ -19,13 +25,20 @@ export {
   defaultStorageRoot,
   getLocalPrivateStorage,
   resolveWithinRoot,
+  VercelBlobStorage,
+  getVercelBlobStorage,
+  sanitizeBlobKey,
 };
 
 /**
- * Resolve the active storage provider. Today: local private root.
- * Later: if (process.env.STORAGE_PROVIDER === 's3') return getS3Storage();
+ * Resolve the active storage provider.
+ * - STORAGE_PROVIDER=vercel-blob → Vercel Blob (prod)
+ * - otherwise → LocalPrivateStorage (dev default)
  */
 export function getStorageProvider(): StorageProvider {
+  if (process.env.STORAGE_PROVIDER === 'vercel-blob') {
+    return getVercelBlobStorage();
+  }
   return getLocalPrivateStorage();
 }
 

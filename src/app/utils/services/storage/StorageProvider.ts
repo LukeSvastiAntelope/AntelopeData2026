@@ -1,5 +1,5 @@
 /**
- * Swappable object storage contract (local private root today, S3 later).
+ * Swappable object storage contract (local private root, Vercel Blob, S3 later).
  * Server-only — never import from client components.
  */
 
