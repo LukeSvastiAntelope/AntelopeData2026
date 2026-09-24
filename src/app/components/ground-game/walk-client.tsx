@@ -7,8 +7,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   applyLocalDoorStatus,
+  enqueueBreadcrumb,
   enqueueOutcome,
   flushWalkQueue,
+  haversineMeters,
+  listGpsQueue,
   listQueue,
   loadWalkSnapshot,
   newClientEventId,
@@ -18,6 +21,8 @@ import {
 import { Loader2, MapPin, RefreshCw, Wifi, WifiOff, Check } from 'lucide-react'
 
 type Props = { token: string }
+
+const GPS_CONSENT_KEY = (token: string) => `walk-gps-consent:${token}`
 
 export function WalkClient({ token }: Props) {
   const [snap, setSnap] = useState<WalkSnapshot | null>(null)
@@ -32,14 +37,19 @@ export function WalkClient({ token }: Props) {
   const [note, setNote] = useState('')
   const [busy, setBusy] = useState(false)
   const [tab, setTab] = useState<'list' | 'map'>('list')
+  const [gpsConsent, setGpsConsent] = useState<'unknown' | 'yes' | 'no'>('unknown')
+  const [gpsActive, setGpsActive] = useState(false)
   const mapRef = useRef<HTMLDivElement>(null)
   const mapInst = useRef<any>(null)
+  const lastGps = useRef<{ lat: number; lng: number; t: number } | null>(null)
+  const watchId = useRef<number | null>(null)
 
   const refreshPending = useCallback(async () => {
-    const q = await listQueue(token)
-    setPending(
-      q.filter((e) => e.syncState === 'pending' || e.syncState === 'error').length
-    )
+    const [q, g] = await Promise.all([listQueue(token), listGpsQueue(token)])
+    const n =
+      q.filter((e) => e.syncState === 'pending' || e.syncState === 'error').length +
+      g.filter((e) => e.syncState === 'pending' || e.syncState === 'error').length
+    setPending(n)
   }, [token])
 
   const syncNow = useCallback(async () => {
@@ -64,7 +74,11 @@ export function WalkClient({ token }: Props) {
       fetchedAt: new Date().toISOString(),
       expiresAt: data.expiresAt,
       turf: data.turf,
-      canvasser: data.canvasser || { name: null },
+      canvasser: {
+        name: data.canvasser?.name ?? null,
+        paidTracking: Boolean(data.canvasser?.paidTracking || data.gps?.enabled),
+      },
+      gps: data.gps || { enabled: false },
       outcomes: data.outcomes || [],
       doors: (data.doors || []).map((d: any) => ({
         voterGeoId: d.voterGeoId,
@@ -84,6 +98,77 @@ export function WalkClient({ token }: Props) {
     setSnap(next)
     return next
   }, [token])
+
+  useEffect(() => {
+    try {
+      const v = localStorage.getItem(GPS_CONSENT_KEY(token))
+      if (v === 'yes' || v === 'no') setGpsConsent(v)
+    } catch {
+      /* ignore */
+    }
+  }, [token])
+
+  // Battery-light GPS sampling for paid canvassers who consented
+  useEffect(() => {
+    const enabled = Boolean(snap?.gps?.enabled)
+    if (!enabled || gpsConsent !== 'yes') {
+      if (watchId.current != null && navigator.geolocation) {
+        navigator.geolocation.clearWatch(watchId.current)
+        watchId.current = null
+      }
+      setGpsActive(false)
+      return
+    }
+    if (!navigator.geolocation) return
+
+    const minIntervalMs = (snap?.gps?.minIntervalSec ?? 45) * 1000
+    const minDistanceM = snap?.gps?.minDistanceM ?? 40
+
+    const onPos = (pos: GeolocationPosition) => {
+      const lat = pos.coords.latitude
+      const lng = pos.coords.longitude
+      const now = Date.now()
+      const prev = lastGps.current
+      if (prev) {
+        const dt = now - prev.t
+        const dist = haversineMeters(prev.lat, prev.lng, lat, lng)
+        if (dt < minIntervalMs && dist < minDistanceM) return
+      }
+      lastGps.current = { lat, lng, t: now }
+      void enqueueBreadcrumb(token, {
+        clientEventId: newClientEventId(),
+        latitude: lat,
+        longitude: lng,
+        accuracyM: pos.coords.accuracy ?? null,
+        recordedAt: new Date(pos.timestamp || now).toISOString(),
+      }).then(() => refreshPending())
+    }
+
+    watchId.current = navigator.geolocation.watchPosition(onPos, undefined, {
+      enableHighAccuracy: false,
+      maximumAge: 30_000,
+      timeout: 20_000,
+    })
+    setGpsActive(true)
+
+    return () => {
+      if (watchId.current != null) {
+        navigator.geolocation.clearWatch(watchId.current)
+        watchId.current = null
+      }
+      setGpsActive(false)
+    }
+  }, [snap?.gps, gpsConsent, token, refreshPending])
+
+  const acceptGps = (yes: boolean) => {
+    const v = yes ? 'yes' : 'no'
+    setGpsConsent(v)
+    try {
+      localStorage.setItem(GPS_CONSENT_KEY(token), v)
+    } catch {
+      /* ignore */
+    }
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -284,6 +369,34 @@ export function WalkClient({ token }: Props) {
 
   return (
     <div className="min-h-dvh flex flex-col bg-zinc-50 text-zinc-900">
+      {snap.gps?.enabled && gpsConsent === 'unknown' && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-5 space-y-4 shadow-xl">
+            <p className="text-sm font-semibold">Location for payroll</p>
+            <p className="text-sm text-zinc-600 leading-relaxed">
+              {snap.gps.disclosure ||
+                'This campaign flagged you as a paid canvasser. GPS will be sampled (battery-light) for miles and hours. Location is separate from voter records.'}
+            </p>
+            <div className="flex flex-col gap-2">
+              <button
+                type="button"
+                className="h-12 rounded-xl bg-teal-700 text-white text-sm font-semibold"
+                onClick={() => acceptGps(true)}
+              >
+                Allow GPS for payroll
+              </button>
+              <button
+                type="button"
+                className="h-11 rounded-xl border border-zinc-200 text-sm font-medium"
+                onClick={() => acceptGps(false)}
+              >
+                Continue without GPS
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <header className="sticky top-0 z-20 border-b border-zinc-200 bg-white/95 backdrop-blur px-4 py-3 safe-pt">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
@@ -294,6 +407,7 @@ export function WalkClient({ token }: Props) {
             <p className="text-xs text-zinc-500">
               {doors.length} doors
               {snap.canvasser.name ? ` · ${snap.canvasser.name}` : ''}
+              {gpsActive ? ' · GPS on' : ''}
             </p>
           </div>
           <div className="shrink-0 text-right space-y-1">

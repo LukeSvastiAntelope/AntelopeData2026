@@ -44,16 +44,24 @@ export async function GET(
       return NextResponse.json({ status: false, message: 'Turf not found' }, { status: 404 });
     }
 
-    // Optional canvasser display (no email / other PII beyond name)
+    // Optional canvasser display + paid GPS flag (no email)
     let canvasserName: string | null = null;
+    let paidTracking = false;
     try {
       const sql = await openSql();
       const [rows] = await sql.execute(
-        `SELECT display_name FROM users WHERE id = ? LIMIT 1`,
-        [walk.canvasser_user_id]
+        `SELECT u.display_name,
+                COALESCE(om.is_paid_canvasser, 0) AS paid
+         FROM users u
+         LEFT JOIN organization_members om
+           ON om.user_id = u.id AND om.organization_id = ?
+         WHERE u.id = ?
+         LIMIT 1`,
+        [walk.organization_id, walk.canvasser_user_id]
       );
       const u = (rows as any[])[0];
       canvasserName = u?.display_name ? String(u.display_name) : null;
+      paidTracking = Number(u?.paid) === 1;
     } catch {
       /* ignore */
     }
@@ -84,7 +92,16 @@ export async function GET(
         label: listed.turf.label,
         addressCount: listed.turf.address_count,
       },
-      canvasser: { name: canvasserName },
+      canvasser: { name: canvasserName, paidTracking },
+      gps: paidTracking
+        ? {
+            enabled: true,
+            disclosure:
+              'This campaign flagged you as a paid canvasser. While you walk, Antelope samples your GPS (battery-light) to calculate miles and hours for payroll. Location is stored separately from voter records and kept only as long as payroll needs. You can decline — door logging still works without GPS.',
+            minIntervalSec: 45,
+            minDistanceM: 40,
+          }
+        : { enabled: false },
       outcomes: ALLOWED_OUTCOMES,
       doors,
     });
