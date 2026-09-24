@@ -22,17 +22,18 @@ Mobile canvass client is **later**. G1–G3 are shaped so it can land without re
 4. **Canvass log is append-only.** Rollup lives in `turf_stop_outcomes`; trail lives in `canvass_contacts`.
 5. **SRID 4326 is latitude-first** in MySQL. Covered by `scripts/geospatial/test-axis-order.ts`.
 
-## Explicitly built (MiniVAN M2)
+## Explicitly built (MiniVAN M2–M3)
 
 - Scoped walk tokens (`walk_tokens`) — create/revoke from Assignments
 - Public `/walk/[token]` PWA (manifest + service worker + IndexedDB queue)
 - Sync via `POST /api/public/walk/[token]/sync` with `client_event_id` (idempotent)
 - Hard door scope: only `turf_addresses` for that token’s turf
+- Paid-canvasser GPS breadcrumbs (`canvass_gps_breadcrumbs`) — battery-light sampling, disclosed on entry
+- Payroll rollup (miles / hours / doors) + CSV on `/payroll`
 
 ## Still later
 
 - Conflict UI / merge for edits (contacts stay append-only)
 - MiniVAN product integration / vendor sync
-- Payroll miles/time from GPS
 
-When pulling a walk: `GET /api/public/walk/[token]` caches doors; flush contacts with `client_event_id` + door `recorded_at`.
+When pulling a walk: `GET /api/public/walk/[token]` caches doors; flush contacts with `client_event_id` + door `recorded_at`. Paid walkers also sync breadcrumbs to `/breadcrumbs`.
