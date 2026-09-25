@@ -33,6 +33,9 @@ const publicRoutes = [
     '/api/public/site-domain', // Sites S6 — middleware custom-domain resolve
     '/api/public/site-media/:slug*', // Storage V2 — public site images (local/CDN proxy)
     '/api/public/walk/:slug*', // MiniVAN M2 — canvasser walk pull + sync (token-scoped)
+    '/api/public/live/:slug*', // Live L2 — public join + participant actions
+    '/api/public/live/linkedin/start',
+    '/api/public/live/linkedin/callback',
     '/api/image-proxy',
     '/api/scheduler/init', // Scheduler initialization
     '/api/admin/scheduler/stats', // Admin scheduler stats
@@ -71,6 +74,8 @@ const publicRoutes = [
     '/s/:slug*',
     // MiniVAN M2 — canvasser walk PWA (scoped token, no login)
     '/walk/:slug*',
+    // Live L2 — audience join on phone (no login)
+    '/live/:slug*',
 ]
 
 // Use an edge-safe config to create an auth middleware wrapper.
@@ -164,9 +169,11 @@ export default auth(async (req) => {
     const isPublicSiteRoute = path === '/s' || path.startsWith('/s/');
     // MiniVAN walk PWA — token in path; no session
     const isPublicWalkRoute = path === '/walk' || path.startsWith('/walk/');
+    // Live audience join — code in path; no session
+    const isPublicLiveRoute = path === '/live' || path.startsWith('/live/');
 
     // Allow public routes
-    if (isPublicApiRoute || isGetPredictionApiRoute || isPublicSiteRoute || isPublicWalkRoute) {
+    if (isPublicApiRoute || isGetPredictionApiRoute || isPublicSiteRoute || isPublicWalkRoute || isPublicLiveRoute) {
         return NextResponse.next();
     }
 

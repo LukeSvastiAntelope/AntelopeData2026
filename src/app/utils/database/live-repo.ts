@@ -896,4 +896,253 @@ export class LiveRepo {
     const [rows] = await sql.execute<RowDataPacket[]>(sqlText, params);
     return rows.map(mapEvent);
   }
+
+  // ── L2 participant actions (append-only events) ──────────────────────
+
+  /** Effective identify mode for a question (session default + override). */
+  static resolveIdentifyMode(
+    session: LiveSession,
+    question: LiveQuestion | null
+  ): LiveIdentifyOverride | 'per_question' {
+    if (question?.identifyOverride) return question.identifyOverride;
+    if (session.identifyMode === 'per_question') return 'per_question';
+    return session.identifyMode === 'anonymous' ? 'anonymous' : 'identified';
+  }
+
+  static async getActiveQuestion(
+    sessionId: number
+  ): Promise<LiveQuestion | null> {
+    const sql = await openSql();
+    const [rows] = await sql.execute<RowDataPacket[]>(
+      `SELECT * FROM session_questions
+       WHERE session_id = ? AND state = 'active'
+       ORDER BY order_idx ASC, id ASC
+       LIMIT 1`,
+      [sessionId]
+    );
+    return rows[0] ? mapQuestion(rows[0]) : null;
+  }
+
+  /**
+   * Record a poll / scale / open / wordcloud response.
+   * Always appends; tallies project the latest answer per participant.
+   */
+  static async recordResponse(params: {
+    sessionId: number;
+    organizationId: number;
+    participantId: number;
+    questionId: number;
+    value: unknown;
+  }): Promise<LiveSessionEvent> {
+    const orgId = normalizeOrgId(params.organizationId);
+    const session = await this.getSessionById(params.sessionId, orgId);
+    if (!session) throw new Error('Session not found');
+    if (session.status === 'ended') throw new Error('Session has ended');
+
+    const participant = await this.getParticipantById(
+      params.participantId,
+      orgId
+    );
+    if (!participant || participant.sessionId !== session.id) {
+      throw new Error('Participant not in this session');
+    }
+
+    const question = await this.getQuestionById(params.questionId);
+    if (!question || question.sessionId !== session.id) {
+      throw new Error('Question not in this session');
+    }
+    if (question.state !== 'active') {
+      throw new Error('Question is not active');
+    }
+    if (question.kind === 'qa') {
+      throw new Error('Use askQa for Q&A prompts');
+    }
+
+    const mode = this.resolveIdentifyMode(session, question);
+    if (mode === 'identified' && participant.isAnonymous) {
+      throw new Error('This question requires an identified participant');
+    }
+
+    return this.appendEvent({
+      sessionId: session.id,
+      organizationId: orgId,
+      participantId: participant.id,
+      questionId: question.id,
+      type: `response.${question.kind}`,
+      payload: {
+        value: params.value,
+        identified: !participant.isAnonymous && mode !== 'anonymous',
+        kind: question.kind,
+      },
+    });
+  }
+
+  static async askQa(params: {
+    sessionId: number;
+    organizationId: number;
+    participantId: number;
+    text: string;
+    questionId?: number | null;
+  }): Promise<LiveSessionEvent> {
+    const orgId = normalizeOrgId(params.organizationId);
+    const session = await this.getSessionById(params.sessionId, orgId);
+    if (!session) throw new Error('Session not found');
+    if (session.status === 'ended') throw new Error('Session has ended');
+
+    const participant = await this.getParticipantById(
+      params.participantId,
+      orgId
+    );
+    if (!participant || participant.sessionId !== session.id) {
+      throw new Error('Participant not in this session');
+    }
+
+    const text = String(params.text || '').trim().slice(0, 500);
+    if (!text) throw new Error('Question text is required');
+
+    return this.appendEvent({
+      sessionId: session.id,
+      organizationId: orgId,
+      participantId: participant.id,
+      questionId: params.questionId ?? null,
+      type: 'qa.asked',
+      payload: {
+        text,
+        identified: !participant.isAnonymous,
+        displayName: participant.isAnonymous
+          ? null
+          : participant.displayName,
+      },
+    });
+  }
+
+  static async upvoteQa(params: {
+    sessionId: number;
+    organizationId: number;
+    participantId: number;
+    askEventId: number;
+  }): Promise<LiveSessionEvent> {
+    const orgId = normalizeOrgId(params.organizationId);
+    const session = await this.getSessionById(params.sessionId, orgId);
+    if (!session) throw new Error('Session not found');
+    if (session.status === 'ended') throw new Error('Session has ended');
+
+    const participant = await this.getParticipantById(
+      params.participantId,
+      orgId
+    );
+    if (!participant || participant.sessionId !== session.id) {
+      throw new Error('Participant not in this session');
+    }
+
+    const events = await this.listEvents(session.id, orgId, {
+      limit: 1000,
+    });
+    const ask = events.find(
+      (e) => e.id === params.askEventId && e.type === 'qa.asked'
+    );
+    if (!ask) throw new Error('Question not found');
+
+    const already = events.some(
+      (e) =>
+        e.type === 'qa.upvoted' &&
+        e.participantId === participant.id &&
+        (e.payload as any)?.askEventId === params.askEventId
+    );
+    if (already) {
+      throw new Error('Already upvoted');
+    }
+
+    return this.appendEvent({
+      sessionId: session.id,
+      organizationId: orgId,
+      participantId: participant.id,
+      questionId: ask.questionId,
+      type: 'qa.upvoted',
+      payload: { askEventId: params.askEventId },
+    });
+  }
+
+  /** Project audience Q&A board from append-only events. */
+  static async projectQaBoard(
+    sessionId: number,
+    organizationId: number
+  ): Promise<
+    Array<{
+      askEventId: number;
+      text: string;
+      upvotes: number;
+      displayName: string | null;
+      identified: boolean;
+      createdAt: string;
+      upvotedByMe?: boolean;
+    }>
+  > {
+    const events = await this.listEvents(sessionId, organizationId, {
+      limit: 1000,
+    });
+    const asks = new Map<
+      number,
+      {
+        askEventId: number;
+        text: string;
+        upvotes: number;
+        displayName: string | null;
+        identified: boolean;
+        createdAt: string;
+        upvoterIds: Set<number>;
+      }
+    >();
+
+    for (const e of events) {
+      if (e.type === 'qa.asked') {
+        const p = (e.payload || {}) as Record<string, unknown>;
+        asks.set(e.id, {
+          askEventId: e.id,
+          text: String(p.text || ''),
+          upvotes: 0,
+          displayName: p.displayName != null ? String(p.displayName) : null,
+          identified: Boolean(p.identified),
+          createdAt: e.createdAt,
+          upvoterIds: new Set(),
+        });
+      } else if (e.type === 'qa.upvoted') {
+        const askId = Number((e.payload as any)?.askEventId);
+        const row = asks.get(askId);
+        if (row && e.participantId != null) {
+          if (!row.upvoterIds.has(e.participantId)) {
+            row.upvoterIds.add(e.participantId);
+            row.upvotes += 1;
+          }
+        }
+      }
+    }
+
+    return Array.from(asks.values())
+      .map(({ upvoterIds, ...rest }) => ({ ...rest }))
+      .sort((a, b) => b.upvotes - a.upvotes || b.askEventId - a.askEventId);
+  }
+
+  /** Latest response value per participant for a question (projection). */
+  static async latestResponseForParticipant(
+    sessionId: number,
+    organizationId: number,
+    participantId: number,
+    questionId: number
+  ): Promise<unknown | null> {
+    const events = await this.listEvents(sessionId, organizationId, {
+      limit: 1000,
+    });
+    let latest: unknown | null = null;
+    for (const e of events) {
+      if (
+        e.participantId === participantId &&
+        e.questionId === questionId &&
+        e.type.startsWith('response.')
+      ) {
+        latest = (e.payload as any)?.value ?? null;
+      }
+    }
+    return latest;
+  }
 }
