@@ -56,6 +56,7 @@ import {
   MapPinned,
   ClipboardCheck,
   Banknote,
+  Radio,
 } from 'lucide-react'
 import LogoText from '@/components/logo-text'
 import LogoIcon from '@/components/logo-icon'
@@ -171,6 +172,11 @@ const GROUND_GAME_ITEMS: NavItem[] = [
   { title: 'Turf', href: '/turf', icon: MapPinned },
   { title: 'Assignments', href: '/assignments', icon: ClipboardCheck },
   { title: 'Payroll', href: '/payroll', icon: Banknote },
+]
+
+/** Antelope Live — audience engagement + intelligence (peer of Workflow). */
+const LIVE_ITEMS: NavItem[] = [
+  { title: 'Sessions', href: '/live-sessions', icon: Radio },
 ]
 
 const RESOURCE_ITEMS: NavItem[] = [
@@ -397,6 +403,34 @@ export function AppSidebar({ className, collapsible = 'offcanvas', ...props }: S
                 )
               })}
             </TooltipProvider>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarSeparator className="mx-4" />
+
+        {/* Live — audience engagement + intelligence */}
+        <SidebarGroup className="px-4">
+          <SidebarGroupLabel>Live</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {LIVE_ITEMS.map((item) => (
+                <SidebarMenuItem key={item.href}>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={pathMatches(pathname, item.href)}
+                    tooltip={item.title}
+                  >
+                    <Link
+                      href={item.href}
+                      className="flex items-center gap-2 px-4 py-2 text-sidebar-foreground"
+                    >
+                      <item.icon className="h-4 w-4 text-sidebar-foreground group-data-[collapsible=offcanvas]:hidden" />
+                      <span className="text-sidebar-foreground">{item.title}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
 
