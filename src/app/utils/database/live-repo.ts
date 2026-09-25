@@ -1145,4 +1145,257 @@ export class LiveRepo {
     }
     return latest;
   }
+
+  // ── L3 screen projections ────────────────────────────────────────────
+
+  static async countParticipants(
+    sessionId: number,
+    organizationId: number
+  ): Promise<number> {
+    const orgId = normalizeOrgId(organizationId);
+    const sql = await openSql();
+    const [rows] = await sql.execute<RowDataPacket[]>(
+      `SELECT COUNT(*) AS c FROM session_participants
+       WHERE session_id = ? AND organization_id = ?`,
+      [sessionId, orgId]
+    );
+    return Number(rows[0]?.c) || 0;
+  }
+
+  /**
+   * Latest answer per participant for a question, then aggregate.
+   * Poll → option bars; scale → histogram + avg; open/wordcloud → token weights.
+   */
+  static async projectQuestionResults(
+    sessionId: number,
+    organizationId: number,
+    question: LiveQuestion
+  ): Promise<{
+    responseCount: number;
+    pollBars: Array<{ label: string; count: number; pct: number }>;
+    scale: { average: number | null; count: number; buckets: number[] } | null;
+    wordCloud: Array<{ text: string; weight: number }>;
+  }> {
+    const events = await this.listEvents(sessionId, organizationId, {
+      limit: 2000,
+    });
+    const latestByParticipant = new Map<number, unknown>();
+    for (const e of events) {
+      if (
+        e.questionId === question.id &&
+        e.participantId != null &&
+        e.type.startsWith('response.')
+      ) {
+        latestByParticipant.set(e.participantId, (e.payload as any)?.value);
+      }
+    }
+
+    const values = Array.from(latestByParticipant.values());
+    const responseCount = values.length;
+
+    const pollBars: Array<{ label: string; count: number; pct: number }> = [];
+    let scale: {
+      average: number | null;
+      count: number;
+      buckets: number[];
+    } | null = null;
+    const wordCloud: Array<{ text: string; weight: number }> = [];
+
+    if (question.kind === 'poll') {
+      const opts = Array.isArray(question.options)
+        ? question.options.map((o) =>
+            typeof o === 'string'
+              ? o
+              : String((o as any)?.label ?? (o as any)?.value ?? o)
+          )
+        : [];
+      const counts = new Map<string, number>();
+      for (const o of opts) counts.set(o, 0);
+      for (const v of values) {
+        const label = String(v);
+        counts.set(label, (counts.get(label) || 0) + 1);
+      }
+      for (const [label, count] of counts) {
+        pollBars.push({
+          label,
+          count,
+          pct: responseCount ? Math.round((count / responseCount) * 100) : 0,
+        });
+      }
+      // Keep option order first, then write-ins
+      pollBars.sort((a, b) => {
+        const ai = opts.indexOf(a.label);
+        const bi = opts.indexOf(b.label);
+        if (ai >= 0 && bi >= 0) return ai - bi;
+        if (ai >= 0) return -1;
+        if (bi >= 0) return 1;
+        return b.count - a.count;
+      });
+    } else if (question.kind === 'scale') {
+      const buckets = Array.from({ length: 10 }, () => 0);
+      let sum = 0;
+      let n = 0;
+      for (const v of values) {
+        const num = Number(v);
+        if (!Number.isFinite(num)) continue;
+        const idx = Math.min(9, Math.max(0, Math.round(num) - 1));
+        buckets[idx]! += 1;
+        sum += num;
+        n += 1;
+      }
+      scale = {
+        average: n ? Math.round((sum / n) * 10) / 10 : null,
+        count: n,
+        buckets,
+      };
+    } else if (question.kind === 'open' || question.kind === 'wordcloud') {
+      const weights = new Map<string, number>();
+      for (const v of values) {
+        const raw = String(v || '').trim();
+        if (!raw) continue;
+        const tokens =
+          question.kind === 'wordcloud'
+            ? [raw.toLowerCase()]
+            : raw
+                .toLowerCase()
+                .split(/[^a-z0-9]+/i)
+                .map((t) => t.trim())
+                .filter((t) => t.length >= 3);
+        for (const t of tokens) {
+          weights.set(t, (weights.get(t) || 0) + 1);
+        }
+      }
+      wordCloud.push(
+        ...Array.from(weights.entries())
+          .map(([text, weight]) => ({ text, weight }))
+          .sort((a, b) => b.weight - a.weight)
+          .slice(0, 60)
+      );
+    }
+
+    return { responseCount, pollBars, scale, wordCloud };
+  }
+
+  /** Full presenter / SSE snapshot for a session code. */
+  static async buildScreenSnapshot(code: string): Promise<{
+    asOf: string;
+    session: {
+      id: number;
+      code: string;
+      title: string;
+      hostName: string | null;
+      eventType: string;
+      identifyMode: string;
+      status: string;
+    };
+    participantCount: number;
+    activeQuestion: null | {
+      id: number;
+      kind: string;
+      prompt: string;
+      options: unknown;
+      identifyEffective: string;
+      results: Awaited<ReturnType<typeof LiveRepo.projectQuestionResults>>;
+    };
+    questions: Array<{
+      id: number;
+      kind: string;
+      prompt: string;
+      state: string;
+      orderIdx: number;
+    }>;
+    qa: Awaited<ReturnType<typeof LiveRepo.projectQaBoard>>;
+    joinPath: string;
+  } | null> {
+    const found = await this.getLiveSessionByCode(code);
+    if (!found) return null;
+    const { session, questions } = found;
+    const active =
+      questions.find((q) => q.state === 'active') ||
+      (await this.getActiveQuestion(session.id));
+    const participantCount = await this.countParticipants(
+      session.id,
+      session.organizationId
+    );
+    const qa = await this.projectQaBoard(session.id, session.organizationId);
+    let activePayload: {
+      id: number;
+      kind: string;
+      prompt: string;
+      options: unknown;
+      identifyEffective: string;
+      results: Awaited<ReturnType<typeof LiveRepo.projectQuestionResults>>;
+    } | null = null;
+    if (active) {
+      const results = await this.projectQuestionResults(
+        session.id,
+        session.organizationId,
+        active
+      );
+      activePayload = {
+        id: active.id,
+        kind: active.kind,
+        prompt: active.prompt,
+        options: active.options,
+        identifyEffective: String(this.resolveIdentifyMode(session, active)),
+        results,
+      };
+    }
+    return {
+      asOf: new Date().toISOString(),
+      session: {
+        id: session.id,
+        code: session.code,
+        title: session.title,
+        hostName: session.hostName,
+        eventType: session.eventType,
+        identifyMode: session.identifyMode,
+        status: session.status,
+      },
+      participantCount,
+      activeQuestion: activePayload,
+      questions: questions.map((q) => ({
+        id: q.id,
+        kind: q.kind,
+        prompt: q.prompt,
+        state: q.state,
+        orderIdx: q.orderIdx,
+      })),
+      qa,
+      joinPath: `/live/${session.code}`,
+    };
+  }
+
+  /** Activate one question (closes other actives). */
+  static async setQuestionState(params: {
+    sessionId: number;
+    organizationId: number;
+    questionId: number;
+    state: LiveQuestionState;
+  }): Promise<LiveQuestion> {
+    const orgId = normalizeOrgId(params.organizationId);
+    const session = await this.getSessionById(params.sessionId, orgId);
+    if (!session) throw new Error('Session not found');
+    const question = await this.getQuestionById(params.questionId);
+    if (!question || question.sessionId !== session.id) {
+      throw new Error('Question not in this session');
+    }
+
+    if (params.state === 'active') {
+      const sql = await openSql();
+      const [actives] = await sql.execute<RowDataPacket[]>(
+        `SELECT id FROM session_questions
+         WHERE session_id = ? AND state = 'active' AND id <> ?`,
+        [session.id, question.id]
+      );
+      for (const row of actives) {
+        await this.updateQuestion(Number(row.id), orgId, { state: 'closed' });
+      }
+      if (session.status === 'draft') {
+        await this.updateSession(session.id, orgId, { status: 'live' });
+      }
+    }
+
+    return this.updateQuestion(question.id, orgId, { state: params.state });
+  }
 }

@@ -109,6 +109,10 @@ export async function POST(
       organizationId: session.organizationId,
     });
 
+    // L3 — bump presenter screens
+    const { notifyLiveSession } = await import('@/app/utils/live/notify');
+    void notifyLiveSession(session.code);
+
     return NextResponse.json({
       status: true,
       participantToken: token,

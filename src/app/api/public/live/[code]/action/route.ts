@@ -87,6 +87,9 @@ export async function POST(
       );
     }
 
+    const { notifyLiveSession } = await import('@/app/utils/live/notify');
+    void notifyLiveSession(session.code);
+
     return NextResponse.json({
       status: true,
       event: {
