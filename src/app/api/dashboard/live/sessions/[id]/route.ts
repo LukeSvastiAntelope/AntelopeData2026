@@ -66,9 +66,25 @@ export async function PATCH(
     const orgId = await ensurePrimaryOrgId(auth);
     const { id } = await context.params;
     const body = await request.json().catch(() => ({}));
-    const session = await LiveRepo.updateSession(Number(id), orgId, body);
+    const patch = { ...body };
+    if (body.goLive) patch.status = 'live';
+    else if (body.scheduledAt && !body.status && !body.goLive) {
+      patch.status = 'scheduled';
+    }
+    const session = await LiveRepo.updateSession(Number(id), orgId, patch);
     await notifyLiveSession(session.code);
-    return NextResponse.json({ status: true, session });
+    const hostToken = issueHostToken({
+      sessionId: session.id,
+      organizationId: orgId,
+      code: session.code,
+    });
+    return NextResponse.json({
+      status: true,
+      session,
+      hostToken,
+      joinPath: `/live/${session.code}`,
+      screenPath: `/live/${session.code}/screen?ht=${encodeURIComponent(hostToken)}`,
+    });
   } catch (error) {
     console.error('[dashboard live session PATCH]', error);
     return NextResponse.json(

@@ -15,7 +15,7 @@ import { openSql } from '@/app/utils/database/db';
 
 export type LiveEventType = 'expert_brief' | 'town_hall' | 'deliberation';
 export type LiveIdentifyMode = 'identified' | 'anonymous' | 'per_question';
-export type LiveSessionStatus = 'draft' | 'live' | 'ended';
+export type LiveSessionStatus = 'draft' | 'scheduled' | 'live' | 'ended';
 export type LiveQuestionKind = 'poll' | 'wordcloud' | 'scale' | 'open' | 'qa';
 export type LiveQuestionState = 'queued' | 'active' | 'closed';
 export type LiveIdentifyOverride = 'identified' | 'anonymous';
@@ -53,6 +53,7 @@ export type LiveSession = {
   updatedAt: string;
   startedAt: string | null;
   endedAt: string | null;
+  scheduledAt: string | null;
 };
 
 export type LiveParticipant = {
@@ -103,6 +104,8 @@ export type CreateLiveSessionInput = {
   consentText?: string | null;
   /** Optional fixed code (tests); otherwise generated short + unique */
   code?: string | null;
+  status?: LiveSessionStatus;
+  scheduledAt?: string | Date | null;
 };
 
 export type UpdateLiveSessionInput = {
@@ -113,6 +116,7 @@ export type UpdateLiveSessionInput = {
   status?: LiveSessionStatus;
   intakeSchema?: LiveIntakeSchema | null;
   consentText?: string | null;
+  scheduledAt?: string | Date | null;
 };
 
 export type AddParticipantInput = {
@@ -151,7 +155,7 @@ const IDENTIFY_MODES: LiveIdentifyMode[] = [
   'anonymous',
   'per_question',
 ];
-const STATUSES: LiveSessionStatus[] = ['draft', 'live', 'ended'];
+const STATUSES: LiveSessionStatus[] = ['draft', 'scheduled', 'live', 'ended'];
 const QUESTION_KINDS: LiveQuestionKind[] = [
   'poll',
   'wordcloud',
@@ -222,6 +226,7 @@ function mapSession(row: RowDataPacket): LiveSession {
     updatedAt: toIso(row.updated_at) || new Date().toISOString(),
     startedAt: toIso(row.started_at),
     endedAt: toIso(row.ended_at),
+    scheduledAt: toIso(row.scheduled_at),
   };
 }
 
@@ -313,6 +318,17 @@ export class LiveRepo {
         }
       : { fields: [] };
 
+    let status: LiveSessionStatus =
+      input.status && STATUSES.includes(input.status) ? input.status : 'draft';
+    let scheduledAt: Date | null = null;
+    if (input.scheduledAt) {
+      const d = new Date(input.scheduledAt);
+      if (!Number.isNaN(d.getTime())) {
+        scheduledAt = d;
+        if (status === 'draft') status = 'scheduled';
+      }
+    }
+
     const sql = await openSql();
     let code =
       input.code?.trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 16) ||
@@ -325,8 +341,11 @@ export class LiveRepo {
         const [result] = await sql.execute<ResultSetHeader>(
           `INSERT INTO live_sessions
             (organization_id, code, title, host_name, event_type, identify_mode,
-             status, intake_schema, consent_text, created_by)
-           VALUES (?, ?, ?, ?, ?, ?, 'draft', ?, ?, ?)`,
+             status, intake_schema, consent_text, created_by, scheduled_at,
+             started_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ${
+             status === 'live' ? 'UTC_TIMESTAMP()' : 'NULL'
+           })`,
           [
             organizationId,
             code,
@@ -334,9 +353,11 @@ export class LiveRepo {
             input.hostName?.trim()?.slice(0, 255) || null,
             eventType,
             identifyMode,
+            status,
             JSON.stringify(intakeSchema),
             input.consentText?.trim() || null,
             createdBy,
+            scheduledAt,
           ]
         );
         const session = await this.getSessionById(
@@ -352,6 +373,8 @@ export class LiveRepo {
             code: session.code,
             eventType: session.eventType,
             identifyMode: session.identifyMode,
+            status: session.status,
+            scheduledAt: session.scheduledAt,
           },
         });
         return session;
@@ -472,6 +495,16 @@ export class LiveRepo {
         ? patch.consentText?.trim() || null
         : existing.consentText;
 
+    let scheduledAt: Date | null | undefined = undefined;
+    if (patch.scheduledAt !== undefined) {
+      if (patch.scheduledAt == null || patch.scheduledAt === '') {
+        scheduledAt = null;
+      } else {
+        const d = new Date(patch.scheduledAt);
+        scheduledAt = Number.isNaN(d.getTime()) ? null : d;
+      }
+    }
+
     const startedAtSql =
       status === 'live' && !existing.startedAt
         ? ', started_at = UTC_TIMESTAMP()'
@@ -480,25 +513,29 @@ export class LiveRepo {
       status === 'ended' && !existing.endedAt
         ? ', ended_at = UTC_TIMESTAMP()'
         : '';
+    const scheduledSql =
+      scheduledAt !== undefined ? ', scheduled_at = ?' : '';
 
     const sql = await openSql();
+    const params: unknown[] = [
+      title,
+      hostName,
+      eventType,
+      identifyMode,
+      status,
+      JSON.stringify(intakeSchema),
+      consentText,
+    ];
+    if (scheduledAt !== undefined) params.push(scheduledAt);
+    params.push(id, normalizeOrgId(organizationId));
+
     await sql.execute(
       `UPDATE live_sessions
        SET title = ?, host_name = ?, event_type = ?, identify_mode = ?,
            status = ?, intake_schema = ?, consent_text = ?
-           ${startedAtSql}${endedAtSql}
+           ${scheduledSql}${startedAtSql}${endedAtSql}
        WHERE id = ? AND organization_id = ?`,
-      [
-        title,
-        hostName,
-        eventType,
-        identifyMode,
-        status,
-        JSON.stringify(intakeSchema),
-        consentText,
-        id,
-        normalizeOrgId(organizationId),
-      ]
+      params
     );
 
     if (status !== existing.status) {

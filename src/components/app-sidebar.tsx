@@ -57,6 +57,7 @@ import {
   ClipboardCheck,
   Banknote,
   Radio,
+  Plus,
 } from 'lucide-react'
 import LogoText from '@/components/logo-text'
 import LogoIcon from '@/components/logo-icon'
@@ -177,6 +178,7 @@ const GROUND_GAME_ITEMS: NavItem[] = [
 /** Antelope Live — audience engagement + intelligence (peer of Workflow). */
 const LIVE_ITEMS: NavItem[] = [
   { title: 'Sessions', href: '/live-sessions', icon: Radio },
+  { title: 'New session', href: '/live-sessions/new', icon: Plus },
 ]
 
 const RESOURCE_ITEMS: NavItem[] = [

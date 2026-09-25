@@ -33,6 +33,8 @@ import {
   Mail,
   FileText,
   UserPlus,
+  Radio,
+  QrCode,
 } from 'lucide-react'
 
 type Session = {
@@ -43,6 +45,17 @@ type Session = {
   eventType: string
   identifyMode: string
   status: string
+  scheduledAt?: string | null
+  consentText?: string | null
+  intakeSchema?: {
+    fields?: Array<{
+      id: string
+      label: string
+      type?: string
+      required?: boolean
+    }>
+    consentPrompt?: string
+  }
 }
 
 type Question = {
@@ -127,6 +140,12 @@ export default function LiveAudiencePage() {
   const [newOptions, setNewOptions] = useState('Yes, No, Undecided')
   const [newKind, setNewKind] = useState<'poll' | 'open' | 'wordcloud'>('poll')
 
+  const [setupBusy, setSetupBusy] = useState(false)
+  const [editTitle, setEditTitle] = useState('')
+  const [editHost, setEditHost] = useState('')
+  const [editScheduledAt, setEditScheduledAt] = useState('')
+  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null)
+
   const loadSession = useCallback(async () => {
     const res = await fetch(`/api/dashboard/live/sessions/${sessionId}`)
     const data = await res.json()
@@ -136,6 +155,19 @@ export default function LiveAudiencePage() {
     setParticipantCount(data.participantCount || 0)
     setJoinPath(data.joinPath)
     setScreenPath(data.screenPath)
+    setEditTitle(data.session?.title || '')
+    setEditHost(data.session?.hostName || '')
+    if (data.session?.scheduledAt) {
+      const d = new Date(data.session.scheduledAt)
+      if (!Number.isNaN(d.getTime())) {
+        const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000)
+          .toISOString()
+          .slice(0, 16)
+        setEditScheduledAt(local)
+      }
+    } else {
+      setEditScheduledAt('')
+    }
     const active = (data.questions || []).find((q: Question) => q.state === 'active')
     const first = active || (data.questions || [])[0]
     if (first) setSelectedQuestionId(first.id)
@@ -432,6 +464,68 @@ export default function LiveAudiencePage() {
     toast.success('Join link copied')
   }
 
+  const patchSession = async (body: Record<string, unknown>, okMsg: string) => {
+    setSetupBusy(true)
+    try {
+      const res = await fetch(`/api/dashboard/live/sessions/${sessionId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      const data = await res.json()
+      if (!res.ok || !data.status) throw new Error(data.message || 'Update failed')
+      if (data.joinPath) setJoinPath(data.joinPath)
+      if (data.screenPath) setScreenPath(data.screenPath)
+      await loadSession()
+      toast.success(okMsg)
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Update failed')
+    } finally {
+      setSetupBusy(false)
+    }
+  }
+
+  const saveSetup = () =>
+    void patchSession(
+      {
+        title: editTitle.trim() || session?.title,
+        hostName: editHost.trim() || null,
+        scheduledAt: editScheduledAt || null,
+        ...(editScheduledAt && session?.status === 'draft'
+          ? { status: 'scheduled' }
+          : {}),
+      },
+      'Session updated'
+    )
+
+  const goLive = () => void patchSession({ goLive: true }, 'Session is live')
+
+  useEffect(() => {
+    if (!joinPath || typeof window === 'undefined') {
+      setQrDataUrl(null)
+      return
+    }
+    let cancelled = false
+    const url = `${window.location.origin}${joinPath}`
+    void import('qrcode')
+      .then((QR) =>
+        QR.toDataURL(url, {
+          width: 180,
+          margin: 1,
+          color: { dark: '#0f172a', light: '#ffffff' },
+        })
+      )
+      .then((dataUrl) => {
+        if (!cancelled) setQrDataUrl(dataUrl)
+      })
+      .catch(() => {
+        if (!cancelled) setQrDataUrl(null)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [joinPath])
+
   if (loading || !session) {
     return (
       <div className="flex-1 p-2 w-full bg-background">
@@ -487,6 +581,163 @@ export default function LiveAudiencePage() {
         <div className="border-b border-border" />
 
         <div className="p-6 space-y-8">
+          {/* L7 Setup + share */}
+          <section className="space-y-4">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <h2 className="text-sm font-semibold flex items-center gap-2">
+                  <Radio className="h-4 w-4" />
+                  Setup & share
+                </h2>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {session.eventType.replace(/_/g, ' ')} ·{' '}
+                  {session.identifyMode.replace(/_/g, ' ')}
+                  {session.scheduledAt
+                    ? ` · scheduled ${new Date(session.scheduledAt).toLocaleString()}`
+                    : ''}
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {session.status !== 'live' && session.status !== 'ended' && (
+                  <Button
+                    size="sm"
+                    disabled={setupBusy}
+                    onClick={goLive}
+                  >
+                    {setupBusy ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />
+                    ) : null}
+                    Go live
+                  </Button>
+                )}
+                <Button size="sm" variant="outline" asChild>
+                  <a href={joinPath} target="_blank" rel="noreferrer">
+                    <ExternalLink className="h-3.5 w-3.5 mr-1" />
+                    Open join
+                  </a>
+                </Button>
+              </div>
+            </div>
+
+            <div className="grid gap-4 lg:grid-cols-[1fr_auto]">
+              <div className="space-y-3">
+                {(session.status === 'draft' ||
+                  session.status === 'scheduled') && (
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="space-y-1.5 sm:col-span-2">
+                      <Label htmlFor="edit-title">Title</Label>
+                      <Input
+                        id="edit-title"
+                        value={editTitle}
+                        onChange={(e) => setEditTitle(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="edit-host">Host</Label>
+                      <Input
+                        id="edit-host"
+                        value={editHost}
+                        onChange={(e) => setEditHost(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="edit-sched">Schedule</Label>
+                      <Input
+                        id="edit-sched"
+                        type="datetime-local"
+                        value={editScheduledAt}
+                        onChange={(e) => setEditScheduledAt(e.target.value)}
+                      />
+                    </div>
+                    <div className="sm:col-span-2">
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        disabled={setupBusy}
+                        onClick={saveSetup}
+                      >
+                        Save setup
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                <div className="rounded-lg border border-border p-3 space-y-2">
+                  <p className="text-xs font-medium">Intake form</p>
+                  {(session.intakeSchema?.fields || []).length === 0 ? (
+                    <p className="text-xs text-muted-foreground">
+                      {session.identifyMode === 'anonymous'
+                        ? 'Anonymous session — no intake fields.'
+                        : 'No intake fields defined.'}
+                    </p>
+                  ) : (
+                    <ul className="flex flex-wrap gap-1.5">
+                      {(session.intakeSchema?.fields || []).map((f) => (
+                        <li key={f.id}>
+                          <Badge variant="outline" className="text-[10px]">
+                            {f.label}
+                            {f.required ? ' *' : ''}
+                          </Badge>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {session.consentText ||
+                  session.intakeSchema?.consentPrompt ? (
+                    <p className="text-[11px] text-muted-foreground line-clamp-2">
+                      Consent:{' '}
+                      {session.consentText ||
+                        session.intakeSchema?.consentPrompt}
+                    </p>
+                  ) : null}
+                </div>
+
+                <div className="rounded-lg border border-border p-3 space-y-2">
+                  <p className="text-xs font-medium">
+                    Question deck ({questions.length})
+                  </p>
+                  {questions.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">
+                      Add questions below before going live.
+                    </p>
+                  ) : (
+                    <ol className="space-y-1 text-xs text-muted-foreground">
+                      {questions.map((q, i) => (
+                        <li key={q.id} className="truncate">
+                          {i + 1}. [{q.kind}/{q.state}] {q.prompt}
+                        </li>
+                      ))}
+                    </ol>
+                  )}
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-border p-3 flex flex-col items-center gap-2 w-full max-w-[200px] mx-auto lg:mx-0">
+                <div className="flex items-center gap-1.5 text-xs font-medium">
+                  <QrCode className="h-3.5 w-3.5" />
+                  Join QR
+                </div>
+                {qrDataUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={qrDataUrl}
+                    alt={`QR for ${session.code}`}
+                    className="w-[160px] h-[160px]"
+                  />
+                ) : (
+                  <div className="w-[160px] h-[160px] bg-muted animate-pulse rounded" />
+                )}
+                <p className="text-[10px] text-muted-foreground text-center font-mono">
+                  {session.code}
+                </p>
+                <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={copyJoin}>
+                  <Copy className="h-3 w-3 mr-1" />
+                  Copy link
+                </Button>
+              </div>
+            </div>
+          </section>
+
           {/* L6 Funnel */}
           <section className="space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-3">
