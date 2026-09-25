@@ -177,7 +177,10 @@ async function nameClustersWithModel(
   clusters: TextUnit[][],
   total: number,
   questionPrompt: string | null
-): Promise<Array<{ name: string; characterization: string }> | null> {
+): Promise<{
+  groups: Array<{ name: string; characterization: string }>;
+  roomSummary: string | null;
+} | null> {
   if (!process.env.ANTHROPIC_API_KEY && !process.env.OPENAI_API_KEY) {
     return null;
   }
@@ -229,7 +232,7 @@ ${JSON.stringify(payload, null, 2)}`;
       roomSummary?: string;
     };
     if (!Array.isArray(parsed.groups)) return null;
-    return clusters.map((_, i) => {
+    const groups = clusters.map((_, i) => {
       const g = parsed.groups!.find((x) => x.clusterIndex === i);
       if (g?.name) {
         return {
@@ -239,6 +242,12 @@ ${JSON.stringify(payload, null, 2)}`;
       }
       return heuristicName(clusters[i]!, i);
     });
+    return {
+      groups,
+      roomSummary: parsed.roomSummary
+        ? String(parsed.roomSummary).slice(0, 500)
+        : null,
+    };
   } catch (err) {
     console.warn('[room-opinion] LLM naming failed, using heuristics', err);
     return null;
@@ -454,12 +463,13 @@ export async function computeRoomOpinionRead(params: {
     rawClusters = rawClusters.sort((a, b) => b.length - a.length).slice(0, 4);
   }
 
+  const namedResult = await nameClustersWithModel(
+    rawClusters,
+    totalResponses,
+    question?.prompt ?? null
+  );
   const named =
-    (await nameClustersWithModel(
-      rawClusters,
-      totalResponses,
-      question?.prompt ?? null
-    )) || rawClusters.map((c, i) => heuristicName(c, i));
+    namedResult?.groups || rawClusters.map((c, i) => heuristicName(c, i));
 
   const groups: OpinionGroup[] = rawClusters.map((cluster, i) => {
     const count = cluster.length;
@@ -511,12 +521,10 @@ export async function computeRoomOpinionRead(params: {
       insufficientData || anyThin ? LIVE_SMALL_N_DISCLAIMER : null,
     method,
     groups: filtered,
-    roomSummary: buildRoomSummaryHeuristic(filtered),
+    roomSummary:
+      namedResult?.roomSummary || buildRoomSummaryHeuristic(filtered),
     traceable: true,
   };
-
-  // Prefer model room summary if available via a light second parse — already
-  // baked into naming call when present; heuristic is fine as default.
 
   if (params.persist !== false) {
     await LiveRepo.appendEvent({
