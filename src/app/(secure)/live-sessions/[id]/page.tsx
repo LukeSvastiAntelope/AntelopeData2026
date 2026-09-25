@@ -109,8 +109,12 @@ export default function LiveAudiencePage() {
   } | null>(null)
   const [drawerBusy, setDrawerBusy] = useState(false)
 
+  const [opinionRead, setOpinionRead] = useState<any>(null)
+  const [opinionBusy, setOpinionBusy] = useState(false)
+
   const [newPrompt, setNewPrompt] = useState('')
   const [newOptions, setNewOptions] = useState('Yes, No, Undecided')
+  const [newKind, setNewKind] = useState<'poll' | 'open' | 'wordcloud'>('poll')
 
   const loadSession = useCallback(async () => {
     const res = await fetch(`/api/dashboard/live/sessions/${sessionId}`)
@@ -173,13 +177,50 @@ export default function LiveAudiencePage() {
     }
   }, [sessionId, selectedQuestionId, segmentField])
 
+  const loadOpinion = useCallback(async () => {
+    const res = await fetch(
+      `/api/dashboard/live/sessions/${sessionId}/opinion-read`
+    )
+    const data = await res.json()
+    if (!res.ok || !data.status) return
+    setOpinionRead(data.opinionRead)
+  }, [sessionId])
+
+  const runOpinionRead = async () => {
+    setOpinionBusy(true)
+    try {
+      const res = await fetch(
+        `/api/dashboard/live/sessions/${sessionId}/opinion-read`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            questionId:
+              selectedQuestionId &&
+              questions.find((q) => q.id === selectedQuestionId)?.kind !== 'poll'
+                ? selectedQuestionId
+                : null,
+          }),
+        }
+      )
+      const data = await res.json()
+      if (!res.ok || !data.status) throw new Error(data.message || 'Failed')
+      setOpinionRead(data.opinionRead)
+      toast.success('Room read updated')
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Opinion read failed')
+    } finally {
+      setOpinionBusy(false)
+    }
+  }
+
   useEffect(() => {
     if (!Number.isFinite(sessionId)) return
     setLoading(true)
-    Promise.all([loadSession(), loadAudience()])
+    Promise.all([loadSession(), loadAudience(), loadOpinion()])
       .catch((e) => toast.error(e instanceof Error ? e.message : 'Load failed'))
       .finally(() => setLoading(false))
-  }, [sessionId, loadSession, loadAudience])
+  }, [sessionId, loadSession, loadAudience, loadOpinion])
 
   useEffect(() => {
     if (!selectedQuestionId) return
@@ -255,10 +296,13 @@ export default function LiveAudiencePage() {
 
   const addQuestion = async () => {
     if (!newPrompt.trim()) return
-    const options = newOptions
-      .split(',')
-      .map((s) => s.trim())
-      .filter(Boolean)
+    const options =
+      newKind === 'poll'
+        ? newOptions
+            .split(',')
+            .map((s) => s.trim())
+            .filter(Boolean)
+        : undefined
     try {
       const res = await fetch(
         `/api/dashboard/live/sessions/${sessionId}/questions`,
@@ -266,7 +310,7 @@ export default function LiveAudiencePage() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            kind: 'poll',
+            kind: newKind,
             prompt: newPrompt.trim(),
             options,
           }),
@@ -513,8 +557,24 @@ export default function LiveAudiencePage() {
 
             {/* Add question */}
             <div className="flex flex-wrap gap-2 items-end">
+              <div className="w-28 space-y-1">
+                <Label className="text-[10px]">Kind</Label>
+                <Select
+                  value={newKind}
+                  onValueChange={(v) => setNewKind(v as typeof newKind)}
+                >
+                  <SelectTrigger className="h-9 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="poll">Poll</SelectItem>
+                    <SelectItem value="open">Open</SelectItem>
+                    <SelectItem value="wordcloud">Word cloud</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="flex-1 min-w-[200px] space-y-1">
-                <Label className="text-[10px]">Queue a poll</Label>
+                <Label className="text-[10px]">Queue a question</Label>
                 <Input
                   value={newPrompt}
                   onChange={(e) => setNewPrompt(e.target.value)}
@@ -522,18 +582,115 @@ export default function LiveAudiencePage() {
                   className="h-9 text-sm"
                 />
               </div>
-              <div className="w-48 space-y-1">
-                <Label className="text-[10px]">Options (comma-sep)</Label>
-                <Input
-                  value={newOptions}
-                  onChange={(e) => setNewOptions(e.target.value)}
-                  className="h-9 text-sm"
-                />
-              </div>
+              {newKind === 'poll' && (
+                <div className="w-48 space-y-1">
+                  <Label className="text-[10px]">Options (comma-sep)</Label>
+                  <Input
+                    value={newOptions}
+                    onChange={(e) => setNewOptions(e.target.value)}
+                    className="h-9 text-sm"
+                  />
+                </div>
+              )}
               <Button size="sm" onClick={() => void addQuestion()}>
                 Add
               </Button>
             </div>
+          </section>
+
+          {/* L5 Room read */}
+          <section className="space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 className="text-sm font-semibold">Room read</h2>
+                <p className="text-xs text-muted-foreground">
+                  Open responses cluster into named opinion groups. Every theme
+                  links to source receipts — significance floors applied in code.
+                </p>
+              </div>
+              <Button
+                size="sm"
+                disabled={opinionBusy}
+                onClick={() => void runOpinionRead()}
+              >
+                {opinionBusy ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />
+                ) : null}
+                Refresh clusters
+              </Button>
+            </div>
+
+            {opinionRead ? (
+              <div className="space-y-3">
+                {(opinionRead.insufficientData ||
+                  opinionRead.smallSampleDisclaimer) && (
+                  <div className="flex gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-950 dark:text-amber-100">
+                    <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+                    <div>
+                      {opinionRead.insufficientDataMessage ||
+                        opinionRead.smallSampleDisclaimer}
+                    </div>
+                  </div>
+                )}
+                <p className="text-sm leading-relaxed rounded-lg border border-border bg-muted/20 p-3">
+                  {opinionRead.roomSummary}
+                </p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {opinionRead.groups?.map((g: any) => (
+                    <div
+                      key={g.id}
+                      className="rounded-lg border border-border p-3 space-y-2"
+                    >
+                      <div className="flex justify-between gap-2 items-start">
+                        <h3 className="text-sm font-semibold">{g.name}</h3>
+                        <span className="text-xs tabular-nums text-muted-foreground">
+                          {Math.round(g.share * 100)}% · {g.count}
+                        </span>
+                      </div>
+                      <p className="text-xs text-muted-foreground leading-snug">
+                        {g.characterization}
+                      </p>
+                      <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                        <div
+                          className="h-full bg-teal-600/80"
+                          style={{ width: `${Math.round(g.share * 100)}%` }}
+                        />
+                      </div>
+                      <details className="text-[11px]">
+                        <summary className="cursor-pointer text-muted-foreground">
+                          {g.receiptEventIds?.length || 0} source receipts
+                        </summary>
+                        <ul className="mt-1.5 space-y-1 max-h-40 overflow-y-auto">
+                          {(g.receipts || []).map((r: any) => (
+                            <li
+                              key={r.eventId}
+                              className="rounded border border-border/60 px-2 py-1"
+                            >
+                              <span className="text-muted-foreground">
+                                #{r.eventId}
+                                {r.displayName ? ` · ${r.displayName}` : ''}
+                                :{' '}
+                              </span>
+                              {r.text}
+                            </li>
+                          ))}
+                        </ul>
+                      </details>
+                    </div>
+                  ))}
+                </div>
+                {(!opinionRead.groups || opinionRead.groups.length === 0) && (
+                  <p className="text-xs text-muted-foreground italic">
+                    Queue an open / wordcloud question and collect answers, then
+                    refresh.
+                  </p>
+                )}
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                No room read yet — collect open responses, then refresh clusters.
+              </p>
+            )}
           </section>
 
           {/* Cross-tab */}

@@ -59,6 +59,20 @@ type Snapshot = {
     displayName: string | null
     identified: boolean
   }>
+  opinionRead?: {
+    roomSummary: string
+    totalResponses: number
+    insufficientData?: boolean
+    smallSampleDisclaimer?: string | null
+    groups: Array<{
+      id: string
+      name: string
+      characterization: string
+      share: number
+      count: number
+      receiptEventIds: number[]
+    }>
+  } | null
   joinPath: string
 }
 
@@ -439,6 +453,56 @@ export function LiveScreenClient({ code, initialHostToken }: Props) {
               </ol>
             </section>
           )}
+
+          {/* L5 — opinion clusters on screen */}
+          {snapshot.opinionRead &&
+            snapshot.opinionRead.groups &&
+            snapshot.opinionRead.groups.length > 0 && (
+              <section className="rounded-2xl border border-teal-500/20 bg-teal-950/30 p-6 space-y-4">
+                <div>
+                  <h3 className="text-sm font-medium text-teal-300/90">
+                    Room read
+                  </h3>
+                  <p className="mt-2 text-lg text-stone-100 leading-snug">
+                    {snapshot.opinionRead.roomSummary}
+                  </p>
+                  {(snapshot.opinionRead.insufficientData ||
+                    snapshot.opinionRead.smallSampleDisclaimer) && (
+                    <p className="mt-2 text-[11px] text-amber-200/80">
+                      Directional only — below publish floors.
+                    </p>
+                  )}
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {snapshot.opinionRead.groups.map((g) => (
+                    <div
+                      key={g.id}
+                      className="rounded-xl border border-stone-700/80 bg-stone-900/50 p-4 space-y-2"
+                    >
+                      <div className="flex justify-between gap-2">
+                        <p className="font-semibold text-stone-50">{g.name}</p>
+                        <p className="tabular-nums text-teal-300 text-sm">
+                          {Math.round(g.share * 100)}%
+                        </p>
+                      </div>
+                      <p className="text-sm text-stone-400 leading-snug">
+                        {g.characterization}
+                      </p>
+                      <div className="h-2 rounded-full bg-stone-800 overflow-hidden">
+                        <div
+                          className="h-full bg-teal-500 transition-[width] duration-700"
+                          style={{ width: `${Math.round(g.share * 100)}%` }}
+                        />
+                      </div>
+                      <p className="text-[10px] text-stone-500">
+                        {g.count} voices · {g.receiptEventIds?.length || 0}{' '}
+                        receipts
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
         </main>
 
         {/* Join rail */}

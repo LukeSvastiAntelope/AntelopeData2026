@@ -1305,6 +1305,7 @@ export class LiveRepo {
       orderIdx: number;
     }>;
     qa: Awaited<ReturnType<typeof LiveRepo.projectQaBoard>>;
+    opinionRead: unknown | null;
     joinPath: string;
   } | null> {
     const found = await this.getLiveSessionByCode(code);
@@ -1341,6 +1342,20 @@ export class LiveRepo {
         results,
       };
     }
+
+    let opinionRead: unknown | null = null;
+    try {
+      const { latestRoomOpinionRead } = await import(
+        '@/app/utils/live/room-opinion-service'
+      );
+      opinionRead = await latestRoomOpinionRead(
+        session.id,
+        session.organizationId
+      );
+    } catch {
+      opinionRead = null;
+    }
+
     return {
       asOf: new Date().toISOString(),
       session: {
@@ -1362,6 +1377,7 @@ export class LiveRepo {
         orderIdx: q.orderIdx,
       })),
       qa,
+      opinionRead,
       joinPath: `/live/${session.code}`,
     };
   }
