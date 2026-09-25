@@ -29,6 +29,10 @@ import {
   Users,
   X,
   AlertTriangle,
+  Download,
+  Mail,
+  FileText,
+  UserPlus,
 } from 'lucide-react'
 
 type Session = {
@@ -111,6 +115,13 @@ export default function LiveAudiencePage() {
 
   const [opinionRead, setOpinionRead] = useState<any>(null)
   const [opinionBusy, setOpinionBusy] = useState(false)
+
+  const [funnel, setFunnel] = useState<{
+    metrics: any
+    leads: any[]
+  } | null>(null)
+  const [funnelBusy, setFunnelBusy] = useState(false)
+  const [funnelNote, setFunnelNote] = useState<string | null>(null)
 
   const [newPrompt, setNewPrompt] = useState('')
   const [newOptions, setNewOptions] = useState('Yes, No, Undecided')
@@ -214,13 +225,76 @@ export default function LiveAudiencePage() {
     }
   }
 
+  const loadFunnel = useCallback(async () => {
+    const res = await fetch(`/api/dashboard/live/sessions/${sessionId}/funnel`)
+    const data = await res.json()
+    if (!res.ok || !data.status) return
+    setFunnel({ metrics: data.metrics, leads: data.leads || [] })
+  }, [sessionId])
+
+  const runFunnelAction = async (action: string, extra?: Record<string, unknown>) => {
+    setFunnelBusy(true)
+    setFunnelNote(null)
+    try {
+      if (action === 'export_csv') {
+        const res = await fetch(
+          `/api/dashboard/live/sessions/${sessionId}/funnel?format=csv`
+        )
+        if (!res.ok) throw new Error('Export failed')
+        const blob = await res.blob()
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `live-${session?.code || sessionId}-leads.csv`
+        a.click()
+        URL.revokeObjectURL(url)
+        toast.success('Lead CSV downloaded')
+        return
+      }
+      const res = await fetch(`/api/dashboard/live/sessions/${sessionId}/funnel`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, ...extra }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data.status) throw new Error(data.message || 'Failed')
+      if (action === 'sync_optin') {
+        setFunnelNote(
+          `Synced ${data.synced} to opt-in rails (${data.skippedSuppressed} suppressed, ${data.skippedNoContact} no contact).`
+        )
+        toast.success('Leads synced to opt-in rails')
+      } else if (action === 'stage_followup') {
+        setFunnelNote(
+          `Follow-up staged (#${data.stagedActionId}) — approve on Outbound. Nothing sent.`
+        )
+        toast.success('Follow-up staged for approval')
+      } else if (action === 'generate_report') {
+        setFunnelNote(`Report ready — open ${data.reportPath}`)
+        toast.success('Post-event report generated')
+        if (data.reportPath) {
+          // keep note with link rendered below
+        }
+        await loadSession()
+      } else if (action === 'end') {
+        toast.success('Session ended')
+        await loadSession()
+      }
+      await loadFunnel()
+      return data
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Funnel action failed')
+    } finally {
+      setFunnelBusy(false)
+    }
+  }
+
   useEffect(() => {
     if (!Number.isFinite(sessionId)) return
     setLoading(true)
-    Promise.all([loadSession(), loadAudience(), loadOpinion()])
+    Promise.all([loadSession(), loadAudience(), loadOpinion(), loadFunnel()])
       .catch((e) => toast.error(e instanceof Error ? e.message : 'Load failed'))
       .finally(() => setLoading(false))
-  }, [sessionId, loadSession, loadAudience, loadOpinion])
+  }, [sessionId, loadSession, loadAudience, loadOpinion, loadFunnel])
 
   useEffect(() => {
     if (!selectedQuestionId) return
@@ -413,6 +487,131 @@ export default function LiveAudiencePage() {
         <div className="border-b border-border" />
 
         <div className="p-6 space-y-8">
+          {/* L6 Funnel */}
+          <section className="space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 className="text-sm font-semibold">Funnel & follow-up</h2>
+                <p className="text-xs text-muted-foreground">
+                  Joined → shared contact → booked/CTA. Export leads, sync to
+                  opt-in rails, stage gated follow-up, generate a shareable recap.
+                  Nothing auto-sends.
+                </p>
+              </div>
+              {session.status !== 'ended' && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={funnelBusy}
+                  onClick={() => void runFunnelAction('end')}
+                >
+                  End session
+                </Button>
+              )}
+            </div>
+
+            {funnel?.metrics && (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {[
+                  { label: 'Joined', value: funnel.metrics.joined },
+                  {
+                    label: 'Shared contact',
+                    value: `${funnel.metrics.sharedContact} (${funnel.metrics.conversionSharedPct}%)`,
+                  },
+                  {
+                    label: 'Booked / CTA',
+                    value: `${funnel.metrics.bookedCta} (${funnel.metrics.conversionBookedPct}%)`,
+                  },
+                  {
+                    label: 'Exportable',
+                    value: `${funnel.metrics.exportable}`,
+                    sub: funnel.metrics.suppressed
+                      ? `${funnel.metrics.suppressed} suppressed`
+                      : undefined,
+                  },
+                ].map((m) => (
+                  <div
+                    key={m.label}
+                    className="rounded-lg border border-border px-3 py-2"
+                  >
+                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                      {m.label}
+                    </p>
+                    <p className="text-sm font-semibold tabular-nums mt-0.5">
+                      {m.value}
+                    </p>
+                    {m.sub && (
+                      <p className="text-[10px] text-muted-foreground">{m.sub}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="flex flex-wrap gap-1.5">
+              <Button
+                size="sm"
+                variant="secondary"
+                disabled={funnelBusy}
+                onClick={() => void runFunnelAction('export_csv')}
+              >
+                <Download className="h-3.5 w-3.5 mr-1" />
+                Export CSV
+              </Button>
+              <Button
+                size="sm"
+                variant="secondary"
+                disabled={funnelBusy}
+                onClick={() => void runFunnelAction('sync_optin')}
+              >
+                <UserPlus className="h-3.5 w-3.5 mr-1" />
+                Sync to opt-in
+              </Button>
+              <Button
+                size="sm"
+                variant="secondary"
+                disabled={funnelBusy}
+                onClick={() => void runFunnelAction('stage_followup', { format: 'email' })}
+              >
+                <Mail className="h-3.5 w-3.5 mr-1" />
+                Stage email follow-up
+              </Button>
+              <Button
+                size="sm"
+                disabled={funnelBusy}
+                onClick={() => void runFunnelAction('generate_report')}
+              >
+                {funnelBusy ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />
+                ) : (
+                  <FileText className="h-3.5 w-3.5 mr-1" />
+                )}
+                Generate report
+              </Button>
+              <Button size="sm" variant="ghost" asChild>
+                <Link href="/outbound">Open Outbound</Link>
+              </Button>
+            </div>
+
+            {funnelNote && (
+              <p className="text-xs rounded-md border border-border bg-muted/30 px-3 py-2">
+                {funnelNote.includes('/reports/') ? (
+                  <>
+                    Report ready —{' '}
+                    <Link
+                      href={funnelNote.replace(/^Report ready — open /, '')}
+                      className="text-teal-700 dark:text-teal-300 underline"
+                    >
+                      open recap
+                    </Link>
+                  </>
+                ) : (
+                  funnelNote
+                )}
+              </p>
+            )}
+          </section>
+
           {/* Questions + results */}
           <section className="space-y-3">
             <div className="flex flex-wrap items-end justify-between gap-3">
