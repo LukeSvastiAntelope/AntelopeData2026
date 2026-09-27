@@ -31,7 +31,7 @@ export default function PortalHomePage() {
               label: 'Contacts',
               hint: 'Friends & family',
             },
-            { href: '/portal/points', label: 'Points', hint: 'Tasteful wins' },
+            { href: '/portal/profile', label: 'Profile', hint: 'Your history' },
           ].map((card) => (
             <Link
               key={card.href}

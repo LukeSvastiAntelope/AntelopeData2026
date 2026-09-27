@@ -66,6 +66,8 @@ const publicRoutes = [
     '/api/donate', // Sites S5 — fundraising intent capture (tenant via siteSlug)
     // Volunteer V1 — passwordless portal auth (magic-link verify is client-side NextAuth)
     '/api/portal/session',
+    // Volunteer V2 — public self-signup by org slug
+    '/api/public/volunteer-signup/:slug*',
     // Automation for Garry's List — the whole flow is explicitly "no log in required".
     '/api/garrys-list/parse',
     '/api/garrys-list/generate',
@@ -178,6 +180,9 @@ export default auth(async (req) => {
         path === '/portal/auth' ||
         path.startsWith('/portal/auth/') ||
         path === '/portal/join';
+    // Volunteer V2 — public self-signup pages
+    const isPublicVolunteerJoin =
+        path === '/join' || path.startsWith('/join/');
 
     // Allow public routes
     if (
@@ -186,7 +191,8 @@ export default auth(async (req) => {
         isPublicSiteRoute ||
         isPublicWalkRoute ||
         isPublicLiveRoute ||
-        isPortalAuthRoute
+        isPortalAuthRoute ||
+        isPublicVolunteerJoin
     ) {
         return NextResponse.next();
     }

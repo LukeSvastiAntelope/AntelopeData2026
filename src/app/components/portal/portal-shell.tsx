@@ -11,7 +11,7 @@ const NAV = [
   { href: '/portal/shifts', label: 'Shifts', icon: CalendarDays },
   { href: '/portal/tasks', label: 'Tasks', icon: CheckSquare },
   { href: '/portal/contacts', label: 'Contacts', icon: Users },
-  { href: '/portal/points', label: 'Points', icon: Trophy },
+  { href: '/portal/profile', label: 'You', icon: Trophy },
 ] as const
 
 export function PortalShell({

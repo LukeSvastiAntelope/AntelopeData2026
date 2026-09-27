@@ -58,6 +58,7 @@ export async function POST(request: NextRequest) {
       email,
       displayName,
       invitedBy: userId,
+      source: 'staff_invite',
     });
 
     const [orgRows] = await sql.execute<RowDataPacket[]>(
