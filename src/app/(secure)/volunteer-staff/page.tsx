@@ -25,6 +25,7 @@ import {
 } from 'lucide-react'
 import { VolunteerShiftsStaffPanel } from '@/app/components/portal/volunteer-shifts-staff-panel'
 import { VolunteerReachStaffPanel } from '@/app/components/portal/volunteer-reach-staff-panel'
+import { VolunteerGamificationStaffPanel } from '@/app/components/portal/volunteer-gamification-staff-panel'
 
 type RosterRow = {
   membershipId: number
@@ -247,6 +248,16 @@ export default function VolunteerStaffPage() {
 
           <div className="border-t border-border pt-6">
             <VolunteerReachStaffPanel />
+          </div>
+
+          <div className="border-t border-border pt-6">
+            <VolunteerGamificationStaffPanel
+              volunteers={volunteers.map((v) => ({
+                userId: v.userId,
+                displayName: v.displayName,
+                email: v.email,
+              }))}
+            />
           </div>
 
           {/* Invite */}
