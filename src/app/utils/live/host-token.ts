@@ -3,10 +3,29 @@
  */
 
 import { createHmac, timingSafeEqual } from 'crypto';
-import {
-  liveSigningSecret,
-  liveSigningSecretOrNull,
-} from '@/app/utils/live/signing-secret';
+
+let warnedDevFallback = false;
+
+function secret(): string {
+  const resolved =
+    process.env.AUTH_SECRET ||
+    process.env.NEXTAUTH_SECRET ||
+    process.env.JWT_SECRET_KEY ||
+    '';
+  if (resolved) return resolved;
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error(
+      'No signing secret configured (AUTH_SECRET) — refusing to sign/verify live tokens'
+    );
+  }
+  if (!warnedDevFallback) {
+    warnedDevFallback = true;
+    console.warn(
+      '[live/host-token] AUTH_SECRET unset — using live-dev-secret (dev only)'
+    );
+  }
+  return 'live-dev-secret';
+}
 
 export type LiveHostClaims = {
   sessionId: number;
@@ -32,9 +51,7 @@ export function issueHostToken(claims: {
     exp: Math.floor(Date.now() / 1000) + ttl,
   };
   const body = Buffer.from(JSON.stringify(payload), 'utf8').toString('base64url');
-  const sig = createHmac('sha256', liveSigningSecret())
-    .update(body)
-    .digest('base64url');
+  const sig = createHmac('sha256', secret()).update(body).digest('base64url');
   return `${body}.${sig}`;
 }
 
@@ -42,14 +59,14 @@ export function verifyHostToken(
   token: string | null | undefined
 ): LiveHostClaims | null {
   if (!token) return null;
-  const key = liveSigningSecretOrNull();
-  if (!key) return null;
   const raw = String(token).trim();
   const i = raw.lastIndexOf('.');
   if (i <= 0) return null;
   const body = raw.slice(0, i);
   const sig = raw.slice(i + 1);
-  const expected = createHmac('sha256', key).update(body).digest('base64url');
+  const expected = createHmac('sha256', secret())
+    .update(body)
+    .digest('base64url');
   try {
     const a = Buffer.from(sig);
     const b = Buffer.from(expected);
