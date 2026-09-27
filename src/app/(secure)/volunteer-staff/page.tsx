@@ -192,23 +192,28 @@ export default function VolunteerStaffPage() {
                 Volunteers
               </h1>
             </div>
-            {publicJoinPath && (
-              <div className="flex gap-1.5">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => copyPath(publicJoinPath)}
-                >
-                  <Copy className="h-3.5 w-3.5 mr-1" />
-                  Copy public join link
-                </Button>
-                <Button size="sm" variant="ghost" asChild>
-                  <a href={publicJoinPath} target="_blank" rel="noreferrer">
-                    <ExternalLink className="h-3.5 w-3.5" />
-                  </a>
-                </Button>
-              </div>
-            )}
+            <div className="flex gap-1.5 items-center">
+              <Button size="sm" variant="outline" asChild className="h-8">
+                <Link href="/volunteers">Dashboard</Link>
+              </Button>
+              {publicJoinPath && (
+                <>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => copyPath(publicJoinPath)}
+                  >
+                    <Copy className="h-3.5 w-3.5 mr-1" />
+                    Copy public join link
+                  </Button>
+                  <Button size="sm" variant="ghost" asChild>
+                    <a href={publicJoinPath} target="_blank" rel="noreferrer">
+                      <ExternalLink className="h-3.5 w-3.5" />
+                    </a>
+                  </Button>
+                </>
+              )}
+            </div>
           </div>
         </div>
         <div className="border-b border-border" />
