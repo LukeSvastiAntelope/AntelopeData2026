@@ -11,10 +11,11 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Loader2 } from "lucide-react";
 
 const RegisterPage = () => {
-    const [formData, setFormData] = useState<{ email: string; displayName: string; password: string }>({
+    const [formData, setFormData] = useState<{ email: string; displayName: string; password: string; districtCode: string }>({
         email: '',
         displayName: '',
         password: '',
+        districtCode: '',
     });
     const [isLoading, setIsLoading] = useState(false);
 
@@ -128,6 +129,21 @@ const RegisterPage = () => {
                                     className="bg-background"
                                     disabled={isLoading}
                                 />
+                            </div>
+                            <div className="space-y-2">
+                                <Input
+                                    id="districtCode"
+                                    name="districtCode"
+                                    type="text"
+                                    placeholder="US House district (optional, e.g. NJ-5)"
+                                    value={formData.districtCode}
+                                    onChange={handleChange}
+                                    className="bg-background"
+                                    disabled={isLoading}
+                                />
+                                <p className="text-[11px] text-muted-foreground px-0.5">
+                                    We&apos;ll prepare your District Intelligence Report in the background.
+                                </p>
                             </div>
                             <Button 
                                 className="w-full" 

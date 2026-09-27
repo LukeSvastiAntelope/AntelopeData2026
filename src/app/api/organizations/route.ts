@@ -93,9 +93,37 @@ export async function POST(request: NextRequest) {
       [orgId, userId, JSON.stringify({ name: name.trim() })]
     );
 
+    // Data D2 — kick District Intelligence Report async when district is known
+    let districtReportStarted = false;
+    if (district_code || (state && office_type === 'federal_house')) {
+      try {
+        const { parseUsHouseDistrict } = await import('@/lib/district-brief-public');
+        const { scheduleDistrictIntelGeneration } = await import(
+          '@/app/utils/services/district-intel-service'
+        );
+        const raw = String(district_code || '').trim();
+        const parsed = raw ? parseUsHouseDistrict(raw) : null;
+        const code =
+          parsed?.label ||
+          (state && raw ? String(raw).toUpperCase() : null);
+        if (code) {
+          const kick = scheduleDistrictIntelGeneration({
+            organizationId: orgId,
+            districtCode: code,
+            state: parsed?.state || state || null,
+            districtNumber: parsed?.districtNumber ?? null,
+          });
+          districtReportStarted = kick.started;
+        }
+      } catch (err) {
+        console.warn('[organizations] district intel kick skipped', err);
+      }
+    }
+
     return NextResponse.json({
       status: true,
       organization: { id: orgId, name: name.trim(), slug },
+      districtReportStarted,
     });
   } catch (error) {
     console.error('Create org error:', error);

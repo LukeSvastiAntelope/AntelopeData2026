@@ -457,13 +457,15 @@ async function readSnapshot(input: {
   try {
     const sql = await openSql();
     const [rows] = await sql.execute<RowDataPacket[]>(
-      `SELECT payload, sources_health, generated_at
+      `SELECT payload, sources_health, generated_at, status
        FROM district_intel_snapshots
        WHERE organization_id = ? AND district_key = ?
        LIMIT 1`,
       [input.organizationId, input.districtKey]
     );
     if (!rows.length) return null;
+    const rowStatus = String(rows[0].status || 'ready');
+    if (rowStatus !== 'ready') return null;
     const generatedAt = new Date(rows[0].generated_at);
     if (Number.isNaN(generatedAt.getTime())) return null;
     if (Date.now() - generatedAt.getTime() > input.ttlMs) return null;
@@ -507,11 +509,13 @@ export async function writeDistrictIntelSnapshot(input: {
     const sql = await openSql();
     await sql.execute<ResultSetHeader>(
       `INSERT INTO district_intel_snapshots
-        (organization_id, district_key, payload, sources_health, generated_at)
-       VALUES (?, ?, ?, ?, UTC_TIMESTAMP())
+        (organization_id, district_key, payload, sources_health, status, error_message, generated_at)
+       VALUES (?, ?, ?, ?, 'ready', NULL, UTC_TIMESTAMP())
        ON DUPLICATE KEY UPDATE
          payload = VALUES(payload),
          sources_health = VALUES(sources_health),
+         status = 'ready',
+         error_message = NULL,
          generated_at = UTC_TIMESTAMP()`,
       [
         input.organizationId,
@@ -588,5 +592,311 @@ export async function getOrBuildDistrictIntel(input: {
     cached: false,
     generatedAt: new Date().toISOString(),
     sourcesHealth: sourcesHealthFromExternal(built.external),
+  };
+}
+
+export type SnapshotJobStatus = 'none' | 'pending' | 'ready' | 'failed';
+
+export type OnboardingReportView = {
+  districtCode: string;
+  state: string;
+  districtNumber: number;
+  headline: string;
+  narrative: string;
+  demographics: DistrictIntelPayload['district']['demographics'];
+  pvi: string | null;
+  incumbentName: string | null;
+  incumbentParty: string | null;
+  fundraising: {
+    status: SourceStatus;
+    committeeName: string | null;
+    receipts: number | null;
+    individualContributions: number | null;
+    cycle: number | null;
+    sampleCandidates: { name: string; party: string }[];
+  };
+  localOfficials: {
+    status: SourceStatus;
+    sample: { name: string; role: string }[];
+  };
+  verifiedFacts: string[];
+  sourcesHealth: SourcesHealth;
+  generatedAt: string;
+};
+
+function parseJsonField<T>(raw: unknown, fallback: T): T {
+  if (raw == null) return fallback;
+  if (typeof raw === 'object') return raw as T;
+  try {
+    return JSON.parse(String(raw)) as T;
+  } catch {
+    return fallback;
+  }
+}
+
+/** Read job row (any status) for onboarding polling. */
+export async function getDistrictIntelJob(input: {
+  organizationId: number;
+  districtKey: string;
+}): Promise<{
+  status: SnapshotJobStatus;
+  payload: DistrictIntelPayload | null;
+  sourcesHealth: SourcesHealth | null;
+  generatedAt: string | null;
+  errorMessage: string | null;
+} | null> {
+  try {
+    const sql = await openSql();
+    const [rows] = await sql.execute<RowDataPacket[]>(
+      `SELECT payload, sources_health, generated_at, status, error_message
+       FROM district_intel_snapshots
+       WHERE organization_id = ? AND district_key = ?
+       LIMIT 1`,
+      [input.organizationId, input.districtKey.slice(0, 32)]
+    );
+    if (!rows.length) return null;
+    const st = String(rows[0].status || 'ready') as 'pending' | 'ready' | 'failed';
+    const payload = parseJsonField<DistrictIntelPayload | null>(
+      rows[0].payload,
+      null
+    );
+    const sourcesHealth = parseJsonField<SourcesHealth | null>(
+      rows[0].sources_health,
+      null
+    );
+    return {
+      status: st,
+      payload: payload?.status === true ? payload : null,
+      sourcesHealth,
+      generatedAt: rows[0].generated_at
+        ? new Date(rows[0].generated_at).toISOString()
+        : null,
+      errorMessage:
+        rows[0].error_message != null ? String(rows[0].error_message) : null,
+    };
+  } catch (err) {
+    console.warn('[district-intel-service] job read skipped', err);
+    return null;
+  }
+}
+
+async function markSnapshotPending(input: {
+  organizationId: number;
+  districtKey: string;
+}): Promise<void> {
+  const sql = await openSql();
+  const stub = {
+    status: true,
+    dbRecordFound: false,
+    district: {
+      districtCode: input.districtKey,
+      state: '',
+      districtNumber: 0,
+      pvi: null,
+      pviNumeric: 0,
+      margin2024: 0,
+      incumbentName: null,
+      incumbentParty: null,
+      demographics: {
+        totalPopulation: null,
+        medianHouseholdIncome: null,
+        bachelorsOrHigherPct: null,
+        medianAge: null,
+      },
+    },
+    external: {
+      censusStatus: 'unavailable',
+      cbpStatus: 'unavailable',
+      blsStatus: 'unavailable',
+      fecStatus: 'unavailable',
+      fecTotalsStatus: 'unavailable',
+      openStatesStatus: 'unavailable',
+      ballotpediaStatus: 'unavailable',
+      mitElectionLabStatus: 'unavailable',
+      censusPreview: null,
+      cbpPreview: null,
+      blsLatest: null,
+      fecPreview: null,
+      fecTotals: null,
+      openStatesPreview: null,
+    },
+    intelligence: {
+      narrative: 'Gathering district data…',
+      recommendedNextSteps: [],
+    },
+  };
+  await sql.execute(
+    `INSERT INTO district_intel_snapshots
+      (organization_id, district_key, payload, sources_health, status, error_message, generated_at)
+     VALUES (?, ?, ?, ?, 'pending', NULL, UTC_TIMESTAMP())
+     ON DUPLICATE KEY UPDATE
+       status = 'pending',
+       error_message = NULL,
+       generated_at = UTC_TIMESTAMP()`,
+    [
+      input.organizationId,
+      input.districtKey.slice(0, 32),
+      JSON.stringify(stub),
+      JSON.stringify({}),
+    ]
+  );
+}
+
+async function markSnapshotFailed(input: {
+  organizationId: number;
+  districtKey: string;
+  message: string;
+}): Promise<void> {
+  try {
+    const sql = await openSql();
+    await sql.execute(
+      `UPDATE district_intel_snapshots
+       SET status = 'failed', error_message = ?, generated_at = UTC_TIMESTAMP()
+       WHERE organization_id = ? AND district_key = ?`,
+      [input.message.slice(0, 500), input.organizationId, input.districtKey.slice(0, 32)]
+    );
+  } catch (err) {
+    console.warn('[district-intel-service] mark failed skipped', err);
+  }
+}
+
+/**
+ * Fire-and-forget generation for signup / first district selection.
+ * Does not block the request on external APIs.
+ */
+export function scheduleDistrictIntelGeneration(input: {
+  organizationId: number;
+  districtCode: string;
+  state?: string | null;
+  districtNumber?: number | null;
+}): { started: boolean; districtKey: string } {
+  const districtKey = String(input.districtCode || '')
+    .trim()
+    .toUpperCase()
+    .slice(0, 32);
+  if (!input.organizationId || !districtKey) {
+    return { started: false, districtKey };
+  }
+
+  void (async () => {
+    try {
+      // Skip if a fresh ready snapshot already exists
+      const existing = await readSnapshot({
+        organizationId: input.organizationId,
+        districtKey,
+        ttlMs: DEFAULT_DISTRICT_INTEL_TTL_MS,
+      });
+      if (existing) return;
+
+      await markSnapshotPending({
+        organizationId: input.organizationId,
+        districtKey,
+      });
+
+      const result = await getOrBuildDistrictIntel({
+        organizationId: input.organizationId,
+        districtCode: districtKey,
+        fallbackState: input.state,
+        fallbackDistrictNumber: input.districtNumber,
+        forceRefresh: true,
+      });
+      if ('error' in result) {
+        await markSnapshotFailed({
+          organizationId: input.organizationId,
+          districtKey,
+          message: result.error,
+        });
+      }
+    } catch (err) {
+      console.error('[scheduleDistrictIntelGeneration]', err);
+      await markSnapshotFailed({
+        organizationId: input.organizationId,
+        districtKey,
+        message: err instanceof Error ? err.message : 'Generation failed',
+      });
+    }
+  })();
+
+  return { started: true, districtKey };
+}
+
+/** Shape a ready snapshot into the onboarding report card. */
+export function toOnboardingReportView(
+  payload: DistrictIntelPayload,
+  sourcesHealth: SourcesHealth,
+  generatedAt: string
+): OnboardingReportView {
+  const stateName =
+    ABBREV_TO_STATE_NAME[payload.district.state] || payload.district.state;
+  const verifiedFacts = buildVerifiedFacts(payload, stateName);
+  const totals = payload.external.fecTotals as
+    | {
+        committee_name?: string;
+        receipts?: number;
+        individual_contributions?: number;
+        cycle?: number;
+      }
+    | null;
+  const sampleCandidates = (
+    Array.isArray(payload.external.fecPreview)
+      ? payload.external.fecPreview
+      : []
+  )
+    .slice(0, 4)
+    .map((c: any) => ({
+      name: String(c?.name || 'Unknown'),
+      party: String(c?.party_full || c?.party || '—'),
+    }));
+
+  const sampleOfficials = (
+    Array.isArray(payload.external.openStatesPreview)
+      ? payload.external.openStatesPreview
+      : []
+  )
+    .slice(0, 4)
+    .map((p: any) => {
+      const role =
+        p?.current_role?.title ||
+        p?.roles?.[0]?.title ||
+        p?.roles?.[0]?.type ||
+        'Legislator';
+      return {
+        name: String(p?.name || 'Unknown'),
+        role: String(role),
+      };
+    });
+
+  const districtLabel = payload.district.districtNumber
+    ? `${stateName}'s ${ordinal(payload.district.districtNumber)} District`
+    : `${stateName} (${payload.district.districtCode})`;
+
+  return {
+    districtCode: payload.district.districtCode,
+    state: payload.district.state,
+    districtNumber: payload.district.districtNumber,
+    headline: `District Intelligence · ${districtLabel}`,
+    narrative: payload.intelligence.narrative,
+    demographics: payload.district.demographics,
+    pvi: payload.district.pvi,
+    incumbentName: payload.district.incumbentName,
+    incumbentParty: payload.district.incumbentParty,
+    fundraising: {
+      status: payload.external.fecTotalsStatus || payload.external.fecStatus,
+      committeeName: totals?.committee_name || null,
+      receipts: totals?.receipts != null ? Number(totals.receipts) : null,
+      individualContributions:
+        totals?.individual_contributions != null
+          ? Number(totals.individual_contributions)
+          : null,
+      cycle: totals?.cycle != null ? Number(totals.cycle) : null,
+      sampleCandidates,
+    },
+    localOfficials: {
+      status: payload.external.openStatesStatus,
+      sample: sampleOfficials,
+    },
+    verifiedFacts,
+    sourcesHealth,
+    generatedAt,
   };
 }

@@ -1050,6 +1050,16 @@ export default function DashboardPage() {
           onDistrictSelect={(district) => {
             setSelectedDistrict(district)
             loadDistrictIntel(district.districtCode)
+            // Data D2 — first selection binds org district + async snapshot (non-blocking)
+            void fetch('/api/dashboard/district-intel/onboarding', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                districtCode: district.districtCode,
+                state: district.state,
+                districtNumber: district.districtNumber,
+              }),
+            }).catch(() => undefined)
           }}
           onPersonSelect={(person) => {
             setSelectedPersonId(person.id)

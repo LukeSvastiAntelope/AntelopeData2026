@@ -18,6 +18,7 @@ import {
   X
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { DistrictIntelOnboardingCard } from '@/components/DistrictIntelOnboardingCard';
 
 interface OnboardingEmptyStateProps {
   onLaunchConsultant: () => void;
@@ -150,6 +151,9 @@ export default function OnboardingEmptyState({
             Turn your polls into campaign intelligence — or launch a Campaign Consultant agent to hit the ground running before you have data.
           </p>
         </div>
+
+        {/* Data D2 — fries in the bag: auto District Intelligence Report */}
+        <DistrictIntelOnboardingCard />
 
         {/* Three-Path Onboarding */}
         <div className="w-full max-w-4xl">
