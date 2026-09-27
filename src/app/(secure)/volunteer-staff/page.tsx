@@ -23,6 +23,7 @@ import {
   Plus,
   Trash2,
 } from 'lucide-react'
+import { VolunteerShiftsStaffPanel } from '@/app/components/portal/volunteer-shifts-staff-panel'
 
 type RosterRow = {
   membershipId: number
@@ -240,6 +241,8 @@ export default function VolunteerStaffPage() {
               </div>
             ))}
           </div>
+
+          <VolunteerShiftsStaffPanel />
 
           {/* Invite */}
           <section className="rounded-lg border border-border p-4 space-y-3">

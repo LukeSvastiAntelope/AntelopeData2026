@@ -50,6 +50,7 @@ const publicRoutes = [
     '/api/surveys/cron/close-expired', // Cron job to close expired surveys
     '/api/cron/loop-propose', // H2 loop proposer platform cron
     '/api/cron/autotrigger-poll', // AT1 survey auto-trigger backstop
+    '/api/cron/volunteer-reminders', // Volunteer V3 — gated shift reminders + check-in prompts
     '/api/channels/telegram/webhook', // Telegram webhook must be public
     '/api/webhooks/resend', // Resend delivery / bounce / complaint webhook
     '/api/email/unsubscribe', // CAN-SPAM one-click unsubscribe (public)
