@@ -1,33 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/auth';
-import { isPortalRole } from '@/app/utils/database/volunteer-repo';
+import { requirePortalIdentity } from '@/app/utils/auth/portal-identity';
 import { VolunteerShiftsRepo } from '@/app/utils/database/volunteer-shifts-repo';
+import { VolunteerEventsRepo } from '@/app/utils/database/volunteer-events-repo';
 
 export const runtime = 'nodejs';
-
-function portalIdentity(session: any) {
-  const userId = Number(session?.user?.id);
-  const organizationId = Number(session?.user?.organizationId);
-  const personRecordId =
-    session?.user?.personRecordId != null
-      ? Number(session.user.personRecordId)
-      : null;
-  const orgRole = session?.user?.orgRole as string | null;
-  if (!isPortalRole(orgRole) || !organizationId || !userId) return null;
-  return { userId, organizationId, personRecordId };
-}
 
 /** GET /api/portal/tasks */
 export async function GET() {
   try {
-    const session = await auth();
-    const id = portalIdentity(session);
-    if (!id) {
-      return NextResponse.json(
-        { status: false, message: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
+    const id = await requirePortalIdentity();
+    if (id instanceof Response) return id;
     const tasks = await VolunteerShiftsRepo.listTasks(id.organizationId, {
       openOnly: true,
       forUserId: id.userId,
@@ -49,14 +31,8 @@ export async function GET() {
 /** POST /api/portal/tasks — claim | complete */
 export async function POST(request: NextRequest) {
   try {
-    const session = await auth();
-    const id = portalIdentity(session);
-    if (!id) {
-      return NextResponse.json(
-        { status: false, message: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
+    const id = await requirePortalIdentity();
+    if (id instanceof Response) return id;
     const body = await request.json().catch(() => ({}));
     const taskId = Number(body.taskId);
     if (!Number.isFinite(taskId)) {
@@ -66,19 +42,36 @@ export async function POST(request: NextRequest) {
       );
     }
     const action = String(body.action || 'claim');
-    const task =
-      action === 'complete'
-        ? await VolunteerShiftsRepo.completeTask({
-            taskId,
-            organizationId: id.organizationId,
-            userId: id.userId,
-          })
-        : await VolunteerShiftsRepo.claimTask({
-            taskId,
-            organizationId: id.organizationId,
-            userId: id.userId,
-            personRecordId: id.personRecordId,
-          });
+    let task;
+    if (action === 'complete') {
+      task = await VolunteerShiftsRepo.completeTask({
+        taskId,
+        organizationId: id.organizationId,
+        userId: id.userId,
+      });
+      await VolunteerEventsRepo.append({
+        organizationId: id.organizationId,
+        userId: id.userId,
+        kind: 'task_completed',
+        relatedType: 'task',
+        relatedId: taskId,
+      });
+    } else {
+      task = await VolunteerShiftsRepo.claimTask({
+        taskId,
+        organizationId: id.organizationId,
+        userId: id.userId,
+        personRecordId: id.personRecordId,
+      });
+      await VolunteerEventsRepo.append({
+        organizationId: id.organizationId,
+        userId: id.userId,
+        kind: 'task_claimed',
+        points: 0,
+        relatedType: 'task',
+        relatedId: taskId,
+      });
+    }
     return NextResponse.json({ status: true, task });
   } catch (error) {
     console.error('[portal tasks POST]', error);

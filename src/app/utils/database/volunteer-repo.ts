@@ -338,7 +338,11 @@ export class VolunteerRepo {
     invitedBy?: number | null;
     /** Hours until expiry (default 72). */
     ttlHours?: number;
-    source?: 'staff_invite' | 'public_signup' | 'site_form';
+    source?:
+      | 'staff_invite'
+      | 'public_signup'
+      | 'site_form'
+      | 'relational_recruit';
     intake?: Record<string, unknown> | null;
     phone?: string | null;
   }): Promise<MagicLinkIssue> {

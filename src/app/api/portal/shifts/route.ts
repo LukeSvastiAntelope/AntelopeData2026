@@ -1,33 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/auth';
-import { isPortalRole } from '@/app/utils/database/volunteer-repo';
+import { requirePortalIdentity } from '@/app/utils/auth/portal-identity';
 import { VolunteerShiftsRepo } from '@/app/utils/database/volunteer-shifts-repo';
+import { VolunteerEventsRepo } from '@/app/utils/database/volunteer-events-repo';
 
 export const runtime = 'nodejs';
-
-function portalIdentity(session: any) {
-  const userId = Number(session?.user?.id);
-  const organizationId = Number(session?.user?.organizationId);
-  const personRecordId =
-    session?.user?.personRecordId != null
-      ? Number(session.user.personRecordId)
-      : null;
-  const orgRole = session?.user?.orgRole as string | null;
-  if (!isPortalRole(orgRole) || !organizationId || !userId) return null;
-  return { userId, organizationId, personRecordId };
-}
 
 /** GET /api/portal/shifts — browse open/upcoming shifts */
 export async function GET() {
   try {
-    const session = await auth();
-    const id = portalIdentity(session);
-    if (!id) {
-      return NextResponse.json(
-        { status: false, message: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
+    const id = await requirePortalIdentity();
+    if (id instanceof Response) return id;
     const shifts = await VolunteerShiftsRepo.listShifts(id.organizationId, {
       upcomingOnly: true,
       forUserId: id.userId,
@@ -49,14 +31,8 @@ export async function GET() {
 /** POST /api/portal/shifts — claim | unclaim | check_in */
 export async function POST(request: NextRequest) {
   try {
-    const session = await auth();
-    const id = portalIdentity(session);
-    if (!id) {
-      return NextResponse.json(
-        { status: false, message: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
+    const id = await requirePortalIdentity();
+    if (id instanceof Response) return id;
     const body = await request.json().catch(() => ({}));
     const shiftId = Number(body.shiftId);
     if (!Number.isFinite(shiftId)) {
@@ -79,12 +55,27 @@ export async function POST(request: NextRequest) {
         organizationId: id.organizationId,
         userId: id.userId,
       });
+      await VolunteerEventsRepo.append({
+        organizationId: id.organizationId,
+        userId: id.userId,
+        kind: 'shift_checked_in',
+        relatedType: 'shift',
+        relatedId: shiftId,
+      });
     } else {
       shift = await VolunteerShiftsRepo.claimShift({
         shiftId,
         organizationId: id.organizationId,
         userId: id.userId,
         personRecordId: id.personRecordId,
+      });
+      await VolunteerEventsRepo.append({
+        organizationId: id.organizationId,
+        userId: id.userId,
+        kind: 'shift_claimed',
+        points: 0,
+        relatedType: 'shift',
+        relatedId: shiftId,
       });
     }
     return NextResponse.json({ status: true, shift });
