@@ -5,6 +5,10 @@
  */
 
 import { createHmac, timingSafeEqual, randomBytes } from 'crypto';
+import {
+  liveSigningSecret,
+  liveSigningSecretOrNull,
+} from '@/app/utils/live/signing-secret';
 
 export type LinkedInPrefill = {
   name: string | null;
@@ -16,12 +20,11 @@ export type LinkedInPrefill = {
 };
 
 function secret(): string {
-  return (
-    process.env.AUTH_SECRET ||
-    process.env.NEXTAUTH_SECRET ||
-    process.env.JWT_SECRET_KEY ||
-    'live-dev-secret'
-  );
+  return liveSigningSecret();
+}
+
+function secretOrNull(): string | null {
+  return liveSigningSecretOrNull();
 }
 
 export function linkedInConfigured(): boolean {
@@ -50,12 +53,14 @@ export function verifyLiveOAuthState(state: string): {
   nonce: string;
   returnPath: string;
 } | null {
+  const key = secretOrNull();
+  if (!key) return null;
   const raw = String(state || '');
   const i = raw.lastIndexOf('.');
   if (i <= 0) return null;
   const body = raw.slice(0, i);
   const sig = raw.slice(i + 1);
-  const expected = createHmac('sha256', secret())
+  const expected = createHmac('sha256', key)
     .update(body)
     .digest('base64url');
   try {

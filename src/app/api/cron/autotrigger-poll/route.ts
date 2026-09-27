@@ -1,23 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { pollSurveyAutotriggers } from '@/app/utils/services/autotrigger-service';
+import { assertCronAuthorized } from '@/app/utils/cron-auth';
 
 /**
  * POST /api/cron/autotrigger-poll
  *
  * AT1 backstop: surveys that go quiet then jump still fire once per band.
- * Public like other platform crons — optional CRON_SECRET.
+ * Production requires CRON_SECRET (x-cron-secret or Bearer).
  */
 export async function POST(req: NextRequest) {
   try {
-    const secret = process.env.CRON_SECRET;
-    if (secret) {
-      const provided =
-        req.headers.get('x-cron-secret') ||
-        req.headers.get('authorization')?.replace(/^Bearer\s+/i, '');
-      if (provided !== secret) {
-        return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
-      }
-    }
+    const denied = assertCronAuthorized(req);
+    if (denied) return denied;
 
     const body = await req.json().catch(() => ({}));
     const orgId =
