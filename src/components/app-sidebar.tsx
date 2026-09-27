@@ -58,6 +58,7 @@ import {
   Banknote,
   Radio,
   Plus,
+  HeartHandshake,
 } from 'lucide-react'
 import LogoText from '@/components/logo-text'
 import LogoIcon from '@/components/logo-icon'
@@ -156,10 +157,9 @@ const WORKFLOW_STAGES: WorkflowStage[] = [
 ]
 
 // Account tray — ops pages outside the numbered workflow spine.
-// /volunteer-staff, /compliance, /team are intentionally linked here (not direct-link-only);
+// /compliance, /team are intentionally linked here (not direct-link-only);
 // each has a (secure) page that renders. Do not remove without leaving a direct-link-only note.
 const ACCOUNT_ITEMS: NavItem[] = [
-  { title: 'Volunteer/Staff', href: '/volunteer-staff', icon: ClipboardList },
   { title: 'Compliance', href: '/compliance', icon: Scale },
   { title: 'Team', href: '/team', icon: Building2 },
   // Ops pages outside the numbered workflow spine — Website is a paid add-on
@@ -179,6 +179,12 @@ const GROUND_GAME_ITEMS: NavItem[] = [
 const LIVE_ITEMS: NavItem[] = [
   { title: 'Sessions', href: '/live-sessions', icon: Radio },
   { title: 'New session', href: '/live-sessions/new', icon: Plus },
+]
+
+/** Volunteer suite — staff dashboard + managed roster (volunteers live in /portal). */
+const VOLUNTEER_ITEMS: NavItem[] = [
+  { title: 'Dashboard', href: '/volunteers', icon: LayoutDashboard },
+  { title: 'Roster', href: '/volunteer-staff', icon: ClipboardList },
 ]
 
 const RESOURCE_ITEMS: NavItem[] = [
@@ -416,6 +422,37 @@ export function AppSidebar({ className, collapsible = 'offcanvas', ...props }: S
           <SidebarGroupContent>
             <SidebarMenu>
               {LIVE_ITEMS.map((item) => (
+                <SidebarMenuItem key={item.href}>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={pathMatches(pathname, item.href)}
+                    tooltip={item.title}
+                  >
+                    <Link
+                      href={item.href}
+                      className="flex items-center gap-2 px-4 py-2 text-sidebar-foreground"
+                    >
+                      <item.icon className="h-4 w-4 text-sidebar-foreground group-data-[collapsible=offcanvas]:hidden" />
+                      <span className="text-sidebar-foreground">{item.title}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarSeparator className="mx-4" />
+
+        {/* Volunteer — staff dashboard + roster (portal is separate) */}
+        <SidebarGroup className="px-4">
+          <SidebarGroupLabel className="flex items-center gap-1.5">
+            <HeartHandshake className="h-3 w-3" />
+            Volunteer
+          </SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {VOLUNTEER_ITEMS.map((item) => (
                 <SidebarMenuItem key={item.href}>
                   <SidebarMenuButton
                     asChild

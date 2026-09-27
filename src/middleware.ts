@@ -302,6 +302,7 @@ export default auth(async (req) => {
         '/fundraising',
         '/compliance',
         '/volunteer-staff',
+        '/volunteers',
         '/agents',
         '/spread',
         '/outbound',
