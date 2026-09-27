@@ -32,10 +32,24 @@ type Report = {
     individualContributions: number | null
     cycle: number | null
     sampleCandidates: { name: string; party: string }[]
+    donorZips: { zip: string; count: number; amount: number }[] | null
   }
   localOfficials: {
     status: string
     sample: { name: string; role: string }[]
+    legislators: {
+      name: string
+      party: string | null
+      chamber: string | null
+      district: string | null
+      role: string | null
+    }[]
+    recentBills: {
+      identifier: string
+      title: string
+      latestAction: string | null
+      updatedAt: string | null
+    }[]
   }
   verifiedFacts: string[]
   sourcesHealth: Record<string, string>
@@ -158,13 +172,14 @@ export function DistrictIntelOnboardingCard() {
         {needsDistrict && (
           <div className="space-y-3">
             <p className="text-sm text-muted-foreground">
-              Tell us your US House district and we&apos;ll prepare the report in
-              the background.
+              Tell us your district (US House e.g. NJ-5, or state house/senate
+              e.g. NJ-LD-12 / NJ-SD-5) and we&apos;ll prepare the report in the
+              background.
             </p>
             <div className="flex flex-col sm:flex-row gap-2">
               <Input
                 className="h-9"
-                placeholder="e.g. NJ-5 or CA-12"
+                placeholder="e.g. NJ-5 or NJ-LD-12"
                 value={districtCode}
                 onChange={(e) => setDistrictCode(e.target.value)}
               />
@@ -319,6 +334,25 @@ export function DistrictIntelOnboardingCard() {
                     ))}
                   </ul>
                 )}
+                {report.fundraising.donorZips &&
+                  report.fundraising.donorZips.length > 0 && (
+                    <div className="pt-1 border-t border-border space-y-1">
+                      <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                        Top donor ZIPs (FEC Schedule A sample)
+                      </p>
+                      <ul className="text-xs space-y-0.5 text-muted-foreground">
+                        {report.fundraising.donorZips.slice(0, 5).map((z) => (
+                          <li key={z.zip} className="flex justify-between gap-2">
+                            <span className="font-mono">{z.zip}</span>
+                            <span>
+                              {money(z.amount)}
+                              <span className="opacity-60"> · {z.count}</span>
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
               </div>
               <div className="rounded-md border border-border p-3 space-y-2">
                 <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -337,6 +371,24 @@ export function DistrictIntelOnboardingCard() {
                   <p className="text-sm text-muted-foreground">
                     OpenStates {report.localOfficials.status}
                   </p>
+                )}
+                {report.localOfficials.recentBills?.length > 0 && (
+                  <div className="pt-1 border-t border-border space-y-1">
+                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                      Recent state bills (OpenStates)
+                    </p>
+                    <ul className="text-xs space-y-1 text-muted-foreground">
+                      {report.localOfficials.recentBills.slice(0, 4).map((b) => (
+                        <li key={b.identifier}>
+                          <span className="font-medium text-foreground/80">
+                            {b.identifier}
+                          </span>{' '}
+                          {b.title.slice(0, 72)}
+                          {b.title.length > 72 ? '…' : ''}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
                 )}
               </div>
             </div>

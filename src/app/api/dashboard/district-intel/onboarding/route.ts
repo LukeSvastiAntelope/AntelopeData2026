@@ -3,12 +3,12 @@ import { requireUserId } from '@/app/utils/auth/require-user';
 import { ensurePrimaryOrgId } from '@/app/api/dashboard/persons/org';
 import { openSql } from '@/app/utils/database/db';
 import type { RowDataPacket } from 'mysql2/promise';
-import { parseUsHouseDistrict } from '@/lib/district-brief-public';
 import {
   getDistrictIntelJob,
   scheduleDistrictIntelGeneration,
   toOnboardingReportView,
   sourcesHealthFromExternal,
+  parseCampaignDistrict,
   type OnboardingReportView,
 } from '@/app/utils/services/district-intel-service';
 
@@ -17,18 +17,20 @@ export const runtime = 'nodejs';
 async function getOrgDistrict(orgId: number): Promise<{
   districtCode: string | null;
   state: string | null;
+  officeType: string | null;
 }> {
   const sql = await openSql();
   const [rows] = await sql.execute<RowDataPacket[]>(
-    `SELECT district_code, state FROM organizations WHERE id = ? LIMIT 1`,
+    `SELECT district_code, state, office_type FROM organizations WHERE id = ? LIMIT 1`,
     [orgId]
   );
-  if (!rows.length) return { districtCode: null, state: null };
+  if (!rows.length) return { districtCode: null, state: null, officeType: null };
   return {
     districtCode: rows[0].district_code
       ? String(rows[0].district_code)
       : null,
     state: rows[0].state ? String(rows[0].state) : null,
+    officeType: rows[0].office_type ? String(rows[0].office_type) : null,
   };
 }
 
@@ -36,14 +38,26 @@ async function setOrgDistrict(input: {
   orgId: number;
   districtCode: string;
   state: string;
+  officeType?: string | null;
 }): Promise<void> {
   const sql = await openSql();
-  await sql.execute(
-    `UPDATE organizations
-     SET district_code = ?, state = COALESCE(state, ?)
-     WHERE id = ?`,
-    [input.districtCode, input.state, input.orgId]
-  );
+  if (input.officeType) {
+    await sql.execute(
+      `UPDATE organizations
+       SET district_code = ?,
+           state = COALESCE(state, ?),
+           office_type = COALESCE(office_type, ?)
+       WHERE id = ?`,
+      [input.districtCode, input.state, input.officeType, input.orgId]
+    );
+  } else {
+    await sql.execute(
+      `UPDATE organizations
+       SET district_code = ?, state = COALESCE(state, ?)
+       WHERE id = ?`,
+      [input.districtCode, input.state, input.orgId]
+    );
+  }
 }
 
 /**
@@ -68,8 +82,10 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    const parsed = parseUsHouseDistrict(org.districtCode);
+    const parsed = parseCampaignDistrict(org.districtCode);
     const districtKey = parsed?.label || org.districtCode.toUpperCase();
+    const officeType =
+      org.officeType || parsed?.officeType || 'federal_house';
     const job = await getDistrictIntelJob({
       organizationId: orgId,
       districtKey,
@@ -81,6 +97,7 @@ export async function GET(request: NextRequest) {
         districtCode: districtKey,
         state: parsed?.state || org.state,
         districtNumber: parsed?.districtNumber ?? null,
+        officeType,
       });
       return NextResponse.json({
         status: true,
@@ -122,6 +139,7 @@ export async function GET(request: NextRequest) {
         districtCode: districtKey,
         state: parsed?.state || org.state,
         districtNumber: parsed?.districtNumber ?? null,
+        officeType,
       });
       return NextResponse.json({
         status: true,
@@ -163,7 +181,7 @@ export async function GET(request: NextRequest) {
 /**
  * POST /api/dashboard/district-intel/onboarding
  * Bind district on first selection + kick async generation.
- * body: { districtCode, state?, districtNumber?, retry? }
+ * body: { districtCode, state?, districtNumber?, officeType?, retry? }
  */
 export async function POST(request: NextRequest) {
   try {
@@ -180,12 +198,13 @@ export async function POST(request: NextRequest) {
           { status: 400 }
         );
       }
-      const parsed = parseUsHouseDistrict(org.districtCode);
+      const parsed = parseCampaignDistrict(org.districtCode);
       const kick = scheduleDistrictIntelGeneration({
         organizationId: orgId,
         districtCode: parsed?.label || org.districtCode,
         state: parsed?.state || org.state,
         districtNumber: parsed?.districtNumber ?? null,
+        officeType: org.officeType || parsed?.officeType || null,
       });
       return NextResponse.json({
         status: true,
@@ -197,7 +216,7 @@ export async function POST(request: NextRequest) {
     }
 
     const rawCode = String(body.districtCode || '').trim();
-    const parsed = parseUsHouseDistrict(rawCode);
+    const parsed = parseCampaignDistrict(rawCode);
     const state =
       (parsed?.state || String(body.state || '').trim().toUpperCase() || null) as
         | string
@@ -205,6 +224,10 @@ export async function POST(request: NextRequest) {
     const districtNumber =
       parsed?.districtNumber ??
       (body.districtNumber != null ? Number(body.districtNumber) : null);
+    const officeType =
+      (body.officeType != null ? String(body.officeType) : null) ||
+      parsed?.officeType ||
+      null;
     const districtKey =
       parsed?.label ||
       (state && districtNumber != null
@@ -215,7 +238,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           status: false,
-          message: 'districtCode required (e.g. NJ-5)',
+          message: 'districtCode required (e.g. NJ-5 or NJ-LD-12)',
         },
         { status: 400 }
       );
@@ -228,6 +251,7 @@ export async function POST(request: NextRequest) {
         orgId,
         districtCode: districtKey,
         state,
+        officeType,
       });
     }
 
@@ -236,6 +260,7 @@ export async function POST(request: NextRequest) {
       districtCode: districtKey,
       state,
       districtNumber,
+      officeType: officeType || existing.officeType,
     });
 
     return NextResponse.json({

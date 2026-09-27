@@ -3,8 +3,7 @@ import { UserRepo } from "@/app/utils/database/user-repo";
 import { signIn } from "@/auth";
 import { ensurePrimaryOrgId } from "@/app/api/dashboard/persons/org";
 import { openSql } from "@/app/utils/database/db";
-import { parseUsHouseDistrict } from "@/lib/district-brief-public";
-import { scheduleDistrictIntelGeneration } from "@/app/utils/services/district-intel-service";
+import { parseCampaignDistrict, scheduleDistrictIntelGeneration } from "@/app/utils/services/district-intel-service";
 
 /**
  * POST /api/signup
@@ -39,19 +38,20 @@ export async function POST(req: NextRequest) {
             const user = await UserRepo.getUserByEmail(email);
             if (user?.id) {
                 const orgId = await ensurePrimaryOrgId(user.id);
-                const parsed = districtRaw ? parseUsHouseDistrict(districtRaw) : null;
+                const parsed = districtRaw ? parseCampaignDistrict(districtRaw) : null;
                 if (parsed) {
                     const sql = await openSql();
                     await sql.execute(
                         `UPDATE organizations
                          SET district_code = ?, state = COALESCE(state, ?),
                              candidate_name = COALESCE(candidate_name, ?),
-                             office_type = COALESCE(office_type, 'federal_house')
+                             office_type = COALESCE(office_type, ?)
                          WHERE id = ?`,
                         [
                             parsed.label,
                             parsed.state,
                             displayName || null,
+                            parsed.officeType,
                             orgId,
                         ]
                     );
@@ -60,6 +60,7 @@ export async function POST(req: NextRequest) {
                         districtCode: parsed.label,
                         state: parsed.state,
                         districtNumber: parsed.districtNumber,
+                        officeType: parsed.officeType,
                     });
                 }
             }

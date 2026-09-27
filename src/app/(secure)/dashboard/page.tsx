@@ -876,12 +876,27 @@ export default function DashboardPage() {
     }
   }
 
-  const loadDistrictIntel = useCallback(async (districtCode: string) => {
+  const loadDistrictIntel = useCallback(async (district: {
+    districtCode: string
+    state?: string
+    districtNumber?: number
+    officeType?: string | null
+  } | string) => {
+    const code = typeof district === 'string' ? district : district.districtCode
+    const state = typeof district === 'string' ? undefined : district.state
+    const districtNumber =
+      typeof district === 'string' ? undefined : district.districtNumber
+    const officeType =
+      typeof district === 'string' ? undefined : district.officeType
     setDistrictIntelLoading(true)
     setDistrictDeepReport(null)
     setDistrictDeepConversationId(null)
     try {
-      const res = await fetch(`/api/dashboard/district-intel?districtCode=${encodeURIComponent(districtCode)}`)
+      const params = new URLSearchParams({ districtCode: code })
+      if (state) params.set('state', state)
+      if (districtNumber != null) params.set('districtNumber', String(districtNumber))
+      if (officeType) params.set('officeType', officeType)
+      const res = await fetch(`/api/dashboard/district-intel?${params.toString()}`)
       const data = await res.json()
       if (!res.ok || !data?.status) {
         toast.error(data?.message || 'Failed to load district intelligence')
@@ -1049,7 +1064,15 @@ export default function DashboardPage() {
           geofencing={null}
           onDistrictSelect={(district) => {
             setSelectedDistrict(district)
-            loadDistrictIntel(district.districtCode)
+            const officeType = district.districtCode.includes('-LD-')
+              ? 'state_house'
+              : district.districtCode.includes('-SD-')
+                ? 'state_senate'
+                : 'federal_house'
+            loadDistrictIntel({
+              ...district,
+              officeType,
+            })
             // Data D2 — first selection binds org district + async snapshot (non-blocking)
             void fetch('/api/dashboard/district-intel/onboarding', {
               method: 'POST',
@@ -1058,6 +1081,7 @@ export default function DashboardPage() {
                 districtCode: district.districtCode,
                 state: district.state,
                 districtNumber: district.districtNumber,
+                officeType,
               }),
             }).catch(() => undefined)
           }}
@@ -1527,7 +1551,18 @@ export default function DashboardPage() {
                           size="sm"
                           variant="outline"
                           className="flex-1 h-7 text-[10px]"
-                          onClick={() => loadDistrictIntel(selectedDistrict.districtCode)}
+                          onClick={() =>
+                            loadDistrictIntel({
+                              districtCode: selectedDistrict.districtCode,
+                              state: selectedDistrict.state,
+                              districtNumber: selectedDistrict.districtNumber,
+                              officeType: selectedDistrict.districtCode.includes('-LD-')
+                                ? 'state_house'
+                                : selectedDistrict.districtCode.includes('-SD-')
+                                  ? 'state_senate'
+                                  : 'federal_house',
+                            })
+                          }
                           disabled={districtIntelLoading}
                         >
                           {districtIntelLoading ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}

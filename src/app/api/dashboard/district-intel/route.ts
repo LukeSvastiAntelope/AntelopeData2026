@@ -43,12 +43,22 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const districtCode = new URL(request.url).searchParams.get('districtCode') || ''
+    const sp = new URL(request.url).searchParams
+    const districtCode = sp.get('districtCode') || ''
+    const fallbackState = sp.get('state')
+    const fallbackDistrictNumber = sp.get('districtNumber')
+    const officeType = sp.get('officeType')
     const organizationId = await resolveOrgId(session.user.id)
-    // GET preserves prior behavior: no client fallback — DB miss → 404
+    // Optional client fallbacks let state-lege / map-click districts resolve
+    // when political_data_districts has no row (no fabricated figures).
     const base = await getOrBuildDistrictIntel({
       organizationId,
       districtCode,
+      fallbackState: fallbackState || null,
+      fallbackDistrictNumber: fallbackDistrictNumber
+        ? Number(fallbackDistrictNumber)
+        : null,
+      officeType: officeType || null,
     })
     if ('error' in base) {
       return NextResponse.json({ status: false, message: base.error }, { status: base.status })
@@ -77,11 +87,14 @@ export async function POST(request: NextRequest) {
     const clientState = String(body?.state || '').trim().toUpperCase()
     const clientDistrictNumber = Number(body?.districtNumber || 0)
 
+    const officeType =
+      body?.officeType != null ? String(body.officeType) : null
     const built = await getOrBuildDistrictIntel({
       organizationId,
       districtCode,
       fallbackState: clientState || null,
       fallbackDistrictNumber: clientDistrictNumber || null,
+      officeType,
       forceRefresh: Boolean(body?.forceRefresh),
     })
     if ('error' in built) {

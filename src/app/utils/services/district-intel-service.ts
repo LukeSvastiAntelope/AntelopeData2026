@@ -50,6 +50,71 @@ export function ordinal(n: number): string {
   return `${n}${s[(v - 20) % 10] || s[v] || s[0]}`;
 }
 
+export type CampaignOfficeType =
+  | 'federal_house'
+  | 'federal_senate'
+  | 'state_house'
+  | 'state_senate'
+  | 'governor'
+  | 'city_council'
+  | 'county'
+  | string;
+
+/**
+ * Parse campaign district codes:
+ *   NJ-5 / NJ05     → federal house
+ *   NJ-LD-12        → state house (lower)
+ *   NJ-SD-5         → state senate (upper)
+ */
+export function parseCampaignDistrict(raw: string): {
+  state: string;
+  districtNumber: number;
+  label: string;
+  officeType: 'federal_house' | 'state_house' | 'state_senate';
+} | null {
+  const s = String(raw || '')
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, '');
+  const lege = s.match(/^([A-Z]{2})-?(LD|SD)-?(\d{1,3})$/);
+  if (lege && STATE_FIPS_MAP[lege[1]]) {
+    const districtNumber = parseInt(lege[3], 10);
+    if (!Number.isFinite(districtNumber) || districtNumber < 0) return null;
+    const officeType =
+      lege[2] === 'SD' ? ('state_senate' as const) : ('state_house' as const);
+    const prefix = lege[2];
+    return {
+      state: lege[1],
+      districtNumber,
+      label: `${lege[1]}-${prefix}-${districtNumber}`,
+      officeType,
+    };
+  }
+  const house = s.match(/^([A-Z]{2})-?(\d{1,2})$/);
+  if (house && STATE_FIPS_MAP[house[1]]) {
+    const districtNumber = parseInt(house[2], 10);
+    if (!Number.isFinite(districtNumber) || districtNumber < 0 || districtNumber > 53)
+      return null;
+    return {
+      state: house[1],
+      districtNumber,
+      label: `${house[1]}-${districtNumber}`,
+      officeType: 'federal_house',
+    };
+  }
+  return null;
+}
+
+export function isCongressionalOffice(
+  officeType: string | null | undefined
+): boolean {
+  return (
+    !officeType ||
+    officeType === 'federal_house' ||
+    officeType === 'federal_senate'
+  );
+}
+
 export async function safeJson(url: string, init?: RequestInit) {
   try {
     const res = await fetch(url, init);
@@ -60,12 +125,35 @@ export async function safeJson(url: string, init?: RequestInit) {
   }
 }
 
+export type OpenStatesLegislator = {
+  name: string;
+  party: string | null;
+  chamber: string | null;
+  district: string | null;
+  role: string | null;
+};
+
+export type OpenStatesBill = {
+  identifier: string;
+  title: string;
+  latestAction: string | null;
+  updatedAt: string | null;
+};
+
+export type FecZipBucket = {
+  zip: string;
+  count: number;
+  amount: number;
+};
+
 export type ExternalDistrictData = {
   censusStatus: SourceStatus;
   cbpStatus: SourceStatus;
   blsStatus: SourceStatus;
   fecStatus: SourceStatus;
   fecTotalsStatus: SourceStatus;
+  /** Congressional-tier only — Schedule A itemized ZIP geography */
+  fecItemizedStatus: SourceStatus;
   openStatesStatus: SourceStatus;
   ballotpediaStatus: SourceStatus;
   mitElectionLabStatus: SourceStatus;
@@ -74,7 +162,13 @@ export type ExternalDistrictData = {
   blsLatest: { period: string; year: string; value: string } | null;
   fecPreview: unknown[] | null;
   fecTotals: Record<string, unknown> | null;
+  fecItemizedByZip: FecZipBucket[] | null;
   openStatesPreview: unknown[] | null;
+  /** D3 — state-lege representation + recent bill activity (bounded) */
+  openStatesDepth: {
+    legislators: OpenStatesLegislator[];
+    recentBills: OpenStatesBill[];
+  } | null;
 };
 
 export type DistrictIntelPayload = {
@@ -110,6 +204,7 @@ export type SourcesHealth = {
   bls: SourceStatus;
   fecCandidates: SourceStatus;
   fecTotals: SourceStatus;
+  fecItemized: SourceStatus;
   openStates: SourceStatus;
   ballotpedia: SourceStatus;
   mitElectionLab: SourceStatus;
@@ -124,70 +219,258 @@ export function sourcesHealthFromExternal(
     bls: external.blsStatus,
     fecCandidates: external.fecStatus,
     fecTotals: external.fecTotalsStatus,
+    fecItemized: external.fecItemizedStatus,
     openStates: external.openStatesStatus,
     ballotpedia: external.ballotpediaStatus,
     mitElectionLab: external.mitElectionLabStatus,
   };
 }
 
+function emptyExternal(): ExternalDistrictData {
+  return {
+    censusStatus: 'unavailable',
+    cbpStatus: 'unavailable',
+    blsStatus: 'unavailable',
+    fecStatus: 'unavailable',
+    fecTotalsStatus: 'unavailable',
+    fecItemizedStatus: 'unavailable',
+    openStatesStatus: 'unavailable',
+    ballotpediaStatus: 'unavailable',
+    mitElectionLabStatus: 'unavailable',
+    censusPreview: null,
+    cbpPreview: null,
+    blsLatest: null,
+    fecPreview: null,
+    fecTotals: null,
+    fecItemizedByZip: null,
+    openStatesPreview: null,
+    openStatesDepth: null,
+  };
+}
+
+function parseOpenStatesDepth(
+  peopleRaw: any,
+  billsRaw: any,
+  districtHint?: number | null
+): {
+  legislators: OpenStatesLegislator[];
+  recentBills: OpenStatesBill[];
+} {
+  const people = Array.isArray(peopleRaw?.results) ? peopleRaw.results : [];
+  const legislators: OpenStatesLegislator[] = [];
+  for (const p of people.slice(0, 40)) {
+    const roles = Array.isArray(p.roles) ? p.roles : [];
+    const current =
+      roles.find((r: any) => r?.type === 'member' || r?.org_classification) ||
+      roles[0];
+    const chamber =
+      current?.org_classification ||
+      current?.chamber ||
+      (String(current?.title || '').toLowerCase().includes('senate')
+        ? 'upper'
+        : String(current?.title || '').toLowerCase().includes('assembly') ||
+            String(current?.title || '').toLowerCase().includes('house')
+          ? 'lower'
+          : null);
+    const district =
+      current?.district != null ? String(current.district) : null;
+    if (
+      districtHint != null &&
+      district != null &&
+      String(districtHint) !== String(parseInt(district, 10)) &&
+      String(districtHint) !== district
+    ) {
+      // Prefer matching district when hint provided; still keep a few statewide
+      // if none match — collected in second pass below
+      continue;
+    }
+    legislators.push({
+      name: String(p.name || 'Unknown'),
+      party: p.party != null ? String(p.party) : null,
+      chamber: chamber != null ? String(chamber) : null,
+      district,
+      role: current?.title != null ? String(current.title) : null,
+    });
+    if (legislators.length >= 8) break;
+  }
+  // If district filter emptied the list, fall back to first 6 statewide
+  if (!legislators.length && people.length) {
+    for (const p of people.slice(0, 6)) {
+      const roles = Array.isArray(p.roles) ? p.roles : [];
+      const current = roles[0];
+      legislators.push({
+        name: String(p.name || 'Unknown'),
+        party: p.party != null ? String(p.party) : null,
+        chamber:
+          current?.org_classification != null
+            ? String(current.org_classification)
+            : null,
+        district:
+          current?.district != null ? String(current.district) : null,
+        role: current?.title != null ? String(current.title) : null,
+      });
+    }
+  }
+
+  const bills = Array.isArray(billsRaw?.results) ? billsRaw.results : [];
+  const recentBills: OpenStatesBill[] = bills.slice(0, 5).map((b: any) => {
+    const actions = Array.isArray(b.actions) ? b.actions : [];
+    const latest = actions[actions.length - 1] || actions[0];
+    return {
+      identifier: String(b.identifier || b.id || '—'),
+      title: String(b.title || '').slice(0, 200),
+      latestAction: latest?.description
+        ? String(latest.description).slice(0, 160)
+        : latest?.classification
+          ? String(
+              Array.isArray(latest.classification)
+                ? latest.classification[0]
+                : latest.classification
+            )
+          : null,
+      updatedAt: b.updated_at ? String(b.updated_at) : null,
+    };
+  });
+
+  return { legislators, recentBills };
+}
+
+async function fetchFecItemizedByZip(
+  committeeId: string,
+  fecKey: string
+): Promise<{ status: SourceStatus; byZip: FecZipBucket[] }> {
+  // Congressional-tier only — Schedule A individual contributions, capped.
+  const url =
+    `https://api.open.fec.gov/v1/schedules/schedule_a/` +
+    `?api_key=${encodeURIComponent(fecKey)}` +
+    `&committee_id=${encodeURIComponent(committeeId)}` +
+    `&is_individual=true&per_page=50&sort=-contribution_receipt_amount`;
+  const raw = await safeJson(url);
+  if (!raw?.results) return { status: 'unavailable', byZip: [] };
+  const buckets = new Map<string, { count: number; amount: number }>();
+  for (const row of raw.results) {
+    const zip = String(row.contributor_zip || '')
+      .replace(/\D/g, '')
+      .slice(0, 5);
+    if (zip.length < 5) continue;
+    const amt = Number(row.contribution_receipt_amount) || 0;
+    const prev = buckets.get(zip) || { count: 0, amount: 0 };
+    buckets.set(zip, { count: prev.count + 1, amount: prev.amount + amt });
+  }
+  const byZip = [...buckets.entries()]
+    .map(([zip, v]) => ({ zip, count: v.count, amount: Math.round(v.amount) }))
+    .sort((a, b) => b.amount - a.amount)
+    .slice(0, 10);
+  return {
+    status: byZip.length ? 'ok' : 'partial',
+    byZip,
+  };
+}
+
 /**
  * Live external-API fetching — identical whether or not the district exists
  * in political_data_districts. Degrades gracefully; never fabricates.
+ *
+ * @param opts.officeType — when state_house/state_senate, still pull OpenStates
+ *   depth; FEC itemized only for congressional (federal_house / default).
+ * @param opts.includeFecItemized — default true for congressional-tier only.
  */
 export async function fetchExternalDistrictData(
   stateAbbrev: string,
-  districtNumber: number
+  districtNumber: number,
+  opts?: {
+    officeType?: string | null;
+    includeFecItemized?: boolean;
+  }
 ): Promise<ExternalDistrictData> {
   const stateFips = STATE_FIPS_MAP[stateAbbrev];
   const districtPadded = districtNumber
     ? String(districtNumber).padStart(2, '0')
     : '';
+  const officeType = opts?.officeType || 'federal_house';
+  const isCongressional =
+    !officeType ||
+    officeType === 'federal_house' ||
+    officeType === 'federal_senate';
+  const wantItemized =
+    opts?.includeFecItemized !== false && officeType === 'federal_house';
 
   const censusKey = process.env.CENSUS_API_KEY;
   const censusKeyParam = censusKey
     ? `&key=${encodeURIComponent(censusKey)}`
     : '';
 
-  const censusUrl =
-    stateFips && districtPadded
-      ? `https://api.census.gov/data/2022/acs/acs5/profile?get=NAME,DP05_0001E,DP03_0062E,DP03_0009PE,DP02_0067PE&for=congressional%20district:${districtPadded}&in=state:${stateFips}${censusKeyParam}`
-      : '';
-  const censusRaw = censusUrl ? await safeJson(censusUrl) : null;
-  const censusStatus: SourceStatus = censusRaw ? 'ok' : 'partial';
-
-  const cbpUrl =
-    censusKey && stateFips && districtPadded
+  // Census ACS/CBP are congressional-district geography — skip for state-lege
+  // rather than fabricating district-level figures from CD APIs.
+  let censusStatus: SourceStatus = 'unavailable';
+  let censusRaw: any = null;
+  let cbpStatus: SourceStatus = 'unavailable';
+  let cbpRaw: any = null;
+  if (isCongressional && stateFips && districtPadded) {
+    const censusUrl = `https://api.census.gov/data/2022/acs/acs5/profile?get=NAME,DP05_0001E,DP03_0062E,DP03_0009PE,DP02_0067PE&for=congressional%20district:${districtPadded}&in=state:${stateFips}${censusKeyParam}`;
+    censusRaw = await safeJson(censusUrl);
+    censusStatus = censusRaw ? 'ok' : 'partial';
+    const cbpUrl = censusKey
       ? `https://api.census.gov/data/2022/cbp?get=NAME,ESTAB,EMP,PAYANN&for=congressional%20district:${districtPadded}&in=state:${stateFips}${censusKeyParam}`
       : '';
-  const cbpRaw = cbpUrl ? await safeJson(cbpUrl) : null;
-  const cbpStatus: SourceStatus = !censusKey
-    ? 'unavailable'
-    : cbpRaw
-      ? 'ok'
-      : 'partial';
+    cbpRaw = cbpUrl ? await safeJson(cbpUrl) : null;
+    cbpStatus = !censusKey ? 'unavailable' : cbpRaw ? 'ok' : 'partial';
+  }
 
   const fecKey = (process.env.FEC_API_KEY || 'DEMO_KEY').trim();
-  const fecUrl = `https://api.open.fec.gov/v1/candidates/search/?api_key=${encodeURIComponent(fecKey)}&office=H&state=${stateAbbrev}&district=${districtNumber}&per_page=5&sort=-election_years`;
-  const fecRaw = await safeJson(fecUrl);
-  const fecStatus: SourceStatus = fecRaw ? 'ok' : 'unavailable';
-
+  let fecStatus: SourceStatus = 'unavailable';
+  let fecRaw: any = null;
   let fecTotals: Record<string, unknown> | null = null;
   let fecTotalsStatus: SourceStatus = 'unavailable';
-  const topCommitteeId =
-    fecRaw?.results?.[0]?.principal_committees?.[0]?.committee_id;
-  if (topCommitteeId) {
-    const totalsUrl = `https://api.open.fec.gov/v1/committee/${topCommitteeId}/totals/?api_key=${encodeURIComponent(fecKey)}&per_page=1&sort=-cycle`;
-    const totalsRaw = await safeJson(totalsUrl);
-    fecTotals = totalsRaw?.results?.[0] || null;
-    fecTotalsStatus = fecTotals ? 'ok' : 'unavailable';
+  let fecItemizedStatus: SourceStatus = 'unavailable';
+  let fecItemizedByZip: FecZipBucket[] | null = null;
+
+  if (isCongressional) {
+    const fecUrl = `https://api.open.fec.gov/v1/candidates/search/?api_key=${encodeURIComponent(fecKey)}&office=H&state=${stateAbbrev}&district=${districtNumber}&per_page=5&sort=-election_years`;
+    fecRaw = await safeJson(fecUrl);
+    fecStatus = fecRaw ? 'ok' : 'unavailable';
+    const topCommitteeId =
+      fecRaw?.results?.[0]?.principal_committees?.[0]?.committee_id;
+    if (topCommitteeId) {
+      const totalsUrl = `https://api.open.fec.gov/v1/committee/${topCommitteeId}/totals/?api_key=${encodeURIComponent(fecKey)}&per_page=1&sort=-cycle`;
+      const totalsRaw = await safeJson(totalsUrl);
+      fecTotals = totalsRaw?.results?.[0] || null;
+      fecTotalsStatus = fecTotals ? 'ok' : 'unavailable';
+      if (wantItemized) {
+        const itemized = await fetchFecItemizedByZip(topCommitteeId, fecKey);
+        fecItemizedStatus = itemized.status;
+        fecItemizedByZip = itemized.byZip.length ? itemized.byZip : null;
+      }
+    }
   }
 
   const openStatesKey = process.env.OPENSTATES_API_KEY;
-  const openStatesUrl = openStatesKey
-    ? `https://v3.openstates.org/people?jurisdiction=${stateAbbrev}&include=roles&apikey=${encodeURIComponent(openStatesKey)}`
-    : '';
-  const openStatesRaw = openStatesUrl ? await safeJson(openStatesUrl) : null;
-  const openStatesStatus: SourceStatus = openStatesRaw ? 'ok' : 'unavailable';
+  let openStatesStatus: SourceStatus = 'unavailable';
+  let openStatesRaw: any = null;
+  let billsRaw: any = null;
+  if (openStatesKey) {
+    const peopleUrl = `https://v3.openstates.org/people?jurisdiction=${encodeURIComponent(stateAbbrev)}&include=roles&per_page=20&apikey=${encodeURIComponent(openStatesKey)}`;
+    openStatesRaw = await safeJson(peopleUrl);
+    const billsUrl = `https://v3.openstates.org/bills?jurisdiction=${encodeURIComponent(stateAbbrev)}&sort=updated_desc&per_page=5&apikey=${encodeURIComponent(openStatesKey)}`;
+    billsRaw = await safeJson(billsUrl);
+    openStatesStatus =
+      openStatesRaw || billsRaw
+        ? openStatesRaw && billsRaw
+          ? 'ok'
+          : 'partial'
+        : 'unavailable';
+  }
+
+  const openStatesDepth =
+    openStatesStatus !== 'unavailable'
+      ? parseOpenStatesDepth(
+          openStatesRaw,
+          billsRaw,
+          officeType === 'state_house' || officeType === 'state_senate'
+            ? districtNumber
+            : null
+        )
+      : null;
 
   const blsKey = process.env.BLS_API_KEY;
   let blsLatest: { period: string; year: string; value: string } | null = null;
@@ -231,6 +514,7 @@ export async function fetchExternalDistrictData(
     blsStatus,
     fecStatus,
     fecTotalsStatus,
+    fecItemizedStatus,
     openStatesStatus,
     ballotpediaStatus: 'unavailable',
     mitElectionLabStatus: 'unavailable',
@@ -239,7 +523,9 @@ export async function fetchExternalDistrictData(
     blsLatest,
     fecPreview: fecRaw?.results?.slice?.(0, 3) || null,
     fecTotals,
+    fecItemizedByZip,
     openStatesPreview: openStatesRaw?.results?.slice?.(0, 3) || null,
+    openStatesDepth,
   };
 }
 
@@ -274,6 +560,7 @@ export async function buildDistrictIntelBase(input: {
   districtCode: string;
   fallbackState?: string | null;
   fallbackDistrictNumber?: number | null;
+  officeType?: string | null;
 }): Promise<
   | DistrictIntelPayload
   | { error: string; status: 400 | 404 }
@@ -284,6 +571,10 @@ export async function buildDistrictIntelBase(input: {
   if (!districtCode) {
     return { error: 'districtCode is required', status: 400 };
   }
+
+  const parsed = parseCampaignDistrict(districtCode);
+  const officeType =
+    input.officeType || parsed?.officeType || 'federal_house';
 
   const db = await getConnection();
   const [rows] = await db.execute<RowDataPacket[]>(
@@ -297,16 +588,19 @@ export async function buildDistrictIntelBase(input: {
   const local = rows?.[0] || null;
 
   if (!local) {
-    const clientState = String(input.fallbackState || '')
+    const clientState = String(input.fallbackState || parsed?.state || '')
       .trim()
       .toUpperCase();
-    const clientDistrictNumber = Number(input.fallbackDistrictNumber || 0);
+    const clientDistrictNumber = Number(
+      input.fallbackDistrictNumber ?? parsed?.districtNumber ?? 0
+    );
     if (!clientState) {
       return { error: 'District not found', status: 404 };
     }
     const external = await fetchExternalDistrictData(
       clientState,
-      clientDistrictNumber
+      clientDistrictNumber,
+      { officeType }
     );
     return {
       status: true,
@@ -337,7 +631,9 @@ export async function buildDistrictIntelBase(input: {
 
   const stateAbbrev = String(local.state || '').toUpperCase();
   const districtNumber = Number(local.district_number || 0);
-  const external = await fetchExternalDistrictData(stateAbbrev, districtNumber);
+  const external = await fetchExternalDistrictData(stateAbbrev, districtNumber, {
+    officeType,
+  });
 
   return {
     status: true,
@@ -442,6 +738,27 @@ export function buildVerifiedFacts(
       } for cycle ${t.cycle} (OpenFEC committee totals)`
     );
   }
+  if (base.external.fecItemizedByZip?.length) {
+    const top = base.external.fecItemizedByZip[0];
+    verifiedFacts.push(
+      `Top donor ZIP ${top.zip}: $${top.amount.toLocaleString()} across ${top.count} itemized individual contribution(s) (OpenFEC Schedule A sample)`
+    );
+  }
+  const depth = base.external.openStatesDepth;
+  if (depth?.legislators?.length) {
+    const names = depth.legislators
+      .slice(0, 3)
+      .map((l) => `${l.name}${l.district ? ` (dist. ${l.district})` : ''}`)
+      .join('; ');
+    verifiedFacts.push(
+      `State legislators (sample): ${names} (OpenStates)`
+    );
+  }
+  if (depth?.recentBills?.length) {
+    verifiedFacts.push(
+      `Recent state bill activity: ${depth.recentBills[0].identifier} — ${depth.recentBills[0].title.slice(0, 80)} (OpenStates)`
+    );
+  }
   return verifiedFacts;
 }
 
@@ -538,6 +855,7 @@ export async function getOrBuildDistrictIntel(input: {
   districtCode: string;
   fallbackState?: string | null;
   fallbackDistrictNumber?: number | null;
+  officeType?: string | null;
   forceRefresh?: boolean;
   ttlMs?: number;
 }): Promise<
@@ -576,6 +894,7 @@ export async function getOrBuildDistrictIntel(input: {
     districtCode: districtKey,
     fallbackState: input.fallbackState,
     fallbackDistrictNumber: input.fallbackDistrictNumber,
+    officeType: input.officeType,
   });
   if ('error' in built) return built;
 
@@ -614,10 +933,15 @@ export type OnboardingReportView = {
     individualContributions: number | null;
     cycle: number | null;
     sampleCandidates: { name: string; party: string }[];
+    /** Congressional-tier Schedule A ZIP geography (optional depth) */
+    donorZips: FecZipBucket[] | null;
   };
   localOfficials: {
     status: SourceStatus;
     sample: { name: string; role: string }[];
+    /** D3 OpenStates depth */
+    legislators: OpenStatesLegislator[];
+    recentBills: OpenStatesBill[];
   };
   verifiedFacts: string[];
   sourcesHealth: SourcesHealth;
@@ -704,22 +1028,7 @@ async function markSnapshotPending(input: {
         medianAge: null,
       },
     },
-    external: {
-      censusStatus: 'unavailable',
-      cbpStatus: 'unavailable',
-      blsStatus: 'unavailable',
-      fecStatus: 'unavailable',
-      fecTotalsStatus: 'unavailable',
-      openStatesStatus: 'unavailable',
-      ballotpediaStatus: 'unavailable',
-      mitElectionLabStatus: 'unavailable',
-      censusPreview: null,
-      cbpPreview: null,
-      blsLatest: null,
-      fecPreview: null,
-      fecTotals: null,
-      openStatesPreview: null,
-    },
+    external: emptyExternal(),
     intelligence: {
       narrative: 'Gathering district data…',
       recommendedNextSteps: [],
@@ -769,14 +1078,21 @@ export function scheduleDistrictIntelGeneration(input: {
   districtCode: string;
   state?: string | null;
   districtNumber?: number | null;
+  officeType?: string | null;
 }): { started: boolean; districtKey: string } {
-  const districtKey = String(input.districtCode || '')
+  const parsed = parseCampaignDistrict(input.districtCode);
+  const districtKey = String(parsed?.label || input.districtCode || '')
     .trim()
     .toUpperCase()
     .slice(0, 32);
   if (!input.organizationId || !districtKey) {
     return { started: false, districtKey };
   }
+  const officeType =
+    input.officeType || parsed?.officeType || 'federal_house';
+  const state = input.state || parsed?.state || null;
+  const districtNumber =
+    input.districtNumber ?? parsed?.districtNumber ?? null;
 
   void (async () => {
     try {
@@ -796,8 +1112,9 @@ export function scheduleDistrictIntelGeneration(input: {
       const result = await getOrBuildDistrictIntel({
         organizationId: input.organizationId,
         districtCode: districtKey,
-        fallbackState: input.state,
-        fallbackDistrictNumber: input.districtNumber,
+        fallbackState: state,
+        fallbackDistrictNumber: districtNumber,
+        officeType,
         forceRefresh: true,
       });
       if ('error' in result) {
@@ -848,23 +1165,31 @@ export function toOnboardingReportView(
       party: String(c?.party_full || c?.party || '—'),
     }));
 
-  const sampleOfficials = (
-    Array.isArray(payload.external.openStatesPreview)
-      ? payload.external.openStatesPreview
-      : []
-  )
-    .slice(0, 4)
-    .map((p: any) => {
-      const role =
-        p?.current_role?.title ||
-        p?.roles?.[0]?.title ||
-        p?.roles?.[0]?.type ||
-        'Legislator';
-      return {
-        name: String(p?.name || 'Unknown'),
-        role: String(role),
-      };
-    });
+  const sampleOfficials =
+    payload.external.openStatesDepth?.legislators?.length
+      ? payload.external.openStatesDepth.legislators.slice(0, 6).map((l) => ({
+          name: l.name,
+          role: [l.role, l.chamber, l.district ? `dist. ${l.district}` : null]
+            .filter(Boolean)
+            .join(' · ') || 'Legislator',
+        }))
+      : (
+          Array.isArray(payload.external.openStatesPreview)
+            ? payload.external.openStatesPreview
+            : []
+        )
+          .slice(0, 4)
+          .map((p: any) => {
+            const role =
+              p?.current_role?.title ||
+              p?.roles?.[0]?.title ||
+              p?.roles?.[0]?.type ||
+              'Legislator';
+            return {
+              name: String(p?.name || 'Unknown'),
+              role: String(role),
+            };
+          });
 
   const districtLabel = payload.district.districtNumber
     ? `${stateName}'s ${ordinal(payload.district.districtNumber)} District`
@@ -890,10 +1215,13 @@ export function toOnboardingReportView(
           : null,
       cycle: totals?.cycle != null ? Number(totals.cycle) : null,
       sampleCandidates,
+      donorZips: payload.external.fecItemizedByZip,
     },
     localOfficials: {
       status: payload.external.openStatesStatus,
       sample: sampleOfficials,
+      legislators: payload.external.openStatesDepth?.legislators || [],
+      recentBills: payload.external.openStatesDepth?.recentBills || [],
     },
     verifiedFacts,
     sourcesHealth,

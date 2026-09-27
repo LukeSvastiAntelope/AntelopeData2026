@@ -288,6 +288,8 @@ export default function DashboardMap({
   const [statePoliticalData, setStatePoliticalData] = useState<PoliticalFeature[]>([])
   const [districtPoliticalData, setDistrictPoliticalData] = useState<DistrictFeature[]>([])
   const districtDataFetchedForKey = useRef<string | null>(null)
+  /** Tracks whether us-districts source currently holds TIGER state-lege data */
+  const districtGeometryMode = useRef<'cd' | 'sldl' | 'sldu' | null>(null)
   const [campaignNewsScopes, setCampaignNewsScopes] = useState<{ states: string[]; districts: string[] }>({ states: [], districts: [] })
   const [campaignNewsSummary, setCampaignNewsSummary] = useState<{
     unreadCount: number
@@ -1196,6 +1198,60 @@ export default function DashboardMap({
       .catch(e => console.error('Failed to fetch district political data:', e))
   }, [showDistrictsLayer, geoData?.orgCenter?.state])
 
+  // -----------------------------------------------------------------------
+  // Data D3 — load TIGER state-legislative boundaries for state_house / state_senate
+  // Swap us-districts GeoJSON so existing fill/hover/click handlers reuse.
+  // -----------------------------------------------------------------------
+  useEffect(() => {
+    if (status !== 'ready' || !mapRef.current) return
+    const map = mapRef.current
+    const officeType = geoData?.orgCenter?.officeType || null
+    const orgState = geoData?.orgCenter?.state?.trim().toUpperCase() || ''
+    const wantSld =
+      (officeType === 'state_house' || officeType === 'state_senate') &&
+      Boolean(orgState)
+
+    const source = map.getSource('us-districts') as
+      | { setData: (data: string | object) => void }
+      | undefined
+    if (!source?.setData) return
+
+    if (!wantSld) {
+      if (districtGeometryMode.current && districtGeometryMode.current !== 'cd') {
+        source.setData('/data/cd-119.geojson')
+        districtGeometryMode.current = 'cd'
+      }
+      return
+    }
+
+    const layer = officeType === 'state_senate' ? 'sldu' : 'sldl'
+    if (districtGeometryMode.current === layer) return
+
+    let cancelled = false
+    fetch(
+      `/api/dashboard/geo/boundaries?state=${encodeURIComponent(orgState)}&layer=${layer}`
+    )
+      .then((r) => r.json())
+      .then((d) => {
+        if (cancelled || !d?.status || !d?.geojson) return
+        try {
+          source.setData(d.geojson)
+          districtGeometryMode.current = layer
+        } catch (err) {
+          console.error('Failed to apply TIGER boundaries:', err)
+        }
+      })
+      .catch((e) => console.error('Failed to fetch TIGER boundaries:', e))
+
+    return () => {
+      cancelled = true
+    }
+  }, [
+    status,
+    geoData?.orgCenter?.officeType,
+    geoData?.orgCenter?.state,
+  ])
+
   // Color district fills by PVI
   useEffect(() => {
     if (status !== 'ready' || !mapRef.current || !districtPoliticalData.length) return
@@ -1250,13 +1306,16 @@ export default function DashboardMap({
 
   useEffect(() => {
     if (status !== 'ready' || !mapRef.current) return
-    const vis = showDistrictsLayer ? 'visible' : 'none'
+    const officeType = geoData?.orgCenter?.officeType
+    const forceStateLege =
+      officeType === 'state_house' || officeType === 'state_senate'
+    const vis = showDistrictsLayer || forceStateLege ? 'visible' : 'none'
     try {
       mapRef.current.setLayoutProperty('district-fills', 'visibility', vis)
       mapRef.current.setLayoutProperty('district-borders', 'visibility', vis)
       mapRef.current.setLayoutProperty('district-hover', 'visibility', vis)
     } catch {}
-  }, [showDistrictsLayer, status])
+  }, [showDistrictsLayer, status, geoData?.orgCenter?.officeType])
 
   // -----------------------------------------------------------------------
   // Custom overlay (uploaded data): color / saturation / heatmap by state or district
@@ -1543,10 +1602,17 @@ export default function DashboardMap({
     const { officeType, districtCode, state: orgState } = geoData.orgCenter
 
     // Highlight the org's district if it's a district-level race
+    // For state-lege, district_code on TIGER features is NJ-LD-N / NJ-SD-N
     if (districtCode && ['federal_house', 'state_senate', 'state_house', 'city_council', 'county'].includes(officeType || '')) {
+      const forceStateLege =
+        officeType === 'state_house' || officeType === 'state_senate'
       try {
         map.setFilter('my-district-border', ['==', ['get', 'district_code'], districtCode])
-        map.setLayoutProperty('my-district-border', 'visibility', showDistrictsLayer ? 'visible' : 'none')
+        map.setLayoutProperty(
+          'my-district-border',
+          'visibility',
+          showDistrictsLayer || forceStateLege ? 'visible' : 'none'
+        )
       } catch {}
     }
 

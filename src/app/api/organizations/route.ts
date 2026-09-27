@@ -95,14 +95,17 @@ export async function POST(request: NextRequest) {
 
     // Data D2 — kick District Intelligence Report async when district is known
     let districtReportStarted = false;
-    if (district_code || (state && office_type === 'federal_house')) {
+    const kickableOffice =
+      !office_type ||
+      ['federal_house', 'state_house', 'state_senate'].includes(
+        String(office_type)
+      );
+    if (district_code || (state && kickableOffice)) {
       try {
-        const { parseUsHouseDistrict } = await import('@/lib/district-brief-public');
-        const { scheduleDistrictIntelGeneration } = await import(
-          '@/app/utils/services/district-intel-service'
-        );
+        const { parseCampaignDistrict, scheduleDistrictIntelGeneration } =
+          await import('@/app/utils/services/district-intel-service');
         const raw = String(district_code || '').trim();
-        const parsed = raw ? parseUsHouseDistrict(raw) : null;
+        const parsed = raw ? parseCampaignDistrict(raw) : null;
         const code =
           parsed?.label ||
           (state && raw ? String(raw).toUpperCase() : null);
@@ -112,6 +115,7 @@ export async function POST(request: NextRequest) {
             districtCode: code,
             state: parsed?.state || state || null,
             districtNumber: parsed?.districtNumber ?? null,
+            officeType: office_type || parsed?.officeType || null,
           });
           districtReportStarted = kick.started;
         }
