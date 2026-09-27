@@ -64,6 +64,8 @@ const publicRoutes = [
     '/api/contact', // Public contact form (works logged out; has its own rate limiting)
     '/api/volunteer', // Sites S5 — thin public volunteer capture (tenant via siteSlug)
     '/api/donate', // Sites S5 — fundraising intent capture (tenant via siteSlug)
+    // Volunteer V1 — passwordless portal auth (magic-link verify is client-side NextAuth)
+    '/api/portal/session',
     // Automation for Garry's List — the whole flow is explicitly "no log in required".
     '/api/garrys-list/parse',
     '/api/garrys-list/generate',
@@ -171,9 +173,21 @@ export default auth(async (req) => {
     const isPublicWalkRoute = path === '/walk' || path.startsWith('/walk/');
     // Live audience join — code in path; no session
     const isPublicLiveRoute = path === '/live' || path.startsWith('/live/');
+    // Volunteer portal auth pages (magic-link verify / join) — no session yet
+    const isPortalAuthRoute =
+        path === '/portal/auth' ||
+        path.startsWith('/portal/auth/') ||
+        path === '/portal/join';
 
     // Allow public routes
-    if (isPublicApiRoute || isGetPredictionApiRoute || isPublicSiteRoute || isPublicWalkRoute || isPublicLiveRoute) {
+    if (
+        isPublicApiRoute ||
+        isGetPredictionApiRoute ||
+        isPublicSiteRoute ||
+        isPublicWalkRoute ||
+        isPublicLiveRoute ||
+        isPortalAuthRoute
+    ) {
         return NextResponse.next();
     }
 
@@ -189,6 +203,10 @@ export default auth(async (req) => {
         if (referer && referer.includes('/logout')) {
             // Allow access to login if coming from logout
             return NextResponse.next();
+        }
+        const orgRole = (session.user as any)?.orgRole as string | null;
+        if (orgRole === 'volunteer' || orgRole === 'captain') {
+            return NextResponse.redirect(new URL('/portal', req.url));
         }
         return NextResponse.redirect(new URL('/surveys', req.url));
     }
@@ -217,14 +235,42 @@ export default auth(async (req) => {
         });
         requestHeaders.set('x-user-id', session.user?.id || '');
         requestHeaders.set('x-user-email', session.user?.email || '');
-        // Note: User role is stored in the database, not in the session
-        // For now, we'll let the API endpoints fetch the role from the database if needed
+        // Volunteer V1 — role + org on headers for API routes (also in JWT)
+        const orgRole = (session.user as any)?.orgRole;
+        const organizationId = (session.user as any)?.organizationId;
+        const personRecordId = (session.user as any)?.personRecordId;
+        if (orgRole) requestHeaders.set('x-org-role', String(orgRole));
+        if (organizationId != null) {
+            requestHeaders.set('x-organization-id', String(organizationId));
+        }
+        if (personRecordId != null) {
+            requestHeaders.set('x-person-record-id', String(personRecordId));
+        }
         
         return NextResponse.next({
             request: {
                 headers: requestHeaders,
             },
         });
+    }
+
+    const orgRole = (session?.user as any)?.orgRole as string | null | undefined;
+    const isPortalUser = orgRole === 'volunteer' || orgRole === 'captain';
+    const isStaffUser =
+        orgRole === 'owner' ||
+        orgRole === 'admin' ||
+        orgRole === 'analyst' ||
+        orgRole === 'viewer';
+
+    // Volunteer portal — auth required; staff bounced to the heavyweight app
+    if (path === '/portal' || path.startsWith('/portal/')) {
+        if (!session) {
+            return NextResponse.redirect(new URL('/portal/join', req.url));
+        }
+        if (isStaffUser) {
+            return NextResponse.redirect(new URL('/surveys', req.url));
+        }
+        return NextResponse.next();
     }
 
     // Protect pages that require authentication (prefix match)
@@ -257,6 +303,7 @@ export default auth(async (req) => {
         '/turf',
         '/assignments',
         '/payroll',
+        '/live-sessions',
         // NOTE: '/blog', '/clients', '/about', '/pricing', '/contact' were moved
         // out of the (secure) route group to the public site — they are real
         // marketing pages and must be reachable without a session.
@@ -264,6 +311,10 @@ export default auth(async (req) => {
     if (protectedPages.some(page => path.startsWith(page))) {
         if (!session) {
             return NextResponse.redirect(new URL('/auth/login', req.url));
+        }
+        // Volunteers stay in the lightweight portal — never the staff app
+        if (isPortalUser) {
+            return NextResponse.redirect(new URL('/portal', req.url));
         }
     }
 

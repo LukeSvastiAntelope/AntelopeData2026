@@ -1,12 +1,64 @@
 'use client'
 
 import Link from 'next/link'
+import { useState } from 'react'
 import { SidebarTrigger } from '@/components/ui/sidebar'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { ClipboardList, FileText, Users, Sparkles } from 'lucide-react'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { toast } from '@/components/ui/sonner'
+import {
+  ClipboardList,
+  FileText,
+  Users,
+  Sparkles,
+  Mail,
+  Copy,
+  Loader2,
+} from 'lucide-react'
 
 export default function VolunteerStaffPage() {
+  const [email, setEmail] = useState('')
+  const [displayName, setDisplayName] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [lastJoinPath, setLastJoinPath] = useState<string | null>(null)
+
+  const invite = async () => {
+    if (!email.trim()) {
+      toast.error('Email is required')
+      return
+    }
+    setBusy(true)
+    try {
+      const res = await fetch('/api/dashboard/volunteers/invite', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: email.trim(),
+          displayName: displayName.trim() || null,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data.status) throw new Error(data.message || 'Invite failed')
+      setLastJoinPath(data.joinPath)
+      toast.success('Invite sent (and link ready to copy)')
+      setEmail('')
+      setDisplayName('')
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Invite failed')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const copyLink = () => {
+    if (!lastJoinPath || typeof window === 'undefined') return
+    const url = `${window.location.origin}${lastJoinPath}`
+    void navigator.clipboard?.writeText(url)
+    toast.success('Invite link copied')
+  }
+
   return (
     <div className="flex-1 p-2 w-full bg-background">
       <div className="mx-auto rounded-lg bg-card text-card-foreground shadow-lg">
@@ -23,6 +75,65 @@ export default function VolunteerStaffPage() {
         <div className="border-b border-border" />
 
         <div className="p-6 max-w-4xl space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Mail className="h-4 w-4" />
+                Invite a volunteer (magic link)
+              </CardTitle>
+              <CardDescription>
+                Passwordless portal access. They tap the link on their phone —
+                no heavyweight app, no password. Creates a person record +
+                volunteer membership in this campaign.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor="vol-email">Email</Label>
+                  <Input
+                    id="vol-email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="volunteer@example.com"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="vol-name">Name (optional)</Label>
+                  <Input
+                    id="vol-name"
+                    value={displayName}
+                    onChange={(e) => setDisplayName(e.target.value)}
+                    placeholder="Jordan Lee"
+                  />
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button size="sm" disabled={busy} onClick={() => void invite()}>
+                  {busy ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />
+                  ) : (
+                    <Mail className="h-3.5 w-3.5 mr-1" />
+                  )}
+                  Send invite
+                </Button>
+                {lastJoinPath && (
+                  <Button size="sm" variant="outline" onClick={copyLink}>
+                    <Copy className="h-3.5 w-3.5 mr-1" />
+                    Copy last link
+                  </Button>
+                )}
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                Portal:{' '}
+                <Link href="/portal/join" className="underline">
+                  /portal/join
+                </Link>
+              </p>
+            </CardContent>
+          </Card>
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Card>
               <CardHeader>
@@ -77,11 +188,11 @@ export default function VolunteerStaffPage() {
           </div>
 
           <div className="text-xs text-muted-foreground">
-            Next step: add a dedicated “Volunteer forms” subtype and a streamlined response summary view (rather than relying on generic surveys).
+            Next step: shifts, tasks, friends &amp; family contacts, and tasteful
+            points — each as its own Volunteer phase.
           </div>
         </div>
       </div>
     </div>
   )
 }
-

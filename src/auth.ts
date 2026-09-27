@@ -6,6 +6,10 @@ import { UserRepo } from "@/app/utils/database/user-repo";
 import { validateEmail } from "@/app/utils/validation";
 import bcrypt from "bcryptjs";
 import { openSql } from "@/app/utils/database/db";
+import {
+  VolunteerRepo,
+  isPortalRole,
+} from "@/app/utils/database/volunteer-repo";
 
 const isDev = process.env.NODE_ENV !== "production";
 const logDebug = (...args: unknown[]) => {
@@ -32,9 +36,35 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       name: "credentials",
       credentials: {
         email: { label: "Email", type: "email" },
-        password: { label: "Password", type: "password" }
+        password: { label: "Password", type: "password" },
+        /** Volunteer V1 — one-time magic-link token (passwordless portal). */
+        magicToken: { label: "Magic token", type: "text" },
       },
       async authorize(credentials) {
+        // ── Passwordless volunteer magic link ─────────────────────────
+        const magicToken = (credentials as any)?.magicToken as
+          | string
+          | undefined;
+        if (magicToken && String(magicToken).trim()) {
+          try {
+            const consumed = await VolunteerRepo.consumeMagicLink(
+              String(magicToken).trim()
+            );
+            return {
+              id: consumed.userId.toString(),
+              email: consumed.email,
+              name: consumed.name,
+              image: null,
+              orgRole: consumed.orgRole,
+              organizationId: consumed.organizationId,
+              personRecordId: consumed.personRecordId,
+            } as any;
+          } catch (err) {
+            console.error("[auth] volunteer magic link failed:", err);
+            throw credentialsSignIn("MagicLinkInvalid");
+          }
+        }
+
         logDebug('Authorize called with credentials:', { email: credentials?.email, hasPassword: !!credentials?.password });
 
         if (!credentials?.email || !credentials?.password) {
@@ -106,11 +136,37 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             throw credentialsSignIn("EmailNotVerified");
           }
 
+          // Attach primary org membership for middleware role routing
+          let orgRole: string | null = null;
+          let organizationId: number | null = null;
+          let personRecordId: number | null = null;
+          try {
+            const membership = await VolunteerRepo.getPrimaryMembership(
+              Number(user.id)
+            );
+            if (membership) {
+              orgRole = membership.role;
+              organizationId = membership.organizationId;
+              personRecordId = membership.personRecordId;
+              // Portal-only accounts must not use password staff login as a
+              // backdoor into the heavyweight app — they stay on magic link.
+              if (isPortalRole(membership.role) && !storedPassword) {
+                throw credentialsSignIn("UseMagicLink");
+              }
+            }
+          } catch (e) {
+            if (e instanceof CredentialsSignin) throw e;
+            console.warn('[auth] membership lookup failed:', e);
+          }
+
           return {
             id: user.id.toString(),
             email: user.email,
             name: user.display_name,
-            image: null
+            image: null,
+            orgRole,
+            organizationId,
+            personRecordId,
           } as any;
         } catch (error) {
           if (error instanceof CredentialsSignin) {
@@ -123,4 +179,3 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     })
   ],
 });
-

@@ -403,4 +403,73 @@ export class EmailService {
       // Don't throw; avoid breaking user flow
     }
   }
+
+  /**
+   * Volunteer V1 — passwordless portal invite (mirrors twin magic-link pattern).
+   */
+  static async sendVolunteerMagicLink(
+    toEmail: string,
+    toName: string | undefined,
+    rawToken: string,
+    campaignName?: string | null
+  ): Promise<void> {
+    const portalUrl = `${BASE_URL}/portal/auth/verify?token=${encodeURIComponent(rawToken)}`
+    const campaign = campaignName?.trim() || 'the campaign'
+
+    const htmlContent = `
+      <p>Hi ${toName || 'there'},</p>
+      <p>You're invited to volunteer with <strong>${campaign}</strong> on Antelope.</p>
+      <p>Tap the link on your phone to get in — no password needed:</p>
+      <p><a href="${portalUrl}" target="_blank" rel="noopener noreferrer">Open volunteer portal</a></p>
+      <p>This link expires in a few days. If you did not expect this email, you can ignore it.</p>
+      <p>— ${campaign}</p>
+    `
+
+    const payload = {
+      personalizations: [
+        {
+          to: [{ email: toEmail, name: toName || undefined }],
+          subject: `Your invite to volunteer with ${campaign}`,
+        },
+      ],
+      from: {
+        email: FROM_EMAIL,
+        name: FROM_NAME,
+      },
+      content: [
+        {
+          type: 'text/html',
+          value: htmlContent,
+        },
+      ],
+    }
+
+    try {
+      if (!SENDGRID_API_KEY) {
+        console.warn(
+          '[EmailService] SENDGRID_API_KEY not set – volunteer magic link not sent.',
+          { toEmail, portalUrl }
+        )
+        return
+      }
+
+      const res = await fetch('https://api.sendgrid.com/v3/mail/send', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${SENDGRID_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      })
+
+      if (!res.ok) {
+        const text = await res.text()
+        throw new Error(`SendGrid API responded with ${res.status}: ${text}`)
+      }
+
+      console.log(`[EmailService] Volunteer magic link sent to ${toEmail}`)
+    } catch (error) {
+      console.error('[EmailService] Failed to send volunteer magic link:', error)
+    }
+  }
 } 

@@ -21,6 +21,16 @@ export const authConfig: NextAuthConfig = {
         (token as any).userId = (user as any).id;
         token.email = (user as any).email;
         token.name = (user as any).name;
+        // Volunteer V1 — role routing (staff ↔ portal) needs these on the JWT
+        if ((user as any).orgRole != null) {
+          (token as any).orgRole = (user as any).orgRole;
+        }
+        if ((user as any).organizationId != null) {
+          (token as any).organizationId = (user as any).organizationId;
+        }
+        if ((user as any).personRecordId != null) {
+          (token as any).personRecordId = (user as any).personRecordId;
+        }
       }
       return token;
     },
@@ -29,6 +39,11 @@ export const authConfig: NextAuthConfig = {
         (session.user as any).id = (token as any).userId as string;
         session.user.email = token.email as string;
         session.user.name = token.name as string;
+        (session.user as any).orgRole = (token as any).orgRole ?? null;
+        (session.user as any).organizationId =
+          (token as any).organizationId ?? null;
+        (session.user as any).personRecordId =
+          (token as any).personRecordId ?? null;
       }
       return session;
     },
@@ -38,5 +53,3 @@ export const authConfig: NextAuthConfig = {
     error: '/auth/login',
   },
 };
-
-

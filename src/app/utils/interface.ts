@@ -486,7 +486,13 @@ export interface DemographicsFormConfig {
 // ORGANIZATION / TEAM TYPES
 // =====================================================================
 
-export type OrgRole = 'owner' | 'admin' | 'analyst' | 'viewer';
+export type OrgRole =
+  | 'owner'
+  | 'admin'
+  | 'analyst'
+  | 'viewer'
+  | 'volunteer'
+  | 'captain'; // reserved — no portal view in v1
 export type OrgMemberStatus = 'pending' | 'active' | 'removed';
 
 export interface OrganizationDB {
@@ -503,6 +509,7 @@ export interface OrganizationMemberDB {
     id: number;
     organization_id: number;
     user_id: number;
+    person_record_id?: number | null;
     role: OrgRole;
     invited_by: number | null;
     invited_at: string;
