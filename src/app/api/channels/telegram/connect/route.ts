@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
     await setTelegramWebhook(botToken, webhookUrl, secret);
 
     // Persist for current user
-    await ChannelRepo.upsertUserTelegramIntegration(parseInt(userIdHeader, 10), botToken, { webhookUrl }, secret)
+    await ChannelRepo.upsertUserTelegramIntegration(userId, botToken, { webhookUrl }, secret)
 
     return NextResponse.json({ status: true, bot: me?.result, webhookUrl });
   } catch (error) {

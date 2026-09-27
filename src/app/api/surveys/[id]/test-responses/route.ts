@@ -12,7 +12,6 @@ export async function POST(
     const auth = requireUserId(req);
     if (typeof auth !== 'string') return auth;
     const userId = Number(auth);
-    const userId = parseInt(userIdHeader, 10);
     if (!Number.isFinite(userId)) {
       return NextResponse.json({ status: false, message: "Invalid user" }, { status: 401 });
     }
@@ -66,7 +65,6 @@ export async function DELETE(
     const auth = requireUserId(req);
     if (typeof auth !== 'string') return auth;
     const userId = Number(auth);
-    const userId = parseInt(userIdHeader, 10);
     if (!Number.isFinite(userId)) {
       return NextResponse.json({ status: false, message: "Invalid user" }, { status: 401 });
     }

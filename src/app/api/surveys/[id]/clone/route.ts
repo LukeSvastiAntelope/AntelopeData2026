@@ -10,8 +10,6 @@ export async function POST(
     const auth = requireUserId(req);
     if (typeof auth !== 'string') return auth;
     const userId = Number(auth);
-    const userId = parseInt(userIdHeader);
-
     const { id } = await params;
     const surveyId = parseInt(id);
     if (isNaN(surveyId)) {

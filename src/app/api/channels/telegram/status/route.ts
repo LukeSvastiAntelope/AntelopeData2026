@@ -19,7 +19,6 @@ export async function GET(req: NextRequest) {
     const auth = requireUserId(req);
     if (typeof auth !== 'string') return auth;
     const userId = Number(auth);
-    const userId = parseInt(userIdHeader, 10)
     const integration = await ChannelRepo.getUserTelegramIntegration(userId)
     if (!integration) {
       return NextResponse.json({ status: true, connected: false })

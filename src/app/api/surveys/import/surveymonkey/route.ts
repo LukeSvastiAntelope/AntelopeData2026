@@ -206,8 +206,6 @@ export async function POST(req: NextRequest) {
     const auth = requireUserId(req);
     if (typeof auth !== 'string') return auth;
     const userId = Number(auth);
-    const userId = parseInt(userIdHeader);
-
     const {
       surveyId,
       accessToken,

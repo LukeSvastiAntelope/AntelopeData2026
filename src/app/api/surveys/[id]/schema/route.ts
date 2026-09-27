@@ -137,8 +137,6 @@ export async function GET(
     const auth = requireUserId(request);
     if (typeof auth !== 'string') return auth;
     const userId = Number(auth);
-    const userId = parseInt(userIdHeader);
-
     const resolvedParams = await params;
     const surveyId = parseInt(resolvedParams.id);
     
@@ -434,8 +432,6 @@ export async function POST(
     const auth = requireUserId(request);
     if (typeof auth !== 'string') return auth;
     const userId = Number(auth);
-    const userId = parseInt(userIdHeader);
-
     const resolvedParams = await params;
     const surveyId = parseInt(resolvedParams.id);
     

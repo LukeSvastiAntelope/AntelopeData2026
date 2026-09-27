@@ -205,7 +205,7 @@ export async function POST(req: NextRequest) {
         totalChunks,
         data: normalizedRows,
         fileName: originalFileName,
-        userId: userIdHeader,
+        userId: String(userId),
         timestamp: Date.now()
       });
       console.log(`Chunk ${chunkIndex} stored successfully`);
@@ -220,7 +220,7 @@ export async function POST(req: NextRequest) {
     // If this is the last chunk, combine all chunks and return complete data
     if (isLastChunk) {
       console.log(`Last chunk received, combining all chunks for ${originalFileName}`);
-      const allChunks = await getAllChunks(userIdHeader, originalFileName);
+      const allChunks = await getAllChunks(String(userId), originalFileName);
       console.log(`Found ${allChunks.length} chunks, expected ${totalChunks}`);
       
       if (allChunks.length !== totalChunks) {
@@ -244,7 +244,7 @@ export async function POST(req: NextRequest) {
       console.log(`Combined ${allChunks.length} chunks into ${totalRows} total rows`);
 
       // Clean up temporary files
-      await cleanupChunks(userIdHeader, originalFileName);
+      await cleanupChunks(String(userId), originalFileName);
 
       return NextResponse.json({ 
         status: true, 
@@ -300,7 +300,7 @@ export async function GET(req: NextRequest) {
       }, { status: 400 });
     }
 
-    const chunks = await getAllChunks(userIdHeader, fileName);
+    const chunks = await getAllChunks(String(userId), fileName);
     const totalRows = chunks.reduce((sum, chunk) => sum + chunk.data.length, 0);
 
     return NextResponse.json({ 

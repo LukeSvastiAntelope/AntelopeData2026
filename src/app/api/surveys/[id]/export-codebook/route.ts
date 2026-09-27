@@ -11,8 +11,6 @@ export async function GET(
     const auth = requireUserId(request);
     if (typeof auth !== 'string') return auth;
     const userId = Number(auth);
-    const userId = parseInt(userIdHeader);
-
     const { id: surveyId } = await params;
     const surveyIdNum = parseInt(surveyId);
 

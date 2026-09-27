@@ -243,7 +243,7 @@ export async function POST(req: NextRequest) {
         isFirstChunk,
         isLastChunk,
         originalFileName: originalFileName || file.name,
-        userId: userIdHeader,
+        userId: String(userId),
         researchDataAnalysis
       });
     }
