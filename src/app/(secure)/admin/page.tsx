@@ -344,6 +344,22 @@ export default function AdminPage() {
           <Clock className="h-4 w-4 mr-1" />
           Scheduler
         </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => router.push('/admin/content')}
+        >
+          <FileText className="h-4 w-4 mr-1" />
+          Content
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => router.push('/admin/growth')}
+        >
+          <Send className="h-4 w-4 mr-1" />
+          Growth
+        </Button>
       </div>
 
       <div className="flex-1 p-6 max-w-6xl mx-auto w-full space-y-6">

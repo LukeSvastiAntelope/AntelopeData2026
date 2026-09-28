@@ -1,20 +1,20 @@
-"use client"
-
 import { PublicLayout } from "@/app/components/PublicLayout"
 import { BlogCard } from "@/components/blog/blog-card"
-import { BLOG_POSTS } from "@/data/blog-posts"
+import { listPublishedBlogPosts } from "@/app/utils/services/content-cms-service"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Mail } from "lucide-react"
 
-const featuredPost = BLOG_POSTS[0]
-const weeklyPosts = BLOG_POSTS.slice(1)
+export const dynamic = "force-dynamic"
 
-export default function BlogPage() {
+export default async function BlogPage() {
+  const posts = await listPublishedBlogPosts()
+  const featuredPost = posts[0] ?? null
+  const weeklyPosts = posts.slice(1)
+
   return (
     <PublicLayout>
     <div className="min-h-screen bg-background">
-      {/* Hero Section */}
       <section className="py-16 px-4 md:px-8 lg:px-16 border-b border-border">
         <div className="max-w-7xl mx-auto text-center">
           <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-4">
@@ -26,7 +26,6 @@ export default function BlogPage() {
         </div>
       </section>
 
-      {/* Recent Post Section */}
       <section className="py-12 px-4 md:px-8 lg:px-16 border-b border-border">
         <div className="max-w-7xl mx-auto">
           <div className="flex items-center justify-between mb-8">
@@ -35,11 +34,17 @@ export default function BlogPage() {
             </h2>
           </div>
           
-          <BlogCard post={featuredPost} featured />
+          {featuredPost ? (
+            <BlogCard post={featuredPost} featured />
+          ) : (
+            <p className="text-muted-foreground text-center py-8">
+              No published articles yet.
+            </p>
+          )}
         </div>
       </section>
 
-      {/* Weekly Most Read Section */}
+      {weeklyPosts.length > 0 && (
       <section className="py-12 px-4 md:px-8 lg:px-16">
         <div className="max-w-7xl mx-auto">
           <h2 className="text-2xl font-semibold mb-8">
@@ -51,32 +56,10 @@ export default function BlogPage() {
               <BlogCard key={post.id} post={post} />
             ))}
           </div>
-
-          {/* Pagination */}
-          <div className="flex justify-center items-center gap-2">
-            <Button variant="ghost" size="sm" disabled>
-              ← Previous
-            </Button>
-            <Button variant="ghost" size="sm" className="bg-foreground text-background hover:bg-foreground/90">
-              1
-            </Button>
-            <Button variant="ghost" size="sm" disabled>
-              2
-            </Button>
-            <Button variant="ghost" size="sm" disabled>
-              3
-            </Button>
-            <Button variant="ghost" size="sm" disabled>
-              4
-            </Button>
-            <Button variant="ghost" size="sm" disabled>
-              Next →
-            </Button>
-          </div>
         </div>
       </section>
+      )}
 
-      {/* Newsletter Section */}
       <section className="py-16 px-4 md:px-8 lg:px-16 bg-muted/30">
         <div className="max-w-2xl mx-auto text-center">
           <div className="mb-8">
