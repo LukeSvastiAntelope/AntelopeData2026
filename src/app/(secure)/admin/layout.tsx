@@ -1,26 +1,19 @@
-'use client'
+import { redirect } from 'next/navigation'
+import { auth } from '@/auth'
+import { isSuperAdminEmail } from '@/app/utils/auth/super-admin'
 
-import { useEffect } from 'react'
-import { useRouter } from 'next/navigation'
-import { useAgent } from '@/app/context/AgentContext'
-
-export default function AdminLayout({
+/**
+ * Server-enforced admin gate. UI-only checks are insufficient —
+ * email must match SUPERADMIN_EMAILS / lukesvasti@antelope.org.
+ */
+export default async function AdminLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  const { user } = useAgent()
-  const router = useRouter()
-
-  useEffect(() => {
-    if (!user || user.role !== 'admin') {
-      router.push('/')
-    }
-  }, [user, router])
-
-  if (!user || user.role !== 'admin') {
-    return null
+  const session = await auth()
+  if (!session?.user?.email || !isSuperAdminEmail(session.user.email)) {
+    redirect('/')
   }
-
   return <>{children}</>
 }

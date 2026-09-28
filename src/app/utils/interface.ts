@@ -80,6 +80,8 @@ export interface UserDB {
     is_verified: number;
     is_first_login: number;
     role: "user" | "admin";
+    /** Platform super-admin (email allowlist) — not org admin / users.role alone */
+    isSuperAdmin?: boolean;
 }
 
 export interface UserOrganization {

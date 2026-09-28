@@ -659,7 +659,7 @@ export function AppSidebar({ className, collapsible = 'offcanvas', ...props }: S
                           Channels
                         </Link>
                       </DropdownMenuItem>
-                      {user?.role === 'admin' && (
+                      {user?.isSuperAdmin && (
                         <DropdownMenuItem asChild>
                           <Link href="/admin" className="flex items-center gap-2">
                             <Shield className="size-4" />

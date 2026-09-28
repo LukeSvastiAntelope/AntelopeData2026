@@ -6,6 +6,7 @@ import {
   normalizeHost,
   slugFromPlatformSubdomain,
 } from '@/app/utils/site-host'
+import { isSuperAdminEmail } from '@/app/utils/auth/super-admin'
 
 const publicRoutes = [
     '/api/signin',
@@ -38,9 +39,7 @@ const publicRoutes = [
     '/api/public/live/linkedin/callback',
     '/api/image-proxy',
     '/api/scheduler/init', // Scheduler initialization
-    '/api/admin/scheduler/stats', // Admin scheduler stats
-    '/api/admin/scheduler/config', // Admin scheduler config
-    '/api/admin/scheduler/trigger', // Admin manual trigger
+    // NOTE: /api/admin/* must NEVER be public — requireSuperAdmin on every handler.
     '/api/agents/query', // Public agent querying
     '/api/digital-twin/:id*/responses', // Twin responses list
     '/api/digital-twin/:id*/update', // Update twin
@@ -233,6 +232,13 @@ export default auth(async (req) => {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
+        // Platform super-admin APIs — email allowlist at the edge (handlers re-check)
+        if (path.startsWith('/api/admin')) {
+            if (!isSuperAdminEmail(session.user?.email)) {
+                return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+            }
+        }
+
         // Add user info to headers for API routes
         const requestHeaders = new Headers(req.headers);
         console.log('Middleware session user:', {
@@ -280,13 +286,23 @@ export default auth(async (req) => {
         return NextResponse.next();
     }
 
+    // Platform super-admin UI — email-pinned allowlist (not users.role)
+    if (path === '/admin' || path.startsWith('/admin/')) {
+        if (!session) {
+            return NextResponse.redirect(new URL('/auth/login', req.url));
+        }
+        if (!isSuperAdminEmail(session.user?.email)) {
+            return NextResponse.redirect(new URL('/', req.url));
+        }
+        return NextResponse.next();
+    }
+
     // Protect pages that require authentication (prefix match)
     const protectedPages = [
         '/cohort-chat',
         '/cohort-chat/chat',
         '/surveys',
         '/create',
-        '/admin',
         '/digital-twins',
         '/profile',
         // NOTE: '/auth' is intentionally NOT protected — login/register/reset/verify

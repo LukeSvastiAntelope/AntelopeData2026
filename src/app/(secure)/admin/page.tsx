@@ -63,6 +63,18 @@ interface PlatformStats {
   twinCount: number
 }
 
+interface AuditEntry {
+  id: number
+  actor_user_id: number
+  action: string
+  target_type: string | null
+  target_id: string | null
+  metadata: Record<string, unknown> | null
+  ip: string | null
+  created_at: string
+  actor_email?: string | null
+}
+
 // -----------------------------------------------------------------------
 // Component
 // -----------------------------------------------------------------------
@@ -90,6 +102,11 @@ export default function AdminPage() {
     responseCount: 0,
     twinCount: 0,
   })
+
+  // Audit log
+  const [auditEntries, setAuditEntries] = useState<AuditEntry[]>([])
+  const [auditTotal, setAuditTotal] = useState(0)
+  const [auditLoading, setAuditLoading] = useState(false)
 
   // ------------------------------------------------------------------
   // Fetch users
@@ -132,6 +149,24 @@ export default function AdminPage() {
     }
   }, [])
 
+  const fetchAudit = useCallback(async () => {
+    setAuditLoading(true)
+    try {
+      const response = await fetch.get('/api/admin/audit-log?limit=50')
+      if (response.status) {
+        setAuditEntries(response.entries || [])
+        setAuditTotal(Number(response.total) || 0)
+      } else {
+        toast.error(response.message || 'Failed to load audit log')
+      }
+    } catch (error) {
+      console.error('Error fetching audit log:', error)
+      toast.error('Failed to load audit log')
+    } finally {
+      setAuditLoading(false)
+    }
+  }, [])
+
   // ------------------------------------------------------------------
   // Initial load
   // ------------------------------------------------------------------
@@ -139,6 +174,7 @@ export default function AdminPage() {
   useEffect(() => {
     fetchUsers()
     fetchSurveys()
+    fetchAudit()
   }, [])
 
   // Derive stats from loaded data
@@ -239,7 +275,7 @@ export default function AdminPage() {
             Admin Dashboard
           </h1>
           <p className="text-sm text-muted-foreground">
-            Platform management and user administration
+            Platform super-admin · email-pinned · all actions audited
           </p>
         </div>
         <Button
@@ -292,6 +328,10 @@ export default function AdminPage() {
             <TabsTrigger value="surveys" className="flex items-center gap-1">
               <FileText className="h-4 w-4" />
               Surveys
+            </TabsTrigger>
+            <TabsTrigger value="audit" className="flex items-center gap-1">
+              <Shield className="h-4 w-4" />
+              Audit log
             </TabsTrigger>
           </TabsList>
 
@@ -483,6 +523,84 @@ export default function AdminPage() {
                             </TableCell>
                             <TableCell className="font-mono text-sm">
                               {s.created_by}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* ---- AUDIT LOG TAB ---- */}
+          <TabsContent value="audit" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Super-admin audit log</CardTitle>
+                    <CardDescription>
+                      {auditTotal} entries · every cross-org read and admin mutation
+                    </CardDescription>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={fetchAudit}
+                    disabled={auditLoading}
+                  >
+                    <RefreshCw
+                      className={`h-4 w-4 mr-1 ${auditLoading ? 'animate-spin' : ''}`}
+                    />
+                    Refresh
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {auditLoading && auditEntries.length === 0 ? (
+                  <div className="flex justify-center py-12">
+                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                  </div>
+                ) : auditEntries.length === 0 ? (
+                  <div className="text-center py-12 text-muted-foreground">
+                    No audit entries yet
+                  </div>
+                ) : (
+                  <div className="rounded-md border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-[90px]">When</TableHead>
+                          <TableHead>Actor</TableHead>
+                          <TableHead>Action</TableHead>
+                          <TableHead>Target</TableHead>
+                          <TableHead className="w-[120px]">IP</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {auditEntries.map((e) => (
+                          <TableRow key={e.id}>
+                            <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+                              {e.created_at
+                                ? formatDistanceToNow(new Date(e.created_at), {
+                                    addSuffix: true,
+                                  })
+                                : '—'}
+                            </TableCell>
+                            <TableCell className="text-xs">
+                              {e.actor_email || e.actor_user_id}
+                            </TableCell>
+                            <TableCell className="font-mono text-xs">
+                              {e.action}
+                            </TableCell>
+                            <TableCell className="text-xs text-muted-foreground">
+                              {[e.target_type, e.target_id].filter(Boolean).join(' · ') ||
+                                '—'}
+                            </TableCell>
+                            <TableCell className="font-mono text-xs text-muted-foreground">
+                              {e.ip || '—'}
                             </TableCell>
                           </TableRow>
                         ))}

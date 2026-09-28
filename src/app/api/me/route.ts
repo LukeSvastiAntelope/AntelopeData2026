@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireUserId } from '@/app/utils/auth/require-user';
 import { UserRepo } from '@/app/utils/database/user-repo';
 import { getConnection } from '@/app/utils/database/db';
+import { isSuperAdminEmail } from '@/app/utils/auth/super-admin';
 
 /**
  * GET /api/me
@@ -72,6 +73,7 @@ export async function GET(req: NextRequest) {
         role: user.role,
         username: user.username,
         is_first_login: user.is_first_login,
+        isSuperAdmin: isSuperAdminEmail(user.email),
       },
       agent,
       organization,

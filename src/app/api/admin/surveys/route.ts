@@ -1,14 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { openSql } from '@/app/utils/database/db';
+import {
+  requireSuperAdmin,
+  clientIp,
+} from '@/app/utils/auth/require-super-admin';
+import { writeAdminAuditLog } from '@/app/utils/database/admin-audit-repo';
 
 /**
  * GET /api/admin/surveys
- *
- * List all surveys across all users (admin only).
- * Returns id, title, slug, status, created_by, response_count, created_at.
+ * List all surveys across all users (super-admin only). Cross-org read — audited.
  */
 export async function GET(req: NextRequest) {
   try {
+    const gate = await requireSuperAdmin(req);
+    if (gate instanceof NextResponse) return gate;
+
     const db = await openSql();
 
     const [surveys]: any = await db.execute(
@@ -25,6 +31,14 @@ export async function GET(req: NextRequest) {
       GROUP BY s.id
       ORDER BY s.id DESC`
     );
+
+    await writeAdminAuditLog({
+      actorUserId: gate.numericUserId,
+      action: 'surveys.list',
+      targetType: 'survey',
+      metadata: { count: Array.isArray(surveys) ? surveys.length : 0 },
+      ip: clientIp(req),
+    });
 
     return NextResponse.json({
       status: true,
