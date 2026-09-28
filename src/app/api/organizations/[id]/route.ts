@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireUserId } from '@/app/utils/auth/require-user';
 import { getConnection } from '../../../utils/database/db';
+import { resolveSupportSession } from '@/app/utils/auth/support-session';
+import { isSuperAdminEmail } from '@/app/utils/auth/super-admin';
+import { UserRepo } from '@/app/utils/database/user-repo';
 
 /**
  * GET /api/organizations/[id]
@@ -18,13 +21,28 @@ export async function GET(
 
     const db = await getConnection();
 
-    // Verify membership
+    // Verify membership — or Admin A4 support "view as" for this org
+    let userRole: string | null = null;
     const [membership]: any = await db.execute(
       `SELECT role FROM organization_members WHERE organization_id = ? AND user_id = ? AND status = 'active'`,
       [orgId, userId]
     );
+    if (membership?.length) {
+      userRole = membership[0].role;
+    } else {
+      const support = await resolveSupportSession(request, { actorUserId: userId });
+      if (
+        support &&
+        Number(support.targetOrganizationId) === Number(orgId)
+      ) {
+        const user = await UserRepo.getUserById(String(userId));
+        if (user && isSuperAdminEmail(user.email)) {
+          userRole = support.mode === 'write' ? 'admin' : 'viewer';
+        }
+      }
+    }
 
-    if (!membership || membership.length === 0) {
+    if (!userRole) {
       return NextResponse.json({ status: false, message: 'Not a member of this organization' }, { status: 403 });
     }
 
@@ -66,7 +84,7 @@ export async function GET(
     return NextResponse.json({
       status: true,
       organization: orgs[0],
-      userRole: membership[0].role,
+      userRole,
       members,
       surveys,
       activity,

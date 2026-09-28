@@ -28,6 +28,7 @@ import { SidebarTrigger } from '@/components/ui/sidebar'
 import {
   ArrowLeft,
   Building2,
+  Eye,
   FileText,
   Loader2,
   Send,
@@ -96,6 +97,7 @@ export default function AdminAccountDetailPage() {
   const id = String(params?.id || '')
   const [account, setAccount] = useState<AccountDetail | null>(null)
   const [loading, setLoading] = useState(true)
+  const [startingViewAs, setStartingViewAs] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -120,6 +122,40 @@ export default function AdminAccountDetailPage() {
     if (id) void load()
   }, [id, load])
 
+  const startViewAs = async (mode: 'read' | 'write' = 'read') => {
+    if (!account) return
+    setStartingViewAs(true)
+    try {
+      const body: Record<string, unknown> = {
+        organizationId: account.id,
+        durationMinutes: 30,
+        mode,
+      }
+      if (mode === 'write') body.confirmWrite = true
+      const res = await fetch('/api/admin/support', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || !data.status) {
+        toast.error(data.message || 'Could not start support session')
+        return
+      }
+      toast.success(
+        mode === 'write'
+          ? `Write-mode support session started for ${account.name}`
+          : `Viewing as ${account.name} (read-only)`
+      )
+      // Enter the campaign workspace under the support overlay
+      window.location.href = '/surveys'
+    } catch {
+      toast.error('Could not start support session')
+    } finally {
+      setStartingViewAs(false)
+    }
+  }
+
   return (
     <div className="flex flex-col min-h-screen">
       <div className="flex items-center gap-2 p-4 border-b">
@@ -142,6 +178,22 @@ export default function AdminAccountDetailPage() {
             Read-only cross-org view · audited
           </p>
         </div>
+        {account && (
+          <Button
+            size="sm"
+            variant="default"
+            disabled={startingViewAs}
+            onClick={() => void startViewAs('read')}
+            title="Time-boxed read-only support access"
+          >
+            {startingViewAs ? (
+              <Loader2 className="h-4 w-4 animate-spin mr-1" />
+            ) : (
+              <Eye className="h-4 w-4 mr-1" />
+            )}
+            View as campaign
+          </Button>
+        )}
       </div>
 
       <div className="flex-1 p-6 max-w-5xl mx-auto w-full space-y-6">

@@ -2,8 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireUserId } from '@/app/utils/auth/require-user';
 import { SurveyRepo } from "@/app/utils/database/survey-repo";
 import { verifyConfirmationToken } from "@/app/utils/api/token";
+import {
+  assertSupportAllowsMutation,
+  resolveSupportSession,
+} from '@/app/utils/auth/support-session';
+import { getConnection } from '@/app/utils/database/db';
+import { isSuperAdminEmail } from '@/app/utils/auth/super-admin';
+import { UserRepo } from '@/app/utils/database/user-repo';
 
 // GET /api/surveys - surveys created by current user + featured examples
+// Admin A4: support session returns the target campaign's org surveys (read-first).
 export async function GET(req: NextRequest) {
   const auth = requireUserId(req);
   if (typeof auth !== 'string') return auth;
@@ -11,6 +19,58 @@ export async function GET(req: NextRequest) {
   console.log('Fetching surveys for user ID:', userId);
   
   try {
+    const support = await resolveSupportSession(req, { actorUserId: userId });
+    if (support) {
+      const user = await UserRepo.getUserById(String(userId));
+      if (user && isSuperAdminEmail(user.email)) {
+        const db = await getConnection();
+        const [rows]: any = await db.execute(
+          `SELECT s.*, COUNT(sr.id) as response_count, o.name as organization_name
+           FROM surveys s
+           LEFT JOIN survey_responses sr ON s.id = sr.survey_id
+           LEFT JOIN organizations o ON s.organization_id = o.id
+           WHERE s.organization_id = ?
+              OR s.created_by IN (
+                SELECT user_id FROM organization_members
+                WHERE organization_id = ? AND status = 'active'
+              )
+           GROUP BY s.id
+           ORDER BY s.created_at DESC`,
+          [support.targetOrganizationId, support.targetOrganizationId]
+        );
+        const editable = support.mode === 'write';
+        const surveys = (rows || []).map((s: any) => ({
+          id: s.id,
+          title: s.title,
+          description: s.description,
+          slug: s.slug,
+          status: s.status,
+          is_public: s.is_public,
+          created_at: s.created_at,
+          response_count: s.response_count || 0,
+          source: s.source || 'native',
+          source_metadata: s.source_metadata || null,
+          start_at: s.start_at,
+          end_at: s.end_at,
+          organization_id: s.organization_id || support.targetOrganizationId,
+          organization_name:
+            s.organization_name || support.targetOrganizationName,
+          survey_type: 'org',
+          is_featured: false,
+          is_editable: editable,
+        }));
+        return NextResponse.json({
+          status: true,
+          surveys,
+          supportSession: {
+            active: true,
+            mode: support.mode,
+            sessionId: support.id,
+          },
+        });
+      }
+    }
+
     // Check if user wants only their own surveys or all (including featured)
     const { searchParams } = new URL(req.url);
     const includeFeatures = searchParams.get('featured') !== 'false'; // Default to true
@@ -142,6 +202,12 @@ export async function POST(req: NextRequest) {
         const auth = requireUserId(req);
         if (typeof auth !== 'string') return auth;
         const userId = Number(auth);
+
+        const blocked = await assertSupportAllowsMutation(req, userId, {
+          path: '/api/surveys',
+          method: 'POST',
+        });
+        if (blocked) return blocked;
 
         const body = await req.json();
         

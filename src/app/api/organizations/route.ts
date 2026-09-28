@@ -1,10 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireUserId } from '@/app/utils/auth/require-user';
 import { getConnection } from '../../utils/database/db';
+import {
+  assertSupportAllowsMutation,
+  resolveSupportSession,
+} from '@/app/utils/auth/support-session';
+import { isSuperAdminEmail } from '@/app/utils/auth/super-admin';
+import { UserRepo } from '@/app/utils/database/user-repo';
 
 /**
  * GET /api/organizations
- * List organizations the current user belongs to
+ * List organizations the current user belongs to.
+ * Admin A4: active support session overlays the target campaign.
  */
 export async function GET(request: NextRequest) {
   try {
@@ -13,6 +20,33 @@ export async function GET(request: NextRequest) {
     const userId = Number(auth);
 
     const db = await getConnection();
+
+    const support = await resolveSupportSession(request, { actorUserId: userId });
+    if (support) {
+      const user = await UserRepo.getUserById(String(userId));
+      if (user && isSuperAdminEmail(user.email)) {
+        const [orgs]: any = await db.execute(
+          `SELECT o.*, ? as role,
+                  (SELECT COUNT(*) FROM organization_members WHERE organization_id = o.id AND status = 'active') as member_count,
+                  (SELECT COUNT(*) FROM surveys WHERE organization_id = o.id) as survey_count
+           FROM organizations o
+           WHERE o.id = ?`,
+          [
+            support.mode === 'write' ? 'admin' : 'viewer',
+            support.targetOrganizationId,
+          ]
+        );
+        return NextResponse.json({
+          status: true,
+          organizations: orgs,
+          supportSession: {
+            active: true,
+            mode: support.mode,
+            sessionId: support.id,
+          },
+        });
+      }
+    }
 
     const [orgs]: any = await db.execute(
       `SELECT o.*, om.role, 
@@ -41,6 +75,12 @@ export async function POST(request: NextRequest) {
     const auth = requireUserId(request);
     if (typeof auth !== 'string') return auth;
     const userId = Number(auth);
+
+    const blocked = await assertSupportAllowsMutation(request, userId, {
+      path: '/api/organizations',
+      method: 'POST',
+    });
+    if (blocked) return blocked;
 
     const {
       name, description, latitude, longitude, default_zoom,

@@ -4,6 +4,7 @@ import { useAgent } from "../context/AgentContext";
 import { AppSidebar } from "@/components/app-sidebar";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { ConsultantDock } from "@/components/consultant/consultant-dock";
+import { SupportSessionBanner } from "@/components/admin/support-session-banner";
 
 // Nav item list lives in AppSidebar (src/components/app-sidebar.tsx), not here.
 // Reachability for /compliance, /team, /volunteer-staff, /voter-file, /website is maintained there.
@@ -15,6 +16,7 @@ const SecureLayout = ({ children }: { children: React.ReactNode }) => {
                 <AppSidebar />
                 
                 <div className="flex flex-col flex-1 min-w-0">
+                    <SupportSessionBanner />
                     <SidebarInset className="bg-background">
                         {children}
                     </SidebarInset>

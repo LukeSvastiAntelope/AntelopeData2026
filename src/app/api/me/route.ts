@@ -3,12 +3,17 @@ import { requireUserId } from '@/app/utils/auth/require-user';
 import { UserRepo } from '@/app/utils/database/user-repo';
 import { getConnection } from '@/app/utils/database/db';
 import { isSuperAdminEmail } from '@/app/utils/auth/super-admin';
+import {
+  loadOrganizationSummary,
+  resolveSupportSession,
+} from '@/app/utils/auth/support-session';
 
 /**
  * GET /api/me
  *
  * Returns the current user, their agent profile, and primary organization
  * using the x-user-id header injected by the auth middleware.
+ * Admin A4: when a support session is active, organization is the target campaign.
  */
 export async function GET(req: NextRequest) {
   try {
@@ -35,33 +40,58 @@ export async function GET(req: NextRequest) {
 
     // Fetch primary organization (campaign context)
     let organization = null;
-    try {
-      const db = await getConnection();
-      const [orgRows]: any = await db.execute(
-        `SELECT o.id, o.name, o.office_type, o.state, o.district_code,
-                o.candidate_name, o.party, o.election_year
-         FROM organizations o
-         JOIN organization_members om ON o.id = om.organization_id
-         WHERE om.user_id = ? AND om.status = 'active'
-         ORDER BY om.role = 'owner' DESC, o.created_at ASC
-         LIMIT 1`,
-        [userId]
-      );
-      if (orgRows.length > 0) {
-        const row = orgRows[0];
-        organization = {
-          id: row.id,
-          name: row.name,
-          officeType: row.office_type || null,
-          state: row.state || null,
-          districtCode: row.district_code || null,
-          candidateName: row.candidate_name || null,
-          party: row.party || null,
-          electionYear: row.election_year || null,
+    let supportOverlay: {
+      active: true;
+      mode: 'read' | 'write';
+      sessionId: string;
+      expiresAt: string;
+    } | null = null;
+
+    const support = await resolveSupportSession(req, {
+      actorUserId: Number(userId),
+    });
+    if (support && isSuperAdminEmail(user.email)) {
+      const org = await loadOrganizationSummary(support.targetOrganizationId);
+      if (org) {
+        organization = org;
+        supportOverlay = {
+          active: true,
+          mode: support.mode,
+          sessionId: support.id,
+          expiresAt: support.expiresAt,
         };
       }
-    } catch {
-      // Org tables may not exist yet
+    }
+
+    if (!organization) {
+      try {
+        const db = await getConnection();
+        const [orgRows]: any = await db.execute(
+          `SELECT o.id, o.name, o.office_type, o.state, o.district_code,
+                  o.candidate_name, o.party, o.election_year
+           FROM organizations o
+           JOIN organization_members om ON o.id = om.organization_id
+           WHERE om.user_id = ? AND om.status = 'active'
+           ORDER BY om.role = 'owner' DESC, o.created_at ASC
+           LIMIT 1`,
+          [userId]
+        );
+        if (orgRows.length > 0) {
+          const row = orgRows[0];
+          organization = {
+            id: row.id,
+            name: row.name,
+            officeType: row.office_type || null,
+            state: row.state || null,
+            districtCode: row.district_code || null,
+            candidateName: row.candidate_name || null,
+            party: row.party || null,
+            electionYear: row.election_year || null,
+          };
+        }
+      } catch {
+        // Org tables may not exist yet
+      }
     }
 
     return NextResponse.json({
@@ -77,6 +107,7 @@ export async function GET(req: NextRequest) {
       },
       agent,
       organization,
+      supportSession: supportOverlay,
     });
   } catch (error) {
     console.error('Error in /api/me:', error);

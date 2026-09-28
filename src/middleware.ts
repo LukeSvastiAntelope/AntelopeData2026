@@ -7,6 +7,21 @@ import {
   slugFromPlatformSubdomain,
 } from '@/app/utils/site-host'
 import { isSuperAdminEmail } from '@/app/utils/auth/super-admin'
+import {
+  SUPPORT_COOKIE,
+  SUPPORT_CTX_COOKIE,
+  verifySupportCtx,
+} from '@/app/utils/auth/support-ctx-cookie'
+
+/** Paths allowed to mutate while a read-only support session is active. */
+function isSupportMutationAllowlisted(pathname: string): boolean {
+  const p = pathname.replace(/\/+$/, '') || '/'
+  if (p.startsWith('/api/admin/support')) return true
+  if (p === '/api/support/session') return true
+  if (p.startsWith('/api/auth')) return true
+  if (p === '/api/signin' || p === '/api/signout') return true
+  return false
+}
 
 const publicRoutes = [
     '/api/signin',
@@ -259,7 +274,53 @@ export default auth(async (req) => {
         if (personRecordId != null) {
             requestHeaders.set('x-person-record-id', String(personRecordId));
         }
-        
+
+        // Admin A4 — support "view as" overlay (signed ctx cookie; DB is source of truth)
+        const supportSid = req.cookies.get(SUPPORT_COOKIE)?.value || '';
+        const supportCtx = await verifySupportCtx(
+          req.cookies.get(SUPPORT_CTX_COOKIE)?.value
+        );
+        if (
+          supportCtx &&
+          supportSid &&
+          supportCtx.sid === supportSid &&
+          isSuperAdminEmail(session.user?.email)
+        ) {
+          requestHeaders.set('x-support-session-id', supportCtx.sid);
+          requestHeaders.set('x-support-org-id', String(supportCtx.orgId));
+          requestHeaders.set('x-support-mode', supportCtx.mode);
+          if (supportCtx.orgName) {
+            requestHeaders.set(
+              'x-support-org-name',
+              encodeURIComponent(supportCtx.orgName)
+            );
+          }
+          // Prefer support org for downstream org-scoped reads
+          requestHeaders.set('x-organization-id', String(supportCtx.orgId));
+          requestHeaders.set(
+            'x-org-role',
+            supportCtx.mode === 'write' ? 'admin' : 'viewer'
+          );
+
+          // Read-first: block mutating verbs at the edge (handlers re-check DB)
+          const method = req.method.toUpperCase();
+          if (
+            supportCtx.mode === 'read' &&
+            !['GET', 'HEAD', 'OPTIONS'].includes(method) &&
+            !isSupportMutationAllowlisted(path)
+          ) {
+            return NextResponse.json(
+              {
+                status: false,
+                error: 'Forbidden',
+                message:
+                  'Support session is read-only. End the session or start write mode (audited) to make changes.',
+              },
+              { status: 403 }
+            );
+          }
+        }
+
         return NextResponse.next({
             request: {
                 headers: requestHeaders,
