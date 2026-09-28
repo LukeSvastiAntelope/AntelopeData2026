@@ -125,4 +125,5 @@ export type CampaignToolName =
   | 'assign_turf'
   | 'record_turf_stop'
   | 'read_propensity'
-  | 'stage_outbound_send';
+  | 'stage_outbound_send'
+  | 'post_antelope_marketing';

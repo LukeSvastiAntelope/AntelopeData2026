@@ -403,11 +403,38 @@ export async function approveStagedAction(params: {
     toolName === 'outbound_review' ||
     toolName === 'draft_newsletter'
   ) {
+    // Admin A5 — sync Antelope marketing draft if this card is a growth post
+    const marketingDraftId = Number(staged.payload.marketingDraftId);
+    if (
+      Number.isFinite(marketingDraftId) &&
+      marketingDraftId > 0 &&
+      (toolName === 'post_antelope_marketing' ||
+        staged.payload.kind === 'antelope_marketing')
+    ) {
+      try {
+        const { AntelopeGrowthRepo } = await import(
+          '@/app/utils/database/antelope-growth-repo'
+        );
+        await AntelopeGrowthRepo.approve(marketingDraftId, params.userId);
+      } catch (err) {
+        console.warn('[approveStaged] marketing draft sync failed', err);
+      }
+    }
+
     const updated = await ConsultantRepo.updateStagedAction(staged.id, {
       status: 'approved',
       resultSummary:
-        'Marked reviewed. No public send ran from this review-only card.',
-      resultData: { reviewOnly: true, implemented: true },
+        toolName === 'post_antelope_marketing'
+          ? 'Approved Antelope growth draft. No tweet was sent — publish manually, then mark posted in Admin → Growth.'
+          : 'Marked reviewed. No public send ran from this review-only card.',
+      resultData: {
+        reviewOnly: true,
+        implemented: true,
+        marketingDraftId: Number.isFinite(marketingDraftId)
+          ? marketingDraftId
+          : null,
+        neverAutoPost: toolName === 'post_antelope_marketing',
+      },
     });
     const messages = [
       ...conversation.messages,

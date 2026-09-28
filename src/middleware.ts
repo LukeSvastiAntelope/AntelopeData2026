@@ -65,6 +65,7 @@ const publicRoutes = [
     '/api/cron/loop-propose', // H2 loop proposer platform cron
     '/api/cron/autotrigger-poll', // AT1 survey auto-trigger backstop
     '/api/cron/volunteer-reminders', // Volunteer V3 — gated shift reminders + check-in prompts
+    '/api/cron/antelope-marketing', // Admin A5 — Antelope own-growth drafts (never auto-posts)
     '/api/channels/telegram/webhook', // Telegram webhook must be public
     '/api/webhooks/resend', // Resend delivery / bounce / complaint webhook
     '/api/email/unsubscribe', // CAN-SPAM one-click unsubscribe (public)
