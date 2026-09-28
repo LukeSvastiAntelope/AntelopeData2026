@@ -17,6 +17,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import {
+  Building2,
   Users,
   FileText,
   Brain,
@@ -28,6 +29,7 @@ import {
   Shield,
   Clock,
   AlertTriangle,
+  Send,
 } from 'lucide-react'
 import { useFetch } from '@/app/utils/lib'
 import toast from 'react-hot-toast'
@@ -75,6 +77,26 @@ interface AuditEntry {
   actor_email?: string | null
 }
 
+interface AccountOverview {
+  id: number
+  name: string
+  slug: string | null
+  officeType: string | null
+  state: string | null
+  districtCode: string | null
+  candidateName: string | null
+  plan: string
+  entitlements: string[]
+  createdAt: string | null
+  lastActiveAt: string | null
+  memberCount: number
+  surveyCount: number
+  contactCount: number
+  sendCount: number
+  ownerEmail: string | null
+  ownerDisplayName: string | null
+}
+
 // -----------------------------------------------------------------------
 // Component
 // -----------------------------------------------------------------------
@@ -107,6 +129,11 @@ export default function AdminPage() {
   const [auditEntries, setAuditEntries] = useState<AuditEntry[]>([])
   const [auditTotal, setAuditTotal] = useState(0)
   const [auditLoading, setAuditLoading] = useState(false)
+
+  // Accounts (orgs)
+  const [accounts, setAccounts] = useState<AccountOverview[]>([])
+  const [accountsLoading, setAccountsLoading] = useState(false)
+  const [accountSearch, setAccountSearch] = useState('')
 
   // ------------------------------------------------------------------
   // Fetch users
@@ -167,6 +194,23 @@ export default function AdminPage() {
     }
   }, [])
 
+  const fetchAccounts = useCallback(async () => {
+    setAccountsLoading(true)
+    try {
+      const response = await fetch.get('/api/admin/accounts')
+      if (response.status) {
+        setAccounts(response.accounts || [])
+      } else {
+        toast.error(response.message || 'Failed to load accounts')
+      }
+    } catch (error) {
+      console.error('Error fetching accounts:', error)
+      toast.error('Failed to load accounts')
+    } finally {
+      setAccountsLoading(false)
+    }
+  }, [])
+
   // ------------------------------------------------------------------
   // Initial load
   // ------------------------------------------------------------------
@@ -175,6 +219,7 @@ export default function AdminPage() {
     fetchUsers()
     fetchSurveys()
     fetchAudit()
+    fetchAccounts()
   }, [])
 
   // Derive stats from loaded data
@@ -260,6 +305,19 @@ export default function AdminPage() {
     )
   })
 
+  const filteredAccounts = accounts.filter((a) => {
+    if (!accountSearch) return true
+    const q = accountSearch.toLowerCase()
+    return (
+      (a.name || '').toLowerCase().includes(q) ||
+      (a.slug || '').toLowerCase().includes(q) ||
+      (a.ownerEmail || '').toLowerCase().includes(q) ||
+      (a.state || '').toLowerCase().includes(q) ||
+      (a.districtCode || '').toLowerCase().includes(q) ||
+      String(a.id).includes(q)
+    )
+  })
+
   // ------------------------------------------------------------------
   // Render
   // ------------------------------------------------------------------
@@ -290,7 +348,13 @@ export default function AdminPage() {
 
       <div className="flex-1 p-6 max-w-6xl mx-auto w-full space-y-6">
         {/* Stats cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+          <StatsCard
+            icon={<Building2 className="h-5 w-5" />}
+            label="Accounts"
+            value={accounts.length}
+            loading={accountsLoading}
+          />
           <StatsCard
             icon={<Users className="h-5 w-5" />}
             label="Total Users"
@@ -319,8 +383,12 @@ export default function AdminPage() {
         </div>
 
         {/* Main tabs */}
-        <Tabs defaultValue="users">
+        <Tabs defaultValue="accounts">
           <TabsList>
+            <TabsTrigger value="accounts" className="flex items-center gap-1">
+              <Building2 className="h-4 w-4" />
+              Accounts
+            </TabsTrigger>
             <TabsTrigger value="users" className="flex items-center gap-1">
               <Users className="h-4 w-4" />
               Users
@@ -334,6 +402,131 @@ export default function AdminPage() {
               Audit log
             </TabsTrigger>
           </TabsList>
+
+          {/* ---- ACCOUNTS TAB ---- */}
+          <TabsContent value="accounts" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Campaign accounts</CardTitle>
+                    <CardDescription>
+                      Cross-org overview · read-only · {accounts.length} orgs
+                    </CardDescription>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={fetchAccounts}
+                    disabled={accountsLoading}
+                  >
+                    <RefreshCw
+                      className={`h-4 w-4 mr-1 ${accountsLoading ? 'animate-spin' : ''}`}
+                    />
+                    Refresh
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="relative mb-4">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search by name, owner, state, district…"
+                    value={accountSearch}
+                    onChange={(e) => setAccountSearch(e.target.value)}
+                    className="pl-9"
+                  />
+                </div>
+
+                {accountsLoading && accounts.length === 0 ? (
+                  <div className="flex justify-center py-12">
+                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                  </div>
+                ) : filteredAccounts.length === 0 ? (
+                  <div className="text-center py-12 text-muted-foreground">
+                    {accountSearch
+                      ? 'No accounts match your search'
+                      : 'No organizations found'}
+                  </div>
+                ) : (
+                  <div className="rounded-md border overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Organization</TableHead>
+                          <TableHead>Plan</TableHead>
+                          <TableHead>Created</TableHead>
+                          <TableHead>Last active</TableHead>
+                          <TableHead className="text-right">Surveys</TableHead>
+                          <TableHead className="text-right">Contacts</TableHead>
+                          <TableHead className="text-right">Sends</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredAccounts.map((a) => (
+                          <TableRow
+                            key={a.id}
+                            className="cursor-pointer"
+                            onClick={() =>
+                              router.push(`/admin/accounts/${a.id}`)
+                            }
+                          >
+                            <TableCell>
+                              <div className="font-medium text-sm">
+                                {a.name}
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                {[
+                                  a.ownerEmail,
+                                  a.state,
+                                  a.districtCode,
+                                  a.officeType,
+                                ]
+                                  .filter(Boolean)
+                                  .join(' · ') || `org #${a.id}`}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <Badge
+                                variant="outline"
+                                className="text-[10px] font-normal"
+                              >
+                                {a.plan}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+                              {a.createdAt
+                                ? formatDistanceToNow(new Date(a.createdAt), {
+                                    addSuffix: true,
+                                  })
+                                : '—'}
+                            </TableCell>
+                            <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+                              {a.lastActiveAt
+                                ? formatDistanceToNow(
+                                    new Date(a.lastActiveAt),
+                                    { addSuffix: true }
+                                  )
+                                : '—'}
+                            </TableCell>
+                            <TableCell className="text-right font-mono text-sm">
+                              {a.surveyCount}
+                            </TableCell>
+                            <TableCell className="text-right font-mono text-sm">
+                              {a.contactCount}
+                            </TableCell>
+                            <TableCell className="text-right font-mono text-sm">
+                              {a.sendCount}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
 
           {/* ---- USERS TAB ---- */}
           <TabsContent value="users" className="space-y-4">
