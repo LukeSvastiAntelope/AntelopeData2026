@@ -33,6 +33,8 @@ Required in `.env.local`:
 Optional (feature-gated):
 - `ANTHROPIC_API_KEY` — Claude AI via ai-service gateway (all LLM calls)
 - `ANTHROPIC_MODEL_WORKHORSE` / `ANTHROPIC_MODEL_HEAVY` / `ANTHROPIC_MODEL_CHEAP` — optional tier model overrides
+- `AI_USAGE_HARD_ENFORCE` — set `true` to block AI calls at plan credit cap (default off; soft-warn only)
+- `AI_CREDITS_GRASSROOTS` / `AI_CREDITS_CAMPAIGN` / `AI_CREDITS_CONGRESSIONAL` — monthly credit allowances
 - `SERPAPI_API_KEY` — news / web search (not an LLM)
 - `PINECONE_API_KEY` — Vector embeddings
 - `STRIPE_SECRET_KEY` — Payments
@@ -140,4 +142,4 @@ All `(secure)` pages follow the pattern documented in `docs/LAYOUT_PATTERN.md`:
 
 ### AI Integration
 
-All LLM calls go through the Anthropic-only gateway in `ai-service.ts` (tiers: workhorse / heavy / cheap). Web search uses `SERPAPI_API_KEY`. Pinecone is used for vector search on survey responses and report embeddings. Digital twin querying is publicly accessible at `/api/agents/query` and `/api/digital-twin/:id*`.
+All LLM calls go through the Anthropic-only gateway in `ai-service.ts` (tiers: workhorse / heavy / cheap) with usage metering → `ai_usage_events` and per-org credit counters (Grassroots / Campaign / Congressional). Web search uses `SERPAPI_API_KEY`. Pinecone is used for vector search on survey responses and report embeddings. Digital twin querying is publicly accessible at `/api/agents/query` and `/api/digital-twin/:id*`.

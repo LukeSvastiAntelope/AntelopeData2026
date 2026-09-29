@@ -8,6 +8,7 @@ import {
   getModelForTier,
   resolveModelTier,
 } from '@/app/utils/services/ai-service';
+import { withUserOrgAiUsage } from '@/app/utils/services/with-org-ai-usage';
 
 // Allow longer processing time during generation
 export const maxDuration = 300;
@@ -386,12 +387,17 @@ Guidelines:
             for (let attempt = 1; attempt <= maxAttempts; attempt++) {
                 try {
                     const tStart = Date.now();
-                    const result = await aiComplete({
-                        tier: activeTier,
-                        system: systemPrompt,
-                        maxTokens: 8000,
-                        messages: [{ role: 'user', content: prompt }],
-                    });
+                    const result = await withUserOrgAiUsage(
+                        userId,
+                        'generate-survey',
+                        () =>
+                            aiComplete({
+                                tier: activeTier,
+                                system: systemPrompt,
+                                maxTokens: 8000,
+                                messages: [{ role: 'user', content: prompt }],
+                            })
+                    );
                     aiResponse = result.content;
                     modelConfig = {
                         ...modelConfig,

@@ -19,6 +19,7 @@ import {
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { useAgent } from '@/app/context/AgentContext'
 import { MinimalThemeToggle } from '@/components/theme-toggle'
+import { AiUsageMeter } from '@/components/ai-usage-meter'
 import {
   Users,
   LogOut,
@@ -290,7 +291,7 @@ export function AppSidebar({ className, collapsible = 'offcanvas', ...props }: S
 
       <SidebarContent className="flex flex-col gap-4">
         {/* Progress nudge — recommendation only, never a gate */}
-        <div className="px-4 group-data-[collapsible=offcanvas]:hidden">
+        <div className="px-4 group-data-[collapsible=offcanvas]:hidden space-y-2">
           <div className="rounded-md border border-border/70 bg-muted/30 px-3 py-2.5 space-y-1">
             <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Campaign flow</p>
             <p className="text-xs text-sidebar-foreground flex items-center gap-1.5 flex-wrap">
@@ -299,6 +300,7 @@ export function AppSidebar({ className, collapsible = 'offcanvas', ...props }: S
               <span className="text-muted-foreground">Next: {recommendedStage.title}</span>
             </p>
           </div>
+          <AiUsageMeter />
         </div>
 
         <SidebarGroup className="px-4">

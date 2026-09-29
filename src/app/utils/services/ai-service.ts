@@ -2,12 +2,18 @@
  * Anthropic-only AI gateway.
  *
  * Single chokepoint for every LLM call: model tiers, env overrides,
- * internal fallback, and (later) usage metering.
+ * internal fallback, and usage metering (credits).
  *
  * No model id literals belong outside this file's tier config.
  */
 
 import Anthropic from '@anthropic-ai/sdk';
+import { getAiUsageContext } from '@/app/utils/services/ai-usage-context';
+import {
+  assertAiUsageAllowed,
+  recordAiUsageEvent,
+} from '@/app/utils/database/ai-usage-repo';
+import { computeCredits } from '@/app/utils/services/ai-usage-config';
 
 // ---------------------------------------------------------------------------
 // Tiers
@@ -99,6 +105,7 @@ export interface AICompletionOptions {
   stream?: boolean;
   frequencyPenalty?: number;
   presencePenalty?: number;
+  usage?: AiUsageMeta;
 }
 
 export interface AICompletionResponse {
@@ -110,7 +117,11 @@ export interface AICompletionResponse {
     promptTokens: number;
     completionTokens: number;
     totalTokens: number;
+    credits?: number;
+    costUsd?: number;
   };
+  /** Soft-limit warning when org is near plan allowance. */
+  usageWarning?: string | null;
 }
 
 export interface AIStreamingCompletionResponse {
@@ -125,13 +136,59 @@ export interface AIStreamingCompletionResponse {
   };
 }
 
+export type AiUsageMeta = {
+  organizationId?: number | null;
+  userId?: number | null;
+  feature?: string;
+};
+
 export type AiCompleteParams = {
   tier?: ModelTier;
   messages: AIMessage[];
   system?: string;
   maxTokens?: number;
   temperature?: number;
+  /** Optional metering attribution (merged with AsyncLocalStorage context). */
+  usage?: AiUsageMeta;
 };
+
+function resolveUsageMeta(explicit?: AiUsageMeta): AiUsageMeta {
+  const ctx = getAiUsageContext();
+  return {
+    organizationId:
+      explicit?.organizationId ?? ctx.organizationId ?? null,
+    userId: explicit?.userId ?? ctx.userId ?? null,
+    feature: explicit?.feature || ctx.feature || 'general',
+  };
+}
+
+function meterInBackground(input: {
+  meta: AiUsageMeta;
+  tier: ModelTier;
+  model: string;
+  inputTokens: number;
+  outputTokens: number;
+  usedFallback: boolean;
+}) {
+  const { credits, costUsd } = computeCredits(
+    input.model,
+    input.inputTokens,
+    input.outputTokens
+  );
+  console.log(
+    `[ai-gateway] metered org=${input.meta.organizationId ?? 'n/a'} feature=${input.meta.feature} tier=${input.tier} model=${input.model} in=${input.inputTokens} out=${input.outputTokens} credits=${credits} usd=${costUsd}`
+  );
+  void recordAiUsageEvent({
+    organizationId: input.meta.organizationId,
+    userId: input.meta.userId,
+    feature: input.meta.feature,
+    tier: input.tier,
+    model: input.model,
+    inputTokens: input.inputTokens,
+    outputTokens: input.outputTokens,
+    usedFallback: input.usedFallback,
+  });
+}
 
 // ---------------------------------------------------------------------------
 // Client
@@ -240,6 +297,7 @@ async function callAnthropicOnce(params: {
 
 /**
  * Preferred entry: tiered Anthropic completion with one-shot internal fallback.
+ * Meters tokens → credits and persists ai_usage_events (tenant-scoped).
  */
 export async function aiComplete(
   params: AiCompleteParams
@@ -247,6 +305,45 @@ export async function aiComplete(
   const tier: ModelTier = params.tier || 'workhorse';
   const primaryModel = getModelForTier(tier);
   const messages = params.messages || [];
+  const meta = resolveUsageMeta(params.usage);
+
+  const gate = await assertAiUsageAllowed(meta.organizationId);
+  const usageWarning = gate.warn
+    ? `AI credits are at ${gate.summary?.percentUsed}% of this period's ${gate.summary?.planLabel} allowance (${gate.summary?.usedCredits} / ${gate.summary?.allowance}).`
+    : null;
+
+  const finish = (
+    servedTier: ModelTier,
+    model: string,
+    usedFallback: boolean,
+    result: { content: string; usage?: AICompletionResponse['usage'] }
+  ): AICompletionResponse => {
+    const promptTokens = result.usage?.promptTokens || 0;
+    const completionTokens = result.usage?.completionTokens || 0;
+    const { credits, costUsd } = computeCredits(
+      model,
+      promptTokens,
+      completionTokens
+    );
+    meterInBackground({
+      meta,
+      tier: servedTier,
+      model,
+      inputTokens: promptTokens,
+      outputTokens: completionTokens,
+      usedFallback,
+    });
+    return {
+      content: result.content,
+      model,
+      tier: servedTier,
+      usedFallback,
+      usage: result.usage
+        ? { ...result.usage, credits, costUsd }
+        : { promptTokens, completionTokens, totalTokens: promptTokens + completionTokens, credits, costUsd },
+      usageWarning,
+    };
+  };
 
   try {
     const result = await callAnthropicOnce({
@@ -256,13 +353,7 @@ export async function aiComplete(
       maxTokens: params.maxTokens,
     });
     console.log(`[ai-gateway] served tier=${tier} model=${primaryModel}`);
-    return {
-      content: result.content,
-      model: primaryModel,
-      tier,
-      usedFallback: false,
-      usage: result.usage,
-    };
+    return finish(tier, primaryModel, false, result);
   } catch (err) {
     const fallbackTier = TIER_FALLBACK[tier];
     if (!fallbackTier || !isRetryableModelError(err)) {
@@ -282,18 +373,12 @@ export async function aiComplete(
     console.log(
       `[ai-gateway] served tier=${fallbackTier} model=${fallbackModel} (fallback from ${tier})`
     );
-    return {
-      content: result.content,
-      model: fallbackModel,
-      tier: fallbackTier,
-      usedFallback: true,
-      usage: result.usage,
-    };
+    return finish(fallbackTier, fallbackModel, true, result);
   }
 }
 
 /**
- * Streaming variant — same tier + fallback semantics.
+ * Streaming variant — same tier + fallback + metering semantics.
  * Emits SSE: `data: {"type":"chunk","content":"..."}\n\n` then `data: [DONE]\n\n`.
  */
 export async function aiCompleteStream(
@@ -303,6 +388,9 @@ export async function aiCompleteStream(
   let model = getModelForTier(tier);
   let usedFallback = false;
   let activeTier: ModelTier = tier;
+  const meta = resolveUsageMeta(params.usage);
+
+  await assertAiUsageAllowed(meta.organizationId);
 
   const client = getAnthropicClient();
   const split = splitSystem(params.messages || [], params.system);
@@ -336,16 +424,30 @@ export async function aiCompleteStream(
   }
 
   const encoder = new TextEncoder();
+  const servedModel = model;
+  const servedTier = activeTier;
+  const servedFallback = usedFallback;
+  let inputTokens = 0;
+  let outputTokens = 0;
+  let streamedChars = 0;
+
   const readableStream = new ReadableStream({
     async start(controller) {
       try {
         for await (const chunk of stream as any) {
+          if (chunk.type === 'message_start' && chunk.message?.usage) {
+            inputTokens = Number(chunk.message.usage.input_tokens) || 0;
+          }
+          if (chunk.type === 'message_delta' && chunk.usage) {
+            outputTokens = Number(chunk.usage.output_tokens) || outputTokens;
+          }
           if (
             chunk.type === 'content_block_delta' &&
             chunk.delta?.type === 'text_delta'
           ) {
             const content = chunk.delta.text;
             if (content) {
+              streamedChars += content.length;
               controller.enqueue(
                 encoder.encode(
                   `data: ${JSON.stringify({ type: 'chunk', content })}\n\n`
@@ -354,6 +456,17 @@ export async function aiCompleteStream(
             }
           }
         }
+        if (!outputTokens && streamedChars > 0) {
+          outputTokens = Math.max(1, Math.ceil(streamedChars / 4));
+        }
+        meterInBackground({
+          meta,
+          tier: servedTier,
+          model: servedModel,
+          inputTokens,
+          outputTokens,
+          usedFallback: servedFallback,
+        });
         controller.enqueue(encoder.encode('data: [DONE]\n\n'));
         controller.close();
       } catch (error) {
@@ -364,9 +477,9 @@ export async function aiCompleteStream(
 
   return {
     stream: readableStream,
-    model,
-    tier: activeTier,
-    usedFallback,
+    model: servedModel,
+    tier: servedTier,
+    usedFallback: servedFallback,
   };
 }
 
@@ -384,6 +497,7 @@ export async function createCompletion(
     messages: options.messages,
     maxTokens: options.maxTokens,
     temperature: options.temperature,
+    usage: options.usage,
   });
 }
 
@@ -397,6 +511,7 @@ export async function createStreamingCompletion(
     messages: options.messages,
     maxTokens: options.maxTokens,
     temperature: options.temperature,
+    usage: options.usage,
   });
 }
 
@@ -454,6 +569,7 @@ export interface AICompletionWithToolsOptions {
   tools: AIToolDefinition[];
   maxTokens?: number;
   toolChoice?: 'auto' | 'any' | 'none';
+  usage?: AiUsageMeta;
 }
 
 export interface AICompletionWithToolsResponse {
@@ -467,7 +583,10 @@ export interface AICompletionWithToolsResponse {
     promptTokens: number;
     completionTokens: number;
     totalTokens: number;
+    credits?: number;
+    costUsd?: number;
   };
+  usageWarning?: string | null;
 }
 
 export async function createCompletionWithTools(
@@ -475,6 +594,48 @@ export async function createCompletionWithTools(
 ): Promise<AICompletionWithToolsResponse> {
   const tier = options.tier || resolveModelTier(options.model);
   const primaryModel = getModelForTier(tier);
+  const meta = resolveUsageMeta(options.usage);
+  const gate = await assertAiUsageAllowed(meta.organizationId);
+  const usageWarning = gate.warn
+    ? `AI credits are at ${gate.summary?.percentUsed}% of this period's ${gate.summary?.planLabel} allowance (${gate.summary?.usedCredits} / ${gate.summary?.allowance}).`
+    : null;
+
+  const finish = (
+    servedTier: ModelTier,
+    model: string,
+    usedFallback: boolean,
+    result: Omit<AICompletionWithToolsResponse, 'model' | 'tier' | 'usedFallback' | 'usageWarning'>
+  ): AICompletionWithToolsResponse => {
+    const promptTokens = result.usage?.promptTokens || 0;
+    const completionTokens = result.usage?.completionTokens || 0;
+    const { credits, costUsd } = computeCredits(
+      model,
+      promptTokens,
+      completionTokens
+    );
+    meterInBackground({
+      meta,
+      tier: servedTier,
+      model,
+      inputTokens: promptTokens,
+      outputTokens: completionTokens,
+      usedFallback,
+    });
+    return {
+      ...result,
+      model,
+      tier: servedTier,
+      usedFallback,
+      usage: {
+        promptTokens,
+        completionTokens,
+        totalTokens: promptTokens + completionTokens,
+        credits,
+        costUsd,
+      },
+      usageWarning,
+    };
+  };
 
   try {
     const result = await createAnthropicCompletionWithTools({
@@ -482,12 +643,7 @@ export async function createCompletionWithTools(
       model: primaryModel,
     });
     console.log(`[ai-gateway] tools tier=${tier} model=${primaryModel}`);
-    return {
-      ...result,
-      model: primaryModel,
-      tier,
-      usedFallback: false,
-    };
+    return finish(tier, primaryModel, false, result);
   } catch (err) {
     const fallbackTier = TIER_FALLBACK[tier];
     if (!fallbackTier || !isRetryableModelError(err)) throw err;
@@ -500,12 +656,7 @@ export async function createCompletionWithTools(
       ...options,
       model: fallbackModel,
     });
-    return {
-      ...result,
-      model: fallbackModel,
-      tier: fallbackTier,
-      usedFallback: true,
-    };
+    return finish(fallbackTier, fallbackModel, true, result);
   }
 }
 
