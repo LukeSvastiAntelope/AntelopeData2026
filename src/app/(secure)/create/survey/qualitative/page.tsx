@@ -34,7 +34,7 @@ export default function CreateQualitativeSurveyPage() {
   const [strategy, setStrategy] = useState<QualStrategy>('open-ended')
   const [maxTurns, setMaxTurns] = useState<number>(12)
   const [maxMinutes, setMaxMinutes] = useState<number>(15)
-  const [model, setModel] = useState<string>('gpt-4o-mini')
+  const [model, setModel] = useState<string>('cheap')
   const [temperature, setTemperature] = useState<number>(0.3)
   const [intro, setIntro] = useState<string>('To start, please share a specific experience related to this topic (time, place, context).')
   const [closing, setClosing] = useState<string>('Before we wrap up: Is there anything important we didn\'t cover? What\'s the one takeaway you want us to remember?')

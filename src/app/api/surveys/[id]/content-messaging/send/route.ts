@@ -211,7 +211,7 @@ export async function POST(
       })
 
       const completion = await createCompletion({
-        model: model || 'gpt-4o-mini',
+        tier: 'cheap',
         temperature: 0.6,
         maxTokens: 350,
         messages: [

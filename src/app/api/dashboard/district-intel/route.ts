@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { getConnection } from '@/app/utils/database/db'
-import OpenAI from 'openai'
+import { createCompletion } from '@/app/utils/services/ai-service'
 import { deepResearch } from '@/app/utils/services/web-search'
 import {
   ABBREV_TO_STATE_NAME,
@@ -14,12 +14,6 @@ import { ensurePrimaryOrgId } from '@/app/api/dashboard/persons/org'
 
 function createConversationId(districtCode: string): string {
   return `district-${districtCode.toLowerCase()}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-}
-
-function getOpenAIClient() {
-  const apiKey = process.env.OPENAI_API_KEY
-  if (!apiKey) return null
-  return new OpenAI({ apiKey })
 }
 
 async function resolveOrgId(userId: string | number): Promise<number> {
@@ -104,8 +98,7 @@ export async function POST(request: NextRequest) {
     const dbRecordFound = built.dbRecordFound
     const base = toClientBase(built)
 
-    const client = getOpenAIClient()
-    if (!client) {
+    if (!process.env.ANTHROPIC_API_KEY) {
       return NextResponse.json({
         status: true,
         llmEnabled: false,
@@ -113,7 +106,7 @@ export async function POST(request: NextRequest) {
           title: `${base.district.districtCode} strategic memo`,
           executiveSummary: base.intelligence.narrative,
           strategicAngles: base.intelligence.recommendedNextSteps,
-          caveats: ['OPENAI_API_KEY missing, generated fallback report.'],
+          caveats: ['ANTHROPIC_API_KEY missing, generated fallback report.'],
         },
       })
     }
@@ -167,15 +160,15 @@ Use ONLY information present in the report below — do not invent facts or sour
 
 REPORT:
 ${deepResult.content}`
-      const completion = await client.chat.completions.create({
-        model: 'gpt-4o-mini',
-        temperature: 0.2,
+      const completion = await createCompletion({
+        tier: 'cheap',
+        maxTokens: 800,
         messages: [
           { role: 'system', content: 'You return only valid JSON. No markdown.' },
           { role: 'user', content: summaryPrompt },
         ],
       })
-      const text = completion.choices?.[0]?.message?.content?.trim() || '{}'
+      const text = (completion.content || '{}').replace(/```json\n?|\n?```/g, '').trim() || '{}'
       parsed = JSON.parse(text)
     } catch {
       parsed = {

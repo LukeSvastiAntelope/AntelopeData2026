@@ -31,8 +31,9 @@ Required in `.env.local`:
 - `NEXT_PUBLIC_APP_URL` — App URL (e.g., `http://localhost:3000`)
 
 Optional (feature-gated):
-- `ANTHROPIC_API_KEY` — Claude AI (survey analytics, digital twins, video prompt-assist)
-- `OPENAI_API_KEY` — GPT models
+- `ANTHROPIC_API_KEY` — Claude AI via ai-service gateway (all LLM calls)
+- `ANTHROPIC_MODEL_WORKHORSE` / `ANTHROPIC_MODEL_HEAVY` / `ANTHROPIC_MODEL_CHEAP` — optional tier model overrides
+- `SERPAPI_API_KEY` — news / web search (not an LLM)
 - `PINECONE_API_KEY` — Vector embeddings
 - `STRIPE_SECRET_KEY` — Payments
 - `TELEGRAM_BOT_TOKEN` — Telegram channel integration
@@ -139,4 +140,4 @@ All `(secure)` pages follow the pattern documented in `docs/LAYOUT_PATTERN.md`:
 
 ### AI Integration
 
-The platform uses both Anthropic (Claude) and OpenAI APIs interchangeably via `ai-service.ts`. Pinecone is used for vector search on survey responses and report embeddings. Digital twin querying is publicly accessible at `/api/agents/query` and `/api/digital-twin/:id*`.
+All LLM calls go through the Anthropic-only gateway in `ai-service.ts` (tiers: workhorse / heavy / cheap). Web search uses `SERPAPI_API_KEY`. Pinecone is used for vector search on survey responses and report embeddings. Digital twin querying is publicly accessible at `/api/agents/query` and `/api/digital-twin/:id*`.

@@ -126,7 +126,7 @@ export async function assistVideoPrompt(params: {
   const template = VIDEO_TEMPLATES.find((t) => t.id === (params.templateId || 'custom'));
 
   // Fail fast when no LLM key — still return a usable structured prompt.
-  if (!process.env.ANTHROPIC_API_KEY && !process.env.OPENAI_API_KEY) {
+  if (!process.env.ANTHROPIC_API_KEY) {
     const fallback = fallbackStructured(plain, params.mode, aspect, duration);
     return {
       ...fallback,

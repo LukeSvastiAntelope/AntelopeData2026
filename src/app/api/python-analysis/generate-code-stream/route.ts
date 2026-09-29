@@ -25,9 +25,9 @@ interface CodeGenerationRequest {
 
 function selectModel(analysisType: string, complexity: string, dataSize: number): string {
   if (analysisType === 'quick-query' || dataSize < 1000) {
-    return 'gpt-4o-mini';
+    return 'cheap';
   }
-  return 'gpt-4o';
+  return 'workhorse';
 }
 
 function classifyAnalysisType(query: string, dataSchema: any): {
@@ -149,7 +149,7 @@ export async function POST(req: NextRequest) {
     const userPrompt = createUserPrompt(request, analysisType);
 
     const streamingResponse = await createStreamingCompletion({
-      model: selectedModel,
+      tier: selectedModel === 'cheap' || selectedModel === 'heavy' ? selectedModel as any : 'workhorse',
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt }

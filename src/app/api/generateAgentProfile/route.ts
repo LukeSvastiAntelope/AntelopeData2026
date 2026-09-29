@@ -1,11 +1,5 @@
 import { NextRequest } from "next/server";
-import OpenAI from "openai";
-
-function getOpenAIClient() {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) throw new Error("OPENAI_API_KEY is missing");
-  return new OpenAI({ apiKey });
-}
+import { createCompletion } from "@/app/utils/services/ai-service";
 
 export async function POST(req: NextRequest) {
   try {
@@ -32,15 +26,13 @@ export async function POST(req: NextRequest) {
       "avatarPrompt": "A detailed description that could be used for generating an avatar image for this agent"
     }`;
 
-    // Call OpenAI with the prompt using the client instance pattern from training/route.ts
-    const completion = await getOpenAIClient().chat.completions.create({
+    const completion = await createCompletion({
+      tier: 'cheap',
+      maxTokens: 500,
       messages: [{ role: "user", content: prompt }],
-      model: "gpt-4o",
-      response_format: { type: "json_object" },
     });
 
-    // Extract the result
-    const responseContent = completion.choices[0].message.content;
+    const responseContent = (completion.content || '{}').replace(/```json\n?|\n?```/g, '').trim();
     const agentProfile = JSON.parse(responseContent || '{}');
     
     // Ensure the description is under the database limit (truncate if needed)
@@ -60,4 +52,4 @@ export async function POST(req: NextRequest) {
       error: error instanceof Error ? error.message : "Unknown error" 
     }, { status: 500 });
   }
-} 
+}

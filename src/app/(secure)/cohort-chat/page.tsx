@@ -123,7 +123,7 @@ export default function CohortChatPage() {
   const { prompts: surveyPrompts, refresh: refreshSurveyPrompts } = useSurveyPrompts(selectedSurveyData);
   const [availableFields, setAvailableFields] = useState<{name: string, label: string, type: string}[]>([]);
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const [selectedModel, setSelectedModel] = useState('gpt-4o');
+  const [selectedModel, setSelectedModel] = useState('workhorse');
   const [temperature, setTemperature] = useState(0.0);
   const [sources, setSources] = useState<{survey: boolean; twins: boolean; web: boolean}>({survey: true, twins: true, web: true});
   const [activeTab, setActiveTab] = useState<'chat' | 'stats'>('chat');

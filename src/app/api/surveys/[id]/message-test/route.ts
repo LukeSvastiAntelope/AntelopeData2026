@@ -133,7 +133,7 @@ Format your response as JSON:
 
         try {
           const completion = await createCompletion({
-            model: 'gpt-4o-mini',
+            tier: 'cheap',
             messages: [
               {
                 role: 'system',
@@ -144,7 +144,7 @@ Format your response as JSON:
             temperature: 0.7,
           });
 
-          const responseText = completion.choices?.[0]?.message?.content || '';
+          const responseText = completion.content || '';
           
           // Parse the JSON response
           let parsed;

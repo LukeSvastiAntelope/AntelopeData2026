@@ -94,9 +94,9 @@ export async function GET(req: NextRequest) {
 
   // Check critical env vars (without exposing values)
   info.env = {
-    OPENAI_API_KEY: {
-      isSet: Boolean(process.env.OPENAI_API_KEY),
-      length: process.env.OPENAI_API_KEY?.length || 0
+    ANTHROPIC_API_KEY: {
+      isSet: Boolean(process.env.ANTHROPIC_API_KEY),
+      length: process.env.ANTHROPIC_API_KEY?.length || 0
     },
     MYSQL_HOST: {
       isSet: Boolean(process.env.MYSQL_HOST),

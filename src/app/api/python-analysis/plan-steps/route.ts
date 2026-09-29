@@ -166,7 +166,7 @@ Return a JSON array of steps in this format:
 ]`;
 
     const completion = await createCompletion({
-      model: 'gpt-4o', // Use more powerful model for planning
+      tier: 'heavy', // planning — deepest reasoning
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt }
@@ -199,7 +199,7 @@ Return a JSON array of steps in this format:
       
       return NextResponse.json({
         steps: enhancedSteps,
-        model: 'gpt-4o'
+        model: 'heavy'
       });
 
     } catch (parseError) {

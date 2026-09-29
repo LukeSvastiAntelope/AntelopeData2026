@@ -1,15 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import OpenAI from 'openai';
 import { openSql } from '@/app/utils/database/db';
 import { RowDataPacket } from 'mysql2/promise';
+import { createCompletion } from '@/app/utils/services/ai-service';
 
 export const dynamic = 'force-dynamic';
-
-function getOpenAIClient() {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) throw new Error('OPENAI_API_KEY is missing');
-  return new OpenAI({ apiKey });
-}
 
 // Basic safeguard to ensure no destructive SQL commands
 function isSafeQuery(sql: string): boolean {
@@ -50,7 +44,6 @@ export async function POST(req: NextRequest) {
   try {
     const { query } = await req.json();
 
-    // 1) Use OpenAI to convert natural language to SQL
     const systemPrompt = `
       You are a helpful assistant that converts natural language to EXACT and VALID SQL queries.
       The database contains tables for surveys, survey_responses, survey_questions, survey_answers,
@@ -61,16 +54,18 @@ export async function POST(req: NextRequest) {
 
     const userPrompt = `Natural Language Query:\n"${query}"\n\nSQL:`;
 
-    const completion = await getOpenAIClient().chat.completions.create({
-      model: "gpt-3.5-turbo",
+    const completion = await createCompletion({
+      tier: 'cheap',
+      maxTokens: 400,
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt },
       ],
-      temperature: 0.1,
     });
 
-    let generatedSql = completion.choices[0].message?.content?.trim() || "";
+    let generatedSql = (completion.content || "").trim();
+    // Strip markdown fences if present
+    generatedSql = generatedSql.replace(/^```(?:sql)?\s*/i, '').replace(/\s*```$/, '').trim();
 
     // Quick check for safety
     if (!isSafeQuery(generatedSql)) {

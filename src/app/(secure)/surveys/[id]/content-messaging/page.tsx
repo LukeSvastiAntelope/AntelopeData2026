@@ -46,7 +46,7 @@ export default function ContentMessagingPage() {
   const [headers, setHeaders] = useState<string[]>([])
 
   const [channel, setChannel] = useState<Channel>('email')
-  const [model, setModel] = useState<string>('gpt-4o-mini')
+  const [model, setModel] = useState<string>('cheap')
   const [tone, setTone] = useState<string>('friendly, concise, fundraising')
   const [campaignContext, setCampaignContext] = useState<string>('')
   const [ctaUrl, setCtaUrl] = useState<string>('')
@@ -270,7 +270,7 @@ export default function ContentMessagingPage() {
                 </div>
                 <div className="space-y-2">
                   <Label>Model</Label>
-                  <Input value={model} onChange={(e) => setModel(e.target.value)} placeholder="gpt-4o-mini" />
+                  <Input value={model} onChange={(e) => setModel(e.target.value)} placeholder="cheap" />
                 </div>
               </div>
 

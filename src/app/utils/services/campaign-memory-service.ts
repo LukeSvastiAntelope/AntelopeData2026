@@ -1,7 +1,7 @@
-import OpenAI from 'openai';
 import { Pinecone } from '@pinecone-database/pinecone';
 import { openSql } from '@/app/utils/database/db';
 import { RowDataPacket } from 'mysql2/promise';
+import { embedText } from '@/app/utils/services/embedding-service';
 
 export type CampaignMemoryType = 'fact' | 'preference' | 'event' | 'summary';
 
@@ -35,30 +35,11 @@ export interface RetrieveCampaignMemoryInput {
   userId?: number | null;
 }
 
-function getOpenAIClient() {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) throw new Error('OPENAI_API_KEY is missing');
-  return new OpenAI({ apiKey });
-}
-
 function getPineconeIndex() {
   const apiKey = process.env.PINECONE_API_KEY;
   if (!apiKey) throw new Error('PINECONE_API_KEY is missing');
   const indexName = process.env.PINECONE_MEMORY_INDEX || process.env.PINECONE_INDEX || 'prediction-results';
   return new Pinecone({ apiKey }).index(indexName);
-}
-
-async function embedText(text: string) {
-  const client = getOpenAIClient();
-  const model = process.env.MEMORY_EMBEDDING_MODEL || 'text-embedding-3-small';
-  const result = await client.embeddings.create({
-    model,
-    input: text,
-  });
-  return {
-    model,
-    vector: result.data[0]?.embedding || [],
-  };
 }
 
 export function buildCampaignMemoryNamespace(orgId?: number | null, userId?: number | null) {

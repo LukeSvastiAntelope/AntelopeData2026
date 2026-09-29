@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Message required' }, { status: 400 });
     }
 
-    const hasKey = Boolean(process.env.ANTHROPIC_API_KEY || process.env.OPENAI_API_KEY);
+    const hasKey = Boolean(process.env.ANTHROPIC_API_KEY);
     if (!hasKey) {
       return NextResponse.json({
         status: true,

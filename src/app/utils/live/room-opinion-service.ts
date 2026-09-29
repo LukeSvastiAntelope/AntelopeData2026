@@ -181,7 +181,7 @@ async function nameClustersWithModel(
   groups: Array<{ name: string; characterization: string }>;
   roomSummary: string | null;
 } | null> {
-  if (!process.env.ANTHROPIC_API_KEY && !process.env.OPENAI_API_KEY) {
+  if (!process.env.ANTHROPIC_API_KEY) {
     return null;
   }
   const payload = clusters.map((units, i) => ({

@@ -778,7 +778,7 @@ Score generously for semantic relevance to ANY topic mentioned in the query.`;
 
     try {
       const completion = await createCompletion({
-        model: 'gpt-4o-mini',
+        tier: 'cheap',
         messages: [
           { role: 'user', content: prompt }
         ],

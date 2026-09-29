@@ -33,7 +33,7 @@ WHEN CITING DATA:
 Remember: You are not just summarizing data - you are providing expert interpretation that helps users make informed decisions based on their survey insights.`;
 
 export function useModelConfig() {
-  const [selectedModel, setSelectedModel] = useState('gpt-4o');
+  const [selectedModel, setSelectedModel] = useState('workhorse');
   const [temperature, setTemperature] = useState(0.0);
   const [streamingMode, setStreamingMode] = useState<StreamingMode>('smart');
   const [systemPrompt, setSystemPrompt] = useState(DEFAULT_SYSTEM_PROMPT);

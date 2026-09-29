@@ -95,7 +95,7 @@ const CreateSurveyPage = () => {
 
   // AI generate from prompt
   const [aiPrompt, setAiPrompt] = useState('')
-  const [aiModel, setAiModel] = useState('gpt-4o-mini')
+  const [aiModel, setAiModel] = useState('cheap')
   const [aiGenerating, setAiGenerating] = useState(false)
   const [aiError, setAiError] = useState<string | null>(null)
   const [aiSuccess, setAiSuccess] = useState(false)

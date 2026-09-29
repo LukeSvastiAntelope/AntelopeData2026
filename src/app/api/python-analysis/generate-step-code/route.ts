@@ -397,13 +397,9 @@ Return concise, executable Python code (10-20 lines max).`;
     }
 
     const completion = await createCompletion({
-      // gpt-4o (not mini): the step code is the core reasoning — it must reliably
-      // map natural-language questions to the right columns, use the 0/1 indicator
-      // columns for multi-select, and compute crosstab/chi-square correctly and
-      // CONSISTENTLY. gpt-4o-mini intermittently ignored these rules (e.g. ran
-      // value_counts on the raw multi-select string), which produced wildly
-      // varying counts run-to-run. temp 0 for maximum determinism.
-      model: 'gpt-4o',
+      // heavy: step code is core reasoning — column mapping, multi-select
+      // indicators, crosstab/chi-square. temp 0 for maximum determinism.
+      tier: 'heavy',
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt }
@@ -431,7 +427,7 @@ Return concise, executable Python code (10-20 lines max).`;
 
     return NextResponse.json({
       code,
-      model: 'gpt-4o',
+      model: 'heavy',
       step_id: request.step.id
     });
 

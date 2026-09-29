@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireUserId } from '@/app/utils/auth/require-user';
 import Papa from 'papaparse'
 import * as XLSX from 'xlsx'
-import OpenAI from 'openai'
+import { createCompletion } from '@/app/utils/services/ai-service'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -69,10 +69,7 @@ async function aiFilter(
   headers: string[],
   prompt: string
 ): Promise<Record<string, string>[]> {
-  const apiKey = process.env.OPENAI_API_KEY
-  if (!apiKey) return rows
-
-  const client = new OpenAI({ apiKey, maxRetries: 0 })
+  if (!process.env.ANTHROPIC_API_KEY) return rows
 
   const systemMsg = `You are a data filtering assistant. The user has a table with these columns: ${headers.join(', ')}.
 They want to filter the rows using the following condition: "${prompt}".
@@ -87,17 +84,16 @@ If all rows pass, return all indices. If none pass, return [].`
     ...sample.map(r => headers.map(h => r[h] ?? '').join('\t'))
   ].join('\n')
 
-  const response = await client.chat.completions.create({
-    model: 'gpt-4o-mini',
+  const response = await createCompletion({
+    tier: 'cheap',
+    maxTokens: 2000,
     messages: [
       { role: 'system', content: systemMsg },
       { role: 'user', content: tableText }
     ],
-    max_tokens: 2000,
-    temperature: 0,
   })
 
-  const content = response.choices[0]?.message?.content?.trim() || '[]'
+  const content = response.content?.trim() || '[]'
 
   try {
     const jsonMatch = content.match(/\[[\d,\s]*\]/)

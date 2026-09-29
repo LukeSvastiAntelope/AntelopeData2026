@@ -148,7 +148,7 @@ export async function scrapeArticle(url: string): Promise<ScrapedArticle> {
 export async function inferTopic(storyText: string, fallbackTitle: string): Promise<{ topic: string; suggestedTitle: string }> {
   try {
     const completion = await createCompletion({
-      model: 'gpt-4o-mini',
+      tier: 'cheap',
       temperature: 0.2,
       maxTokens: 150,
       messages: [
@@ -255,7 +255,7 @@ reveal_mode: ${opts.revealMode}
 context_instructions: ${opts.contextInstructions || '(none)'}`;
 
   const completion = await createCompletion({
-    model: 'gpt-4o',
+    tier: 'workhorse',
     temperature: 0.3,
     maxTokens: 1800,
     messages: [
@@ -294,7 +294,7 @@ export async function generateMethodologyNote(opts: {
 }): Promise<string> {
   try {
     const completion = await createCompletion({
-      model: 'gpt-4o-mini',
+      tier: 'cheap',
       temperature: 0.2,
       maxTokens: 300,
       messages: [

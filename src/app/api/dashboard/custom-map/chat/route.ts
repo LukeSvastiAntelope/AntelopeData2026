@@ -1,15 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
-import OpenAI from 'openai'
+import { createCompletion } from '@/app/utils/services/ai-service'
 import type { CustomLayerGeoType, CustomLayerStyle, MapAssistantModelResult } from '@/lib/custom-map-assistant'
 
 export const maxDuration = 60
-
-function getOpenAIClient() {
-  const apiKey = process.env.OPENAI_API_KEY
-  if (!apiKey) return null
-  return new OpenAI({ apiKey })
-}
 
 function normalizeResult(raw: Record<string, unknown>): MapAssistantModelResult {
   const style = raw.style as string | null | undefined
@@ -51,12 +45,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'message is required' }, { status: 400 })
     }
 
-    const client = getOpenAIClient()
-    if (!client) {
+    if (!process.env.ANTHROPIC_API_KEY) {
       const fallback: MapAssistantModelResult = {
         reply: hasUploadedData
-          ? 'Add OPENAI_API_KEY to enable the map assistant. Until then, use the dropdowns under “Upload data set” and Apply to map.'
-          : 'Add OPENAI_API_KEY for AI answers. You can still use the map layers from the right panel (Political, Districts, Responses, etc.). Upload a CSV under “Upload data set to map” when you want custom choropleth or pins.',
+          ? 'Add ANTHROPIC_API_KEY to enable the map assistant. Until then, use the dropdowns under “Upload data set” and Apply to map.'
+          : 'Add ANTHROPIC_API_KEY for AI answers. You can still use the map layers from the right panel (Political, Districts, Responses, etc.). Upload a CSV under “Upload data set to map” when you want custom choropleth or pins.',
         filterKeywords: null,
         districtText: null,
         showPins: false,
@@ -135,16 +128,16 @@ Return ONLY valid JSON (no markdown) with this exact shape:
 
 Always set showPins and applyChoropleth to false (no dataset). Other fields null.`
 
-    const completion = await client.chat.completions.create({
-      model: 'gpt-4o-mini',
-      temperature: hasUploadedData ? 0.2 : 0.35,
+    const completion = await createCompletion({
+      tier: 'cheap',
+      maxTokens: 800,
       messages: [
         { role: 'system', content: 'You output only compact JSON. No markdown fences.' },
         { role: 'user', content: prompt },
       ],
     })
 
-    const text = completion.choices?.[0]?.message?.content?.trim() ?? '{}'
+    const text = completion.content?.trim() ?? '{}'
     let parsed: Record<string, unknown>
     try {
       parsed = JSON.parse(text.replace(/^```json\s*|\s*```$/g, ''))

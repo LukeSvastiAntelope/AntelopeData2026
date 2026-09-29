@@ -149,7 +149,7 @@ Be analytical and insightful, not just descriptive. Transform raw statistics int
 Do not repeat the exact percentages already shown above - instead interpret what they reveal.`;
 
     const completion = await createCompletion({
-      model: 'gpt-4o',
+      tier: 'workhorse',
       messages: [
         { role: "system", content: "You are an expert data analyst providing insights based on survey results." },
         { role: "user", content: prompt }

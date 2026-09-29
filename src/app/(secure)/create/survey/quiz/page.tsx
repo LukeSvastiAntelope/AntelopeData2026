@@ -42,7 +42,7 @@ export default function QuizSurveyBuilderPage() {
 
   // AI prompt
   const [prompt, setPrompt] = useState('Create a 10-question quiz to assess product knowledge for onboarding sales reps.')
-  const [selectedModel, setSelectedModel] = useState('gpt-4o')
+  const [selectedModel, setSelectedModel] = useState('workhorse')
   const [isGenerating, setIsGenerating] = useState(false)
   const [error, setError] = useState<string|null>(null)
 

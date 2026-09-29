@@ -120,7 +120,7 @@ export async function respondFromCampaignNewsOnly(params: NewsCopilotParams) {
   } = params;
 
   const items = (newsContext?.items || []).slice(0, 8);
-  const selectedModel = (model || process.env.NEWS_COPILOT_MODEL || "gpt-4o").trim();
+  const selectedModel = (model || process.env.NEWS_COPILOT_MODEL || "workhorse").trim();
   const candidateLabel =
     campaignIdentity?.candidateName ||
     campaignIdentity?.organizationName ||
@@ -250,7 +250,7 @@ Requirements:
 - Be concise and useful, not templated.`;
 
     const draftResult = await createCompletion({
-      model: selectedModel,
+      model: selectedModel, // resolved → tier by gateway
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: draftPrompt },
@@ -273,9 +273,9 @@ Requirements:
     }
 
     // Fallback model for transient provider/model failures.
-    if ((!finalResult.content || !finalResult.content.trim()) && selectedModel !== "gpt-4o") {
+    if ((!finalResult.content || !finalResult.content.trim()) && selectedModel !== "workhorse") {
       finalResult = await createCompletion({
-        model: "gpt-4o",
+        tier: 'workhorse',
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: (useCriticPass ? reviewPrompt.replace('{DRAFT}', draftResult.content || '') : draftPrompt) },
@@ -416,7 +416,7 @@ export async function respondFromGeneralWebOnly(params: GeneralWebCopilotParams)
     districtScope,
   } = params;
 
-  const selectedModel = (model || process.env.GENERAL_COPILOT_MODEL || "gpt-4o").trim();
+  const selectedModel = (model || process.env.GENERAL_COPILOT_MODEL || "workhorse").trim();
   const candidateLabel =
     campaignIdentity?.candidateName ||
     campaignIdentity?.organizationName ||
@@ -475,7 +475,7 @@ export async function respondFromGeneralWebOnly(params: GeneralWebCopilotParams)
     .filter(Boolean)
     .join("\n\n");
 
-  // First try a LIVE web search (OpenAI search-preview) so general/news mode
+  // First try a LIVE web search (SerpAPI + Anthropic gateway) so general/news mode
   // pulls real, current political/news/clerk/ballot information and cites it.
   try {
     const { webSearchAnswer, withSourcesSection } = await import("../../../utils/services/web-search");
@@ -513,9 +513,9 @@ export async function respondFromGeneralWebOnly(params: GeneralWebCopilotParams)
     });
 
     let content = (result.content || "").trim();
-    if (!content && selectedModel !== "gpt-4o") {
+    if (!content && selectedModel !== "workhorse") {
       const fallback = await createCompletion({
-        model: "gpt-4o",
+        tier: 'workhorse',
         messages: [
           { role: "system", content: baseSystem },
           { role: "user", content: userPrompt },
@@ -529,7 +529,7 @@ export async function respondFromGeneralWebOnly(params: GeneralWebCopilotParams)
     if (!content) {
       content = [
         "## Unable to generate a response",
-        "The AI service returned an empty reply. Check that `OPENAI_API_KEY` (or your selected model provider key) is set in `.env.local` / `.env.production`, then try again.",
+        "The AI service returned an empty reply. Check that `ANTHROPIC_API_KEY` is set in `.env.local` / `.env.production`, then try again.",
         "",
         "For **general/news** questions without a news digest, you can still ask about methodology (e.g. ballot order effects, merging clerk files with results) and I will outline a data plan.",
       ].join("\n");

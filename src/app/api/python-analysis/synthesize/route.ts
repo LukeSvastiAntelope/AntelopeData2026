@@ -86,7 +86,7 @@ Structure your response as:
 Focus on being clear, specific, and actionable.`;
 
     const completion = await createCompletion({
-      model: 'gpt-4o', // Use powerful model for synthesis
+      tier: 'heavy', // synthesis — deepest reasoning
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt }
@@ -101,7 +101,7 @@ Focus on being clear, specific, and actionable.`;
 
     return NextResponse.json({
       synthesis,
-      model: 'gpt-4o',
+      model: 'heavy',
       analysisSteps: request.executedSteps.length,
       totalFindings: request.keyFindings.length
     });

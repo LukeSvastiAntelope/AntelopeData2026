@@ -1,71 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server'
-import OpenAI from 'openai'
 import { requireUserId } from '@/app/utils/auth/require-user'
-import {
-  buildMediaKey,
-  getStorageProvider,
-  mediaMonthFolder,
-  mediaObjectUrl,
-} from '@/app/utils/services/storage'
 
-// POST /api/media/generate - generate an image via LLM image API and save via StorageProvider
-// Body: { prompt: string, size?: '512x512'|'1024x1024'|'256x256', format?: 'png'|'jpeg'|'webp' }
+/**
+ * Image generation endpoint — LLM gateway is Anthropic-only and does not
+ * include an image model. Return 503 until a dedicated image provider is wired.
+ */
 export async function POST(req: NextRequest) {
+  const auth = requireUserId(req)
+  if (typeof auth !== 'string') return auth
+
   try {
-    const auth = requireUserId(req)
-    if (typeof auth !== 'string') return auth
-    const safeUserId = auth
-
-    if (!process.env.OPENAI_API_KEY) {
-      return NextResponse.json({ status: false, message: 'OpenAI API key not configured' }, { status: 503 })
-    }
-
-    const { prompt, size = '1024x1024', format = 'png' } = await req.json()
-    if (!prompt || typeof prompt !== 'string') {
-      return NextResponse.json({ status: false, message: 'Missing prompt' }, { status: 400 })
-    }
-
-    const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY, timeout: 240000, maxRetries: 0 })
-
-    // Generate image
-    const img = await client.images.generate({
-      model: 'gpt-image-1',
-      prompt,
-      size,
-    } as any)
-
-    // Prefer b64 if present, else fetch URL
-    const b64 = img?.data?.[0]?.b64_json as string | undefined
-    let buffer: Buffer
-    let mime = format === 'jpeg' ? 'image/jpeg' : format === 'webp' ? 'image/webp' : 'image/png'
-    let ext = format === 'jpeg' ? '.jpg' : format === 'webp' ? '.webp' : '.png'
-    if (b64 && typeof b64 === 'string') {
-      buffer = Buffer.from(b64, 'base64')
-    } else if (img?.data?.[0]?.url) {
-      const u = img.data[0].url as string
-      const resp = await fetch(u)
-      const ab = await resp.arrayBuffer()
-      buffer = Buffer.from(ab)
-      const ct = resp.headers.get('content-type') || ''
-      if (ct.includes('image/jpeg')) { mime = 'image/jpeg'; ext = '.jpg' }
-      else if (ct.includes('image/webp')) { mime = 'image/webp'; ext = '.webp' }
-      else if (ct.includes('image/png')) { mime = 'image/png'; ext = '.png' }
-    } else {
-      return NextResponse.json({ status: false, message: 'Image generation failed' }, { status: 502 })
-    }
-
-    const filename = `${Date.now()}_gen${ext}`
-    const key = buildMediaKey({
-      userId: safeUserId,
-      folder: mediaMonthFolder(),
-      filename,
-    })
-    await getStorageProvider().put(key, buffer, mime)
-
-    const url = mediaObjectUrl(key)
-    return NextResponse.json({ status: true, url, key, type: mime })
-  } catch (err: any) {
-    console.error('Generate image error', err?.status || '', err?.message || err)
-    return NextResponse.json({ status: false, message: 'Generate failed' }, { status: 500 })
+    await req.json()
+  } catch {
+    /* ignore body parse */
   }
+
+  return NextResponse.json(
+    {
+      status: false,
+      message:
+        'Image generation is not available on the Anthropic-only AI gateway. Use an uploaded asset instead.',
+    },
+    { status: 503 }
+  )
 }

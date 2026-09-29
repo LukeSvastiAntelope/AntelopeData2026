@@ -124,7 +124,7 @@ export async function POST(request: NextRequest) {
           breakdowns: breakdownCharts.map((b) => ({ prompt: b.questionPrompt, headlineOption: b.headlineOption, bars: b.bars })),
         };
         const completion = await createCompletion({
-          model: 'gpt-4o-mini',
+          tier: 'cheap',
           temperature: 0.2,
           maxTokens: 200,
           messages: [

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createCompletion } from '@/app/utils/services/ai-service';
 import { requireUserId } from '@/app/utils/auth/require-user';
 import { openSql as getMySQLConnection } from '@/app/utils/database/db';
 import type { RowDataPacket } from 'mysql2/promise';
@@ -262,32 +263,13 @@ Better to include too many relevant questions than to miss important ones.
 Relevant questions:`;
 
   try {
-    // Make request to OpenAI API
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-4',
-        messages: [
-          {
-            role: 'user',
-            content: prompt
-          }
-        ],
-        temperature: 0.1, // Low temperature for consistent, focused analysis
-        max_tokens: 1000
-      })
+    const completion = await createCompletion({
+      tier: 'workhorse',
+      maxTokens: 1000,
+      messages: [{ role: 'user', content: prompt }],
     });
 
-    if (!response.ok) {
-      throw new Error(`OpenAI API error: ${response.status} ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    const llmResponse = data.choices[0].message.content.trim();
+    const llmResponse = (completion.content || '').trim();
     
     console.log('🧠 LLM Response:', llmResponse);
 

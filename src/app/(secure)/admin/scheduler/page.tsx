@@ -429,7 +429,7 @@ export default function SchedulerAdminPage() {
                                             <Badge variant="default">Active</Badge>
                                         </div>
                                         <div className="flex items-center justify-between">
-                                            <span className="text-sm">OpenAI API</span>
+                                            <span className="text-sm">Anthropic API</span>
                                             <Badge variant="default">Available</Badge>
                                         </div>
                                     </div>

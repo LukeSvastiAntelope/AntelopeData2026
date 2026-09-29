@@ -34,12 +34,11 @@ interface CodeGenerationResponse {
 
 // Model routing logic based on analysis type and complexity
 function selectModel(analysisType: string, complexity: string, dataSize: number): string {
-  // Only OpenAI is configured in this deployment, so route everything to
-  // available GPT models (o3-mini / deepseek-coder would 401 with no key).
+  // Gateway tiers: cheap for high-volume/quick, workhorse for standard analysis.
   if (analysisType === 'quick-query' || dataSize < 1000) {
-    return 'gpt-4o-mini';
+    return 'cheap';
   }
-  return 'gpt-4o';
+  return 'workhorse';
 }
 
 // Determine analysis type from query
@@ -242,7 +241,7 @@ export async function POST(req: NextRequest) {
     const userPrompt = createUserPrompt(request, analysisType);
 
     const completion = await createCompletion({
-      model: selectedModel,
+      tier: selectedModel === 'cheap' || selectedModel === 'heavy' ? selectedModel as any : 'workhorse',
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt }

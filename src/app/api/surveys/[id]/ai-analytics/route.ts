@@ -31,24 +31,16 @@ export async function GET(
         hasAnalytics: false,
         responseCount: status.responseCount,
         availableModels: {
-          analysis: getAllModels().filter(m => 
-            ['gpt-4o', 'gpt-4o', 'o1', 'gemini-2.0-flash'].includes(m.id)
-          ),
-          queries: getAllModels().filter(m => 
-            ['gpt-4o-mini', 'gpt-4o-mini', 'deepseek-chat'].includes(m.id)
-          ),
-          insights: getAllModels().filter(m => 
-            ['gpt-4o', 'gpt-4o', 'o1'].includes(m.id)
-          ),
-          visualization: getAllModels().filter(m => 
-            ['gpt-4o', 'gpt-4o', 'gemini-2.0-flash'].includes(m.id)
-          )
+          analysis: getAllModels(),
+          queries: getAllModels(),
+          insights: getAllModels(),
+          visualization: getAllModels(),
         },
         recommendedModels: {
-          analysis: 'gpt-4o',
-          queries: 'gpt-4o-mini', 
-          insights: 'gpt-4o',
-          visualization: 'gpt-4o'
+          analysis: 'workhorse',
+          queries: 'cheap',
+          insights: 'workhorse',
+          visualization: 'workhorse',
         },
         minimumResponses: 10,
         message: status.responseCount < 10 

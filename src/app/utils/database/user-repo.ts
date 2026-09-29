@@ -283,7 +283,7 @@ async function createAgent(id: string) {
     
     await db.execute(
         'INSERT INTO agents (user_id, riskLevel, image, name, is_onboarded, description, interests, principles, maxTimelineLimit, category, model, plugins) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        [Number(id), AGENT_RISK_LEVEL[0], defaultAvatar, defaultName, 0, '', '', '', 30, 'General', 'gpt-4o', '']
+        [Number(id), AGENT_RISK_LEVEL[0], defaultAvatar, defaultName, 0, '', '', '', 30, 'General', 'workhorse', '']
     );
     return await getAgentByUserId(id);
 }

@@ -76,7 +76,7 @@ export async function assistOutboundGoal(params: {
   }
 
   const fallbackGoal = plain.slice(0, 240);
-  if (params.mock || (!process.env.ANTHROPIC_API_KEY && !process.env.OPENAI_API_KEY)) {
+  if (params.mock || (!process.env.ANTHROPIC_API_KEY)) {
     return {
       goal: fallbackGoal,
       explanation:

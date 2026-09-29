@@ -181,7 +181,7 @@ export async function runConsultantMessage(params: {
     },
   ];
 
-  const hasKey = Boolean(process.env.ANTHROPIC_API_KEY || process.env.OPENAI_API_KEY);
+  const hasKey = Boolean(process.env.ANTHROPIC_API_KEY);
   if (!hasKey) {
     const reply = offlineIntakeReply(text);
     messages.push({

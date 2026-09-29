@@ -435,7 +435,7 @@ Be analytical and insightful, not just descriptive. Transform raw statistics int
 Do not repeat the exact percentages already shown above - instead interpret what they reveal.`;
 
     const completion = await createCompletion({
-      model: 'gpt-4o', // Use stronger model for analysis
+      tier: 'workhorse', // Use stronger model for analysis
       messages: [
         { role: 'user', content: prompt }
       ],
@@ -590,7 +590,7 @@ export async function POST(req: NextRequest) {
     const numericUserId = Number.isFinite(Number(userId)) ? Number(userId) : null;
 
     const body = (await req.json()) as CohortQueryPayload;
-    const { cohort, question, recentMessages, topK = 1000, surveyId: initialSurveyId, model = 'gpt-4o', temperature = 0.0, sources, systemPrompt, stream = true, responseMode: requestedResponseMode, districtScope } = body;
+    const { cohort, question, recentMessages, topK = 1000, surveyId: initialSurveyId, model = 'workhorse', temperature = 0.0, sources, systemPrompt, stream = true, responseMode: requestedResponseMode, districtScope } = body;
     const deepResearchRequested = Boolean((body as any).deepResearch);
 
     // Deep Research mode runs early and self-contained (decompose -> parallel web
@@ -1028,7 +1028,7 @@ Return ONLY a JSON object with this format:
 Only suggest auto-selection if there's a clear, unambiguous match with high confidence (>0.8).`;
 
           const autoSelectionResult = await createCompletion({
-            model: 'gpt-4o-mini',
+            tier: 'cheap',
             messages: [{ role: 'user', content: autoSelectionPrompt }],
             temperature: 0.2,
             maxTokens: 200

@@ -58,11 +58,9 @@ Return JSON only:
 If the output contains no usable numbers, return: { "insights": [] }`;
 
     const completion = await createCompletion({
-      // gpt-4o (not mini): this step converts executed output into stated claims —
-      // it is THE place hallucinations enter. The stronger model adheres to the
-      // strict "only numbers literally in the output" grounding rules far more
-      // reliably than mini. temp 0 for deterministic, faithful extraction.
-      model: 'gpt-4o',
+      // heavy: converts executed output into stated claims — hallucination gate.
+      // temp 0 for deterministic, faithful extraction.
+      tier: 'heavy',
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt }
@@ -84,7 +82,7 @@ If the output contains no usable numbers, return: { "insights": [] }`;
       const result = JSON.parse(responseText);
       return NextResponse.json({
         insights: result.insights || [],
-        model: 'gpt-4o'
+        model: 'heavy'
       });
     } catch (parseError) {
       console.warn('Failed to parse insights JSON, using fallback extraction');

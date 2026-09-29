@@ -13,7 +13,7 @@ export async function POST(
     if (!survey) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
     const cfg = (survey as any).source_metadata?.settings?.qualitative || {}
-    const model = cfg.model || 'gpt-4o-mini'
+    const model = 'cheap' // gateway tier
     const temperature = typeof cfg.temperature === 'number' ? cfg.temperature : 0.3
 
     const system = [
@@ -34,7 +34,7 @@ export async function POST(
       ...((body.messages || []).map((m: any) => ({ role: m.role === 'user' ? 'user' as const : 'assistant' as const, content: String(m.content || '') })))
     ]
 
-    const completion = await createCompletion({ model, messages, temperature, maxTokens: 400 })
+    const completion = await createCompletion({ tier: 'cheap', messages, temperature, maxTokens: 400 })
     const reply = completion.content?.trim() || ''
 
     // Simple stop heuristic: limit total turns

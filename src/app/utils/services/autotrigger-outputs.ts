@@ -180,7 +180,7 @@ async function generateNewsletterCopy(params: {
   }
   try {
     const result = await createCompletion({
-      model: process.env.AT2_NEWSLETTER_MODEL || 'gpt-4o-mini',
+      tier: 'cheap',
       temperature: 0.5,
       maxTokens: 700,
       messages: [
@@ -243,7 +243,7 @@ async function generateVideoScript(params: {
   }
   try {
     const result = await createCompletion({
-      model: process.env.AT2_VIDEO_MODEL || 'gpt-4o-mini',
+      tier: 'cheap',
       temperature: 0.4,
       maxTokens: 400,
       messages: [

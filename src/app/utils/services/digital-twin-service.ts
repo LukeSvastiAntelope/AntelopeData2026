@@ -1,4 +1,5 @@
-import OpenAI from 'openai';
+import { embedText } from '@/app/utils/services/embedding-service';
+import { createCompletion } from '@/app/utils/services/ai-service';
 import { Pinecone } from '@pinecone-database/pinecone';
 import { 
   AnonymityLevel, 
@@ -10,12 +11,6 @@ import {
   filterDemographicsForAnonymity,
   categorizeImportedTwin 
 } from '../anonymity-config';
-
-function getOpenAIClient() {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) throw new Error('OPENAI_API_KEY is missing');
-  return new OpenAI({ apiKey });
-}
 
 function getPineconeClient() {
   const apiKey = process.env.PINECONE_API_KEY;
@@ -109,20 +104,18 @@ Guidelines:
 - Focus on what makes this person unique`;
 
     try {
-      const openai = getOpenAIClient();
-      const completion = await openai.chat.completions.create({
-        model: "gpt-4o",
+      const completion = await createCompletion({
+        tier: 'workhorse',
         messages: [
           { role: "system", content: "You are an expert psychologist creating detailed persona profiles from survey data. Return only valid JSON." },
           { role: "user", content: prompt }
         ],
-        temperature: 0.3,
-        max_tokens: 2000,
+        maxTokens: 2000,
       });
 
-      const response = completion.choices[0]?.message?.content;
+      const response = completion.content;
       if (!response) {
-        throw new Error('No response from OpenAI');
+        throw new Error('No response from AI gateway');
       }
 
       // Clean and parse the response
@@ -185,17 +178,16 @@ Rules:
     const personaContext = `Demographics: ${JSON.stringify(demographics)}\nPersona: ${JSON.stringify(principles)}`;
     const surveyContext = `Questions: ${JSON.stringify(typedQuestions)}`;
 
-    const completion = await getOpenAIClient().chat.completions.create({
-      model: 'gpt-4o',
-      temperature: 0.3,
+    const completion = await createCompletion({
+      tier: 'workhorse',
+      maxTokens: 2000,
       messages: [
         { role: 'system', content: instruction },
-        { role: 'user', content: personaContext },
-        { role: 'user', content: surveyContext }
+        { role: 'user', content: personaContext + '\n\n' + surveyContext }
       ]
     });
 
-    const content = completion.choices[0]?.message?.content || '';
+    const content = completion.content || '';
     const cleaned = content.replace(/```json\n?|```/g, '').trim();
     let parsed: any;
     try {
@@ -329,12 +321,8 @@ Rules:
       `.trim();
 
       // Generate embedding
-      const embeddingResponse = await getOpenAIClient().embeddings.create({
-        model: "text-embedding-3-small",
-        input: textForEmbedding,
-      });
-
-      const embedding = embeddingResponse.data[0].embedding;
+      const embeddingResponse = await embedText(textForEmbedding);
+      const embedding = embeddingResponse.vector;
 
       // Store in Pinecone (following betting agent patterns)
       await index.upsert([
@@ -514,12 +502,8 @@ Rules:
       const index = getPineconeClient().index('prediction-results');
 
       // Generate embedding for query
-      const embeddingResponse = await getOpenAIClient().embeddings.create({
-        model: "text-embedding-3-small",
-        input: queryText,
-      });
-
-      const queryEmbedding = embeddingResponse.data[0].embedding;
+      const embeddingResponse = await embedText(queryText);
+      const queryEmbedding = embeddingResponse.vector;
 
       // Search Pinecone (filter for digital twins only)
       const digitalTwinFilter = {
@@ -554,12 +538,8 @@ Rules:
       const index = getPineconeClient().index('prediction-results');
 
       // Generate embedding for query
-      const embeddingResponse = await getOpenAIClient().embeddings.create({
-        model: "text-embedding-3-small",
-        input: queryText,
-      });
-
-      const queryEmbedding = embeddingResponse.data[0].embedding;
+      const embeddingResponse = await embedText(queryText);
+      const queryEmbedding = embeddingResponse.vector;
 
       // Search Pinecone (filter for digital twins only AND user ownership)
       const digitalTwinFilter = {
@@ -636,17 +616,16 @@ Instructions:
 - Keep responses conversational and natural
 - Don't mention that you're a digital twin`;
 
-      const completion = await getOpenAIClient().chat.completions.create({
-        model: "gpt-4o",
+      const completion = await createCompletion({
+        tier: 'workhorse',
+        maxTokens: 500,
         messages: [
           { role: "system", content: "You are a digital twin of a real person. Respond authentically as that person would." },
           { role: "user", content: prompt }
         ],
-        temperature: 0.7,
-        max_tokens: 500,
       });
 
-      return completion.choices[0]?.message?.content || "I'm not sure how to respond to that.";
+      return completion.content || "I'm not sure how to respond to that.";
     } catch (error) {
       console.error('Error querying digital twin:', error);
       throw new Error('Failed to query digital twin');
@@ -711,17 +690,16 @@ Instructions:
 - Keep responses conversational and natural
 - Don't mention that you're a digital twin`;
 
-      const completion = await getOpenAIClient().chat.completions.create({
-        model: "gpt-4o",
+      const completion = await createCompletion({
+        tier: 'workhorse',
+        maxTokens: 500,
         messages: [
           { role: "system", content: "You are a digital twin of a real person. Respond authentically as that person would." },
           { role: "user", content: prompt }
         ],
-        temperature: 0.7,
-        max_tokens: 500,
       });
 
-      return completion.choices[0]?.message?.content || "I'm not sure how to respond to that.";
+      return completion.content || "I'm not sure how to respond to that.";
     } catch (error) {
       console.error('Error querying user digital twin:', error);
       throw new Error('Failed to query digital twin');

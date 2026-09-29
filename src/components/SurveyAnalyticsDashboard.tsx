@@ -145,10 +145,10 @@ export function SurveyAnalyticsDashboard({ surveyId, className }: SurveyAnalytic
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          analysisModel: 'gpt-4o',
-          queryModel: 'gpt-4o-mini',
-          insightModel: 'gpt-4o',
-          visualizationModel: 'gpt-4o',
+          analysisModel: 'workhorse',
+          queryModel: 'cheap',
+          insightModel: 'workhorse',
+          visualizationModel: 'workhorse',
           maxCharts: 8,
           includeRawData: true,
           forceRegenerate: true

@@ -95,7 +95,7 @@ function classifyUpstreamError(err: any): {
         return {
             httpStatus: 429,
             clientMessage:
-                'OpenAI rate limit (requests or tokens per minute for this key/model). Wait 1–2 minutes, choose GPT-4o Mini, or review limits at https://platform.openai.com/settings/organization/limits — then try again.',
+                'Anthropic rate limit (requests or tokens per minute for this key/model). Wait 1–2 minutes, switch to Cheap (Haiku), or check Anthropic rate limits — then try again.',
             retryable: true,
         };
     }
@@ -501,22 +501,6 @@ Guidelines:
                 console.error('[gen-survey] Full AI response:', aiResponse);
                 
                 // Check if it's a reasoning model that might need special handling
-                const isReasoningModel = (
-                    modelConfig.model.includes('o1') ||
-                    modelConfig.model.includes('o3') ||
-                    modelConfig.model.includes('gpt-5') ||
-                    modelConfig.model.includes('gpt-4o')
-                );
-                
-                if (isReasoningModel) {
-                    return NextResponse.json({
-                        status: true,
-                        modelUsed: modelConfig.label,
-                        surveyRaw: aiResponse,
-                        note: 'Model returned non-JSON content; showing raw output.'
-                    });
-                }
-                
                 return NextResponse.json({ 
                     error: 'Failed to parse AI response. The model did not return valid JSON. Please try again or switch models.',
                     details: aiResponse?.substring(0, 500) // Include snippet for debugging

@@ -503,7 +503,7 @@ export async function POST(req: NextRequest) {
         let qmeta: any = (survey as any).source_metadata
         if (typeof qmeta === 'string') { try { qmeta = JSON.parse(qmeta) } catch { qmeta = {} } }
         const cfg = qmeta?.settings?.qualitative || {}
-        const model = cfg.model || 'gpt-4o-mini'
+        const model = 'cheap'
         const temperature = typeof cfg.temperature === 'number' ? cfg.temperature : 0.3
         const minTurnsBeforeSubmit = typeof cfg.minTurnsBeforeSubmit === 'number' ? cfg.minTurnsBeforeSubmit : 3
 
@@ -527,7 +527,7 @@ export async function POST(req: NextRequest) {
         ]
 
         try {
-          const completion = await createCompletion({ model, temperature, messages, maxTokens: 180 })
+          const completion = await createCompletion({ tier: 'cheap', temperature, messages, maxTokens: 180 })
           const nextQ = (completion.content || '').trim() || 'Can you share a concrete example of that? (time/place/context)'
           state.transcript.push({ role: 'assistant', content: nextQ })
           await ChannelRepo.updateSessionState(session.id, state)

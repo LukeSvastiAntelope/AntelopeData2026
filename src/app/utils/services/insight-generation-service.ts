@@ -1,5 +1,4 @@
 // Insight Generation Service - Converts statistical results into meaningful insights using LLM
-import OpenAI from 'openai';
 import { openSql as getMySQLConnection } from '../database/db';
 import { RowDataPacket, ResultSetHeader } from 'mysql2';
 import { SurveyAnalysisResult } from './survey-analysis-types';
@@ -10,9 +9,7 @@ import {
   type AnalyticsContextBundle,
 } from './analytics-context-service';
 
-// NOTE: This file routes LLM calls through `createCompletion()` which lazily
-// initializes provider clients. Do not instantiate OpenAI at module-load time
-// because it makes `next build` fail when keys are not present.
+// NOTE: LLM calls go through the Anthropic-only ai-service gateway.
 
 export interface InsightGenerationConfig {
   insightModel?: string;
