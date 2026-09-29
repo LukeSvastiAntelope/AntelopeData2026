@@ -131,7 +131,7 @@ export async function POST(
     
     // Extract configuration from request body.
     // Model fields stay undefined unless the client/env sets them so Phase A
-    // orchestrator defaults (claude-sonnet-4-6) apply — this is the A/B switch.
+    // orchestrator defaults (workhorse tier) apply — this is the A/B switch.
     const config: AIAnalyticsConfig = {
       analysisModel: body.analysisModel || process.env.ANALYTICS_ANALYSIS_MODEL || undefined,
       queryModel: body.queryModel || process.env.ANALYTICS_QUERY_MODEL || undefined,

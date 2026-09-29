@@ -105,7 +105,7 @@ Task for slot "${slotPath}":
 ${SLOT_INSTRUCTIONS[slotPath]}`;
 
   const result = await createCompletion({
-    model: 'claude-sonnet-4-6',
+    tier: 'workhorse',
     maxTokens: 1200,
     messages: [
       { role: 'system', content: system },

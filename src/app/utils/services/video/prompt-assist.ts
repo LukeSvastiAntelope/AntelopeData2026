@@ -1,6 +1,6 @@
 /**
  * Prompt-assist: expand plain candidate language into model-tuned video prompts.
- * Uses claude-sonnet-4-6 via ai-service.
+ * Uses Anthropic workhorse tier via ai-service.
  */
 
 import { createCompletion } from '@/app/utils/services/ai-service';
@@ -139,16 +139,10 @@ export async function assistVideoPrompt(params: {
     };
   }
 
-  const model = process.env.ANTHROPIC_API_KEY
-    ? 'claude-sonnet-4-6'
-    : process.env.OPENAI_API_KEY
-      ? 'gpt-4o'
-      : 'claude-sonnet-4-6';
-
   let completion;
   try {
     completion = await createCompletion({
-      model,
+      tier: 'workhorse',
       temperature: 0.4,
       maxTokens: 1200,
       // Keep the studio responsive if the provider hangs

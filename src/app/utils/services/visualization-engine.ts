@@ -62,7 +62,7 @@ export class VisualizationEngine {
   private defaultCacheHours: number = 720; // 30 days instead of 24 hours
 
   constructor(
-    defaultModel: string = 'gpt-4o', // Good balance for visualization logic
+    defaultModel: string = 'workhorse', // Anthropic workhorse tier
     defaultCacheHours: number = 720
   ) {
     this.defaultModel = defaultModel;

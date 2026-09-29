@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUserId } from '@/app/utils/auth/require-user';
-import OpenAI from 'openai';
-import Anthropic from '@anthropic-ai/sdk';
 import { GPT_MODELS } from '@/app/utils/const';
 import { SURVEY_SYSTEM_PROMPT } from '@/app/utils/survey/survey-generation-prompt';
 import { auth } from '@/auth';
+import {
+  aiComplete,
+  getModelForTier,
+  resolveModelTier,
+} from '@/app/utils/services/ai-service';
 
 // Allow longer processing time during generation
 export const maxDuration = 300;
@@ -303,7 +306,7 @@ export async function POST(req: NextRequest) {
             }, { status: 400 });
         }
 
-        const { prompt, model = 'gpt-4o', mode } = body || {};
+        const { prompt, model = 'workhorse', mode } = body || {};
         const t0 = Date.now();
         
         if (!prompt || typeof prompt !== 'string') {
@@ -312,78 +315,40 @@ export async function POST(req: NextRequest) {
             }, { status: 400 });
         }
 
-        // Find the model configuration
-        let modelConfig = GPT_MODELS.find(m => m.key === model);
-        if (!modelConfig) {
-            return NextResponse.json({ 
-                error: 'Invalid model specified' 
-            }, { status: 400 });
-        }
+        // Anthropic-only gateway: coerce any picker key / legacy id → tier → model id
+        const tier = resolveModelTier(
+          typeof model === 'string' ? model : 'workhorse'
+        );
+        const resolvedModelId = getModelForTier(tier);
+        let modelConfig =
+          GPT_MODELS.find((m) => m.key === tier) ||
+          GPT_MODELS.find((m) => m.key === model) || {
+            key: tier,
+            label: tier,
+            type: 'anthropic' as const,
+            model: resolvedModelId,
+          };
+        modelConfig = {
+          ...modelConfig,
+          type: 'anthropic',
+          model: resolvedModelId,
+          key: tier,
+        };
 
         const isProd = process.env.NODE_ENV === 'production';
         const originalModelKey = modelConfig.key;
 
-        // Initialize the appropriate AI client based on model type
-        let aiClient: OpenAI | Anthropic;
-        let isAnthropic = false;
-        
-        if (modelConfig.type === "openai") {
-            if (!process.env.OPENAI_API_KEY) {
-                return NextResponse.json({
-                    error: 'OpenAI API key not configured',
-                    message:
-                        'Add OPENAI_API_KEY to .env.local (see https://platform.openai.com/api-keys) and restart the dev server.',
-                }, { status: 503 });
-            }
-            aiClient = new OpenAI({
-                apiKey: process.env.OPENAI_API_KEY,
-                timeout: 180_000,
-                // We implement our own 429 / backoff + optional model fallback below; SDK retries stack and worsen rate limits.
-                maxRetries: 0,
-            });
-            console.log('[gen-survey] Using OpenAI', { requestId, model: modelConfig.model });
-        } else if (modelConfig.type === "deepseek") {
-            if (!process.env.DEEPSEEK_API_KEY) {
-                return NextResponse.json({ 
-                    error: 'DeepSeek API key not configured' 
-                }, { status: 503 });
-            }
-            aiClient = new OpenAI({
-                apiKey: process.env.DEEPSEEK_API_KEY,
-                baseURL: 'https://api.deepseek.com',
-                timeout: 180_000,
-                maxRetries: 0,
-            });
-            console.log('[gen-survey] Using DeepSeek', { requestId, model: modelConfig.model });
-        } else if (modelConfig.type === "gemini") {
-            if (!process.env.GEMINI_API_KEY) {
-                return NextResponse.json({ 
-                    error: 'Gemini API key not configured' 
-                }, { status: 503 });
-            }
-            aiClient = new OpenAI({
-                apiKey: process.env.GEMINI_API_KEY,
-                baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai/',
-                timeout: 180_000,
-                maxRetries: 0,
-            });
-            console.log('[gen-survey] Using Gemini', { requestId, model: modelConfig.model });
-        } else if (modelConfig.type === "anthropic") {
-            if (!process.env.ANTHROPIC_API_KEY) {
-                return NextResponse.json({ 
-                    error: 'Anthropic API key not configured' 
-                }, { status: 503 });
-            }
-            aiClient = new Anthropic({
-                apiKey: process.env.ANTHROPIC_API_KEY,
-            });
-            isAnthropic = true;
-        } else {
-            return NextResponse.json({ 
-                error: 'Unsupported model type' 
-            }, { status: 400 });
+        // Anthropic-only — OpenAI / Gemini / DeepSeek paths removed from this route
+        if (!process.env.ANTHROPIC_API_KEY) {
+            return NextResponse.json({
+                error: 'Anthropic API key not configured',
+            }, { status: 503 });
         }
-
+        console.log('[gen-survey] Using Anthropic gateway', {
+            requestId,
+            tier,
+            model: modelConfig.model,
+        });
         const systemPrompt = (mode === 'quiz') ? `You are an expert assessment and quiz designer. Create a multiple-question quiz with correct answers based on the user's request.
 
 Return a JSON object with this exact structure:
@@ -413,258 +378,72 @@ Guidelines:
 
         let aiResponse: string | undefined;
 
-        if (isAnthropic) {
-            // Use Anthropic API
-            const completion = await (aiClient as Anthropic).messages.create({
-                model: modelConfig.model,
-                // Headroom for a 10-15 question survey with options + reasoning (2000 truncates the JSON).
-                max_tokens: 8000,
-                system: systemPrompt,
-                messages: [
-                    { role: "user", content: prompt }
-                ],
-                // NOTE: omit `temperature` — the latest Claude models reject it
-                // ("temperature is deprecated for this model"). Defaults are fine for JSON generation.
-            });
-
-            // Extract text content from Claude's response
-            aiResponse = completion.content
-                .filter((block: any) => block.type === 'text')
-                .map((block: any) => block.text)
-                .join('');
-        } else {
-            // Use OpenAI-compatible API
-            // Use Responses API only for "reasoning" models where it's needed (o1/o3/gpt-5 family).
-            // gpt-4o works reliably via Chat Completions, and treating it as a reasoning model can cause
-            // production-only failures depending on runtime/SDK/deployment environment.
-            const isReasoningModel = (
-                modelConfig.model.includes('o1') ||
-                modelConfig.model.includes('o3') ||
-                modelConfig.model.includes('o4') ||
-                modelConfig.model.includes('gpt-5')
-            );
-            const useNewTokenParam = modelConfig.type === "openai" && isReasoningModel;
-            
-            const requestParams: any = {
-                model: modelConfig.model,
-                messages: [
-                    { role: "system", content: systemPrompt },
-                    { role: "user", content: prompt }
-                ],
-            };
-
-            // Strongly enforce JSON output for OpenAI chat-completions models to avoid parse failures in production.
-            // Only set for OpenAI (not DeepSeek/Gemini) to avoid incompatibilities with OpenAI-compatible providers.
-            if (modelConfig.type === "openai" && !isReasoningModel) {
-                const jsonSchema = getOpenAiSurveyJsonSchema(mode);
-                // Prefer strict schema when supported (Structured Outputs).
-                requestParams.response_format = {
-                    type: "json_schema",
-                    json_schema: {
-                        name: jsonSchema.name,
-                        schema: jsonSchema.schema,
-                        strict: true,
-                    },
-                };
-            }
-            
-            // Remove temperature for reasoning models like gpt-5; keep it only for classic models
-            if (!isReasoningModel) {
-                requestParams.temperature = 0.7;
-            }
-            
-            const tokenBudget = modelConfig.model.includes('gpt-5') ? 8000 : 2000;
-            if (useNewTokenParam) {
-                requestParams.max_completion_tokens = tokenBudget;
-            } else {
-                requestParams.max_tokens = tokenBudget;
-            }
-
-            console.log('[gen-survey] Request params', {
-                requestId,
-                model: requestParams.model,
-                hasTemperature: requestParams.temperature !== undefined,
-                max_completion_tokens: requestParams.max_completion_tokens,
-                max_tokens: requestParams.max_tokens,
-                response_format: requestParams.response_format?.type,
-                promptLen: prompt.length
-            });
-            
-            // Retry wrapper for transient errors (DNS, timeouts, rate limits).
-            // OpenAI client uses maxRetries: 0 so we do not stack SDK retries on top of this loop (that worsens 429s).
-            const maxAttempts = 6;
+        // Anthropic-only via ai-service gateway (tier + internal fallback)
+        {
+            const maxAttempts = 4;
+            let activeTier = tier;
             let lastError: any = null;
-            let did429MiniFallback = false;
             for (let attempt = 1; attempt <= maxAttempts; attempt++) {
                 try {
                     const tStart = Date.now();
-                    if (isReasoningModel) {
-                        // Prefer Responses API for GPT-5/4o/o1/o3
-                        const resp: any = await (aiClient as OpenAI).responses.create({
-                            model: modelConfig.model,
-                            input: [
-                                { role: 'system', content: systemPrompt },
-                                { role: 'user', content: prompt }
-                            ],
-                            max_output_tokens: tokenBudget,
-                        } as any);
-                        console.log('[gen-survey] OpenAI responses ok', { ms: Date.now() - tStart });
-                        let content: any = (resp as any).output_text;
-                        if (!content || (typeof content === 'string' && content.trim() === '')) {
-                            const parts = (((resp as any).output || [])
-                                .flatMap((o: any) => (o?.content || []))
-                                .map((c: any) => c?.text ?? '')).join('');
-                            if (parts && parts.trim()) content = parts;
-                        }
-                        // Fallback to Chat Completions if still empty
-                        if (!content || (typeof content === 'string' && content.trim() === '')) {
-                            const t2 = Date.now();
-                            const completion = await (aiClient as OpenAI).chat.completions.create(requestParams);
-                            console.log('[gen-survey] OpenAI completion fallback ok', {
-                                ms: Date.now() - t2,
-                                usage: completion.usage,
-                            });
-                            const firstChoice: any = completion?.choices?.[0]?.message ?? {};
-                            content = firstChoice.content;
-                            if (Array.isArray(content)) {
-                                try {
-                                    content = content
-                                        .map((part: any) => typeof part === 'string' ? part : (part?.text ?? ''))
-                                        .join('');
-                                } catch {}
-                            }
-                            if (!content || (typeof content === 'string' && content.trim() === '')) {
-                                const reasoning: any = (firstChoice as any).reasoning;
-                                if (Array.isArray(reasoning)) {
-                                    try {
-                                        const reasoningText = reasoning
-                                            .map((r: any) => {
-                                                if (typeof r === 'string') return r;
-                                                if (Array.isArray(r?.content)) {
-                                                    return r.content.map((c: any) => c?.text ?? '').join('');
-                                                }
-                                                return r?.text ?? '';
-                                            })
-                                            .join('');
-                                        if (reasoningText && reasoningText.trim()) content = reasoningText;
-                                    } catch {}
-                                }
-                            }
-                        }
-                        aiResponse = typeof content === 'string' ? content : (content ?? '');
-                    } else {
-                        // Classic Chat Completions
-                        const completion = await (aiClient as OpenAI).chat.completions.create(requestParams);
-                        console.log('[gen-survey] OpenAI completion ok', {
-                            ms: Date.now() - tStart,
-                            usage: completion.usage,
-                        });
-                        const firstChoice: any = completion?.choices?.[0]?.message ?? {};
-                        let content: any = firstChoice.content;
-                        if (Array.isArray(content)) {
-                            try {
-                                content = content
-                                    .map((part: any) => typeof part === 'string' ? part : (part?.text ?? ''))
-                                    .join('');
-                            } catch {}
-                        }
-                        aiResponse = typeof content === 'string' ? content : (content ?? '');
-                    }
-                    if (!aiResponse || aiResponse.trim() === '') {
-                        console.warn('[gen-survey] Empty assistant content after request; falling back if possible');
-                    }
+                    const result = await aiComplete({
+                        tier: activeTier,
+                        system: systemPrompt,
+                        maxTokens: 8000,
+                        messages: [{ role: 'user', content: prompt }],
+                    });
+                    aiResponse = result.content;
+                    modelConfig = {
+                        ...modelConfig,
+                        key: result.tier,
+                        model: result.model,
+                        type: 'anthropic',
+                    };
+                    console.log('[gen-survey] Anthropic gateway ok', {
+                        requestId,
+                        ms: Date.now() - tStart,
+                        tier: result.tier,
+                        model: result.model,
+                        usedFallback: result.usedFallback,
+                    });
                     break;
                 } catch (err: any) {
                     lastError = err;
-                    const code = err?.code;
-                    const status = err?.status;
-                    const isTimeoutLike = (err?.name === 'AbortError') || (String(err?.message || '').toLowerCase().includes('timeout'));
+                    const status = err?.status ?? err?.statusCode;
+                    const msg = String(err?.message || '').toLowerCase();
                     const isTransient =
-                        code === 'ENOTFOUND' ||
-                        code === 'ETIMEDOUT' ||
                         status === 429 ||
-                        (status >= 500 && status < 600) ||
-                        isTimeoutLike;
-                    // First 429 on a heavier OpenAI model: wait per OpenAI headers, then retry once as gpt-4o-mini (separate TPM bucket).
-                    if (
-                        status === 429 &&
-                        modelConfig.type === 'openai' &&
-                        modelConfig.model !== 'gpt-4o-mini' &&
-                        !did429MiniFallback
-                    ) {
-                        const mini = GPT_MODELS.find((m) => m.key === 'gpt-4o-mini');
-                        if (mini) {
-                            did429MiniFallback = true;
-                            modelConfig = mini;
-                            requestParams.model = mini.model;
-                            const wait = openAi429WaitMs(err);
-                            console.warn('[gen-survey] OpenAI 429: backing off then retrying as gpt-4o-mini', {
-                                requestId,
-                                waitMs: wait,
-                                previousModel: originalModelKey,
-                            });
-                            await new Promise((res) => setTimeout(res, wait));
-                            continue;
-                        }
-                    }
-                    // If production is hitting function timeouts with a slower model, fall back once to a faster model.
-                    if (isProd && attempt === 1 && originalModelKey === 'gpt-4o' && (isTransient || isTimeoutLike)) {
-                        const fallback = GPT_MODELS.find(m => m.key === 'gpt-4o-mini');
-                        if (fallback && fallback.type === modelConfig.type) {
-                            console.warn('[gen-survey] Falling back to faster model due to timeout/transient error', {
-                                requestId,
-                                from: modelConfig.model,
-                                to: fallback.model,
-                                code,
-                                status
-                            });
-                            modelConfig = fallback;
-                            // Update request params for the fallback model; keep other params the same.
-                            requestParams.model = modelConfig.model;
-                            continue;
-                        }
-                    }
-                    // If the provider rejects structured outputs, fall back to JSON object mode once.
-                    if (
-                        modelConfig.type === "openai" &&
-                        !isReasoningModel &&
-                        (status === 400 || status === 422) &&
-                        requestParams?.response_format?.type === 'json_schema'
-                    ) {
-                        console.warn('[gen-survey] Falling back from json_schema to json_object', {
-                            requestId,
-                            status,
-                            message: err?.message,
-                        });
-                        requestParams.response_format = { type: 'json_object' };
-                        continue;
-                    }
-                    console.warn('[gen-survey] OpenAI completion error', {
+                        status === 404 ||
+                        status === 529 ||
+                        status === 503 ||
+                        (typeof status === 'number' && status >= 500 && status < 600) ||
+                        msg.includes('timeout') ||
+                        msg.includes('overloaded') ||
+                        msg.includes('not_found');
+                    console.warn('[gen-survey] Anthropic gateway error', {
                         requestId,
                         attempt,
-                        code,
                         status,
-                        message: err?.message
+                        message: err?.message,
+                        tier: activeTier,
                     });
+                    if (isTransient && activeTier !== 'cheap') {
+                        activeTier = 'cheap';
+                        await new Promise((res) => setTimeout(res, status === 429 ? 6000 : 1500));
+                        continue;
+                    }
                     if (attempt < maxAttempts && isTransient) {
-                        let delayMs: number;
-                        if (status === 429) {
-                            delayMs = Math.min(
-                                120_000,
-                                Math.max(openAi429WaitMs(err), 6000 * attempt)
-                            );
-                        } else {
-                            delayMs = 1000 * Math.pow(2, attempt - 1);
-                        }
-                        console.log(`[gen-survey] Retrying after ${delayMs}ms (attempt ${attempt}/${maxAttempts})`);
-                        await new Promise((res) => setTimeout(res, delayMs));
+                        await new Promise((res) =>
+                            setTimeout(res, 1000 * Math.pow(2, attempt - 1))
+                        );
                         continue;
                     }
                     throw err;
                 }
             }
+            if (!aiResponse && lastError) throw lastError;
         }
-        
+
         if (!aiResponse) {
             const isReasoningOverall = (
                 modelConfig.model.includes('o1') ||

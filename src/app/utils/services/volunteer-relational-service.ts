@@ -82,16 +82,13 @@ export async function generateRelationalScript(input: {
   const channel = input.channel || 'sms';
   const fallback = fallbackScript(input.contact, volunteerName);
 
-  if (!process.env.ANTHROPIC_API_KEY && !process.env.OPENAI_API_KEY) {
+  if (!process.env.ANTHROPIC_API_KEY) {
     return { script: fallback, usedFallback: true };
   }
 
-  const model = process.env.ANTHROPIC_API_KEY
-    ? 'claude-sonnet-4-6'
-    : 'gpt-4o-mini';
   try {
     const completion = await createCompletion({
-      model,
+      tier: 'workhorse',
       temperature: 0.55,
       maxTokens: 280,
       messages: [

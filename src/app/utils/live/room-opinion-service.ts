@@ -204,11 +204,8 @@ Clusters:
 ${JSON.stringify(payload, null, 2)}`;
 
   try {
-    const model = process.env.ANTHROPIC_API_KEY
-      ? 'claude-sonnet-4-6'
-      : 'gpt-4o-mini';
     const res = await createCompletion({
-      model,
+      tier: 'workhorse',
       temperature: 0.2,
       maxTokens: 800,
       messages: [

@@ -28,12 +28,7 @@ export type CampaignBrief = {
   topIssues?: string | null;
 };
 
-const DEFAULT_MODEL =
-  process.env.ANTHROPIC_API_KEY
-    ? 'claude-sonnet-4-20250514'
-    : process.env.OPENAI_API_KEY
-      ? 'gpt-4o'
-      : 'claude-sonnet-4-20250514';
+const DEFAULT_TIER = 'workhorse' as const;
 
 const SYSTEM_PROMPT = `You are Antelope's Campaign Consultant Expert Agent — a seasoned political strategist for hyperlocal and downballot races (school board, city council, county, state house, etc.).
 
@@ -141,11 +136,11 @@ export async function runCampaignConsultantTurn(params: {
   brief?: CampaignBrief | null;
   model?: string;
 }): Promise<ConsultantTurnResult> {
-  const model = params.model || DEFAULT_MODEL;
+  const tier = (params.model as any) || DEFAULT_TIER;
   const history = (params.messages || []).slice(-12);
 
   const completion = await createCompletion({
-    model,
+    tier: tier === 'heavy' || tier === 'cheap' ? tier : 'workhorse',
     maxTokens: 1800,
     messages: [
       { role: 'system', content: SYSTEM_PROMPT },
@@ -166,7 +161,7 @@ export async function runCampaignConsultantTurn(params: {
       cleanReply ||
       'I can help you build a turnkey campaign plan. Tell me the office you are running for, your district, and your election date.',
     actions,
-    modelUsed: model,
+    modelUsed: typeof tier === 'string' ? tier : 'workhorse',
   };
 }
 
@@ -176,7 +171,7 @@ export function consultantOfflineFallback(userMessage: string): ConsultantTurnRe
   const reply = [
     '## Campaign Consultant (setup mode)',
     '',
-    'I am ready to act as your campaign consultant, but no AI provider key is configured in this environment yet (`ANTHROPIC_API_KEY` or `OPENAI_API_KEY`).',
+    'I am ready to act as your campaign consultant, but no AI provider key is configured in this environment yet (`ANTHROPIC_API_KEY`).',
     '',
     '### What I will do once connected',
     '1. Learn your race (office, district, timeline, opponents)',

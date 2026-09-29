@@ -96,20 +96,20 @@ export class AIAnalyticsOrchestrator {
   private visualizationEngine: VisualizationEngine;
 
   constructor(config: Partial<AIAnalyticsConfig> = {}) {
-    // Defaults: claude-sonnet-4-6. Override any stage via config.*Model (A/B / rollback).
+    // Defaults: Anthropic workhorse tier. Override any stage via config.*Model (tier name or legacy id).
     this.analysisEngine = new SurveyAnalysisEngine(
-      config.analysisModel || 'claude-sonnet-4-6'
+      config.analysisModel || 'workhorse'
     );
     this.queryGenerator = new StatisticalQueryGenerator(
-      config.queryModel || 'claude-sonnet-4-6',
+      config.queryModel || 'workhorse',
       config.queryCacheHours || 24
     );
     this.insightService = new InsightGenerationService(
-      config.insightModel || 'claude-sonnet-4-6',
+      config.insightModel || 'workhorse',
       config.insightsCacheHours || 48
     );
     this.visualizationEngine = new VisualizationEngine(
-      config.visualizationModel || 'claude-sonnet-4-6',
+      config.visualizationModel || 'workhorse',
       config.visualizationCacheHours || 24
     );
   }
@@ -165,10 +165,10 @@ export class AIAnalyticsOrchestrator {
       },
       metadata: {
         modelsUsed: {
-          analysis: config.analysisModel || 'claude-sonnet-4-6',
-          queries: config.queryModel || 'claude-sonnet-4-6',
-          insights: config.insightModel || 'claude-sonnet-4-6',
-          visualization: config.visualizationModel || 'claude-sonnet-4-6'
+          analysis: config.analysisModel || 'workhorse',
+          queries: config.queryModel || 'workhorse',
+          insights: config.insightModel || 'workhorse',
+          visualization: config.visualizationModel || 'workhorse'
         },
         generatedAt: new Date().toISOString(),
         cacheStatus: {

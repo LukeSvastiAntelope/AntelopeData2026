@@ -65,17 +65,12 @@ export async function generateAntelopeMarketingCopy(input?: {
     (input?.tone && String(input.tone).trim()) ||
     String(settings.tone || 'plainspoken civic-tech');
 
-  const hasKey = Boolean(
-    process.env.ANTHROPIC_API_KEY || process.env.OPENAI_API_KEY
-  );
+  const hasKey = Boolean(process.env.ANTHROPIC_API_KEY);
 
   if (hasKey) {
     try {
-      const model = process.env.ANTHROPIC_API_KEY
-        ? 'claude-sonnet-4-6'
-        : 'gpt-4o-mini';
       const res = await createCompletion({
-        model,
+        tier: 'workhorse',
         temperature: 0.7,
         maxTokens: 280,
         messages: [

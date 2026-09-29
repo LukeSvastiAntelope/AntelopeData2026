@@ -49,11 +49,7 @@ export const draftSurveyTool: CampaignTool<Input> = {
     const office = input.office ? String(input.office).trim() : '';
 
     const completion = await createCompletion({
-      model: process.env.ANTHROPIC_API_KEY
-        ? 'claude-sonnet-4-20250514'
-        : process.env.OPENAI_API_KEY
-          ? 'gpt-4o'
-          : 'gpt-4o-mini',
+      tier: 'workhorse',
       temperature: 0.4,
       maxTokens: 1600,
       messages: [

@@ -232,10 +232,8 @@ export function applyThinSegmentDiscipline(
   });
 }
 
-function pickModel(): string | null {
-  if (process.env.ANTHROPIC_API_KEY) return 'claude-sonnet-4-6';
-  if (process.env.OPENAI_API_KEY) return 'gpt-4o';
-  return null;
+function hasAiKey(): boolean {
+  return Boolean(process.env.ANTHROPIC_API_KEY);
 }
 
 /** Deterministic drafts when LLM unavailable — still honest about known vs unknown. */
@@ -391,7 +389,7 @@ THIN SEGMENT (n=${ctx.voterCount} < ${THIN_SEGMENT_THRESHOLD}):
     : '';
 
   const completion = await createCompletion({
-    model,
+    tier: 'workhorse',
     temperature: ctx.thinSegment ? 0.25 : 0.35,
     maxTokens: 2800,
     messages: [
@@ -529,9 +527,9 @@ export async function draftOutboundForSegment(
   });
 
   const context = buildTailoringContext(resolved);
-  const model = opts.mock ? null : pickModel();
+  const useAi = !opts.mock && hasAiKey();
 
-  if (!model) {
+  if (!useAi) {
     return {
       context,
       drafts: applyThinSegmentDiscipline(
@@ -548,12 +546,12 @@ export async function draftOutboundForSegment(
       context,
       formats,
       opts.goal ? String(opts.goal) : null,
-      model
+      'workhorse'
     );
     return {
       context,
       drafts: applyThinSegmentDiscipline(drafts, context.thinSegment),
-      modelUsed: model,
+      modelUsed: 'workhorse',
       usedFallback: false,
     };
   } catch (err) {
@@ -564,7 +562,7 @@ export async function draftOutboundForSegment(
         fallbackDrafts(context, formats),
         context.thinSegment
       ),
-      modelUsed: model,
+      modelUsed: 'workhorse',
       usedFallback: true,
     };
   }

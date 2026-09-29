@@ -1,5 +1,88 @@
-import OpenAI from 'openai';
+/**
+ * Anthropic-only AI gateway.
+ *
+ * Single chokepoint for every LLM call: model tiers, env overrides,
+ * internal fallback, and (later) usage metering.
+ *
+ * No model id literals belong outside this file's tier config.
+ */
+
 import Anthropic from '@anthropic-ai/sdk';
+
+// ---------------------------------------------------------------------------
+// Tiers
+// ---------------------------------------------------------------------------
+
+export type ModelTier = 'workhorse' | 'heavy' | 'cheap';
+
+/** Defaults — override via ANTHROPIC_MODEL_WORKHORSE / _HEAVY / _CHEAP. */
+export const DEFAULT_TIER_MODELS: Record<ModelTier, string> = {
+  workhorse: 'claude-sonnet-5',
+  heavy: 'claude-opus-5-5',
+  cheap: 'claude-haiku-4-5-20251001',
+};
+
+/** Fallback tier when the primary errors (not_found / overloaded / 5xx). */
+export const TIER_FALLBACK: Record<ModelTier, ModelTier | null> = {
+  workhorse: 'cheap',
+  heavy: 'workhorse',
+  cheap: null,
+};
+
+export function getTierModels(): Record<ModelTier, string> {
+  return {
+    workhorse:
+      process.env.ANTHROPIC_MODEL_WORKHORSE?.trim() ||
+      DEFAULT_TIER_MODELS.workhorse,
+    heavy:
+      process.env.ANTHROPIC_MODEL_HEAVY?.trim() || DEFAULT_TIER_MODELS.heavy,
+    cheap:
+      process.env.ANTHROPIC_MODEL_CHEAP?.trim() || DEFAULT_TIER_MODELS.cheap,
+  };
+}
+
+export function getModelForTier(tier: ModelTier): string {
+  return getTierModels()[tier];
+}
+
+export function isModelTier(value: unknown): value is ModelTier {
+  return value === 'workhorse' || value === 'heavy' || value === 'cheap';
+}
+
+/**
+ * Map a legacy model id (or tier name) → tier.
+ * Non-Anthropic ids are coerced to workhorse so remaining call sites
+ * degrade onto Anthropic until they migrate to `tier:`.
+ */
+export function resolveModelTier(
+  modelOrTier?: string | null
+): ModelTier {
+  const raw = String(modelOrTier || '').trim().toLowerCase();
+  if (!raw) return 'workhorse';
+  if (isModelTier(raw)) return raw;
+  if (raw.includes('opus') || raw.includes('heavy')) return 'heavy';
+  if (raw.includes('haiku') || raw.includes('cheap')) return 'cheap';
+  if (raw.includes('sonnet') || raw.includes('claude')) return 'workhorse';
+  // gpt-*, gemini-*, deepseek-*, etc. → workhorse bridge
+  if (
+    raw.startsWith('gpt-') ||
+    raw.startsWith('o1') ||
+    raw.startsWith('o3') ||
+    raw.startsWith('o4') ||
+    raw.startsWith('gemini-') ||
+    raw.startsWith('deepseek-')
+  ) {
+    console.warn(
+      `[ai-gateway] non-Anthropic model "${modelOrTier}" coerced to workhorse tier`
+    );
+    return 'workhorse';
+  }
+  return 'workhorse';
+}
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
 
 export interface AIMessage {
   role: 'system' | 'user' | 'assistant';
@@ -7,7 +90,9 @@ export interface AIMessage {
 }
 
 export interface AICompletionOptions {
-  model: string;
+  /** @deprecated Prefer `tier`. Resolved through the gateway if provided. */
+  model?: string;
+  tier?: ModelTier;
   messages: AIMessage[];
   temperature?: number;
   maxTokens?: number;
@@ -18,6 +103,9 @@ export interface AICompletionOptions {
 
 export interface AICompletionResponse {
   content: string;
+  model: string;
+  tier: ModelTier;
+  usedFallback: boolean;
   usage?: {
     promptTokens: number;
     completionTokens: number;
@@ -27,6 +115,9 @@ export interface AICompletionResponse {
 
 export interface AIStreamingCompletionResponse {
   stream: ReadableStream<Uint8Array>;
+  model: string;
+  tier: ModelTier;
+  usedFallback: boolean;
   usage?: {
     promptTokens: number;
     completionTokens: number;
@@ -34,439 +125,232 @@ export interface AIStreamingCompletionResponse {
   };
 }
 
-// Initialize AI clients - only on server side
-let openai: OpenAI | null = null;
-let deepseek: OpenAI | null = null;
-let gemini: OpenAI | null = null;
+export type AiCompleteParams = {
+  tier?: ModelTier;
+  messages: AIMessage[];
+  system?: string;
+  maxTokens?: number;
+  temperature?: number;
+};
+
+// ---------------------------------------------------------------------------
+// Client
+// ---------------------------------------------------------------------------
+
 let anthropic: Anthropic | null = null;
 
-function getOpenAIClient() {
-  if (!openai) {
-    openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-  }
-  return openai;
-}
-
-function getDeepSeekClient() {
-  if (!deepseek) {
-    deepseek = new OpenAI({
-      apiKey: process.env.DEEPSEEK_API_KEY,
-      baseURL: 'https://api.deepseek.com/v1'
-    });
-  }
-  return deepseek;
-}
-
-function getGeminiClient() {
-  if (!gemini) {
-    gemini = new OpenAI({
-      apiKey: process.env.GEMINI_API_KEY,
-      baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai/'
-    });
-  }
-  return gemini;
-}
-
-function getAnthropicClient() {
+function getAnthropicClient(): Anthropic {
   if (!anthropic) {
-    anthropic = new Anthropic({
-      apiKey: process.env.ANTHROPIC_API_KEY
-    });
+    const apiKey = process.env.ANTHROPIC_API_KEY;
+    if (!apiKey) {
+      throw new Error('ANTHROPIC_API_KEY is not configured');
+    }
+    anthropic = new Anthropic({ apiKey });
   }
   return anthropic;
 }
 
-// Determine provider from model ID
-function getProvider(modelId: string): 'openai' | 'deepseek' | 'gemini' | 'anthropic' {
-  if (
-    modelId.startsWith('gpt-') ||
-    modelId.startsWith('o1') ||
-    modelId.startsWith('o3') ||
-    modelId.startsWith('o4')
-  ) return 'openai';
-  if (modelId.startsWith('deepseek-')) return 'deepseek';
-  if (modelId.startsWith('gemini-')) return 'gemini';
-  if (modelId.startsWith('claude-')) return 'anthropic';
-  return 'openai'; // default fallback
-}
+// ---------------------------------------------------------------------------
+// Error classification / fallback
+// ---------------------------------------------------------------------------
 
-// Main completion function that routes to appropriate provider
-export async function createCompletion(options: AICompletionOptions): Promise<AICompletionResponse> {
-  const provider = getProvider(options.model);
-  
-  switch (provider) {
-    case 'openai':
-      return createOpenAICompletion(options);
-    case 'deepseek':
-      return createDeepSeekCompletion(options);
-    case 'gemini':
-      return createGeminiCompletion(options);
-    case 'anthropic':
-      return createAnthropicCompletion(options);
-    default:
-      throw new Error(`Unsupported provider for model: ${options.model}`);
-  }
-}
-
-// Streaming completion function
-export async function createStreamingCompletion(options: AICompletionOptions): Promise<AIStreamingCompletionResponse> {
-  const provider = getProvider(options.model);
-  
-  switch (provider) {
-    case 'openai':
-      return createOpenAIStreamingCompletion(options);
-    case 'deepseek':
-      return createDeepSeekStreamingCompletion(options);
-    case 'gemini':
-      return createGeminiStreamingCompletion(options);
-    case 'anthropic':
-      return createAnthropicStreamingCompletion(options);
-    default:
-      throw new Error(`Unsupported provider for model: ${options.model}`);
-  }
-}
-
-// OpenAI completion
-async function createOpenAICompletion(options: AICompletionOptions): Promise<AICompletionResponse> {
-  const client = getOpenAIClient();
-  
-  // Determine if this is a newer model that uses max_completion_tokens
-  // All o-series, gpt-4.1+, gpt-4o, and gpt-5+ models use this parameter
-  const usesCompletionTokens =
-    options.model.startsWith('o1') ||
-    options.model.startsWith('o3') ||
-    options.model.startsWith('o4') ||
-    options.model.startsWith('gpt-5') ||
-    options.model.startsWith('gpt-4.1') ||
-    options.model.includes('gpt-4o');
-  
-  const requestParams: any = {
-    model: options.model,
-    messages: options.messages.map(msg => ({
-      role: msg.role,
-      content: msg.content
-    })),
-    stream: false,
+function isRetryableModelError(err: unknown): boolean {
+  const e = err as {
+    status?: number;
+    statusCode?: number;
+    message?: string;
+    error?: { type?: string; message?: string };
   };
-
-  // Add parameters based on model type
-  if (usesCompletionTokens) {
-    // Newer models (o1, o3) use max_completion_tokens and don't support some parameters
-    // These models need more tokens because they use many for internal reasoning
-    requestParams.max_completion_tokens = options.maxTokens ? Math.max(options.maxTokens, 2000) : 2000;
-  } else {
-    // Older models use max_tokens and support all parameters
-    requestParams.temperature = options.temperature !== undefined ? options.temperature : 0.25;
-    requestParams.max_tokens = options.maxTokens || 500;
-    requestParams.frequency_penalty = options.frequencyPenalty || 0.2;
-    requestParams.presence_penalty = options.presencePenalty || 0.2;
+  const status = e?.status ?? e?.statusCode;
+  const msg = `${e?.message || ''} ${e?.error?.message || ''} ${e?.error?.type || ''}`.toLowerCase();
+  if (status === 404 || status === 529 || status === 503 || status === 500) {
+    return true;
   }
+  if (status === 429) return true;
+  if (msg.includes('not_found')) return true;
+  if (msg.includes('overloaded')) return true;
+  if (msg.includes('model:')) return true;
+  if (msg.includes('unavailable')) return true;
+  return false;
+}
 
-  console.log(`Making request to ${options.model} with params:`, requestParams);
-  
-  const completion = await client.chat.completions.create(requestParams);
-  
-  console.log(`Response from ${options.model}:`, {
-    choices: completion.choices,
-    usage: completion.usage,
-    content: completion.choices[0]?.message?.content
-  });
-
-  const content = completion.choices[0]?.message?.content;
-  
-  if (!content) {
-    console.warn(`Empty content returned from ${options.model}`);
+function splitSystem(messages: AIMessage[], system?: string): {
+  system?: string;
+  messages: { role: 'user' | 'assistant'; content: string }[];
+} {
+  const fromMessages = messages
+    .filter((m) => m.role === 'system')
+    .map((m) => m.content)
+    .filter(Boolean);
+  const systemText = [system, ...fromMessages].filter(Boolean).join('\n\n') || undefined;
+  const anthMessages = messages
+    .filter((m) => m.role !== 'system')
+    .map((m) => ({
+      role: m.role as 'user' | 'assistant',
+      content: m.content,
+    }));
+  // Anthropic requires first message to be user
+  if (anthMessages.length && anthMessages[0].role !== 'user') {
+    anthMessages.unshift({ role: 'user', content: 'Continue.' });
   }
-
-  return {
-    content: content || '',
-    usage: completion.usage ? {
-      promptTokens: completion.usage.prompt_tokens,
-      completionTokens: completion.usage.completion_tokens,
-      totalTokens: completion.usage.total_tokens,
-    } : undefined
-  };
+  return { system: systemText, messages: anthMessages };
 }
 
-// DeepSeek completion (uses OpenAI-compatible API)
-async function createDeepSeekCompletion(options: AICompletionOptions): Promise<AICompletionResponse> {
-  const client = getDeepSeekClient();
-  const completion = await client.chat.completions.create({
-    model: options.model,
-    messages: options.messages.map(msg => ({
-      role: msg.role,
-      content: msg.content
-    })),
-    temperature: options.temperature !== undefined ? options.temperature : 0.25,
-    max_tokens: options.maxTokens || 500,
-    stream: false,
-  });
-
-  return {
-    content: completion.choices[0].message.content || '',
-    usage: completion.usage ? {
-      promptTokens: completion.usage.prompt_tokens,
-      completionTokens: completion.usage.completion_tokens,
-      totalTokens: completion.usage.total_tokens,
-    } : undefined
-  };
-}
-
-// Gemini completion (uses OpenAI-compatible API)
-async function createGeminiCompletion(options: AICompletionOptions): Promise<AICompletionResponse> {
-  const client = getGeminiClient();
-  const completion = await client.chat.completions.create({
-    model: options.model,
-    messages: options.messages.map(msg => ({
-      role: msg.role,
-      content: msg.content
-    })),
-    temperature: options.temperature !== undefined ? options.temperature : 0.25,
-    max_tokens: options.maxTokens || 500,
-    stream: false,
-  });
-
-  return {
-    content: completion.choices[0].message.content || '',
-    usage: completion.usage ? {
-      promptTokens: completion.usage.prompt_tokens,
-      completionTokens: completion.usage.completion_tokens,
-      totalTokens: completion.usage.total_tokens,
-    } : undefined
-  };
-}
-
-// Anthropic Claude completion (uses native Anthropic API)
-async function createAnthropicCompletion(options: AICompletionOptions): Promise<AICompletionResponse> {
+async function callAnthropicOnce(params: {
+  model: string;
+  messages: AIMessage[];
+  system?: string;
+  maxTokens?: number;
+}): Promise<{
+  content: string;
+  usage?: AICompletionResponse['usage'];
+}> {
   const client = getAnthropicClient();
-  
-  // Convert messages to Anthropic format
-  const messages = options.messages.filter(msg => msg.role !== 'system').map(msg => ({
-    role: msg.role as 'user' | 'assistant',
-    content: msg.content
-  }));
-  
-  // Extract system message if present
-  const systemMessage = options.messages.find(msg => msg.role === 'system');
-  
-  const requestParams: any = {
-    model: options.model,
-    max_tokens: options.maxTokens || 500,
-    messages: messages,
+  const split = splitSystem(params.messages, params.system);
+  const requestParams: Record<string, unknown> = {
+    model: params.model,
+    max_tokens: params.maxTokens || 500,
+    messages: split.messages,
   };
-  
-  if (systemMessage) {
-    requestParams.system = systemMessage.content;
-  }
+  if (split.system) requestParams.system = split.system;
+  // Omit temperature — current Claude lineup rejects deprecated temperature.
 
-  // Omit `temperature` — the current Claude model lineup (Opus/Sonnet/Haiku)
-  // rejects it ("temperature is deprecated for this model"); defaults are fine.
-
-  console.log(`Making request to ${options.model} with params:`, requestParams);
-
-  const completion = await client.messages.create(requestParams);
-  
-  console.log(`Response from ${options.model}:`, {
-    content: completion.content,
-    usage: completion.usage
-  });
-
-  // Extract text content from Claude's response
-  const textContent = completion.content
+  const completion = await client.messages.create(requestParams as any);
+  const textContent = (completion.content || [])
     .filter((block: any) => block.type === 'text')
     .map((block: any) => block.text)
     .join('');
 
   return {
     content: textContent,
-    usage: completion.usage ? {
-      promptTokens: completion.usage.input_tokens,
-      completionTokens: completion.usage.output_tokens,
-      totalTokens: completion.usage.input_tokens + completion.usage.output_tokens,
-    } : undefined
+    usage: completion.usage
+      ? {
+          promptTokens: completion.usage.input_tokens,
+          completionTokens: completion.usage.output_tokens,
+          totalTokens:
+            completion.usage.input_tokens + completion.usage.output_tokens,
+        }
+      : undefined,
   };
 }
 
-// Streaming implementations
+// ---------------------------------------------------------------------------
+// Public entry points
+// ---------------------------------------------------------------------------
 
-// OpenAI streaming completion
-async function createOpenAIStreamingCompletion(options: AICompletionOptions): Promise<AIStreamingCompletionResponse> {
-  const client = getOpenAIClient();
-  
-  // Determine if this is a newer model that uses max_completion_tokens
-  const usesCompletionTokens =
-    options.model.startsWith('o1') ||
-    options.model.startsWith('o3') ||
-    options.model.startsWith('o4') ||
-    options.model.startsWith('gpt-5') ||
-    options.model.startsWith('gpt-4.1') ||
-    options.model.includes('gpt-4o');
-  
-  const requestParams: any = {
-    model: options.model,
-    messages: options.messages.map(msg => ({
-      role: msg.role,
-      content: msg.content
-    })),
-    stream: true,
-  };
+/**
+ * Preferred entry: tiered Anthropic completion with one-shot internal fallback.
+ */
+export async function aiComplete(
+  params: AiCompleteParams
+): Promise<AICompletionResponse> {
+  const tier: ModelTier = params.tier || 'workhorse';
+  const primaryModel = getModelForTier(tier);
+  const messages = params.messages || [];
 
-  // Add parameters based on model type
-  if (usesCompletionTokens) {
-    requestParams.max_completion_tokens = options.maxTokens ? Math.max(options.maxTokens, 2000) : 2000;
-  } else {
-    requestParams.temperature = options.temperature !== undefined ? options.temperature : 0.25;
-    requestParams.max_tokens = options.maxTokens || 500;
-    requestParams.frequency_penalty = options.frequencyPenalty || 0.2;
-    requestParams.presence_penalty = options.presencePenalty || 0.2;
+  try {
+    const result = await callAnthropicOnce({
+      model: primaryModel,
+      messages,
+      system: params.system,
+      maxTokens: params.maxTokens,
+    });
+    console.log(`[ai-gateway] served tier=${tier} model=${primaryModel}`);
+    return {
+      content: result.content,
+      model: primaryModel,
+      tier,
+      usedFallback: false,
+      usage: result.usage,
+    };
+  } catch (err) {
+    const fallbackTier = TIER_FALLBACK[tier];
+    if (!fallbackTier || !isRetryableModelError(err)) {
+      throw err;
+    }
+    const fallbackModel = getModelForTier(fallbackTier);
+    console.warn(
+      `[ai-gateway] tier=${tier} model=${primaryModel} failed; falling back to tier=${fallbackTier} model=${fallbackModel}`,
+      err instanceof Error ? err.message : err
+    );
+    const result = await callAnthropicOnce({
+      model: fallbackModel,
+      messages,
+      system: params.system,
+      maxTokens: params.maxTokens,
+    });
+    console.log(
+      `[ai-gateway] served tier=${fallbackTier} model=${fallbackModel} (fallback from ${tier})`
+    );
+    return {
+      content: result.content,
+      model: fallbackModel,
+      tier: fallbackTier,
+      usedFallback: true,
+      usage: result.usage,
+    };
   }
-
-  const stream = await client.chat.completions.create(requestParams);
-  
-  const encoder = new TextEncoder();
-  const readableStream = new ReadableStream({
-    async start(controller) {
-      try {
-        console.log('🔍 STREAMING DEBUG: Starting OpenAI stream processing');
-        let chunkCount = 0;
-        let contentChunks = 0;
-        
-        for await (const chunk of stream as any) {
-          chunkCount++;
-          console.log('🔍 STREAMING DEBUG: Chunk', chunkCount, 'received:', JSON.stringify(chunk));
-          
-          const content = chunk.choices[0]?.delta?.content;
-          if (content) {
-            contentChunks++;
-            console.log('🔍 STREAMING DEBUG: Content found in chunk', chunkCount, ':', content.length, 'chars');
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'chunk', content })}\n\n`));
-          } else {
-            console.log('🔍 STREAMING DEBUG: No content in chunk', chunkCount, '- delta:', JSON.stringify(chunk.choices[0]?.delta));
-          }
-        }
-        
-        console.log('🔍 STREAMING DEBUG: Stream complete -', chunkCount, 'total chunks,', contentChunks, 'with content');
-        controller.enqueue(encoder.encode('data: [DONE]\n\n'));
-        controller.close();
-      } catch (error) {
-        console.error('🔍 STREAMING DEBUG: Stream error:', error);
-        controller.error(error);
-      }
-    }
-  });
-
-  return { stream: readableStream };
 }
 
-// DeepSeek streaming completion
-async function createDeepSeekStreamingCompletion(options: AICompletionOptions): Promise<AIStreamingCompletionResponse> {
-  const client = getDeepSeekClient();
-  
-  const stream = await client.chat.completions.create({
-    model: options.model,
-    messages: options.messages.map(msg => ({
-      role: msg.role,
-      content: msg.content
-    })),
-    temperature: options.temperature !== undefined ? options.temperature : 0.25,
-    max_tokens: options.maxTokens || 500,
-    stream: true,
-  });
-  
-  const encoder = new TextEncoder();
-  const readableStream = new ReadableStream({
-    async start(controller) {
-      try {
-        for await (const chunk of stream as any) {
-          const content = chunk.choices[0]?.delta?.content;
-          if (content) {
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'chunk', content })}\n\n`));
-          }
-        }
-        controller.enqueue(encoder.encode('data: [DONE]\n\n'));
-        controller.close();
-      } catch (error) {
-        controller.error(error);
-      }
-    }
-  });
+/**
+ * Streaming variant — same tier + fallback semantics.
+ * Emits SSE: `data: {"type":"chunk","content":"..."}\n\n` then `data: [DONE]\n\n`.
+ */
+export async function aiCompleteStream(
+  params: AiCompleteParams
+): Promise<AIStreamingCompletionResponse> {
+  const tier: ModelTier = params.tier || 'workhorse';
+  let model = getModelForTier(tier);
+  let usedFallback = false;
+  let activeTier: ModelTier = tier;
 
-  return { stream: readableStream };
-}
-
-// Gemini streaming completion
-async function createGeminiStreamingCompletion(options: AICompletionOptions): Promise<AIStreamingCompletionResponse> {
-  const client = getGeminiClient();
-  
-  const stream = await client.chat.completions.create({
-    model: options.model,
-    messages: options.messages.map(msg => ({
-      role: msg.role,
-      content: msg.content
-    })),
-    temperature: options.temperature !== undefined ? options.temperature : 0.25,
-    max_tokens: options.maxTokens || 500,
-    stream: true,
-  });
-  
-  const encoder = new TextEncoder();
-  const readableStream = new ReadableStream({
-    async start(controller) {
-      try {
-        for await (const chunk of stream as any) {
-          const content = chunk.choices[0]?.delta?.content;
-          if (content) {
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'chunk', content })}\n\n`));
-          }
-        }
-        controller.enqueue(encoder.encode('data: [DONE]\n\n'));
-        controller.close();
-      } catch (error) {
-        controller.error(error);
-      }
-    }
-  });
-
-  return { stream: readableStream };
-}
-
-// Anthropic streaming completion
-async function createAnthropicStreamingCompletion(options: AICompletionOptions): Promise<AIStreamingCompletionResponse> {
   const client = getAnthropicClient();
-  
-  // Convert messages to Anthropic format
-  const messages = options.messages.filter(msg => msg.role !== 'system').map(msg => ({
-    role: msg.role as 'user' | 'assistant',
-    content: msg.content
-  }));
-  
-  // Extract system message if present
-  const systemMessage = options.messages.find(msg => msg.role === 'system');
-  
-  const requestParams: any = {
-    model: options.model,
-    max_tokens: options.maxTokens || 500,
-    messages: messages,
-    stream: true,
+  const split = splitSystem(params.messages || [], params.system);
+
+  const startStream = async (modelId: string) => {
+    const requestParams: Record<string, unknown> = {
+      model: modelId,
+      max_tokens: params.maxTokens || 500,
+      messages: split.messages,
+      stream: true,
+    };
+    if (split.system) requestParams.system = split.system;
+    return client.messages.create(requestParams as any);
   };
-  
-  if (systemMessage) {
-    requestParams.system = systemMessage.content;
+
+  let stream: any;
+  try {
+    stream = await startStream(model);
+    console.log(`[ai-gateway] stream tier=${tier} model=${model}`);
+  } catch (err) {
+    const fallbackTier = TIER_FALLBACK[tier];
+    if (!fallbackTier || !isRetryableModelError(err)) throw err;
+    activeTier = fallbackTier;
+    model = getModelForTier(fallbackTier);
+    usedFallback = true;
+    console.warn(
+      `[ai-gateway] stream tier=${tier} failed; falling back to tier=${fallbackTier} model=${model}`,
+      err instanceof Error ? err.message : err
+    );
+    stream = await startStream(model);
   }
 
-  // Omit `temperature` — see createAnthropicCompletion above.
-
-  const stream = await client.messages.create(requestParams);
-  
   const encoder = new TextEncoder();
   const readableStream = new ReadableStream({
     async start(controller) {
       try {
         for await (const chunk of stream as any) {
-          if (chunk.type === 'content_block_delta' && chunk.delta.type === 'text_delta') {
+          if (
+            chunk.type === 'content_block_delta' &&
+            chunk.delta?.type === 'text_delta'
+          ) {
             const content = chunk.delta.text;
             if (content) {
-              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'chunk', content })}\n\n`));
+              controller.enqueue(
+                encoder.encode(
+                  `data: ${JSON.stringify({ type: 'chunk', content })}\n\n`
+                )
+              );
             }
           }
         }
@@ -475,14 +359,49 @@ async function createAnthropicStreamingCompletion(options: AICompletionOptions):
       } catch (error) {
         controller.error(error);
       }
-    }
+    },
   });
 
-  return { stream: readableStream };
+  return {
+    stream: readableStream,
+    model,
+    tier: activeTier,
+    usedFallback,
+  };
 }
 
 // ---------------------------------------------------------------------------
-// Tool-calling completions (Phase 2B consultant / shared agents)
+// Backward-compatible wrappers (resolve model → tier → gateway)
+// ---------------------------------------------------------------------------
+
+export async function createCompletion(
+  options: AICompletionOptions
+): Promise<AICompletionResponse> {
+  const tier =
+    options.tier || resolveModelTier(options.model);
+  return aiComplete({
+    tier,
+    messages: options.messages,
+    maxTokens: options.maxTokens,
+    temperature: options.temperature,
+  });
+}
+
+export async function createStreamingCompletion(
+  options: AICompletionOptions
+): Promise<AIStreamingCompletionResponse> {
+  const tier =
+    options.tier || resolveModelTier(options.model);
+  return aiCompleteStream({
+    tier,
+    messages: options.messages,
+    maxTokens: options.maxTokens,
+    temperature: options.temperature,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Tool-calling completions (consultant / shared agents) — Anthropic only
 // ---------------------------------------------------------------------------
 
 export type AIToolDefinition = {
@@ -528,7 +447,9 @@ export type AIToolLoopMessage =
   | AIMessage;
 
 export interface AICompletionWithToolsOptions {
-  model: string;
+  /** @deprecated Prefer `tier`. */
+  model?: string;
+  tier?: ModelTier;
   messages: AIToolLoopMessage[];
   tools: AIToolDefinition[];
   maxTokens?: number;
@@ -539,6 +460,9 @@ export interface AICompletionWithToolsResponse {
   content: string;
   toolCalls: AIToolCall[];
   stopReason: string;
+  model: string;
+  tier: ModelTier;
+  usedFallback: boolean;
   usage?: {
     promptTokens: number;
     completionTokens: number;
@@ -546,51 +470,73 @@ export interface AICompletionWithToolsResponse {
   };
 }
 
-/**
- * Provider-routed completion that supports tool definitions and tool_use responses.
- * Primary path: Anthropic. OpenAI tools supported as fallback when model is gpt-*.
- */
 export async function createCompletionWithTools(
   options: AICompletionWithToolsOptions
 ): Promise<AICompletionWithToolsResponse> {
-  const provider = getProvider(options.model);
-  if (provider === 'anthropic') {
-    return createAnthropicCompletionWithTools(options);
+  const tier = options.tier || resolveModelTier(options.model);
+  const primaryModel = getModelForTier(tier);
+
+  try {
+    const result = await createAnthropicCompletionWithTools({
+      ...options,
+      model: primaryModel,
+    });
+    console.log(`[ai-gateway] tools tier=${tier} model=${primaryModel}`);
+    return {
+      ...result,
+      model: primaryModel,
+      tier,
+      usedFallback: false,
+    };
+  } catch (err) {
+    const fallbackTier = TIER_FALLBACK[tier];
+    if (!fallbackTier || !isRetryableModelError(err)) throw err;
+    const fallbackModel = getModelForTier(fallbackTier);
+    console.warn(
+      `[ai-gateway] tools tier=${tier} failed; falling back to tier=${fallbackTier}`,
+      err instanceof Error ? err.message : err
+    );
+    const result = await createAnthropicCompletionWithTools({
+      ...options,
+      model: fallbackModel,
+    });
+    return {
+      ...result,
+      model: fallbackModel,
+      tier: fallbackTier,
+      usedFallback: true,
+    };
   }
-  if (provider === 'openai') {
-    return createOpenAICompletionWithTools(options);
-  }
-  const text = await createCompletion({
-    model: options.model,
-    messages: options.messages
-      .filter((m): m is AIMessage => m.role === 'system' || m.role === 'user' || m.role === 'assistant')
-      .map((m) => ({
-        role: m.role as 'system' | 'user' | 'assistant',
-        content: typeof (m as any).content === 'string' ? (m as any).content : '',
-      })),
-    maxTokens: options.maxTokens,
-  });
-  return { content: text.content, toolCalls: [], stopReason: 'end_turn', usage: text.usage };
 }
 
 async function createAnthropicCompletionWithTools(
-  options: AICompletionWithToolsOptions
-): Promise<AICompletionWithToolsResponse> {
+  options: AICompletionWithToolsOptions & { model: string }
+): Promise<Omit<AICompletionWithToolsResponse, 'model' | 'tier' | 'usedFallback'>> {
   const client = getAnthropicClient();
 
   const systemParts = options.messages
     .filter((m) => m.role === 'system')
-    .map((m) => (typeof (m as AISystemMessage).content === 'string' ? (m as AISystemMessage).content : ''))
+    .map((m) =>
+      typeof (m as AISystemMessage).content === 'string'
+        ? (m as AISystemMessage).content
+        : ''
+    )
     .filter(Boolean);
 
   type AnthContent = any;
-  const anthMessages: { role: 'user' | 'assistant'; content: string | AnthContent[] }[] = [];
+  const anthMessages: {
+    role: 'user' | 'assistant';
+    content: string | AnthContent[];
+  }[] = [];
 
   for (const msg of options.messages) {
     if (msg.role === 'system') continue;
 
     if (msg.role === 'user') {
-      anthMessages.push({ role: 'user', content: (msg as AIUserTextMessage).content || '' });
+      anthMessages.push({
+        role: 'user',
+        content: (msg as AIUserTextMessage).content || '',
+      });
       continue;
     }
 
@@ -667,95 +613,24 @@ async function createAnthropicCompletionWithTools(
     .map((b: any) => ({
       id: String(b.id),
       name: String(b.name),
-      input: (b.input && typeof b.input === 'object' ? b.input : {}) as Record<string, unknown>,
+      input: (b.input && typeof b.input === 'object'
+        ? b.input
+        : {}) as Record<string, unknown>,
     }));
 
   return {
     content: textContent,
     toolCalls,
-    stopReason: String(completion.stop_reason || (toolCalls.length ? 'tool_use' : 'end_turn')),
+    stopReason: String(
+      completion.stop_reason || (toolCalls.length ? 'tool_use' : 'end_turn')
+    ),
     usage: completion.usage
       ? {
           promptTokens: completion.usage.input_tokens,
           completionTokens: completion.usage.output_tokens,
-          totalTokens: completion.usage.input_tokens + completion.usage.output_tokens,
+          totalTokens:
+            completion.usage.input_tokens + completion.usage.output_tokens,
         }
       : undefined,
   };
 }
-
-async function createOpenAICompletionWithTools(
-  options: AICompletionWithToolsOptions
-): Promise<AICompletionWithToolsResponse> {
-  const client = getOpenAIClient();
-  const oaiMessages: any[] = [];
-
-  for (const msg of options.messages) {
-    if (msg.role === 'system') {
-      oaiMessages.push({ role: 'system', content: (msg as AISystemMessage).content });
-    } else if (msg.role === 'user') {
-      oaiMessages.push({ role: 'user', content: (msg as AIUserTextMessage).content });
-    } else if (msg.role === 'assistant') {
-      const assistant = msg as AIAssistantToolMessage | AIMessage;
-      const toolCalls = (assistant as AIAssistantToolMessage).toolCalls || [];
-      oaiMessages.push({
-        role: 'assistant',
-        content: assistant.content || null,
-        tool_calls: toolCalls.length
-          ? toolCalls.map((c) => ({
-              id: c.id,
-              type: 'function',
-              function: { name: c.name, arguments: JSON.stringify(c.input || {}) },
-            }))
-          : undefined,
-      });
-    } else if (msg.role === 'tool') {
-      const toolMsg = msg as AIToolResultMessage;
-      oaiMessages.push({
-        role: 'tool',
-        tool_call_id: toolMsg.toolCallId,
-        content: toolMsg.content,
-      });
-    }
-  }
-
-  const completion = await client.chat.completions.create({
-    model: options.model,
-    messages: oaiMessages,
-    max_completion_tokens: options.maxTokens || 2000,
-    tools: (options.tools || []).map((t) => ({
-      type: 'function' as const,
-      function: {
-        name: t.name,
-        description: t.description,
-        parameters: t.inputSchema || { type: 'object', properties: {} },
-      },
-    })),
-    tool_choice: options.toolChoice === 'none' ? 'none' : 'auto',
-  });
-
-  const choice = completion.choices[0];
-  const message = choice?.message;
-  const toolCalls: AIToolCall[] = (message?.tool_calls || []).map((c: any) => {
-    let input: Record<string, unknown> = {};
-    try {
-      input = JSON.parse(c.function?.arguments || '{}');
-    } catch {
-      input = {};
-    }
-    return { id: String(c.id), name: String(c.function?.name || ''), input };
-  });
-
-  return {
-    content: message?.content || '',
-    toolCalls,
-    stopReason: toolCalls.length ? 'tool_use' : String(choice?.finish_reason || 'stop'),
-    usage: completion.usage
-      ? {
-          promptTokens: completion.usage.prompt_tokens,
-          completionTokens: completion.usage.completion_tokens,
-          totalTokens: completion.usage.total_tokens,
-        }
-      : undefined,
-  };
-} 

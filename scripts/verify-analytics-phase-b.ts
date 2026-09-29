@@ -20,10 +20,10 @@ async function main() {
   console.log('CONTEXT_PREVIEW\n', formatAnalyticsContextForPrompt(ctx).slice(0, 1200));
 
   const orch = new AIAnalyticsOrchestrator({
-    analysisModel: 'claude-sonnet-4-6',
-    queryModel: 'claude-sonnet-4-6',
-    insightModel: 'claude-sonnet-4-6',
-    visualizationModel: 'claude-sonnet-4-6',
+    analysisModel: 'workhorse',
+    queryModel: 'workhorse',
+    insightModel: 'workhorse',
+    visualizationModel: 'workhorse',
   });
 
   await orch.clearAnalyticsCache(surveyId);
@@ -34,10 +34,10 @@ async function main() {
     enableContextInjection: true,
     campaignId: 1,
     minimumResponses: 10,
-    insightModel: 'claude-sonnet-4-6',
-    analysisModel: 'claude-sonnet-4-6',
-    queryModel: 'claude-sonnet-4-6',
-    visualizationModel: 'claude-sonnet-4-6',
+    insightModel: 'workhorse',
+    analysisModel: 'workhorse',
+    queryModel: 'workhorse',
+    visualizationModel: 'workhorse',
   });
 
   const insights: any = result.insights || {};

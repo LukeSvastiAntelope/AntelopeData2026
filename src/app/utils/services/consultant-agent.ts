@@ -16,12 +16,7 @@ import {
 } from '@/app/utils/database/consultant-repo';
 import { stripRawPriorFromPayload } from '@/app/utils/propensity/quarantine';
 
-const CONSULTANT_MODEL =
-  process.env.ANTHROPIC_API_KEY
-    ? 'claude-sonnet-4-6'
-    : process.env.OPENAI_API_KEY
-      ? 'gpt-4o'
-      : 'claude-sonnet-4-6';
+const CONSULTANT_TIER = 'workhorse' as const;
 
 const MAX_TOOL_ROUNDS = 6;
 
@@ -210,7 +205,6 @@ export async function runConsultantMessage(params: {
 
   const autoResults: ConsultantTurnAutoResult[] = [];
   const newlyStaged: ConsultantStagedAction[] = [];
-  const model = CONSULTANT_MODEL;
   const tools = descriptorsToAITools();
 
   const loopMessages: AIToolLoopMessage[] = [
@@ -223,7 +217,7 @@ export async function runConsultantMessage(params: {
   try {
     for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
       const completion = await createCompletionWithTools({
-        model,
+        tier: CONSULTANT_TIER,
         messages: loopMessages,
         tools,
         maxTokens: 2000,
@@ -320,7 +314,7 @@ export async function runConsultantMessage(params: {
     // If we exited after tools without a closing text turn, ask the model once more with tools disabled
     if (!finalReply) {
       const closing = await createCompletionWithTools({
-        model,
+        tier: CONSULTANT_TIER,
         messages: loopMessages,
         tools,
         maxTokens: 1200,
@@ -366,7 +360,7 @@ export async function runConsultantMessage(params: {
     messages,
     autoResults,
     stagedActions: pending,
-    modelUsed: model,
+    modelUsed: CONSULTANT_TIER,
     offline: false,
   };
 }

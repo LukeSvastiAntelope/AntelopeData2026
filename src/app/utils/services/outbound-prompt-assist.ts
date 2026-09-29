@@ -85,10 +85,9 @@ export async function assistOutboundGoal(params: {
     };
   }
 
-  const model = process.env.ANTHROPIC_API_KEY ? 'claude-sonnet-4-6' : 'gpt-4o';
   try {
     const completion = await createCompletion({
-      model,
+      tier: 'workhorse',
       temperature: 0.3,
       maxTokens: 400,
       messages: [

@@ -116,11 +116,7 @@ Return ONLY JSON:
 Rank at most ${params.maxCandidates} items.`;
 
   const completion = await createCompletion({
-    model: process.env.ANTHROPIC_API_KEY
-      ? 'claude-sonnet-4-6'
-      : process.env.OPENAI_API_KEY
-        ? 'gpt-4o'
-        : 'claude-sonnet-4-6',
+    tier: 'workhorse',
     temperature: 0.3,
     maxTokens: 2500,
     messages: [

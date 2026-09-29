@@ -280,7 +280,7 @@ const AISurveyBuilderPageInner = () => {
 
     try {
       const controller = new AbortController()
-      const isSlowModel = selectedModel.includes('gpt-5') || selectedModel.includes('o1') || selectedModel.includes('o3') || selectedModel.includes('o4')
+      const isSlowModel = selectedModel === 'heavy'
       const timeoutMs = isSlowModel ? 300_000 : 120_000
       const timeoutId = window.setTimeout(() => {
         controller.abort(new Error(`Request timeout after ${timeoutMs / 1000} seconds`))
@@ -307,7 +307,7 @@ const AISurveyBuilderPageInner = () => {
             '⚠️ AI model returned empty or unparseable content.\n\n' +
             'This can happen with reasoning models. Please:\n' +
             '• Try again with the same prompt\n' +
-            '• Switch to gpt-4o or gpt-4o-mini\n' +
+            '• Switch to Workhorse or Cheap tier\n' +
             '• Make your prompt more specific'
           )
           return
@@ -386,7 +386,7 @@ const AISurveyBuilderPageInner = () => {
         } else if (response.status === 503 || response.status === 504) {
           setError(
             serverMsg ||
-              '⚠️ AI service temporarily unavailable or timed out.\n\nThis usually resolves quickly. Please:\n• Wait a moment and try again\n• Or switch to gpt-4o-mini for faster responses'
+              '⚠️ AI service temporarily unavailable or timed out.\n\nThis usually resolves quickly. Please:\n• Wait a moment and try again\n• Or switch to Cheap (Haiku) for faster responses'
           )
         } else if (response.status >= 500) {
           setError(
@@ -406,7 +406,7 @@ const AISurveyBuilderPageInner = () => {
           '⏱️ Request timed out after 35 seconds.\n\n' +
           'The AI is taking longer than expected. Please:\n' +
           '• Try again (it may work on retry)\n' +
-          '• Switch to gpt-4o-mini for faster generation\n' +
+          '• Switch to Cheap (Haiku) for faster generation\n' +
           '• Simplify your prompt slightly'
         )
       } else {
@@ -1024,19 +1024,8 @@ const AISurveyBuilderPageInner = () => {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectGroup>
-                        <SelectLabel>OpenAI · GPT</SelectLabel>
-                        {SURVEY_MODELS.filter((m) => m.provider === 'OpenAI').map((m) => (
-                          <SelectItem key={m.key} value={m.key}>
-                            <div className="flex items-center gap-2">
-                              <span>{m.label}</span>
-                              {m.recommended && <Badge variant="secondary" className="text-[10px]">Recommended</Badge>}
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectGroup>
-                      <SelectGroup>
-                        <SelectLabel>Anthropic · Claude</SelectLabel>
-                        {SURVEY_MODELS.filter((m) => m.provider === 'Anthropic').map((m) => (
+                        <SelectLabel>Anthropic · tiers</SelectLabel>
+                        {SURVEY_MODELS.map((m) => (
                           <SelectItem key={m.key} value={m.key}>
                             <div className="flex items-center gap-2">
                               <span>{m.label}</span>
@@ -1048,7 +1037,7 @@ const AISurveyBuilderPageInner = () => {
                     </SelectContent>
                   </Select>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    {SURVEY_MODELS.find((m) => m.key === selectedModel)?.blurb || 'Latest GPT and Claude models'}
+                    {SURVEY_MODELS.find((m) => m.key === selectedModel)?.blurb || 'Anthropic model tiers via the AI gateway'}
                   </p>
                 </div>
 

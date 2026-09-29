@@ -29,7 +29,7 @@ interface SurveyDataPayload {
 export class SurveyAnalysisEngine {
   private defaultModel: string;
 
-  constructor(defaultModel: string = 'gpt-4o') {
+  constructor(defaultModel: string = 'workhorse') {
     this.defaultModel = defaultModel;
   }
 
