@@ -4,6 +4,17 @@ import { useState, useCallback } from 'react';
 import * as XLSX from 'xlsx';
 import Papa from 'papaparse';
 
+/** Incomplete / truncated Python — regenerate rather than fix-code. */
+function isIncompleteCodeError(error: unknown): boolean {
+  const msg = String(error).toLowerCase();
+  return (
+    msg.includes('was never closed') ||
+    msg.includes('unexpected eof') ||
+    msg.includes('eof while scanning') ||
+    msg.includes('truncated')
+  );
+}
+
 export interface Dataset {
   name: string;
   data: any[][];
@@ -400,6 +411,16 @@ export function useAnalysisContext() {
           result = pyodide.runPython(code);
         } catch (execError) {
           console.warn('Code execution failed, attempting automatic fixes:', execError);
+
+          // Truncated / incomplete Python cannot be patched — signal regenerate
+          if (isIncompleteCodeError(execError)) {
+            console.warn(
+              '[analysis-context] incomplete code SyntaxError; skipping fix-code (regenerate required)'
+            );
+            throw new Error(
+              `Incomplete generated code (${String(execError)}). Please regenerate.`
+            );
+          }
           
           // Try to diagnose and fix common issues
           const errorMessage = String(execError);
@@ -515,14 +536,30 @@ except Exception as e:
                 })
               });
               
-              if (fixResponse.ok) {
-                const fixResult = await fixResponse.json();
+              const fixResult = await fixResponse.json().catch(() => ({}));
+              if (fixResult?.truncated || isIncompleteCodeError(String(finalError))) {
+                console.warn(
+                  '[analysis-context] fix-code truncated or incomplete; regenerating required'
+                );
+                throw new Error(
+                  fixResult?.error ||
+                    'Fixed code was truncated; please regenerate'
+                );
+              }
+              if (fixResponse.ok && fixResult?.fixedCode) {
                 console.log('AI suggested fix:', fixResult.fixedCode);
                 result = pyodide.runPython(fixResult.fixedCode);
               } else {
                 throw new Error('AI fix failed');
               }
             } catch (aiFinalError) {
+              if (
+                isIncompleteCodeError(aiFinalError) ||
+                String(aiFinalError).toLowerCase().includes('regenerate') ||
+                String(aiFinalError).toLowerCase().includes('truncated')
+              ) {
+                throw aiFinalError;
+              }
               console.error('AI fix also failed:', aiFinalError);
               result = pyodide.runPython(`
 print("=== ANALYSIS ERROR ===")

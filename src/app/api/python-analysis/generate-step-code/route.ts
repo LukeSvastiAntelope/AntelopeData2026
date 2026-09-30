@@ -58,6 +58,7 @@ export async function POST(req: NextRequest) {
       : '';
     
     const systemPrompt = `You are an expert Python data analyst. Generate focused, executable code for a specific analysis step.
+Return only executable Python. Keep it compact: no long comments, no docstrings, no explanatory prose.
 ${richBundle}
 
 ${grainBlock}
@@ -405,8 +406,21 @@ Return concise, executable Python code (10-20 lines max).`;
         { role: 'user', content: userPrompt }
       ],
       temperature: 0,
-      maxTokens: 1200
+      maxTokens: 4000,
+      expandOnTruncation: true,
     });
+
+    if (completion.stopReason === 'max_tokens') {
+      console.warn(
+        `[generate-step-code] still truncated after expand (step=${request.step.id})`
+      );
+      return NextResponse.json({
+        truncated: true,
+        error: 'Generated code was truncated; please regenerate',
+        step_id: request.step.id,
+        model: completion.model,
+      });
+    }
 
     let code = completion.content?.trim() || '';
     
@@ -427,8 +441,9 @@ Return concise, executable Python code (10-20 lines max).`;
 
     return NextResponse.json({
       code,
-      model: 'heavy',
-      step_id: request.step.id
+      model: completion.model || 'heavy',
+      step_id: request.step.id,
+      stopReason: completion.stopReason,
     });
 
   } catch (error) {

@@ -92,7 +92,7 @@ Focus on being clear, specific, and actionable.`;
         { role: 'user', content: userPrompt }
       ],
       temperature: 0.3,
-      maxTokens: 1200
+      maxTokens: 2500
     });
 
     const synthesis = completion.content?.trim() || 'Analysis synthesis could not be generated.';

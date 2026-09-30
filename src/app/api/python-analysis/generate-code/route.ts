@@ -97,6 +97,8 @@ function createSurveyAnalysisPrompt(
 - Cross-tabulation and correlation analysis
 - Data visualization best practices
 - Common survey biases and limitations
+
+Return only executable Python. Keep it compact: no long comments, no docstrings, no explanatory prose.
 ${rich}
 
 ${grain}
@@ -247,8 +249,18 @@ export async function POST(req: NextRequest) {
         { role: 'user', content: userPrompt }
       ],
       temperature: 0.3,
-      maxTokens: 1500 // Increased to avoid truncation
+      maxTokens: 4000,
+      expandOnTruncation: true,
     });
+
+    if (completion.stopReason === 'max_tokens') {
+      console.warn('[PYTHON-ANALYSIS] code generation still truncated after expand');
+      return NextResponse.json({
+        truncated: true,
+        error: 'Generated code was truncated; please regenerate',
+        model: completion.model,
+      });
+    }
 
     // Parse AI response
     let aiResponse;

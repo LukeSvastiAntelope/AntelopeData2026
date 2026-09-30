@@ -22,6 +22,7 @@ export async function POST(req: NextRequest) {
     const request: CodeFixRequest = await req.json();
     
     const systemPrompt = `You are an expert Python debugger specializing in data analysis with Pyodide. Your job is to fix broken Python code.
+Return only executable Python. Keep it compact: no long comments, no docstrings, no explanatory prose.
 
 AVAILABLE ENVIRONMENT:
 - Pyodide (browser-based Python)
@@ -69,8 +70,18 @@ Return ONLY the fixed Python code, no explanations.`;
         { role: 'user', content: userPrompt }
       ],
       temperature: 0,
-      maxTokens: 800
+      maxTokens: 4000,
+      expandOnTruncation: true,
     });
+
+    if (completion.stopReason === 'max_tokens') {
+      console.warn('[fix-code] still truncated after expand');
+      return NextResponse.json({
+        truncated: true,
+        error: 'Fixed code was truncated; please regenerate',
+        model: completion.model,
+      });
+    }
 
     let fixedCode = completion.content?.trim() || '';
     
@@ -83,7 +94,8 @@ Return ONLY the fixed Python code, no explanations.`;
 
     return NextResponse.json({
       fixedCode,
-      model: 'workhorse'
+      model: completion.model || 'workhorse',
+      stopReason: completion.stopReason,
     });
 
   } catch (error) {

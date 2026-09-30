@@ -73,6 +73,8 @@ function createSurveyAnalysisPrompt(
 
   return `You are an expert data analyst specializing in survey research and statistical analysis.
 
+Return only executable Python. Keep it compact: no long comments, no docstrings, no explanatory prose.
+
 ${rich}
 
 ${grain}
@@ -81,7 +83,7 @@ IMPORTANT GUIDELINES:
 1. Always consider statistical significance for survey data
 2. Account for sample sizes when making claims
 3. Plan against the real dataframe head + dtypes — do not invent columns
-4. Generate clean, well-commented Python code for Pyodide (pandas/numpy/matplotlib)
+4. Generate clean, compact Python code for Pyodide (pandas/numpy/matplotlib)
 5. Always check for missing values and data quality issues
 6. You may request more grain via print(df.describe()), value_counts, etc. — full frame is df
 
@@ -155,7 +157,7 @@ export async function POST(req: NextRequest) {
         { role: 'user', content: userPrompt }
       ],
       temperature: 0.3,
-      maxTokens: 800
+      maxTokens: 4000
     });
 
     const headers = new Headers({

@@ -172,7 +172,7 @@ Return a JSON array of steps in this format:
         { role: 'user', content: userPrompt }
       ],
       temperature: 0.4,
-      maxTokens: 1000
+      maxTokens: 2000
     });
 
     let stepsText = completion.content?.trim() || '';

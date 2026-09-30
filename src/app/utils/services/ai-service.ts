@@ -106,6 +106,8 @@ export interface AICompletionOptions {
   frequencyPenalty?: number;
   presencePenalty?: number;
   usage?: AiUsageMeta;
+  /** If true and stopReason is max_tokens, retry once with a larger budget. */
+  expandOnTruncation?: boolean;
 }
 
 export interface AICompletionResponse {
@@ -113,6 +115,8 @@ export interface AICompletionResponse {
   model: string;
   tier: ModelTier;
   usedFallback: boolean;
+  /** Anthropic stop_reason (e.g. end_turn, max_tokens). */
+  stopReason?: string;
   usage?: {
     promptTokens: number;
     completionTokens: number;
@@ -150,6 +154,8 @@ export type AiCompleteParams = {
   temperature?: number;
   /** Optional metering attribution (merged with AsyncLocalStorage context). */
   usage?: AiUsageMeta;
+  /** If true and stopReason is max_tokens, retry once with a larger budget. */
+  expandOnTruncation?: boolean;
 };
 
 function resolveUsageMeta(explicit?: AiUsageMeta): AiUsageMeta {
@@ -260,6 +266,7 @@ async function callAnthropicOnce(params: {
   maxTokens?: number;
 }): Promise<{
   content: string;
+  stopReason?: string;
   usage?: AICompletionResponse['usage'];
 }> {
   const client = getAnthropicClient();
@@ -280,6 +287,9 @@ async function callAnthropicOnce(params: {
 
   return {
     content: textContent,
+    stopReason: completion.stop_reason
+      ? String(completion.stop_reason)
+      : undefined,
     usage: completion.usage
       ? {
           promptTokens: completion.usage.input_tokens,
@@ -306,6 +316,7 @@ export async function aiComplete(
   const primaryModel = getModelForTier(tier);
   const messages = params.messages || [];
   const meta = resolveUsageMeta(params.usage);
+  let maxTokens = params.maxTokens || 500;
 
   const gate = await assertAiUsageAllowed(meta.organizationId);
   const usageWarning = gate.warn
@@ -316,7 +327,11 @@ export async function aiComplete(
     servedTier: ModelTier,
     model: string,
     usedFallback: boolean,
-    result: { content: string; usage?: AICompletionResponse['usage'] }
+    result: {
+      content: string;
+      stopReason?: string;
+      usage?: AICompletionResponse['usage'];
+    }
   ): AICompletionResponse => {
     const promptTokens = result.usage?.promptTokens || 0;
     const completionTokens = result.usage?.completionTokens || 0;
@@ -338,21 +353,64 @@ export async function aiComplete(
       model,
       tier: servedTier,
       usedFallback,
+      stopReason: result.stopReason,
       usage: result.usage
         ? { ...result.usage, credits, costUsd }
-        : { promptTokens, completionTokens, totalTokens: promptTokens + completionTokens, credits, costUsd },
+        : {
+            promptTokens,
+            completionTokens,
+            totalTokens: promptTokens + completionTokens,
+            credits,
+            costUsd,
+          },
       usageWarning,
     };
   };
 
-  try {
-    const result = await callAnthropicOnce({
-      model: primaryModel,
+  const runOnce = async (
+    model: string,
+    budget: number
+  ): Promise<{
+    content: string;
+    stopReason?: string;
+    usage?: AICompletionResponse['usage'];
+  }> =>
+    callAnthropicOnce({
+      model,
       messages,
       system: params.system,
-      maxTokens: params.maxTokens,
+      maxTokens: budget,
     });
-    console.log(`[ai-gateway] served tier=${tier} model=${primaryModel}`);
+
+  const maybeExpand = async (
+    model: string,
+    result: {
+      content: string;
+      stopReason?: string;
+      usage?: AICompletionResponse['usage'];
+    }
+  ) => {
+    if (
+      !params.expandOnTruncation ||
+      result.stopReason !== 'max_tokens'
+    ) {
+      return result;
+    }
+    const expanded = Math.min(maxTokens * 2, 8000);
+    if (expanded <= maxTokens) return result;
+    console.warn(
+      `[ai-gateway] truncated, retrying with larger budget (${maxTokens} → ${expanded})`
+    );
+    maxTokens = expanded;
+    return runOnce(model, expanded);
+  };
+
+  try {
+    let result = await runOnce(primaryModel, maxTokens);
+    result = await maybeExpand(primaryModel, result);
+    console.log(
+      `[ai-gateway] served tier=${tier} model=${primaryModel} stop=${result.stopReason || 'n/a'}`
+    );
     return finish(tier, primaryModel, false, result);
   } catch (err) {
     const fallbackTier = TIER_FALLBACK[tier];
@@ -364,14 +422,10 @@ export async function aiComplete(
       `[ai-gateway] tier=${tier} model=${primaryModel} failed; falling back to tier=${fallbackTier} model=${fallbackModel}`,
       err instanceof Error ? err.message : err
     );
-    const result = await callAnthropicOnce({
-      model: fallbackModel,
-      messages,
-      system: params.system,
-      maxTokens: params.maxTokens,
-    });
+    let result = await runOnce(fallbackModel, maxTokens);
+    result = await maybeExpand(fallbackModel, result);
     console.log(
-      `[ai-gateway] served tier=${fallbackTier} model=${fallbackModel} (fallback from ${tier})`
+      `[ai-gateway] served tier=${fallbackTier} model=${fallbackModel} (fallback from ${tier}) stop=${result.stopReason || 'n/a'}`
     );
     return finish(fallbackTier, fallbackModel, true, result);
   }
@@ -498,6 +552,7 @@ export async function createCompletion(
     maxTokens: options.maxTokens,
     temperature: options.temperature,
     usage: options.usage,
+    expandOnTruncation: options.expandOnTruncation,
   });
 }
 

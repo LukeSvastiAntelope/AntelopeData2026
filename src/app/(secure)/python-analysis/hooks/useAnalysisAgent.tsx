@@ -2,6 +2,17 @@
 
 import { useState, useCallback, useRef } from 'react';
 
+/** Incomplete / truncated Python — regenerate rather than fix-code. */
+function isIncompleteCodeError(error: unknown): boolean {
+  const msg = String(error).toLowerCase();
+  return (
+    msg.includes('was never closed') ||
+    msg.includes('unexpected eof') ||
+    msg.includes('eof while scanning') ||
+    msg.includes('truncated')
+  );
+}
+
 // Agent State Types
 interface AnalysisStep {
   id: string;
@@ -193,7 +204,7 @@ export function useAnalysisAgent() {
     }
   }, []);
 
-  // Generate code for specific step
+  // Generate code for specific step (retries once if server reports truncation)
   const generateStepCode = useCallback(async (
     step: AnalysisStep,
     context: AnalysisContext,
@@ -201,29 +212,45 @@ export function useAnalysisAgent() {
   ): Promise<string> => {
     const fullRows = context.dataset_info.sample_data || [];
     const rowCount = context.dataset_info.row_count ?? fullRows.length;
-    const response = await fetch('/api/python-analysis/generate-step-code', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        step,
-        context: {
-          ...context,
-          dataset_info: {
-            ...context.dataset_info,
-            sample_data: fullRows.slice(0, 15),
-            row_count: rowCount,
-          },
+    const payload = {
+      step,
+      context: {
+        ...context,
+        dataset_info: {
+          ...context.dataset_info,
+          sample_data: fullRows.slice(0, 15),
+          row_count: rowCount,
         },
-        executedSteps: executedSteps.slice(-3),
-        analyticsContextPrompt: context.analytics_context_prompt,
-      })
-    });
+      },
+      executedSteps: executedSteps.slice(-3),
+      analyticsContextPrompt: context.analytics_context_prompt,
+    };
 
-    if (!response.ok) {
-      throw new Error(`Code generation failed: ${response.status}`);
+    const requestOnce = async () => {
+      const response = await fetch('/api/python-analysis/generate-step-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok && !result?.truncated) {
+        throw new Error(result?.error || `Code generation failed: ${response.status}`);
+      }
+      return result as { code?: string; truncated?: boolean; error?: string };
+    };
+
+    let result = await requestOnce();
+    if (result.truncated || !result.code) {
+      console.warn(
+        `[analysis-agent] step code truncated/missing (step=${step.id}); regenerating`
+      );
+      result = await requestOnce();
     }
-
-    const result = await response.json();
+    if (result.truncated || !result.code) {
+      throw new Error(
+        result.error || 'Generated code was truncated; regenerate failed'
+      );
+    }
     return result.code;
   }, []);
 
@@ -232,8 +259,9 @@ export function useAnalysisAgent() {
     code: string,
     pyodide: any,
     context: AnalysisContext,
-    maxRetries: number = 3
-  ): Promise<{ output: string; success: boolean; error?: string; plots?: string[] }> => {
+    maxRetries: number = 3,
+    regenerateCode?: () => Promise<string>
+  ): Promise<{ output: string; success: boolean; error?: string; plots?: string[]; code?: string }> => {
     let lastError: string = '';
     
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -455,14 +483,36 @@ exec_result
         return { 
           output: combinedOutput, 
           success: true, 
-          plots: plots // Add plots to return value
+          plots: plots, // Add plots to return value
+          code,
         };
       } catch (error) {
         lastError = String(error);
         console.warn(`Execution attempt ${attempt} failed:`, error);
         
         if (attempt < maxRetries) {
-          // Try to fix the code
+          // Truncated / incomplete Python cannot be patched — regenerate whole script
+          if (isIncompleteCodeError(lastError)) {
+            if (regenerateCode) {
+              try {
+                console.warn(
+                  `[analysis-agent] incomplete code SyntaxError; regenerating (attempt ${attempt})`
+                );
+                code = await regenerateCode();
+                continue;
+              } catch (regenError) {
+                console.warn('Regenerate failed:', regenError);
+                lastError = String(regenError);
+              }
+            } else {
+              console.warn(
+                '[analysis-agent] incomplete code SyntaxError; no regenerate callback — skipping fix-code'
+              );
+            }
+            continue;
+          }
+
+          // Runtime / logic errors: ask fix-code to rewrite
           try {
             const fixResponse = await fetch('/api/python-analysis/fix-code', {
               method: 'POST',
@@ -478,8 +528,17 @@ exec_result
               })
             });
 
-            if (fixResponse.ok) {
-              const fixResult = await fixResponse.json();
+            const fixResult = await fixResponse.json().catch(() => ({}));
+            if (fixResult?.truncated) {
+              if (regenerateCode) {
+                console.warn(
+                  '[analysis-agent] fix-code truncated; regenerating step code'
+                );
+                code = await regenerateCode();
+                continue;
+              }
+              console.warn('[analysis-agent] fix-code truncated; no regenerate callback');
+            } else if (fixResponse.ok && fixResult?.fixedCode) {
               code = fixResult.fixedCode;
               console.log(`Attempting fix ${attempt}:`, code.substring(0, 100) + '...');
             }
@@ -490,7 +549,7 @@ exec_result
       }
     }
 
-    return { output: '', success: false, error: lastError };
+    return { output: '', success: false, error: lastError, code };
   }, []);
 
   // Extract insights from execution results
@@ -646,15 +705,28 @@ exec_result
 
         try {
           // Generate code for this step
-          const stepCode = await generateStepCode(
+          let stepCode = await generateStepCode(
             currentStep,
             currentState.context,
             currentState.executed_steps
           );
 
-          // Execute the code
+          const regenerate = () =>
+            generateStepCode(
+              currentStep,
+              currentState.context,
+              currentState.executed_steps
+            );
+
+          // Execute the code (regenerate on incomplete SyntaxError / truncation)
           const startTime = Date.now();
-          const executionResult = await executeStepCode(stepCode, pyodide, currentState.context);
+          const executionResult = await executeStepCode(
+            stepCode,
+            pyodide,
+            currentState.context,
+            3,
+            regenerate
+          );
           const executionTime = Date.now() - startTime;
 
           // Extract insights
@@ -668,7 +740,7 @@ exec_result
           const executedStep: ExecutedStep = {
             id: `exec-${Date.now()}`,
             step: currentStep,
-            code: stepCode,
+            code: executionResult.code || stepCode,
             output: executionResult.output,
             success: executionResult.success,
             error: executionResult.error,

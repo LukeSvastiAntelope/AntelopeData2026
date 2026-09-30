@@ -66,7 +66,7 @@ If the output contains no usable numbers, return: { "insights": [] }`;
         { role: 'user', content: userPrompt }
       ],
       temperature: 0,
-      maxTokens: 500
+      maxTokens: 1500
     });
 
     let responseText = completion.content?.trim() || '';
