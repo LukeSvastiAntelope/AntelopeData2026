@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireUserId } from '@/app/utils/auth/require-user';
 import { openSql as getMySQLConnection } from '@/app/utils/database/db';
 import { DigitalTwinService } from "@/app/utils/services/digital-twin-service";
+import { withUserOrgAiUsage } from "@/app/utils/services/with-org-ai-usage";
 import { RowDataPacket } from 'mysql2/promise';
 
 // POST /api/digital-twins/sync - Sync missing digital twins from database to Pinecone
@@ -84,10 +85,15 @@ export async function POST(req: NextRequest) {
                     }
 
                     // Generate persona principles
-                    const principles = await DigitalTwinService.generatePersonaPrinciples(
-                        demographics,
-                        answers,
-                        agent.survey_title || 'Unknown Survey'
+                    const principles = await withUserOrgAiUsage(
+                        userId,
+                        'digital_twins.sync',
+                        () =>
+                            DigitalTwinService.generatePersonaPrinciples(
+                                demographics,
+                                answers,
+                                agent.survey_title || 'Unknown Survey'
+                            )
                     );
 
                     // Store in Pinecone

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { SurveyRepo } from "@/app/utils/database/survey-repo";
 import { DigitalTwinService } from "@/app/utils/services/digital-twin-service";
+import { runWithAiUsageContextAsync } from "@/app/utils/services/ai-usage-context";
 import { EmailService } from "@/app/utils/services/email-service";
 
 export const runtime = 'nodejs';
@@ -8,6 +9,10 @@ export const maxDuration = 30;
 
 // Helper function to ensure digital twin is stored in Pinecone with retry logic
 async function ensureDigitalTwinInPinecone(agentToken: string, body: any, survey: any, maxRetries: number = 3) {
+    const orgId = Number(survey?.organization_id) || null;
+    return runWithAiUsageContextAsync(
+      { organizationId: orgId, feature: 'digital_twins.public_submit' },
+      async () => {
     let lastError: Error | null = null;
     
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -95,6 +100,8 @@ async function ensureDigitalTwinInPinecone(agentToken: string, body: any, survey
     
     // Log this failure for manual intervention
     console.error(`🔧 MANUAL INTERVENTION NEEDED: Digital twin ${agentToken} exists in database but not in Pinecone. Run regeneration script.`);
+      }
+    );
 }
 
 // POST /api/surveys/[slug]/submit - Submit survey response
@@ -209,7 +216,16 @@ export async function POST(
                 const answers = answerRows.map((r: any, idx: number) => ({ questionId: idx + 1, questionText: r.question_text, value: r.answer_value }));
 
                 // Regenerate persona from aggregated data and persist
-                const principles = await DigitalTwinService.generatePersonaPrinciples(latest.demographics, answers, latest.surveyTitle);
+                const orgId = Number((survey as any).organization_id) || null;
+                const principles = await runWithAiUsageContextAsync(
+                  { organizationId: orgId, feature: 'digital_twins.public_submit' },
+                  () =>
+                    DigitalTwinService.generatePersonaPrinciples(
+                      latest.demographics,
+                      answers,
+                      latest.surveyTitle
+                    )
+                );
                 await DigitalTwinService.storeInPinecone(
                     result.agentToken,
                     latest.demographics,

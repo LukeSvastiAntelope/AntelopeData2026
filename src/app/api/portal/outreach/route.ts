@@ -8,6 +8,7 @@ import {
 } from '@/app/utils/services/volunteer-relational-service';
 import { VolunteerRelationalRepo } from '@/app/utils/database/volunteer-relational-repo';
 import type { OutreachOutcome } from '@/app/utils/database/volunteer-relational-repo';
+import { withUserOrgAiUsage } from '@/app/utils/services/with-org-ai-usage';
 
 export const runtime = 'nodejs';
 
@@ -63,13 +64,19 @@ export async function POST(request: NextRequest) {
           { status: 400 }
         );
       }
-      const out = await assignRelationalOutreach({
-        organizationId: id.organizationId,
-        ownerUserId: id.userId,
-        contactId,
-        channel: body.channel,
-        askHint: body.askHint ?? null,
-      });
+      const out = await withUserOrgAiUsage(
+        id.userId,
+        'volunteer.relational',
+        () =>
+          assignRelationalOutreach({
+            organizationId: id.organizationId,
+            ownerUserId: id.userId,
+            contactId,
+            channel: body.channel,
+            askHint: body.askHint ?? null,
+          }),
+        id.organizationId
+      );
       return NextResponse.json({
         status: true,
         outreach: out.outreach,

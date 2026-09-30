@@ -363,7 +363,8 @@ async function llmDrafts(
   ctx: SegmentTailoringContext,
   formats: OutboundFormat[],
   goal: string | null,
-  model: string
+  model: string,
+  organizationId?: number | null
 ): Promise<OutboundDraft[]> {
   const positionCap = ctx.thinSegment ? 1 : 8;
   const statedBlock =
@@ -392,6 +393,10 @@ THIN SEGMENT (n=${ctx.voterCount} < ${THIN_SEGMENT_THRESHOLD}):
     tier: 'workhorse',
     temperature: ctx.thinSegment ? 0.25 : 0.35,
     maxTokens: 2800,
+    usage: {
+      organizationId: organizationId ?? null,
+      feature: 'outbound.draft',
+    },
     messages: [
       {
         role: 'system',
@@ -546,7 +551,8 @@ export async function draftOutboundForSegment(
       context,
       formats,
       opts.goal ? String(opts.goal) : null,
-      'workhorse'
+      'workhorse',
+      opts.organizationId
     );
     return {
       context,

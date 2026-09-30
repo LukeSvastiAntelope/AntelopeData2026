@@ -63,6 +63,7 @@ export default function AdminAiUsagePage() {
     costUsd: 0,
     orgCount: 0,
   })
+  const [unattributedCredits, setUnattributedCredits] = useState(0)
   const [hardEnforce, setHardEnforce] = useState(false)
   const [savingId, setSavingId] = useState<number | null>(null)
 
@@ -81,6 +82,7 @@ export default function AdminAiUsagePage() {
       }
       setOrgs(data.orgs || [])
       setTotals(data.totals || { usedCredits: 0, callCount: 0, costUsd: 0, orgCount: 0 })
+      setUnattributedCredits(Number(data.unattributed?.credits) || 0)
       setHardEnforce(Boolean(data.hardEnforce))
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Failed')
@@ -178,6 +180,16 @@ export default function AdminAiUsagePage() {
             </CardHeader>
           </Card>
         </div>
+
+        <p className="text-sm text-muted-foreground">
+          Unattributed usage: {Math.round(unattributedCredits).toLocaleString()}{' '}
+          credits (last 30d)
+          {unattributedCredits > 0 ? (
+            <Badge variant="outline" className="ml-2 text-[10px]">
+              check gateway wraps
+            </Badge>
+          ) : null}
+        </p>
 
         <Card>
           <CardHeader>

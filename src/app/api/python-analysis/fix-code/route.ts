@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { createCompletion } from '@/app/utils/services/ai-service';
+import { withUserOrgAiUsage } from '@/app/utils/services/with-org-ai-usage';
 
 interface CodeFixRequest {
   originalCode: string;
@@ -63,7 +64,10 @@ REQUIREMENTS:
 
 Return ONLY the fixed Python code, no explanations.`;
 
-    const completion = await createCompletion({
+    const completion = await withUserOrgAiUsage(
+      session.user.id,
+      'analytics.fix',
+      () => createCompletion({
       tier: 'workhorse', // fix-code — grounded repair
       messages: [
         { role: 'system', content: systemPrompt },
@@ -72,7 +76,8 @@ Return ONLY the fixed Python code, no explanations.`;
       temperature: 0,
       maxTokens: 4000,
       expandOnTruncation: true,
-    });
+    })
+    );
 
     if (completion.stopReason === 'max_tokens') {
       console.warn('[fix-code] still truncated after expand');

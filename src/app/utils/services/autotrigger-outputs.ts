@@ -5,6 +5,7 @@
  */
 
 import { createCompletion } from '@/app/utils/services/ai-service';
+import { runWithAiUsageContextAsync } from '@/app/utils/services/ai-usage-context';
 import { ConsultantRepo } from '@/app/utils/database/consultant-repo';
 import { generateVideoUntilDone } from '@/app/utils/services/video/generate-service';
 import {
@@ -318,6 +319,13 @@ export async function generateAndStageAutotriggerOutputs(params: {
     organizationId: params.organizationId ?? null,
   });
 
+  return runWithAiUsageContextAsync(
+    {
+      organizationId: params.organizationId ?? null,
+      userId: params.userId,
+      feature: 'autotrigger.outputs',
+    },
+    async () => {
   const drafts: StagedDraftResult[] = [];
   const mock = Boolean(params.options?.mockOutputs);
 
@@ -466,4 +474,6 @@ export async function generateAndStageAutotriggerOutputs(params: {
   }
 
   return { finding: params.finding, drafts };
+    }
+  );
 }

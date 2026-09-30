@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createCompletion } from '@/app/utils/services/ai-service';
+import { withUserOrgAiUsage } from '@/app/utils/services/with-org-ai-usage';
 import { requireUserId } from '@/app/utils/auth/require-user';
 import { openSql as getMySQLConnection } from '@/app/utils/database/db';
 import type { RowDataPacket } from 'mysql2/promise';
@@ -119,7 +120,7 @@ export async function POST(
     });
 
     // Step 3: Use LLM to analyze ALL questions and select relevant ones
-    const selectedQuestions = await analyzeQuestionsWithLLM(query, allQuestions);
+    const selectedQuestions = await analyzeQuestionsWithLLM(query, allQuestions, userId);
     
     console.log(`🧠 LLM Analysis: Selected ${selectedQuestions.length} relevant questions from ${allQuestions.length} total`);
 
@@ -228,7 +229,8 @@ export async function POST(
  */
 async function analyzeQuestionsWithLLM(
   userQuery: string, 
-  allQuestions: QuestionCandidate[]
+  allQuestions: QuestionCandidate[],
+  userId: number
 ): Promise<QuestionCandidate[]> {
   
   // Prepare the full codebook for LLM analysis
@@ -263,11 +265,15 @@ Better to include too many relevant questions than to miss important ones.
 Relevant questions:`;
 
   try {
-    const completion = await createCompletion({
+    const completion = await withUserOrgAiUsage(
+      userId,
+      'targeted_data',
+      () => createCompletion({
       tier: 'workhorse',
       maxTokens: 1000,
       messages: [{ role: 'user', content: prompt }],
-    });
+    })
+    );
 
     const llmResponse = (completion.content || '').trim();
     

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { openSql } from '@/app/utils/database/db';
 import { RowDataPacket } from 'mysql2/promise';
 import { createCompletion } from '@/app/utils/services/ai-service';
+import { withUserOrgAiUsage } from '@/app/utils/services/with-org-ai-usage';
 
 export const dynamic = 'force-dynamic';
 
@@ -43,6 +44,7 @@ function removeSensitiveColumns(rows: RowDataPacket[]): { columns: string[]; res
 export async function POST(req: NextRequest) {
   try {
     const { query } = await req.json();
+    const headerUserId = req.headers.get('x-user-id');
 
     const systemPrompt = `
       You are a helpful assistant that converts natural language to EXACT and VALID SQL queries.
@@ -54,14 +56,19 @@ export async function POST(req: NextRequest) {
 
     const userPrompt = `Natural Language Query:\n"${query}"\n\nSQL:`;
 
-    const completion = await createCompletion({
-      tier: 'cheap',
-      maxTokens: 400,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt },
-      ],
-    });
+    const completion = await withUserOrgAiUsage(
+      headerUserId,
+      'nl_to_sql',
+      () =>
+        createCompletion({
+          tier: 'cheap',
+          maxTokens: 400,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt },
+          ],
+        })
+    );
 
     let generatedSql = (completion.content || "").trim();
     // Strip markdown fences if present

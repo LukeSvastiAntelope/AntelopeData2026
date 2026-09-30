@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { createStreamingCompletion } from '@/app/utils/services/ai-service';
+import { withUserOrgAiUsage } from '@/app/utils/services/with-org-ai-usage';
 import { formatDatasetGrainForPrompt } from '@/app/utils/services/dataset-grain';
 
 interface CodeGenerationRequest {
@@ -150,15 +151,19 @@ export async function POST(req: NextRequest) {
     );
     const userPrompt = createUserPrompt(request, analysisType);
 
-    const streamingResponse = await createStreamingCompletion({
-      tier: selectedModel === 'cheap' || selectedModel === 'heavy' ? selectedModel as any : 'workhorse',
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt }
-      ],
-      temperature: 0.3,
-      maxTokens: 4000
-    });
+    const streamingResponse = await withUserOrgAiUsage(
+      session.user.id,
+      'analytics.generate',
+      () => createStreamingCompletion({
+        tier: selectedModel === 'cheap' || selectedModel === 'heavy' ? selectedModel as any : 'workhorse',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt }
+        ],
+        temperature: 0.3,
+        maxTokens: 4000
+      })
+    );
 
     const headers = new Headers({
       'Content-Type': 'text/plain; charset=utf-8',

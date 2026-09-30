@@ -6,6 +6,7 @@ import {
 import { writeAdminAuditLog } from '@/app/utils/database/admin-audit-repo';
 import {
   getOrgUsageSummary,
+  getUnattributedUsageLast30d,
   listOrgUsageSummaries,
   setOrgAiPlan,
 } from '@/app/utils/database/ai-usage-repo';
@@ -52,6 +53,7 @@ export async function GET(req: NextRequest) {
     }
 
     const orgs = await listOrgUsageSummaries(300);
+    const unattributed = await getUnattributedUsageLast30d();
     const totals = orgs.reduce(
       (acc, o) => {
         acc.usedCredits += o.usedCredits;
@@ -70,6 +72,12 @@ export async function GET(req: NextRequest) {
         callCount: totals.callCount,
         costUsd: Math.round(totals.costUsd * 1e6) / 1e6,
         orgCount: orgs.length,
+      },
+      unattributed: {
+        credits: unattributed.credits,
+        callCount: unattributed.callCount,
+        costUsd: unattributed.costUsd,
+        windowDays: 30,
       },
       plans: AI_PLAN_ALLOWANCES,
       planLabels: AI_PLAN_LABELS,

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { createCompletion } from '@/app/utils/services/ai-service';
+import { withUserOrgAiUsage } from '@/app/utils/services/with-org-ai-usage';
 import { formatDatasetGrainForPrompt } from '@/app/utils/services/dataset-grain';
 
 interface CodeGenerationRequest {
@@ -242,7 +243,10 @@ export async function POST(req: NextRequest) {
     );
     const userPrompt = createUserPrompt(request, analysisType);
 
-    const completion = await createCompletion({
+    const completion = await withUserOrgAiUsage(
+      session.user.id,
+      'analytics.generate',
+      () => createCompletion({
       tier: selectedModel === 'cheap' || selectedModel === 'heavy' ? selectedModel as any : 'workhorse',
       messages: [
         { role: 'system', content: systemPrompt },
@@ -251,7 +255,8 @@ export async function POST(req: NextRequest) {
       temperature: 0.3,
       maxTokens: 4000,
       expandOnTruncation: true,
-    });
+    })
+    );
 
     if (completion.stopReason === 'max_tokens') {
       console.warn('[PYTHON-ANALYSIS] code generation still truncated after expand');

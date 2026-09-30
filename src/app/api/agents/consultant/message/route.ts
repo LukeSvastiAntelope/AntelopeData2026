@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { runConsultantMessage } from '@/app/utils/services/consultant-agent';
+import { withUserOrgAiUsage } from '@/app/utils/services/with-org-ai-usage';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -38,12 +39,18 @@ export async function POST(request: NextRequest) {
         ? Number(body.organizationId)
         : null;
 
-    const result = await runConsultantMessage({
+    const result = await withUserOrgAiUsage(
       userId,
-      organizationId,
-      message,
-      conversationId,
-    });
+      'consultant',
+      () =>
+        runConsultantMessage({
+          userId,
+          organizationId,
+          message,
+          conversationId,
+        }),
+      organizationId
+    );
 
     return NextResponse.json({ status: true, ...result });
   } catch (error) {

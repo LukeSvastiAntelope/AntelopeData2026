@@ -3,6 +3,7 @@ import { requireUserId } from '@/app/utils/auth/require-user';
 import { SurveyRepo } from "@/app/utils/database/survey-repo";
 import { openSql as getMySQLConnection } from "@/app/utils/database/db";
 import { DigitalTwinService } from "@/app/utils/services/digital-twin-service";
+import { withUserOrgAiUsage } from "@/app/utils/services/with-org-ai-usage";
 
 // POST /api/surveys/[id]/twins/deploy
 // Enqueue a synthetic response job (Phase 2 placeholder; currently returns computed set)
@@ -44,6 +45,10 @@ export async function POST(
     const questions = Array.isArray((survey as any).questions) ? (survey as any).questions : [];
 
     let created = 0; const errors: Array<{ agentToken: string; error: string }> = [];
+    await withUserOrgAiUsage(
+      userId,
+      'digital_twins.deploy',
+      async () => {
     for (const twin of eligible) {
       try {
         const answers = await DigitalTwinService.generateSurveyAnswersForUserTwin(
@@ -72,6 +77,9 @@ export async function POST(
         errors.push({ agentToken: twin.agentToken, error: e.message || 'unknown' });
       }
     }
+    },
+      Number((survey as any).organization_id) || undefined
+    );
 
     return NextResponse.json({ status: true, surveyId, created, attempted: eligible.length, errors });
   } catch (error) {

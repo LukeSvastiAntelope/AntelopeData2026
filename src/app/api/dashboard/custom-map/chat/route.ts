@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { createCompletion } from '@/app/utils/services/ai-service'
+import { withUserOrgAiUsage } from '@/app/utils/services/with-org-ai-usage'
 import type { CustomLayerGeoType, CustomLayerStyle, MapAssistantModelResult } from '@/lib/custom-map-assistant'
 
 export const maxDuration = 60
@@ -128,7 +129,10 @@ Return ONLY valid JSON (no markdown) with this exact shape:
 
 Always set showPins and applyChoropleth to false (no dataset). Other fields null.`
 
-    const completion = await createCompletion({
+    const completion = await withUserOrgAiUsage(
+      session.user.id,
+      'custom_map_chat',
+      () => createCompletion({
       tier: 'cheap',
       maxTokens: 800,
       messages: [
@@ -136,6 +140,7 @@ Always set showPins and applyChoropleth to false (no dataset). Other fields null
         { role: 'user', content: prompt },
       ],
     })
+    );
 
     const text = completion.content?.trim() ?? '{}'
     let parsed: Record<string, unknown>

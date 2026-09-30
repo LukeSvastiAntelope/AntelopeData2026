@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { createCompletion } from '@/app/utils/services/ai-service';
+import { withUserOrgAiUsage } from '@/app/utils/services/with-org-ai-usage';
 import { formatDatasetGrainForPrompt } from '@/app/utils/services/dataset-grain';
 
 interface StepPlanningRequest {
@@ -165,7 +166,10 @@ Return a JSON array of steps in this format:
   }
 ]`;
 
-    const completion = await createCompletion({
+    const completion = await withUserOrgAiUsage(
+      session.user.id,
+      'analytics.plan',
+      () => createCompletion({
       tier: 'heavy', // planning — deepest reasoning
       messages: [
         { role: 'system', content: systemPrompt },
@@ -173,7 +177,8 @@ Return a JSON array of steps in this format:
       ],
       temperature: 0.4,
       maxTokens: 2000
-    });
+    })
+    );
 
     let stepsText = completion.content?.trim() || '';
     

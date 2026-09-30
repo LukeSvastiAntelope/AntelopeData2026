@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireUserId } from '@/app/utils/auth/require-user';
 import { openSql } from '@/app/utils/database/db'
 import { createCompletion } from '@/app/utils/services/ai-service'
+import { withUserOrgAiUsage } from '@/app/utils/services/with-org-ai-usage'
 import { EmailService } from '@/app/utils/services/email-service'
 
 export const runtime = 'nodejs'
@@ -195,6 +196,7 @@ export async function POST(
     // Generate + send sequentially (keeps AI/provider load predictable). Optimize later with batching/queue.
     const results: Array<{ to: string; status: 'sent' | 'failed'; error?: string }> = []
 
+    await withUserOrgAiUsage(auth, 'content_messaging', async () => {
     for (const r of recipients) {
       const to = channel === 'email' ? (r.email || '') : (r.phone || '')
       if (!to) {
@@ -237,6 +239,7 @@ export async function POST(
         else results.push({ to, status: 'failed', error: (emailRes as any).reason || (emailRes as any).error || 'email_failed' })
       }
     }
+    })
 
     const sent = results.filter(r => r.status === 'sent').length
     const failed = results.filter(r => r.status === 'failed').length

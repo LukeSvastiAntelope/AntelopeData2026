@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { openSql as getMySQLConnection } from "@/app/utils/database/db";
 import { SurveyRepo } from "@/app/utils/database/survey-repo";
 import { DigitalTwinService } from "@/app/utils/services/digital-twin-service";
+import { runWithAiUsageContextAsync } from "@/app/utils/services/ai-usage-context";
 
 // PATCH /api/digital-twin/[token]/update – Update responder demographics
 export async function PATCH(
@@ -47,16 +48,21 @@ export async function PATCH(
       try {
         // Get the survey creator's user ID from the database
         const [surveyCreatorResult] = await db.execute(
-          'SELECT s.created_by FROM survey_responses sr JOIN surveys s ON sr.survey_id = s.id WHERE sr.id = ?',
+          'SELECT s.created_by, s.organization_id FROM survey_responses sr JOIN surveys s ON sr.survey_id = s.id WHERE sr.id = ?',
           [(existing as any).created_from_response_id]
         );
         const surveyCreatorId = (surveyCreatorResult as any[])[0]?.created_by || 'unknown';
+        const orgId = Number((surveyCreatorResult as any[])[0]?.organization_id) || null;
         
         const allAnswers: any[] = []; // Could load existing answers if desired
-        const principles = await DigitalTwinService.generatePersonaPrinciples(
-          mergedDemographics,
-          allAnswers,
-          'Profile Update'
+        const principles = await runWithAiUsageContextAsync(
+          { organizationId: orgId, feature: 'digital_twins.update' },
+          () =>
+            DigitalTwinService.generatePersonaPrinciples(
+              mergedDemographics,
+              allAnswers,
+              'Profile Update'
+            )
         );
         await DigitalTwinService.storeInPinecone(
           token,

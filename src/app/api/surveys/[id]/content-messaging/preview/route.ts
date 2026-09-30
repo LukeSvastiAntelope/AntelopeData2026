@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireUserId } from '@/app/utils/auth/require-user';
 import { openSql } from '@/app/utils/database/db'
 import { createCompletion } from '@/app/utils/services/ai-service'
+import { withUserOrgAiUsage } from '@/app/utils/services/with-org-ai-usage'
 
 export const runtime = 'nodejs'
 export const maxDuration = 120
@@ -98,7 +99,10 @@ export async function POST(
           ctaUrl: ctaUrl || '',
           channel,
         })
-        const result = await createCompletion({
+        const result = await withUserOrgAiUsage(
+          auth,
+          'content_messaging',
+          () => createCompletion({
           tier: 'cheap',
           temperature: 0.5,
           maxTokens: 300,
@@ -107,6 +111,7 @@ export async function POST(
             { role: 'user', content: prompt },
           ],
         })
+        )
         return { to, message: (result.content || '').trim() }
       })
     )

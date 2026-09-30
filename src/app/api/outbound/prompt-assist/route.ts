@@ -4,6 +4,7 @@ import {
   assistOutboundGoal,
   OUTBOUND_GOAL_TEMPLATES,
 } from '@/app/utils/services/outbound-prompt-assist';
+import { withUserOrgAiUsage } from '@/app/utils/services/with-org-ai-usage';
 
 export const runtime = 'nodejs';
 
@@ -35,12 +36,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const assisted = await assistOutboundGoal({
+    const assisted = await withUserOrgAiUsage(
+      userId,
+      'outbound.prompt_assist',
+      () => assistOutboundGoal({
       plainDescription,
       segmentName: body?.segmentName ? String(body.segmentName) : null,
       formats: Array.isArray(body?.formats) ? body.formats.map(String) : undefined,
       mock: body?.mock === true,
-    });
+    })
+    );
 
     return NextResponse.json({ status: true, ...assisted });
   } catch (error) {

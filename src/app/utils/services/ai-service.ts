@@ -181,13 +181,23 @@ function meterInBackground(input: {
     input.inputTokens,
     input.outputTokens
   );
+  const feature = String(input.meta.feature || 'general');
+  const orgId =
+    input.meta.organizationId != null && Number(input.meta.organizationId) > 0
+      ? Number(input.meta.organizationId)
+      : null;
+  // Guardrail: user/campaign spend must be org-attributed. platform.* is
+  // intentionally unbilled (Antelope own-growth, etc.).
+  if (orgId == null && !feature.startsWith('platform.')) {
+    console.warn('[ai-usage] unattributed', feature);
+  }
   console.log(
-    `[ai-gateway] metered org=${input.meta.organizationId ?? 'n/a'} feature=${input.meta.feature} tier=${input.tier} model=${input.model} in=${input.inputTokens} out=${input.outputTokens} credits=${credits} usd=${costUsd}`
+    `[ai-gateway] metered org=${orgId ?? 'n/a'} feature=${feature} tier=${input.tier} model=${input.model} in=${input.inputTokens} out=${input.outputTokens} credits=${credits} usd=${costUsd}`
   );
   void recordAiUsageEvent({
-    organizationId: input.meta.organizationId,
+    organizationId: orgId,
     userId: input.meta.userId,
-    feature: input.meta.feature,
+    feature,
     tier: input.tier,
     model: input.model,
     inputTokens: input.inputTokens,

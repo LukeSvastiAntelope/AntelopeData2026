@@ -5,6 +5,7 @@ import {
   assistVideoPrompt,
   VIDEO_TEMPLATES,
 } from '@/app/utils/services/video/prompt-assist';
+import { withUserOrgAiUsage } from '@/app/utils/services/with-org-ai-usage';
 import {
   getDefaultVideoProviderId,
   listVideoProviders,
@@ -47,7 +48,10 @@ export async function POST(req: NextRequest) {
     const provider = (body.provider || getDefaultVideoProviderId()) as VideoProviderId;
     const mode = (body.mode || 't2v') as VideoGenMode;
 
-    const assisted = await assistVideoPrompt({
+    const assisted = await withUserOrgAiUsage(
+      userId,
+      'video.prompt_assist',
+      () => assistVideoPrompt({
       plainDescription,
       provider,
       mode,
@@ -56,7 +60,8 @@ export async function POST(req: NextRequest) {
       durationSeconds: body.durationSeconds,
       hasReferenceImage: Boolean(body.referenceImage || body.hasReferenceImage),
       hasReferenceVideo: Boolean(body.referenceVideo || body.hasReferenceVideo),
-    });
+    })
+    );
 
     return NextResponse.json({ ok: true, assisted });
   } catch (error) {

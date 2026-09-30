@@ -3,6 +3,7 @@ import { requireUserId } from '@/app/utils/auth/require-user';
 import Papa from 'papaparse'
 import * as XLSX from 'xlsx'
 import { createCompletion } from '@/app/utils/services/ai-service'
+import { withUserOrgAiUsage } from '@/app/utils/services/with-org-ai-usage';
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -67,7 +68,8 @@ function mapRow(row: Record<string, string>, colMap: Record<string, string>): Re
 async function aiFilter(
   rows: Record<string, string>[],
   headers: string[],
-  prompt: string
+  prompt: string,
+  userId: number
 ): Promise<Record<string, string>[]> {
   if (!process.env.ANTHROPIC_API_KEY) return rows
 
@@ -84,7 +86,10 @@ If all rows pass, return all indices. If none pass, return [].`
     ...sample.map(r => headers.map(h => r[h] ?? '').join('\t'))
   ].join('\n')
 
-  const response = await createCompletion({
+  const response = await withUserOrgAiUsage(
+    userId,
+    'contact_lists.preview',
+    () => createCompletion({
     tier: 'cheap',
     maxTokens: 2000,
     messages: [
@@ -92,6 +97,7 @@ If all rows pass, return all indices. If none pass, return [].`
       { role: 'user', content: tableText }
     ],
   })
+  )
 
   const content = response.content?.trim() || '[]'
 
@@ -154,7 +160,7 @@ export async function POST(req: NextRequest) {
     let filteredRows = rows
     let filterApplied = false
     if (filterPrompt) {
-      filteredRows = await aiFilter(rows, headers, filterPrompt)
+      filteredRows = await aiFilter(rows, headers, filterPrompt, userId)
       filterApplied = true
     }
 

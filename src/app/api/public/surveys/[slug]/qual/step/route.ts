@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { SurveyRepo } from '@/app/utils/database/survey-repo'
 import { createCompletion } from '@/app/utils/services/ai-service'
+import { runWithAiUsageContextAsync } from '@/app/utils/services/ai-usage-context'
 
 export async function POST(
   req: NextRequest,
@@ -34,7 +35,11 @@ export async function POST(
       ...((body.messages || []).map((m: any) => ({ role: m.role === 'user' ? 'user' as const : 'assistant' as const, content: String(m.content || '') })))
     ]
 
-    const completion = await createCompletion({ tier: 'cheap', messages, temperature, maxTokens: 400 })
+    const orgId = Number((survey as any).organization_id) || null
+    const completion = await runWithAiUsageContextAsync(
+      { organizationId: orgId, feature: 'survey.qual_step' },
+      () => createCompletion({ tier: 'cheap', messages, temperature, maxTokens: 400 })
+    )
     const reply = completion.content?.trim() || ''
 
     // Simple stop heuristic: limit total turns

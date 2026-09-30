@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { createCompletion } from '@/app/utils/services/ai-service';
+import { withUserOrgAiUsage } from '@/app/utils/services/with-org-ai-usage';
 
 interface SynthesisRequest {
   question: string;
@@ -85,7 +86,10 @@ Structure your response as:
 
 Focus on being clear, specific, and actionable.`;
 
-    const completion = await createCompletion({
+    const completion = await withUserOrgAiUsage(
+      session.user.id,
+      'analytics.synthesize',
+      () => createCompletion({
       tier: 'heavy', // synthesis — deepest reasoning
       messages: [
         { role: 'system', content: systemPrompt },
@@ -93,7 +97,8 @@ Focus on being clear, specific, and actionable.`;
       ],
       temperature: 0.3,
       maxTokens: 2500
-    });
+    })
+    );
 
     const synthesis = completion.content?.trim() || 'Analysis synthesis could not be generated.';
 

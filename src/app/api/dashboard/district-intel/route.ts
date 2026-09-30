@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { getConnection } from '@/app/utils/database/db'
 import { createCompletion } from '@/app/utils/services/ai-service'
+import { withUserOrgAiUsage } from '@/app/utils/services/with-org-ai-usage'
 import { deepResearch } from '@/app/utils/services/web-search'
 import {
   ABBREV_TO_STATE_NAME,
@@ -145,7 +146,12 @@ export async function POST(request: NextRequest) {
 
     let deepResult: { content: string; citations: { title: string; url: string }[] } = { content: '', citations: [] }
     try {
-      deepResult = await deepResearch({ question: researchQuestion, systemContext })
+      deepResult = await withUserOrgAiUsage(
+        session.user.id,
+        'district_intel',
+        () => deepResearch({ question: researchQuestion, systemContext }),
+        organizationId > 0 ? organizationId : null
+      )
     } catch (error) {
       console.error('district-intel deepResearch error:', error)
     }
@@ -160,14 +166,19 @@ Use ONLY information present in the report below — do not invent facts or sour
 
 REPORT:
 ${deepResult.content}`
-      const completion = await createCompletion({
-        tier: 'cheap',
-        maxTokens: 800,
-        messages: [
-          { role: 'system', content: 'You return only valid JSON. No markdown.' },
-          { role: 'user', content: summaryPrompt },
-        ],
-      })
+      const completion = await withUserOrgAiUsage(
+        session.user.id,
+        'district_intel',
+        () => createCompletion({
+          tier: 'cheap',
+          maxTokens: 800,
+          messages: [
+            { role: 'system', content: 'You return only valid JSON. No markdown.' },
+            { role: 'user', content: summaryPrompt },
+          ],
+        }),
+        organizationId > 0 ? organizationId : null
+      )
       const text = (completion.content || '{}').replace(/```json\n?|\n?```/g, '').trim() || '{}'
       parsed = JSON.parse(text)
     } catch {

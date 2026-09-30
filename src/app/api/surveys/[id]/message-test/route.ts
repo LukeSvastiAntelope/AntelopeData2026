@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireUserId } from '@/app/utils/auth/require-user';
+import { withUserOrgAiUsage } from '@/app/utils/services/with-org-ai-usage';
 
 /**
  * POST /api/surveys/[id]/message-test
@@ -91,7 +92,8 @@ export async function POST(
     }
 
     const profiles = twinsData.results.slice(0, maxProfiles);
-    
+
+    return await withUserOrgAiUsage(userId, 'message_test', async () => {
     // For each message variant, query each voter profile
     const { createCompletion } = await import('../../../../utils/services/ai-service');
     
@@ -209,6 +211,7 @@ Format your response as JSON:
       surveyId: parseInt(surveyId),
       totalProfiles: profiles.length,
       results,
+    });
     });
 
   } catch (error) {

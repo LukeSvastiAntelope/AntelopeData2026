@@ -5,6 +5,7 @@ import { CohortFilterRule } from "@/app/utils/interface";
 import { auth } from '@/auth';
 
 import { createCompletion } from "@/app/utils/services/ai-service";
+import { withUserOrgAiUsage } from "@/app/utils/services/with-org-ai-usage";
 import { verifyConfirmationToken } from "@/app/utils/api/token";
 import { SmartSurveyQueryBuilder } from "@/app/utils/survey/smart-query-builder";
 import { EnhancedSurveyQueryBuilder } from "@/app/utils/survey/enhanced-query-builder";
@@ -588,6 +589,8 @@ export async function POST(req: NextRequest) {
     }
     const userId = session.user.id;
     const numericUserId = Number.isFinite(Number(userId)) ? Number(userId) : null;
+
+    return await withUserOrgAiUsage(userId, 'cohort.query', async () => {
 
     const body = (await req.json()) as CohortQueryPayload;
     const { cohort, question, recentMessages, topK = 1000, surveyId: initialSurveyId, model = 'workhorse', temperature = 0.0, sources, systemPrompt, stream = true, responseMode: requestedResponseMode, districtScope } = body;
@@ -1567,6 +1570,7 @@ Only suggest auto-selection if there's a clear, unambiguous match with high conf
       model,
       temperature,
       systemPrompt: effectiveSystemPrompt
+    });
     });
   } catch (error) {
     logRoute(traceId, 'unhandled_error', {

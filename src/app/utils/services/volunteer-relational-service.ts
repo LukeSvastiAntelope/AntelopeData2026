@@ -91,6 +91,11 @@ export async function generateRelationalScript(input: {
       tier: 'workhorse',
       temperature: 0.55,
       maxTokens: 280,
+      usage: {
+        organizationId: input.organizationId,
+        userId: input.ownerUserId,
+        feature: 'volunteer.relational',
+      },
       messages: [
         {
           role: 'system',

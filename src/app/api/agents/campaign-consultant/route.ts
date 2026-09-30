@@ -6,6 +6,7 @@ import {
   type CampaignBrief,
   type ConsultantMessage,
 } from '@/app/utils/services/campaign-consultant-service';
+import { withUserOrgAiUsage } from '@/app/utils/services/with-org-ai-usage';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -36,7 +37,11 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-      const result = await runCampaignConsultantTurn({ messages, brief });
+      const result = await withUserOrgAiUsage(
+        session.user.id,
+        'consultant',
+        () => runCampaignConsultantTurn({ messages, brief })
+      );
       return NextResponse.json({ status: true, ...result, offline: false });
     } catch (error) {
       console.error('Campaign consultant AI error:', error);

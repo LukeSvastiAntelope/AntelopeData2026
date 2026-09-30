@@ -5,6 +5,7 @@ import { telegramSendMessage } from "@/app/api/channels/telegram/send";
 import { DEMOGRAPHICS_FORM_CONFIGS, shouldCollectField } from "@/app/utils/anonymity-config";
 import { EmailService } from "@/app/utils/services/email-service";
 import { createCompletion } from "@/app/utils/services/ai-service";
+import { runWithAiUsageContextAsync } from "@/app/utils/services/ai-usage-context";
 
 // Runtime config for long-lived webhook processing when needed
 export const runtime = 'nodejs';
@@ -527,7 +528,11 @@ export async function POST(req: NextRequest) {
         ]
 
         try {
-          const completion = await createCompletion({ tier: 'cheap', temperature, messages, maxTokens: 180 })
+          const orgId = Number((survey as any).organization_id) || null
+          const completion = await runWithAiUsageContextAsync(
+            { organizationId: orgId, feature: 'telegram.qual' },
+            () => createCompletion({ tier: 'cheap', temperature, messages, maxTokens: 180 })
+          )
           const nextQ = (completion.content || '').trim() || 'Can you share a concrete example of that? (time/place/context)'
           state.transcript.push({ role: 'assistant', content: nextQ })
           await ChannelRepo.updateSessionState(session.id, state)

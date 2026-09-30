@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { createCompletion } from '@/app/utils/services/ai-service';
+import { withUserOrgAiUsage } from '@/app/utils/services/with-org-ai-usage';
 import { formatDatasetGrainForPrompt } from '@/app/utils/services/dataset-grain';
 
 interface StepCodeRequest {
@@ -397,7 +398,10 @@ Return concise, executable Python code (10-20 lines max).`;
         break;
     }
 
-    const completion = await createCompletion({
+    const completion = await withUserOrgAiUsage(
+      session.user.id,
+      'analytics.generate',
+      () => createCompletion({
       // heavy: step code is core reasoning — column mapping, multi-select
       // indicators, crosstab/chi-square. temp 0 for maximum determinism.
       tier: 'heavy',
@@ -408,7 +412,8 @@ Return concise, executable Python code (10-20 lines max).`;
       temperature: 0,
       maxTokens: 4000,
       expandOnTruncation: true,
-    });
+    })
+    );
 
     if (completion.stopReason === 'max_tokens') {
       console.warn(

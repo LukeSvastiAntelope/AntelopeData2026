@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { createCompletion } from '@/app/utils/services/ai-service';
+import { withUserOrgAiUsage } from '@/app/utils/services/with-org-ai-usage';
 
 interface InsightExtractionRequest {
   step: {
@@ -57,7 +58,10 @@ Return JSON only:
 { "insights": ["insight grounded in the output above", "..."] }
 If the output contains no usable numbers, return: { "insights": [] }`;
 
-    const completion = await createCompletion({
+    const completion = await withUserOrgAiUsage(
+      session.user.id,
+      'analytics.extract',
+      () => createCompletion({
       // heavy: converts executed output into stated claims — hallucination gate.
       // temp 0 for deterministic, faithful extraction.
       tier: 'heavy',
@@ -67,7 +71,8 @@ If the output contains no usable numbers, return: { "insights": [] }`;
       ],
       temperature: 0,
       maxTokens: 1500
-    });
+    })
+    );
 
     let responseText = completion.content?.trim() || '';
     

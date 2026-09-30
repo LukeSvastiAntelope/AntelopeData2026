@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireUserId } from '@/app/utils/auth/require-user';
 import { openSql as getMySQLConnection } from "@/app/utils/database/db";
 import { DigitalTwinService } from "@/app/utils/services/digital-twin-service";
+import { withUserOrgAiUsage } from "@/app/utils/services/with-org-ai-usage";
 
 interface EnrichBody {
   agentToken?: string;
@@ -74,6 +75,7 @@ export async function POST(req: NextRequest) {
     const db = await getMySQLConnection();
     const results: Array<{ agentToken: string, status: 'updated' | 'skipped' | 'error', reason?: string }> = [];
 
+    await withUserOrgAiUsage(userId, 'digital_twins.enrich', async () => {
     for (const agentToken of tokens) {
       try {
         const owns = await userOwnsTwin(db, agentToken, userId);
@@ -117,6 +119,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    });
     return NextResponse.json({ status: true, results });
   } catch (error) {
     console.error('Error in POST /api/digital-twins/enrich:', error);

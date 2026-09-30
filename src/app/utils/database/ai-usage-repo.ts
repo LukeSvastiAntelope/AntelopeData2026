@@ -199,6 +199,44 @@ export async function sumOrgCreditsInPeriod(
   }
 }
 
+/**
+ * Credits metered with organization_id IS NULL and feature not platform.*
+ * over the last 30 days — regression signal for missing ALS/org wraps.
+ */
+export async function getUnattributedUsageLast30d(): Promise<{
+  credits: number;
+  callCount: number;
+  costUsd: number;
+}> {
+  try {
+    const db = await openSql();
+    const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const [rows] = await db.execute<RowDataPacket[]>(
+      `SELECT
+         COALESCE(SUM(credits), 0) AS credits,
+         COUNT(*) AS call_count,
+         COALESCE(SUM(cost_usd), 0) AS cost_usd
+       FROM ai_usage_events
+       WHERE organization_id IS NULL
+         AND (feature IS NULL OR feature NOT LIKE 'platform.%')
+         AND created_at >= ?`,
+      [toMysqlDatetime(since)]
+    );
+    const r = (rows[0] || {}) as RowDataPacket;
+    return {
+      credits: Math.round((Number(r.credits) || 0) * 100) / 100,
+      callCount: Number(r.call_count) || 0,
+      costUsd: Math.round((Number(r.cost_usd) || 0) * 1e6) / 1e6,
+    };
+  } catch (err) {
+    console.warn(
+      '[ai-usage] getUnattributedUsageLast30d failed',
+      err instanceof Error ? err.message : err
+    );
+    return { credits: 0, callCount: 0, costUsd: 0 };
+  }
+}
+
 export async function getOrgUsageSummary(
   organizationId: number
 ): Promise<OrgAiUsageSummary> {

@@ -2,24 +2,50 @@ import { ensurePrimaryOrgId } from '@/app/api/dashboard/persons/org';
 import { runWithAiUsageContextAsync } from '@/app/utils/services/ai-usage-context';
 
 /**
- * Attribute AI gateway metering to the caller's primary org for the duration
- * of `fn`. Safe no-op when userId is missing.
+ * Attribute AI gateway metering to the caller's org for the duration of `fn`.
+ *
+ * Prefer an explicit `organizationId` when the route already knows the active
+ * org (x-organization-id, conversation org, survey org, etc.). Otherwise
+ * resolve via ensurePrimaryOrgId. Safe no-op when userId is missing and no
+ * organizationId is provided.
  */
 export async function withUserOrgAiUsage<T>(
   userId: string | number | null | undefined,
   feature: string,
-  fn: () => Promise<T>
+  fn: () => Promise<T>,
+  organizationId?: number | null
 ): Promise<T> {
-  if (userId == null || userId === '') {
-    return runWithAiUsageContextAsync({ feature }, fn);
-  }
-  const uid = Number(userId);
-  try {
-    const organizationId = await ensurePrimaryOrgId(uid);
+  const uid =
+    userId != null && userId !== '' && Number.isFinite(Number(userId))
+      ? Number(userId)
+      : null;
+
+  // Explicit org (including null) wins over ensurePrimaryOrgId.
+  if (organizationId !== undefined) {
+    const orgId =
+      organizationId != null && Number(organizationId) > 0
+        ? Number(organizationId)
+        : null;
     return runWithAiUsageContextAsync(
       {
-        organizationId,
-        userId: Number.isFinite(uid) ? uid : null,
+        organizationId: orgId,
+        userId: uid,
+        feature,
+      },
+      fn
+    );
+  }
+
+  if (uid == null) {
+    return runWithAiUsageContextAsync({ feature }, fn);
+  }
+
+  try {
+    const resolvedOrgId = await ensurePrimaryOrgId(uid);
+    return runWithAiUsageContextAsync(
+      {
+        organizationId: resolvedOrgId,
+        userId: uid,
         feature,
       },
       fn
@@ -27,7 +53,7 @@ export async function withUserOrgAiUsage<T>(
   } catch {
     return runWithAiUsageContextAsync(
       {
-        userId: Number.isFinite(uid) ? uid : null,
+        userId: uid,
         feature,
       },
       fn

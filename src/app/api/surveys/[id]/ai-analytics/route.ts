@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireUserId } from '@/app/utils/auth/require-user';
 import { AIAnalyticsOrchestrator, AIAnalyticsConfig } from '@/app/utils/services/ai-analytics-orchestrator';
+import { withUserOrgAiUsage } from '@/app/utils/services/with-org-ai-usage';
 import { getAllModels } from '@/app/utils/models';
 import { openSql } from '@/app/utils/database/db';
 
@@ -202,7 +203,12 @@ export async function POST(
     const orchestrator = new AIAnalyticsOrchestrator(config);
     
     // Generate analytics
-    const result = await orchestrator.generateCompleteAnalytics(surveyId, config);
+    const result = await withUserOrgAiUsage(
+      config.userId,
+      'analytics.legacy',
+      () => orchestrator.generateCompleteAnalytics(surveyId, config),
+      config.organizationId ?? undefined
+    );
     
     // Return successful result
     return NextResponse.json({

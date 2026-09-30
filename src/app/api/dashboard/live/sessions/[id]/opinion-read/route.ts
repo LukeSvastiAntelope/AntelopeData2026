@@ -7,6 +7,7 @@ import {
   latestRoomOpinionRead,
 } from '@/app/utils/live/room-opinion-service';
 import { notifyLiveSession } from '@/app/utils/live/notify';
+import { withUserOrgAiUsage } from '@/app/utils/services/with-org-ai-usage';
 
 export const runtime = 'nodejs';
 
@@ -71,12 +72,18 @@ export async function POST(
         ? null
         : Number(body.questionId);
 
-    const opinionRead = await computeRoomOpinionRead({
-      sessionId: session.id,
-      organizationId: orgId,
-      questionId: Number.isFinite(questionId as number) ? questionId : null,
-      persist: true,
-    });
+    const opinionRead = await withUserOrgAiUsage(
+      auth,
+      'live.opinion_read',
+      () =>
+        computeRoomOpinionRead({
+          sessionId: session.id,
+          organizationId: orgId,
+          questionId: Number.isFinite(questionId as number) ? questionId : null,
+          persist: true,
+        }),
+      orgId
+    );
 
     // Invariant: every group has receipts
     for (const g of opinionRead.groups) {

@@ -12,6 +12,7 @@ import {
   writeSiteSlotWithAi,
 } from '@/app/utils/services/site-ai-write';
 import { defaultSiteContent, type SiteContent } from '@/app/utils/types/site';
+import { withUserOrgAiUsage } from '@/app/utils/services/with-org-ai-usage';
 
 export async function POST(req: NextRequest) {
   try {
@@ -35,11 +36,16 @@ export async function POST(req: NextRequest) {
         : defaultSiteContent();
 
     const org = await getOrgCampaignContext(access.organizationId);
-    const result = await writeSiteSlotWithAi({
+    const result = await withUserOrgAiUsage(
+      access.userId,
+      'site.ai_write',
+      () => writeSiteSlotWithAi({
       slotPath: body.slotPath,
       content,
       org,
-    });
+    }),
+      access.organizationId
+    );
 
     return NextResponse.json({
       status: true,

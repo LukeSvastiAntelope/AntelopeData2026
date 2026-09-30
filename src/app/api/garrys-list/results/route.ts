@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { openSql } from '@/app/utils/database/db';
 import { createCompletion } from '@/app/utils/services/ai-service';
+import { runWithAiUsageContextAsync } from '@/app/utils/services/ai-usage-context';
 
 export const runtime = 'nodejs';
 export const maxDuration = 30;
@@ -33,7 +34,7 @@ export async function POST(request: NextRequest) {
 
     const db = await openSql();
     const [surveys]: any = await db.execute(
-      `SELECT id, title, slug, source_metadata FROM surveys
+      `SELECT id, title, slug, source_metadata, organization_id FROM surveys
        WHERE source = 'garrys_list' AND source_metadata->>'$.accessToken' = ? LIMIT 1`,
       [token]
     );
@@ -123,24 +124,29 @@ export async function POST(request: NextRequest) {
           opinionQuestions: answeredOpinionQs.map((q) => ({ prompt: q.prompt, sampleSize: q.answered, split: q.split })),
           breakdowns: breakdownCharts.map((b) => ({ prompt: b.questionPrompt, headlineOption: b.headlineOption, bars: b.bars })),
         };
-        const completion = await createCompletion({
-          tier: 'cheap',
-          temperature: 0.2,
-          maxTokens: 200,
-          messages: [
-            {
-              role: 'system',
-              content:
-                'You write a 2-3 sentence "what stands out" insight for a newsletter publisher\'s reader-survey dashboard. ' +
-                'Use ONLY the numbers in the JSON provided — never invent or round from memory. Every question included has ' +
-                'sampleSize > 0, meaning it has real answers; only discuss questions actually present in the JSON — never ' +
-                'mention or imply anything about a question that is not in the data (silence about it is missing data, not a ' +
-                'reader opinion). Note the sample size when it is small (under 20). Point out the most notable real gap, ' +
-                'contrast, or pattern, and suggest what story angle it opens up. Plain language.',
-            },
-            { role: 'user', content: JSON.stringify(dataSummary) },
-          ],
-        });
+        const orgId = Number(survey.organization_id) || null;
+        const completion = await runWithAiUsageContextAsync(
+          { organizationId: orgId, feature: 'garrys_list' },
+          () =>
+            createCompletion({
+              tier: 'cheap',
+              temperature: 0.2,
+              maxTokens: 200,
+              messages: [
+                {
+                  role: 'system',
+                  content:
+                    'You write a 2-3 sentence "what stands out" insight for a newsletter publisher\'s reader-survey dashboard. ' +
+                    'Use ONLY the numbers in the JSON provided — never invent or round from memory. Every question included has ' +
+                    'sampleSize > 0, meaning it has real answers; only discuss questions actually present in the JSON — never ' +
+                    'mention or imply anything about a question that is not in the data (silence about it is missing data, not a ' +
+                    'reader opinion). Note the sample size when it is small (under 20). Point out the most notable real gap, ' +
+                    'contrast, or pattern, and suggest what story angle it opens up. Plain language.',
+                },
+                { role: 'user', content: JSON.stringify(dataSummary) },
+              ],
+            })
+        );
         insight = completion.content.trim();
       } catch {
         insight = '';

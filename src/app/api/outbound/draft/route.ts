@@ -9,6 +9,7 @@ import {
 import type { VoterSegmentDefinition } from '@/app/utils/services/voter-segments';
 import { listSegmentCatalog } from '@/app/utils/services/voter-segments';
 import { resolveSegmentHint } from '@/app/utils/voter-segment-presets';
+import { withUserOrgAiUsage } from '@/app/utils/services/with-org-ai-usage';
 
 export const runtime = 'nodejs';
 export const maxDuration = 120;
@@ -64,7 +65,10 @@ export async function POST(request: NextRequest) {
           .filter((f) => OUTBOUND_FORMATS.includes(f))
       : undefined;
 
-    const result = await draftOutboundForSegment({
+    const result = await withUserOrgAiUsage(
+      userId,
+      'outbound.draft',
+      () => draftOutboundForSegment({
       organizationId: orgId,
       segmentId,
       definition,
@@ -72,7 +76,9 @@ export async function POST(request: NextRequest) {
       goal: body?.goal ? String(body.goal) : null,
       mock: body?.mock === true,
       limit: body?.limit != null ? Number(body.limit) : 200,
-    });
+    }),
+      orgId
+    );
 
     return NextResponse.json({
       status: true,

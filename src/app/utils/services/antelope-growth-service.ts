@@ -4,6 +4,7 @@
  */
 
 import { createCompletion } from '@/app/utils/services/ai-service';
+import { runWithAiUsageContextAsync } from '@/app/utils/services/ai-usage-context';
 import {
   AntelopeGrowthRepo,
   type GrowthChannel,
@@ -69,26 +70,31 @@ export async function generateAntelopeMarketingCopy(input?: {
 
   if (hasKey) {
     try {
-      const res = await createCompletion({
-        tier: 'workhorse',
-        temperature: 0.7,
-        maxTokens: 280,
-        messages: [
-          {
-            role: 'system',
-            content: [
-              'You write short Twitter/X posts for Antelope (antelopedata.org), a civic-tech survey + analytics platform for downballot campaigns.',
-              'Rules: one post only; max 260 characters; no hashtag spam (at most 1); no emojis; no invented endorsements, poll numbers, or candidate claims;',
-              'never speak as a candidate campaign — this is Antelope the company;',
-              'plainspoken, confident, specific; end without a hard sell.',
-            ].join(' '),
-          },
-          {
-            role: 'user',
-            content: `Topic: ${topic}\nTone: ${tone}\nWrite the post body only.`,
-          },
-        ],
-      });
+      const res = await runWithAiUsageContextAsync(
+        { organizationId: null, feature: 'platform.growth' },
+        () =>
+          createCompletion({
+            tier: 'workhorse',
+            temperature: 0.7,
+            maxTokens: 280,
+            usage: { organizationId: null, feature: 'platform.growth' },
+            messages: [
+              {
+                role: 'system',
+                content: [
+                  'You write short Twitter/X posts for Antelope (antelopedata.org), a civic-tech survey + analytics platform for downballot campaigns.',
+                  'Rules: one post only; max 260 characters; no hashtag spam (at most 1); no emojis; no invented endorsements, poll numbers, or candidate claims;',
+                  'never speak as a candidate campaign — this is Antelope the company;',
+                  'plainspoken, confident, specific; end without a hard sell.',
+                ].join(' '),
+              },
+              {
+                role: 'user',
+                content: `Topic: ${topic}\nTone: ${tone}\nWrite the post body only.`,
+              },
+            ],
+          })
+      );
       const body = stripQuotes(res.content || '').slice(0, 280);
       if (body.length >= 40) {
         return { body, topic, tone, via: 'ai' };
