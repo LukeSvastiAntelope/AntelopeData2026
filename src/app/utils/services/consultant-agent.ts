@@ -406,6 +406,7 @@ export async function approveStagedAction(params: {
   ) {
     // Admin A5 — sync Antelope marketing draft if this card is a growth post
     const marketingDraftId = Number(staged.payload.marketingDraftId);
+    let growthDistribution: Record<string, unknown> | null = null;
     if (
       Number.isFinite(marketingDraftId) &&
       marketingDraftId > 0 &&
@@ -413,10 +414,16 @@ export async function approveStagedAction(params: {
         staged.payload.kind === 'antelope_marketing')
     ) {
       try {
-        const { AntelopeGrowthRepo } = await import(
-          '@/app/utils/database/antelope-growth-repo'
+        const { approveMarketingDraft } = await import(
+          '@/app/utils/services/antelope-growth-service'
         );
-        await AntelopeGrowthRepo.approve(marketingDraftId, params.userId);
+        const approved = await approveMarketingDraft(
+          marketingDraftId,
+          params.userId
+        );
+        if (approved && 'distribution' in approved && approved.distribution) {
+          growthDistribution = approved.distribution as Record<string, unknown>;
+        }
       } catch (err) {
         console.warn('[approveStaged] marketing draft sync failed', err);
       }
@@ -426,7 +433,9 @@ export async function approveStagedAction(params: {
       status: 'approved',
       resultSummary:
         toolName === 'post_antelope_marketing'
-          ? 'Approved Antelope growth draft. No tweet was sent — publish manually, then mark posted in Admin → Growth.'
+          ? growthDistribution
+            ? `Approved Antelope growth draft. ${String(growthDistribution.label || 'Delivery queued.')}`
+            : 'Approved Antelope growth draft. Configure a platform webhook in Admin → Growth to deliver via Zapier/Make.'
           : 'Marked reviewed. No public send ran from this review-only card.',
       resultData: {
         reviewOnly: true,
@@ -435,6 +444,7 @@ export async function approveStagedAction(params: {
           ? marketingDraftId
           : null,
         neverAutoPost: toolName === 'post_antelope_marketing',
+        ...(growthDistribution ? { distribution: growthDistribution } : {}),
       },
     });
     const messages = [
@@ -442,7 +452,11 @@ export async function approveStagedAction(params: {
       {
         role: 'assistant' as const,
         content:
-          'Reviewed. This card was review-only — nothing was sent or posted. Use an approval-tier send/post tool when you are ready to distribute.',
+          toolName === 'post_antelope_marketing'
+            ? growthDistribution
+              ? `Approved Antelope growth draft. ${String(growthDistribution.label || 'Sending to Zapier…')}`
+              : 'Approved Antelope growth draft. Nothing posts until a platform webhook is configured (Admin → Growth).'
+            : 'Reviewed. This card was review-only — nothing was sent or posted. Use an approval-tier send/post tool when you are ready to distribute.',
         meta: {
           kind: 'tool_result' as const,
           toolName,
@@ -466,9 +480,30 @@ export async function approveStagedAction(params: {
         status: 'executed',
         tool: toolName,
         risk: 'approval',
-        summary: 'Review-only card approved — no send executed.',
-        data: { reviewOnly: true, implemented: true },
+        summary:
+          toolName === 'post_antelope_marketing'
+            ? 'Antelope growth draft approved.'
+            : 'Review-only card approved — no send executed.',
+        data: {
+          reviewOnly: true,
+          implemented: true,
+          ...(growthDistribution ? { distribution: growthDistribution } : {}),
+        },
       },
+      ...(growthDistribution
+        ? {
+            distribution: {
+              queued: Boolean(growthDistribution.queued),
+              status: String(growthDistribution.status || 'none'),
+              label: String(growthDistribution.label || ''),
+              deliveryIds: Array.isArray(growthDistribution.deliveryIds)
+                ? (growthDistribution.deliveryIds as number[])
+                : [],
+              contentType:
+                (growthDistribution.contentType as string | null) ?? null,
+            },
+          }
+        : {}),
     };
   }
 

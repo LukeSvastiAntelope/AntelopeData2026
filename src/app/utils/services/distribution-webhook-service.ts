@@ -157,7 +157,15 @@ export async function assertSafeHttpsWebhookUrl(
   }
 
   try {
-    const addrs = await dns.lookup(host, { all: true, verbatim: true });
+    const addrs = await Promise.race([
+      dns.lookup(host, { all: true, verbatim: true }),
+      new Promise<never>((_, reject) =>
+        setTimeout(
+          () => reject(new Error('Webhook URL host DNS lookup timed out')),
+          5000
+        )
+      ),
+    ]);
     if (!addrs.length) {
       throw new Error('Webhook URL host could not be resolved');
     }

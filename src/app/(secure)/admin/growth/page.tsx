@@ -29,7 +29,10 @@ import {
   Loader2,
   Megaphone,
   RefreshCw,
+  Send,
   Sparkles,
+  Trash2,
+  Webhook,
   X,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
@@ -81,6 +84,17 @@ function StatusBadge({ status }: { status: string }) {
   }
 }
 
+type PlatformWebhook = {
+  id: number
+  label: string
+  urlMasked: string
+  secretMasked: string
+  contentTypes: string[]
+  enabled: boolean
+  lastSuccessAt: string | null
+  lastFailureAt: string | null
+}
+
 export default function AdminGrowthPage() {
   const router = useRouter()
   const [channel, setChannel] = useState<GrowthChannel | null>(null)
@@ -93,6 +107,24 @@ export default function AdminGrowthPage() {
   const [topic, setTopic] = useState('')
   const [autoDraft, setAutoDraft] = useState(true)
   const [savingChannel, setSavingChannel] = useState(false)
+  const [platformHooks, setPlatformHooks] = useState<PlatformWebhook[]>([])
+  const [hookLabel, setHookLabel] = useState('Antelope X via Zapier')
+  const [hookUrl, setHookUrl] = useState('')
+  const [savingHook, setSavingHook] = useState(false)
+  const [testingHookId, setTestingHookId] = useState<number | null>(null)
+  const [freshHookSecret, setFreshHookSecret] = useState<string | null>(null)
+
+  const loadPublishing = useCallback(async () => {
+    try {
+      const res = await fetch('/api/admin/growth/publishing')
+      const data = await res.json()
+      if (res.ok && data.status) {
+        setPlatformHooks(Array.isArray(data.webhooks) ? data.webhooks : [])
+      }
+    } catch {
+      /* non-fatal */
+    }
+  }, [])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -107,12 +139,13 @@ export default function AdminGrowthPage() {
       setDrafts(data.drafts || [])
       setPendingCount(Number(data.pendingCount) || 0)
       setAutoDraft(data.channel?.settings?.autoDraftEnabled !== false)
+      await loadPublishing()
     } catch {
       toast.error('Failed to load growth panel')
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [loadPublishing])
 
   useEffect(() => {
     void load()
@@ -163,7 +196,9 @@ export default function AdminGrowthPage() {
       }
       toast.success(
         action === 'approve'
-          ? 'Approved — still not posted to X'
+          ? data.distribution?.queued
+            ? 'Approved — Zapier delivery queued'
+            : 'Approved — add a platform webhook to deliver via Zapier'
           : action === 'reject'
             ? 'Rejected'
             : 'Marked posted'
@@ -203,6 +238,92 @@ export default function AdminGrowthPage() {
       toast.error('Failed to save channel')
     } finally {
       setSavingChannel(false)
+    }
+  }
+
+  const savePlatformHook = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setSavingHook(true)
+    setFreshHookSecret(null)
+    try {
+      const res = await fetch('/api/admin/growth/publishing', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          label: hookLabel.trim() || 'Antelope X via Zapier',
+          url: hookUrl.trim(),
+          contentTypes: ['text'],
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data.status) {
+        toast.error(data.message || 'Failed to save webhook')
+        return
+      }
+      if (data.secret) setFreshHookSecret(String(data.secret))
+      setHookUrl('')
+      toast.success('Platform webhook saved')
+      await loadPublishing()
+    } catch {
+      toast.error('Failed to save webhook')
+    } finally {
+      setSavingHook(false)
+    }
+  }
+
+  const testPlatformHook = async (id: number) => {
+    setTestingHookId(id)
+    try {
+      const res = await fetch(`/api/admin/growth/publishing/${id}/test`, {
+        method: 'POST',
+      })
+      const data = await res.json()
+      if (!res.ok || !data.status) {
+        toast.error(data.message || 'Test send failed')
+        return
+      }
+      toast.success(data.message || 'Test sent')
+      await loadPublishing()
+    } catch {
+      toast.error('Test send failed')
+    } finally {
+      setTestingHookId(null)
+    }
+  }
+
+  const togglePlatformHook = async (wh: PlatformWebhook, enabled: boolean) => {
+    try {
+      const res = await fetch(`/api/admin/growth/publishing/${wh.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data.status) {
+        toast.error(data.message || 'Failed to update')
+        return
+      }
+      await loadPublishing()
+    } catch {
+      toast.error('Failed to update')
+    }
+  }
+
+  const deletePlatformHook = async (wh: PlatformWebhook) => {
+    if (!window.confirm(`Remove platform hook “${wh.label}”?`)) return
+    try {
+      const res = await fetch(`/api/admin/growth/publishing/${wh.id}`, {
+        method: 'DELETE',
+      })
+      const data = await res.json()
+      if (!res.ok || !data.status) {
+        toast.error(data.message || 'Failed to delete')
+        return
+      }
+      toast.success('Removed')
+      await loadPublishing()
+    } catch {
+      toast.error('Failed to delete')
     }
   }
 
@@ -316,6 +437,121 @@ export default function AdminGrowthPage() {
                   )}
                   Save channel
                 </Button>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Webhook className="h-4 w-4" />
+                  Platform publishing (Zapier / Make)
+                </CardTitle>
+                <CardDescription>
+                  Super-admin only. Separate from campaign Publishing destinations.
+                  After you approve a growth draft, Antelope posts a signed payload
+                  here so your Zap can publish to @
+                  {channel?.handle || 'antelopeHQ'}.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {freshHookSecret && (
+                  <div className="rounded border border-border bg-muted/30 p-3 space-y-1">
+                    <p className="text-xs font-medium">Signing secret (copy now)</p>
+                    <code className="text-xs break-all block select-all">
+                      {freshHookSecret}
+                    </code>
+                  </div>
+                )}
+                {platformHooks.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    No platform Catch Hook yet. Add one to fan out approved Antelope
+                    posts.
+                  </p>
+                ) : (
+                  <ul className="space-y-3">
+                    {platformHooks.map((wh) => (
+                      <li
+                        key={wh.id}
+                        className="rounded-md border border-border p-3 space-y-2"
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div>
+                            <p className="text-sm font-medium">{wh.label}</p>
+                            <p className="text-xs text-muted-foreground font-mono">
+                              {wh.urlMasked}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Label className="text-xs text-muted-foreground">
+                              {wh.enabled ? 'Enabled' : 'Disabled'}
+                            </Label>
+                            <Switch
+                              checked={wh.enabled}
+                              onCheckedChange={(v) =>
+                                void togglePlatformHook(wh, v)
+                              }
+                            />
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={testingHookId === wh.id}
+                            onClick={() => void testPlatformHook(wh.id)}
+                          >
+                            {testingHookId === wh.id ? (
+                              <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
+                            ) : (
+                              <Send className="h-3.5 w-3.5 mr-1" />
+                            )}
+                            Send test
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="text-destructive"
+                            onClick={() => void deletePlatformHook(wh)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5 mr-1" />
+                            Delete
+                          </Button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <form onSubmit={savePlatformHook} className="space-y-3 border-t pt-4">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="plat-label">Name</Label>
+                    <Input
+                      id="plat-label"
+                      value={hookLabel}
+                      onChange={(e) => setHookLabel(e.target.value)}
+                      placeholder="Antelope X via Zapier"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="plat-url">Catch Hook URL</Label>
+                    <Input
+                      id="plat-url"
+                      type="url"
+                      required
+                      value={hookUrl}
+                      onChange={(e) => setHookUrl(e.target.value)}
+                      placeholder="https://hooks.zapier.com/hooks/catch/…"
+                    />
+                    <p className="text-[11px] text-muted-foreground">
+                      https only · encrypted at rest · masked after save · audited
+                    </p>
+                  </div>
+                  <Button type="submit" size="sm" disabled={savingHook || !hookUrl.trim()}>
+                    {savingHook && (
+                      <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
+                    )}
+                    Save platform destination
+                  </Button>
+                </form>
               </CardContent>
             </Card>
 

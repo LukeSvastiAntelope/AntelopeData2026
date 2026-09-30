@@ -38,19 +38,27 @@ export async function POST(req: NextRequest, context: Ctx) {
     const action = String(body.action || '').toLowerCase();
 
     if (action === 'approve') {
-      const draft = await approveMarketingDraft(id, gate.numericUserId);
+      const draft = await approveMarketingDraft(id, gate.numericUserId, {
+        actorEmail: gate.email,
+      });
       await writeAdminAuditLog({
         actorUserId: gate.numericUserId,
         action: 'growth.draft_approve',
         targetType: 'growth_draft',
         targetId: id,
-        metadata: { neverAutoPost: true },
+        metadata: {
+          neverAutoPost: true,
+          distribution: (draft as any).distribution || null,
+        },
         ip: clientIp(req),
       });
       return NextResponse.json({
         status: true,
         draft,
-        note: 'Approved. Nothing was posted to X.',
+        distribution: (draft as any).distribution || null,
+        note: (draft as any).distribution?.queued
+          ? 'Approved. Platform webhook delivery queued.'
+          : 'Approved. Configure a platform webhook to deliver via Zapier/Make.',
       });
     }
 

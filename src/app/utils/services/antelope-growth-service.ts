@@ -248,8 +248,9 @@ export async function stageAntelopeMarketingDraft(params: {
 
 export async function approveMarketingDraft(
   draftId: number,
-  actorUserId: number
-): Promise<MarketingDraft> {
+  actorUserId: number,
+  opts?: { actorEmail?: string | null }
+): Promise<MarketingDraft & { distribution?: Record<string, unknown> }> {
   const updated = await AntelopeGrowthRepo.approve(draftId, actorUserId);
   if (!updated) {
     throw new Error('Draft not found or not pending approval');
@@ -259,7 +260,7 @@ export async function approveMarketingDraft(
     await ConsultantRepo.updateStagedAction(updated.stagedActionId, {
       status: 'approved',
       resultSummary:
-        'Approved for Antelope growth. No tweet was sent — mark posted only after you publish manually (or wire X API in a follow-on).',
+        'Approved for Antelope growth. Platform Zapier/Make delivery queued when configured — mark posted after it lands on X.',
       resultData: {
         reviewOnly: true,
         marketingDraftId: updated.id,
@@ -267,7 +268,45 @@ export async function approveMarketingDraft(
       },
     });
   }
-  return updated;
+
+  // Distribution W4 — platform Catch Hooks (super-admin destinations only)
+  let distribution: Record<string, unknown> | undefined;
+  try {
+    const { queuePlatformGrowthOnApproval } = await import(
+      '@/app/utils/services/platform-distribution-service'
+    );
+    const dist = await queuePlatformGrowthOnApproval({
+      draft: updated,
+      actorUserId,
+      actorEmail: opts?.actorEmail ?? null,
+    });
+    if (dist.queued || dist.status !== 'none') {
+      distribution = {
+        queued: dist.queued,
+        status: dist.status,
+        label: dist.label,
+        deliveryIds: dist.deliveryIds,
+        contentType: dist.contentType,
+      };
+      if (updated.stagedActionId) {
+        await ConsultantRepo.updateStagedAction(updated.stagedActionId, {
+          resultData: {
+            reviewOnly: true,
+            marketingDraftId: updated.id,
+            neverAutoPost: true,
+            distribution,
+          },
+        });
+      }
+    }
+  } catch (err) {
+    console.warn(
+      '[approveMarketingDraft] platform distribution failed',
+      err instanceof Error ? err.message : err
+    );
+  }
+
+  return distribution ? { ...updated, distribution } : updated;
 }
 
 export async function rejectMarketingDraft(

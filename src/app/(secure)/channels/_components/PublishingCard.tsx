@@ -250,7 +250,7 @@ export function PublishingCard() {
           >
             <span className="text-xs font-medium flex items-center gap-1.5">
               <BookOpen className="h-3.5 w-3.5" />
-              Setup guide — Zapier &amp; Make
+              Setup guide — Zapier & Make
             </span>
             {showGuide ? (
               <ChevronUp className="h-3.5 w-3.5 text-muted-foreground" />
