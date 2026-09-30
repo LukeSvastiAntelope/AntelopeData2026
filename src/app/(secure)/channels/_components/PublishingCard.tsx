@@ -8,9 +8,26 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
-import { Webhook, Loader2, Send, Trash2, Plus } from 'lucide-react';
+import { Webhook, Loader2, Send, Trash2, Plus, BookOpen, ChevronDown, ChevronUp } from 'lucide-react';
 
 type ContentType = 'video' | 'text';
+
+/** Documented content.approved shape — keep in sync with distribution-webhook-service. */
+const SAMPLE_APPROVED_PAYLOAD = `{
+  "event": "content.approved",
+  "id": "staged-123",
+  "organization": { "id": 42, "name": "Your Campaign" },
+  "content_type": "video",
+  "platform_hint": "tiktok",
+  "caption": "Door-knocking this Saturday — join us.",
+  "hashtags": ["doors", "GOTV"],
+  "ai_disclosure": "This video includes AI-generated or AI-edited content.",
+  "media_url": "https://…/api/public/distribution-media?token=…",
+  "media_expires_at": "2026-10-03T19:00:00.000Z",
+  "thumbnail_url": null,
+  "approved_by": { "user_id": 7, "email": "you@campaign.org" },
+  "approved_at": "2026-09-30T19:00:00.000Z"
+}`;
 
 type WebhookPublic = {
   id: number;
@@ -55,6 +72,7 @@ export function PublishingCard() {
   const [notice, setNotice] = useState<string | null>(null);
   const [freshSecret, setFreshSecret] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [showGuide, setShowGuide] = useState(true);
 
   const load = useCallback(async () => {
     try {
@@ -223,6 +241,83 @@ export function PublishingCard() {
         </Badge>
       </CardHeader>
       <CardContent className="space-y-4">
+        <div className="rounded-md border border-border bg-muted/20">
+          <button
+            type="button"
+            className="w-full flex items-center justify-between gap-2 px-3 py-2 text-left"
+            onClick={() => setShowGuide((v) => !v)}
+            aria-expanded={showGuide}
+          >
+            <span className="text-xs font-medium flex items-center gap-1.5">
+              <BookOpen className="h-3.5 w-3.5" />
+              Setup guide — Zapier &amp; Make
+            </span>
+            {showGuide ? (
+              <ChevronUp className="h-3.5 w-3.5 text-muted-foreground" />
+            ) : (
+              <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+            )}
+          </button>
+          {showGuide && (
+            <div className="px-3 pb-3 space-y-3 border-t border-border pt-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs text-muted-foreground">
+                <div className="space-y-1.5">
+                  <p className="font-medium text-foreground">Zapier</p>
+                  <ol className="list-decimal pl-4 space-y-1">
+                    <li>Create a Zap</li>
+                    <li>
+                      Trigger: <span className="text-foreground">Webhooks by Zapier</span> →{' '}
+                      <span className="text-foreground">Catch Hook</span>
+                    </li>
+                    <li>Copy the Catch Hook URL and paste it here</li>
+                    <li>
+                      Action: post to TikTok / Instagram / YouTube / Facebook / X
+                      (map fields from the sample below)
+                    </li>
+                    <li>
+                      Use <span className="text-foreground">Send test</span> on a
+                      destination to see a sample arrive in Zapier
+                    </li>
+                  </ol>
+                </div>
+                <div className="space-y-1.5">
+                  <p className="font-medium text-foreground">Make</p>
+                  <ol className="list-decimal pl-4 space-y-1">
+                    <li>Create a scenario</li>
+                    <li>
+                      Trigger: <span className="text-foreground">Webhooks</span> →{' '}
+                      <span className="text-foreground">Custom webhook</span> (Catch Hook)
+                    </li>
+                    <li>Copy the webhook URL and paste it here</li>
+                    <li>
+                      Action: post to TikTok / Instagram / YouTube / Facebook / X
+                      (same field mapping)
+                    </li>
+                    <li>
+                      Use <span className="text-foreground">Send test</span> to
+                      confirm Make receives the payload
+                    </li>
+                  </ol>
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <p className="text-xs font-medium text-foreground">
+                  Sample payload — map these fields
+                </p>
+                <p className="text-[11px] text-muted-foreground">
+                  Key fields: <code className="text-[10px]">caption</code>,{' '}
+                  <code className="text-[10px]">media_url</code>,{' '}
+                  <code className="text-[10px]">ai_disclosure</code>. Keep AI
+                  disclosure in the published caption when present.
+                </p>
+                <pre className="text-[10px] leading-relaxed font-mono bg-background border border-border rounded-md p-3 overflow-x-auto max-h-56 whitespace-pre">
+                  {SAMPLE_APPROVED_PAYLOAD}
+                </pre>
+              </div>
+            </div>
+          )}
+        </div>
+
         {error && (
           <p className="text-sm text-destructive bg-destructive/10 rounded px-3 py-2">
             {error}
