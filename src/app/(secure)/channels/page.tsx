@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { SidebarTrigger } from '@/components/ui/sidebar'
 import { Badge } from '@/components/ui/badge'
 import { Bot, Send, MessageCircle, Mail, Globe, List } from 'lucide-react'
+import { PublishingCard } from './_components/PublishingCard'
 
 export default function ChannelsPage() {
   const [tgConnected, setTgConnected] = useState<boolean | null>(null)
@@ -209,6 +210,8 @@ export default function ChannelsPage() {
                 <Button size="sm" variant="outline" disabled>Always enabled</Button>
               </CardContent>
             </Card>
+
+            <PublishingCard />
 
           </div>
         </div>
