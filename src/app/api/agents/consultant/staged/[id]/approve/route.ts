@@ -35,6 +35,7 @@ export async function POST(_request: Request, context: RouteContext) {
       staged: result.staged,
       conversation: result.conversation,
       execution: result.execution,
+      distribution: result.distribution || null,
     });
   } catch (error) {
     console.error('Staged approve error:', error);

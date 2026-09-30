@@ -275,6 +275,14 @@ export default function OutboundPage() {
                   data.staged?.status === 'executed' || data.execution?.status === 'executed'
                     ? 'executed'
                     : 'approved',
+                distribution: data.distribution
+                  ? {
+                      status: data.distribution.status || 'queued',
+                      label: data.distribution.label || 'Sending to Zapier…',
+                      deliveryIds: data.distribution.deliveryIds,
+                      contentType: data.distribution.contentType,
+                    }
+                  : c.distribution,
               }
             : c
         )

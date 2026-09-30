@@ -66,6 +66,8 @@ const publicRoutes = [
     '/api/cron/autotrigger-poll', // AT1 survey auto-trigger backstop
     '/api/cron/volunteer-reminders', // Volunteer V3 — gated shift reminders + check-in prompts
     '/api/cron/antelope-marketing', // Admin A5 — Antelope own-growth drafts (never auto-posts)
+    '/api/cron/distribution-retries', // Distribution W2 — Zapier/Make delivery retries
+    '/api/public/distribution-media', // Distribution W2 — signed media for Catch Hooks
     '/api/channels/telegram/webhook', // Telegram webhook must be public
     '/api/webhooks/resend', // Resend delivery / bounce / complaint webhook
     '/api/email/unsubscribe', // CAN-SPAM one-click unsubscribe (public)

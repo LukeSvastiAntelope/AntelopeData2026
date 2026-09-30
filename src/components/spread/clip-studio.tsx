@@ -241,6 +241,14 @@ export function ClipStudioPanel() {
                   data.staged?.resultSummary ||
                   data.execution?.summary ||
                   c.summary,
+                distribution: data.distribution
+                  ? {
+                      status: data.distribution.status || 'queued',
+                      label: data.distribution.label || 'Sending to Zapier…',
+                      deliveryIds: data.distribution.deliveryIds,
+                      contentType: data.distribution.contentType,
+                    }
+                  : c.distribution,
               }
             : c
         )

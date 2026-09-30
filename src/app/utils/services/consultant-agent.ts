@@ -375,6 +375,13 @@ export async function approveStagedAction(params: {
   staged: ConsultantStagedAction;
   conversation: ConsultantConversation;
   execution: ToolExecutionResult;
+  distribution?: {
+    queued: boolean;
+    status: string;
+    label: string;
+    deliveryIds: number[];
+    contentType: string | null;
+  };
 }> {
   const staged = await ConsultantRepo.getStagedActionById(params.stagedActionId);
   if (!staged) throw new Error('Staged action not found');
@@ -471,10 +478,66 @@ export async function approveStagedAction(params: {
     { userId: params.userId, organizationId: conversation.organizationId }
   );
 
+  // Distribution W2 — queue Zapier/Make webhooks for video/text social posts.
+  // Never blocks or undoes approval; first attempts run async.
+  let distributionSummary: {
+    queued: boolean;
+    status: string;
+    label: string;
+    deliveryIds: number[];
+    contentType: string | null;
+  } | undefined;
+  if (execution.ok && execution.status === 'executed') {
+    try {
+      const { queueDistributionOnApproval } = await import(
+        '@/app/utils/services/distribution-webhook-service'
+      );
+      const { ensurePrimaryOrgId } = await import(
+        '@/app/api/dashboard/persons/org'
+      );
+      const organizationId =
+        conversation.organizationId && conversation.organizationId > 0
+          ? conversation.organizationId
+          : await ensurePrimaryOrgId(params.userId);
+      const dist = await queueDistributionOnApproval({
+        staged,
+        execution,
+        userId: params.userId,
+        organizationId,
+      });
+      if (dist.queued || dist.status !== 'none') {
+        distributionSummary = {
+          queued: dist.queued,
+          status: dist.status,
+          label: dist.label,
+          deliveryIds: dist.deliveryIds,
+          contentType: dist.contentType,
+        };
+      }
+    } catch (err) {
+      console.warn(
+        '[approveStaged] distribution queue failed',
+        err instanceof Error ? err.message : err
+      );
+    }
+  }
+
+  const resultData =
+    execution.ok && 'data' in execution
+      ? {
+          ...(execution.data || {}),
+          ...(distributionSummary
+            ? { distribution: distributionSummary }
+            : {}),
+        }
+      : distributionSummary
+        ? { distribution: distributionSummary }
+        : null;
+
   const updated = await ConsultantRepo.updateStagedAction(staged.id, {
     status: execution.ok && execution.status === 'executed' ? 'executed' : 'approved',
     resultSummary: execution.summary,
-    resultData: execution.ok && 'data' in execution ? execution.data || null : null,
+    resultData,
   });
 
   const messages = [
@@ -502,6 +565,7 @@ export async function approveStagedAction(params: {
     staged: updated!,
     conversation: refreshed!,
     execution,
+    ...(distributionSummary ? { distribution: distributionSummary } : {}),
   };
 }
 

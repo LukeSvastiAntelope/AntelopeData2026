@@ -70,7 +70,17 @@ export function ConsultantPanel({
         setMessages(payload.messages);
       }
       const nextStaged = payload.stagedActions || [];
-      setStaged(nextStaged);
+      setStaged((prev) => {
+        // Keep recently approved cards that still show Zapier delivery status
+        const keep = prev.filter(
+          (s) =>
+            s.status !== 'pending' &&
+            s.distribution &&
+            s.distribution.status !== 'none' &&
+            !nextStaged.some((n) => n.id === s.id)
+        );
+        return [...nextStaged, ...keep];
+      });
       onPendingCountChange?.(nextStaged.filter((s) => s.status === 'pending').length);
     },
     [onPendingCountChange]
@@ -148,9 +158,31 @@ export function ConsultantPanel({
       if (data.conversation?.messages) {
         setMessages(data.conversation.messages);
       }
-      setStaged((prev) => prev.filter((s) => s.id !== id));
+      const dist = data.distribution || null;
+      // Keep the card so delivery status (Sent to Zapier ✓ / failed) is visible
+      setStaged((prev) =>
+        prev.map((s) =>
+          s.id === id
+            ? {
+                ...s,
+                status:
+                  data.staged?.status === 'executed' ||
+                  data.execution?.status === 'executed'
+                    ? 'executed'
+                    : 'approved',
+                distribution: dist
+                  ? {
+                      status: dist.status || 'queued',
+                      label: dist.label || 'Sending to Zapier…',
+                      deliveryIds: dist.deliveryIds,
+                      contentType: dist.contentType,
+                    }
+                  : s.distribution,
+              }
+            : s
+        )
+      );
       onPendingCountChange?.(0);
-      // Refresh pending list
       await loadConversation();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Approve failed');
@@ -178,6 +210,12 @@ export function ConsultantPanel({
   };
 
   const pending = staged.filter((s) => s.status === 'pending');
+  const recentDistributed = staged.filter(
+    (s) =>
+      s.status !== 'pending' &&
+      s.distribution &&
+      s.distribution.status !== 'none'
+  );
 
   return (
     <div
@@ -259,6 +297,16 @@ export function ConsultantPanel({
           {pending.map((action) => (
             <StagedActionCard
               key={action.id}
+              action={action}
+              onApprove={approve}
+              onDismiss={dismiss}
+              busyId={busyStagedId}
+            />
+          ))}
+
+          {recentDistributed.map((action) => (
+            <StagedActionCard
+              key={`done-${action.id}`}
               action={action}
               onApprove={approve}
               onDismiss={dismiss}

@@ -1,26 +1,36 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, ShieldAlert, Check, X } from 'lucide-react';
+import { Loader2, ShieldAlert, Check, X, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 /**
  * Shared "review before it goes out" card — used by the consultant panel
  * and intended for Auto-Post / other agents so the product speaks one language.
  */
+export type DistributionStatusModel = {
+  status: 'none' | 'queued' | 'sent' | 'failed' | 'partial';
+  label: string;
+  deliveryIds?: number[];
+  contentType?: string | null;
+};
+
 export type StagedActionCardModel = {
   id: number;
   toolName: string;
   summary: string;
   status: 'pending' | 'approved' | 'executed' | 'dismissed';
   payload?: Record<string, unknown>;
+  distribution?: DistributionStatusModel | null;
 };
 
 type Props = {
   action: StagedActionCardModel;
   onApprove: (id: number) => void | Promise<void>;
   onDismiss: (id: number) => void | Promise<void>;
+  onRetryDelivery?: (id: number) => void | Promise<void>;
   busyId?: number | null;
   className?: string;
 };
@@ -33,17 +43,87 @@ export function StagedActionCard({
   action,
   onApprove,
   onDismiss,
+  onRetryDelivery,
   busyId,
   className,
 }: Props) {
   const busy = busyId === action.id;
   const pending = action.status === 'pending';
+  const [distribution, setDistribution] = useState<DistributionStatusModel | null>(
+    action.distribution || null
+  );
+  const [retrying, setRetrying] = useState(false);
+
+  useEffect(() => {
+    setDistribution(action.distribution || null);
+  }, [action.distribution]);
+
+  // Poll while queued / partial so the card flips to Sent ✓ without a refresh
+  useEffect(() => {
+    if (pending) return;
+    const status = distribution?.status;
+    if (status !== 'queued' && status !== 'partial') return;
+
+    let cancelled = false;
+    const tick = async () => {
+      try {
+        const res = await fetch(
+          `/api/agents/consultant/staged/${action.id}/distribution`,
+          { credentials: 'include' }
+        );
+        const data = await res.json().catch(() => ({}));
+        if (!cancelled && data?.status && data.distribution) {
+          setDistribution(data.distribution as DistributionStatusModel);
+        }
+      } catch {
+        /* ignore poll errors */
+      }
+    };
+
+    void tick();
+    const t = setInterval(tick, 2500);
+    return () => {
+      cancelled = true;
+      clearInterval(t);
+    };
+  }, [action.id, pending, distribution?.status]);
+
+  const handleRetry = async () => {
+    setRetrying(true);
+    try {
+      if (onRetryDelivery) {
+        await onRetryDelivery(action.id);
+      } else {
+        const res = await fetch(
+          `/api/agents/consultant/staged/${action.id}/distribution`,
+          {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({}),
+          }
+        );
+        const data = await res.json().catch(() => ({}));
+        if (data?.distribution) {
+          setDistribution(data.distribution as DistributionStatusModel);
+        }
+      }
+    } finally {
+      setRetrying(false);
+    }
+  };
+
+  const showDelivery =
+    !pending &&
+    distribution &&
+    distribution.status !== 'none' &&
+    Boolean(distribution.label);
 
   return (
     <div
       className={cn(
         'rounded-lg border border-amber-500/40 bg-amber-500/5 p-3 space-y-2',
-        !pending && 'opacity-70',
+        !pending && 'opacity-90',
         className
       )}
       data-staged-action-id={action.id}
@@ -74,6 +154,43 @@ export function StagedActionCard({
             <p className="text-[11px] text-muted-foreground">
               This reaches voters, posts publicly, or spends money. Nothing runs until you Approve.
             </p>
+          )}
+          {showDelivery && (
+            <div className="flex flex-wrap items-center gap-2 pt-1">
+              <p
+                className={cn(
+                  'text-xs font-medium',
+                  distribution.status === 'sent' && 'text-emerald-700 dark:text-emerald-400',
+                  (distribution.status === 'failed' ||
+                    distribution.status === 'partial') &&
+                    'text-destructive',
+                  distribution.status === 'queued' && 'text-muted-foreground'
+                )}
+              >
+                {distribution.status === 'queued' && (
+                  <Loader2 className="inline h-3 w-3 animate-spin mr-1" />
+                )}
+                {distribution.label}
+              </p>
+              {(distribution.status === 'failed' ||
+                distribution.status === 'partial') && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="h-7 text-xs"
+                  disabled={retrying || busy}
+                  onClick={() => void handleRetry()}
+                >
+                  {retrying ? (
+                    <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                  ) : (
+                    <RefreshCw className="h-3 w-3 mr-1" />
+                  )}
+                  Retry
+                </Button>
+              )}
+            </div>
           )}
         </div>
       </div>

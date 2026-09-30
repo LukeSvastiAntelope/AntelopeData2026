@@ -356,6 +356,14 @@ export function VideoStudio() {
               ...prev,
               status: data.staged?.status || 'executed',
               summary: data.staged?.resultSummary || data.execution?.summary || prev.summary,
+              distribution: data.distribution
+                ? {
+                    status: data.distribution.status || 'queued',
+                    label: data.distribution.label || 'Sending to Zapier…',
+                    deliveryIds: data.distribution.deliveryIds,
+                    contentType: data.distribution.contentType,
+                  }
+                : prev.distribution,
             }
           : prev
       );
