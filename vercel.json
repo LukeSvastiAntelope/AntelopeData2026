@@ -22,7 +22,7 @@
     },
     {
       "path": "/api/cron/distribution-retries",
-      "schedule": "* * * * *"
+      "schedule": "30 11 * * *"
     }
   ]
 }
