@@ -7,6 +7,7 @@
 import { createHmac, timingSafeEqual } from 'crypto';
 import dns from 'dns/promises';
 import { after } from 'next/server';
+import { Agent, fetch as undiciFetch } from 'undici';
 import {
   DistributionWebhookRepo,
   type DistributionContentType,
@@ -20,7 +21,10 @@ import {
   refreshDeliveryPayloadMedia,
   resolvePublicMediaUrl,
 } from '@/app/utils/services/distribution-media-token';
-import { AI_DISCLOSURE_DEFAULT } from '@/app/utils/services/video/guardrails';
+import {
+  AI_DISCLOSURE_DEFAULT,
+  applyAiDisclosure,
+} from '@/app/utils/services/video/guardrails';
 import { openSql } from '@/app/utils/database/db';
 import type { RowDataPacket } from 'mysql2/promise';
 import type {
@@ -123,6 +127,7 @@ const BLOCKED_HOSTNAMES = new Set([
   '0.0.0.0',
   '[::1]',
   '::1',
+  '::',
   'metadata.google.internal',
 ]);
 
@@ -134,25 +139,71 @@ const PRIVATE_HOSTNAME_SUFFIXES = [
   '.lan',
 ];
 
+/** Entire 0.0.0.0/8 plus classic private / link-local / CGNAT ranges. */
 const PRIVATE_IPV4_RANGES = [
   /^10\./,
   /^127\./,
-  /^0\./,
+  /^0\./, // 0.0.0.0/8
   /^169\.254\./,
   /^192\.168\./,
   /^172\.(1[6-9]|2[0-9]|3[0-1])\./,
   /^100\.(6[4-9]|[7-9][0-9]|1[0-2][0-9])\./,
 ];
 
+export type PinnedWebhookAddress = {
+  address: string;
+  family: 4 | 6;
+};
+
+export type SafeWebhookTarget = {
+  url: URL;
+  pinned: PinnedWebhookAddress;
+};
+
+/**
+ * Extract IPv4 from IPv4-mapped IPv6 (::ffff:a.b.c.d or ::ffff:xxxx:xxxx).
+ */
+export function mappedIpv4FromIpv6(ip: string): string | null {
+  const lower = String(ip || '')
+    .toLowerCase()
+    .replace(/^\[|\]$/g, '');
+  const dotted = lower.match(/^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/);
+  if (dotted) return dotted[1];
+  const hex = lower.match(/^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/i);
+  if (hex) {
+    const hi = parseInt(hex[1], 16);
+    const lo = parseInt(hex[2], 16);
+    if (!Number.isFinite(hi) || !Number.isFinite(lo)) return null;
+    return `${(hi >> 8) & 0xff}.${hi & 0xff}.${(lo >> 8) & 0xff}.${lo & 0xff}`;
+  }
+  return null;
+}
+
 function isPrivateIpv4(ip: string): boolean {
   return PRIVATE_IPV4_RANGES.some((re) => re.test(ip));
 }
 
 function isPrivateIpv6(ip: string): boolean {
-  const lower = ip.toLowerCase();
+  const lower = String(ip || '')
+    .toLowerCase()
+    .replace(/^\[|\]$/g, '');
   if (lower === '::1') return true;
-  if (lower.startsWith('fc') || lower.startsWith('fd')) return true;
-  if (lower.startsWith('fe80')) return true;
+  if (lower === '::' || lower === '0:0:0:0:0:0:0:0') return true;
+  // IPv4-mapped — treat as the embedded IPv4
+  const mapped = mappedIpv4FromIpv6(lower);
+  if (mapped) return isPrivateIpv4(mapped);
+  if (lower.startsWith('fc') || lower.startsWith('fd')) return true; // ULA
+  if (lower.startsWith('fe80')) return true; // link-local
+  return false;
+}
+
+function isBlockedIpLiteral(ip: string): boolean {
+  const lower = String(ip || '')
+    .toLowerCase()
+    .replace(/^\[|\]$/g, '');
+  if (/^(\d{1,3}\.){3}\d{1,3}$/.test(lower)) return isPrivateIpv4(lower);
+  // Heuristic: contains ':' → IPv6
+  if (lower.includes(':')) return isPrivateIpv6(lower);
   return false;
 }
 
@@ -160,15 +211,17 @@ function isBlockedHostname(hostname: string): boolean {
   const lower = hostname.toLowerCase();
   if (BLOCKED_HOSTNAMES.has(lower)) return true;
   if (PRIVATE_HOSTNAME_SUFFIXES.some((s) => lower.endsWith(s))) return true;
-  if (/^(\d{1,3}\.){3}\d{1,3}$/.test(lower) && isPrivateIpv4(lower)) {
-    return true;
-  }
+  if (isBlockedIpLiteral(lower)) return true;
   return false;
 }
 
-export async function assertSafeHttpsWebhookUrl(
+/**
+ * Validate https webhook URL and return a public IP to pin the TCP connect to
+ * (closes DNS-rebinding between check and fetch).
+ */
+export async function resolveSafeHttpsWebhookTarget(
   raw: string
-): Promise<URL> {
+): Promise<SafeWebhookTarget> {
   let url: URL;
   try {
     url = new URL(String(raw || '').trim());
@@ -199,14 +252,26 @@ export async function assertSafeHttpsWebhookUrl(
     if (!addrs.length) {
       throw new Error('Webhook URL host could not be resolved');
     }
+
+    const publicAddrs: PinnedWebhookAddress[] = [];
     for (const a of addrs) {
-      if (a.family === 4 && isPrivateIpv4(a.address)) {
+      const family = (a.family === 6 ? 6 : 4) as 4 | 6;
+      const address = String(a.address);
+      if (family === 4 && isPrivateIpv4(address)) {
         throw new Error('Webhook URL resolves to a private IP');
       }
-      if (a.family === 6 && isPrivateIpv6(a.address)) {
+      if (family === 6 && isPrivateIpv6(address)) {
         throw new Error('Webhook URL resolves to a private IP');
       }
+      publicAddrs.push({ address, family });
     }
+    if (!publicAddrs.length) {
+      throw new Error('Webhook URL resolves to a private IP');
+    }
+    // Prefer IPv4 for broader Catch Hook compatibility
+    const pinned =
+      publicAddrs.find((a) => a.family === 4) || publicAddrs[0];
+    return { url, pinned };
   } catch (err) {
     if (
       err instanceof Error &&
@@ -222,8 +287,62 @@ export async function assertSafeHttpsWebhookUrl(
       }`
     );
   }
+}
 
+export async function assertSafeHttpsWebhookUrl(
+  raw: string
+): Promise<URL> {
+  const { url } = await resolveSafeHttpsWebhookTarget(raw);
   return url;
+}
+
+/**
+ * HTTPS fetch that connects to the IP already validated by
+ * resolveSafeHttpsWebhookTarget (no second DNS resolve).
+ */
+export async function fetchPinnedWebhook(
+  target: SafeWebhookTarget,
+  init: {
+    method?: string;
+    headers?: Record<string, string>;
+    body?: string;
+    signal?: AbortSignal;
+  }
+): Promise<Response> {
+  const pinned = target.pinned;
+  const agent = new Agent({
+    connect: {
+      lookup(
+        _hostname: string,
+        opts: { all?: boolean } | undefined,
+        cb: (
+          err: Error | null,
+          address: string | Array<{ address: string; family: number }>,
+          family?: number
+        ) => void
+      ) {
+        if (opts && opts.all) {
+          cb(null, [{ address: pinned.address, family: pinned.family }]);
+          return;
+        }
+        cb(null, pinned.address, pinned.family);
+      },
+    },
+  });
+  try {
+    const res = await undiciFetch(target.url.href, {
+      method: init.method || 'GET',
+      headers: init.headers,
+      body: init.body,
+      signal: init.signal,
+      redirect: 'error',
+      dispatcher: agent,
+    });
+    // undici Response is compatible enough for status/text usage
+    return res as unknown as Response;
+  } finally {
+    await agent.close().catch(() => {});
+  }
 }
 
 export function signDistributionPayload(
@@ -285,8 +404,8 @@ async function postOnce(
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
 
   try {
-    await assertSafeHttpsWebhookUrl(webhook.url);
-    const res = await fetch(webhook.url, {
+    const target = await resolveSafeHttpsWebhookTarget(webhook.url);
+    const res = await fetchPinnedWebhook(target, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -297,7 +416,6 @@ async function postOnce(
       },
       body,
       signal: controller.signal,
-      redirect: 'error',
     });
 
     const ok = res.status >= 200 && res.status < 300;
@@ -521,7 +639,7 @@ export function resolveDistributableContent(
       : {};
 
   if (tool === 'generate_and_post_video') {
-    const caption =
+    const rawCaption =
       (data.caption as string) ||
       (input.caption as string) ||
       null;
@@ -537,9 +655,20 @@ export function resolveDistributableContent(
       Boolean(staged.payload?.includeAiDisclosure);
     const disclosureText =
       (input.aiDisclosureText as string) || AI_DISCLOSURE_DEFAULT;
+    // Brief requires disclosure in BOTH caption (for caption-only Zaps) and
+    // the separate ai_disclosure field.
+    const caption = includeDisclosure
+      ? applyAiDisclosure({
+          caption: rawCaption ? String(rawCaption) : '',
+          includeDisclosure: true,
+          disclosureText,
+        }) || null
+      : rawCaption
+        ? String(rawCaption)
+        : null;
     return {
       contentType: 'video',
-      caption: caption ? String(caption) : null,
+      caption,
       hashtags: extractHashtags(String(caption || '')),
       platformHint:
         String(data.platform || input.platform || 'tiktok') || null,

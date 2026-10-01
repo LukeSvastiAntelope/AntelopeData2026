@@ -5,6 +5,8 @@
 
 import {
   assertSafeHttpsWebhookUrl,
+  resolveSafeHttpsWebhookTarget,
+  fetchPinnedWebhook,
   signDistributionPayload,
   DISTRIBUTION_RETRY_BACKOFF_MS,
   DISTRIBUTION_FAILED_LABEL,
@@ -43,8 +45,8 @@ async function postPlatformOnce(
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
 
   try {
-    await assertSafeHttpsWebhookUrl(webhook.url);
-    const res = await fetch(webhook.url, {
+    const target = await resolveSafeHttpsWebhookTarget(webhook.url);
+    const res = await fetchPinnedWebhook(target, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -56,7 +58,6 @@ async function postPlatformOnce(
       },
       body,
       signal: controller.signal,
-      redirect: 'error',
     });
 
     const ok = res.status >= 200 && res.status < 300;
