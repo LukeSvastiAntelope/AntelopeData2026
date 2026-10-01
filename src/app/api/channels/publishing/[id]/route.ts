@@ -14,7 +14,7 @@ type Ctx = { params: Promise<{ id: string }> };
 
 function parseContentTypes(raw: unknown): DistributionContentType[] | undefined {
   if (raw == null) return undefined;
-  const allowed = new Set(['video', 'text']);
+  const allowed = new Set(['video', 'text', 'image']);
   const arr = Array.isArray(raw) ? raw : [];
   const out = arr
     .map((v) => String(v).toLowerCase())

@@ -23,6 +23,8 @@ export type ChartActionFigure = {
   n?: number | null;
   storageKey?: string | null;
   stepId?: string | null;
+  /** Preceding step Python for social-card re-render */
+  code?: string | null;
 };
 
 interface ChartActionsProps {

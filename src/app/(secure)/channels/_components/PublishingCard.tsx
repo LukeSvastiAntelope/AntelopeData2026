@@ -10,18 +10,18 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
 import { Webhook, Loader2, Send, Trash2, Plus, BookOpen, ChevronDown, ChevronUp } from 'lucide-react';
 
-type ContentType = 'video' | 'text';
+type ContentType = 'video' | 'text' | 'image';
 
 /** Documented content.approved shape — keep in sync with distribution-webhook-service. */
 const SAMPLE_APPROVED_PAYLOAD = `{
   "event": "content.approved",
   "id": "staged-123",
   "organization": { "id": 42, "name": "Your Campaign" },
-  "content_type": "video",
-  "platform_hint": "tiktok",
+  "content_type": "image",
+  "platform_hint": "linkedin",
   "caption": "Door-knocking this Saturday — join us.",
   "hashtags": ["doors", "GOTV"],
-  "ai_disclosure": "This video includes AI-generated or AI-edited content.",
+  "ai_disclosure": null,
   "media_url": "https://…/api/public/distribution-media?token=…",
   "media_expires_at": "2026-10-03T19:00:00.000Z",
   "thumbnail_url": null,
@@ -49,7 +49,7 @@ type Draft = {
 const EMPTY_DRAFT: Draft = {
   label: '',
   url: '',
-  contentTypes: ['video', 'text'],
+  contentTypes: ['video', 'text', 'image'],
 };
 
 function formatWhen(iso: string | null): string | null {
@@ -465,7 +465,7 @@ export function PublishingCard() {
             <div className="space-y-2">
               <Label>Content types</Label>
               <div className="flex flex-wrap gap-4">
-                {(['video', 'text'] as ContentType[]).map((type) => (
+                {(['video', 'text', 'image'] as ContentType[]).map((type) => (
                   <label
                     key={type}
                     className="flex items-center gap-2 text-sm"
@@ -474,7 +474,11 @@ export function PublishingCard() {
                       checked={draft.contentTypes.includes(type)}
                       onCheckedChange={(v) => toggleType(type, Boolean(v))}
                     />
-                    {type === 'video' ? 'Video' : 'Text post'}
+                    {type === 'video'
+                      ? 'Video'
+                      : type === 'text'
+                        ? 'Text post'
+                        : 'Image'}
                   </label>
                 ))}
               </div>

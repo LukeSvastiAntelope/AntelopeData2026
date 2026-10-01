@@ -75,7 +75,7 @@ function decryptUrl(enc: string | null): string | null {
 }
 
 function normalizeContentTypes(raw: unknown): DistributionContentType[] {
-  const allowed = new Set<DistributionContentType>(['video', 'text']);
+  const allowed = new Set<DistributionContentType>(['video', 'text', 'image']);
   let arr: unknown[] = [];
   if (Array.isArray(raw)) arr = raw;
   else if (typeof raw === 'string') {

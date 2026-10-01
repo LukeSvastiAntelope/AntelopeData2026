@@ -13,6 +13,7 @@ import { sendEmailTool } from './send-email';
 import { distributeViaWebhookTool } from './distribute-via-webhook';
 import { chargeOrFundraiseTool } from './charge-or-fundraise';
 import { generateAndPostVideoTool } from './generate-and-post-video';
+import { postSocialCardTool } from './post-social-card';
 import { findPostableInsightTool } from './find-postable-insight';
 import { proposeCycleActionTool } from './propose-cycle-action';
 import { clipVideoTool } from './clip-video';
@@ -45,6 +46,7 @@ export const TOOL_REGISTRY: Record<CampaignToolName, CampaignTool> = {
   distribute_via_webhook: distributeViaWebhookTool,
   charge_or_fundraise: chargeOrFundraiseTool,
   generate_and_post_video: generateAndPostVideoTool,
+  post_social_card: postSocialCardTool,
   propose_cycle_action: proposeCycleActionTool,
   clip_video: clipVideoTool,
   addresses_in_area: addressesInAreaTool,
@@ -83,6 +85,7 @@ const APPROVAL_TOOLS: CampaignToolName[] = [
   'distribute_via_webhook',
   'charge_or_fundraise',
   'generate_and_post_video',
+  'post_social_card',
   'propose_cycle_action',
   'stage_outbound_send',
   'post_antelope_marketing',

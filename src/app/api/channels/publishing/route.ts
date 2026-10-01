@@ -11,7 +11,7 @@ import { assertSafeHttpsWebhookUrl } from '@/app/utils/services/distribution-web
 export const runtime = 'nodejs';
 
 function parseContentTypes(raw: unknown): DistributionContentType[] {
-  const allowed = new Set(['video', 'text']);
+  const allowed = new Set(['video', 'text', 'image']);
   const arr = Array.isArray(raw) ? raw : [];
   const out = arr
     .map((v) => String(v).toLowerCase())

@@ -15,6 +15,7 @@ import {
   uploadChartPng,
 } from '../../python-analysis/utils/persist-figure';
 import type { ChartActionFigure } from '../../python-analysis/components/ChartActions';
+import { SocialCardComposer } from '../../python-analysis/components/SocialCardComposer';
 
 interface CodeConversationProps {
   surveyId: number | null;
@@ -67,6 +68,7 @@ interface AnalysisMessage {
     stepId?: string;
     caption?: string;
     n?: number;
+    code?: string;
   };
 }
 
@@ -86,6 +88,9 @@ export function CodeConversation({
   const [exportingReport, setExportingReport] = useState(false);
   const [exportHint, setExportHint] = useState<string | null>(null);
   const persistingRef = useRef<Set<string>>(new Set());
+  const [socialCardOpen, setSocialCardOpen] = useState(false);
+  const [socialCardFigure, setSocialCardFigure] = useState<ChartActionFigure | null>(null);
+  const [socialCardCode, setSocialCardCode] = useState<string | null>(null);
   
   // Helper function to add messages
   const addMessage = (newMessage: AnalysisMessage) => {
@@ -201,6 +206,37 @@ export function CodeConversation({
     setExportHint('Added to report');
     setTimeout(() => setExportHint(null), 1500);
   }, []);
+
+  const handleMakePostFromFigure = useCallback(
+    (figure: ChartActionFigure) => {
+      let code = figure.code || null;
+      if (!code) {
+        const idx = messages.findIndex(
+          (m) =>
+            m.id === figure.stepId ||
+            m.metadata?.stepId === figure.stepId ||
+            (typeof m.content === 'string' &&
+              (m.content === figure.src ||
+                m.metadata?.storageKey === figure.storageKey))
+        );
+        if (idx >= 0) {
+          for (let i = idx - 1; i >= 0; i--) {
+            if (messages[i].type === 'code') {
+              code = messages[i].content;
+              break;
+            }
+          }
+          if (!code && messages[idx].metadata?.code) {
+            code = messages[idx].metadata?.code || null;
+          }
+        }
+      }
+      setSocialCardFigure(figure);
+      setSocialCardCode(code);
+      setSocialCardOpen(true);
+    },
+    [messages]
+  );
 
   const collectExportableFigures = useCallback(async (): Promise<ExportableFigure[]> => {
     const source =
@@ -668,6 +704,7 @@ Ready for intelligent survey analysis!`,
                     executionTime: latestStep.execution_time_ms,
                     recipeType: 'plot',
                     stepId: latestStep.id,
+                    code: latestStep.code,
                     caption: latestStep.step?.description
                       ? `${latestStep.step.description}${plots.length > 1 ? ` (${index + 1})` : ''}`
                       : undefined,
@@ -1130,6 +1167,7 @@ Error: ${err.message}
             isLoading={isLoading}
             messagesEndRef={messagesEndRef}
             onAddFigureToReport={handleAddFigureToReport}
+            onMakePostFromFigure={handleMakePostFromFigure}
             onQuickAction={(action) => {
               if (action === 'python-analysis') {
                 const lastUserMessage = messages.findLast(m => m.type === 'user');
@@ -1156,6 +1194,17 @@ Error: ${err.message}
             placeholder="Ask me to analyze your survey data..."
             disabled={!currentDataset || pyodideLoading}
             onFileUpload={async () => {}} // Not needed for survey data
+          />
+
+          <SocialCardComposer
+            open={socialCardOpen}
+            onOpenChange={setSocialCardOpen}
+            figure={socialCardFigure}
+            stepCode={socialCardCode}
+            pyodide={pyodide}
+            datasetColumns={currentDataset?.columns || []}
+            surveyTitle={surveyTitle}
+            findingClaim={socialCardFigure?.caption || null}
           />
         </>
       )}

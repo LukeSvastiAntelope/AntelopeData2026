@@ -2,7 +2,7 @@
 
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Code, Terminal, User, Bot, AlertCircle, CheckCircle, Clock, FileSpreadsheet, File, ChevronDown, ChevronRight, RefreshCw } from 'lucide-react';
+import { Code, Terminal, User, Bot, AlertCircle, Clock, FileSpreadsheet, File, ChevronDown, ChevronRight, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import ReactMarkdown from 'react-markdown';
 import { useState } from 'react';
@@ -41,6 +41,7 @@ interface AnalysisMessage {
     stepId?: string;
     caption?: string;
     n?: number;
+    code?: string;
   };
 }
 
@@ -78,6 +79,7 @@ export function ConversationView({
       n: message.metadata?.n ?? null,
       storageKey: message.metadata?.storageKey,
       stepId: message.metadata?.stepId || message.id,
+      code: message.metadata?.code || null,
     };
   };
 

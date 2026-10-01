@@ -117,6 +117,7 @@ export type CampaignToolName =
   | 'distribute_via_webhook'
   | 'charge_or_fundraise'
   | 'generate_and_post_video'
+  | 'post_social_card'
   | 'propose_cycle_action'
   | 'clip_video'
   | 'addresses_in_area'

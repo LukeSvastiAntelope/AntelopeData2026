@@ -599,7 +599,7 @@ export async function sendTestDistributionWebhook(
     ai_disclosure:
       contentType === 'video' ? AI_DISCLOSURE_DEFAULT : null,
     media_url:
-      contentType === 'video'
+      contentType === 'video' || contentType === 'image'
         ? 'https://www.antelopedata.org/og-image.png'
         : null,
     media_expires_at: null,
@@ -680,6 +680,31 @@ export function resolveDistributableContent(
     };
   }
 
+  if (tool === 'post_social_card') {
+    const caption =
+      (data.caption as string) ||
+      (input.caption as string) ||
+      (input.headline as string) ||
+      null;
+    const mediaUrl =
+      (data.mediaUrl as string) ||
+      (input.mediaUrl as string) ||
+      (staged.payload?.mediaUrl as string) ||
+      (input.storageKey as string) ||
+      (staged.payload?.storageKey as string) ||
+      null;
+    return {
+      contentType: 'image',
+      caption: caption ? String(caption) : null,
+      hashtags: extractHashtags(String(caption || '')),
+      platformHint:
+        String(data.platform || input.platform || 'linkedin') || null,
+      mediaUrl: mediaUrl ? String(mediaUrl) : null,
+      thumbnailUrl: null,
+      aiDisclosure: null,
+    };
+  }
+
   if (tool === 'draft_posts') {
     const caption =
       (data.caption as string) ||
@@ -698,18 +723,23 @@ export function resolveDistributableContent(
     };
   }
 
-  // Explicit payload flag for future text social cards
+  // Explicit payload flag for text / image social cards
   if (
     staged.payload?.distributeAs === 'text' ||
-    staged.payload?.contentType === 'text'
+    staged.payload?.contentType === 'text' ||
+    staged.payload?.distributeAs === 'image' ||
+    staged.payload?.contentType === 'image'
   ) {
+    const isImage =
+      staged.payload?.distributeAs === 'image' ||
+      staged.payload?.contentType === 'image';
     const caption =
       (staged.payload.caption as string) ||
       (input.caption as string) ||
       (input.body as string) ||
       null;
     return {
-      contentType: 'text',
+      contentType: isImage ? 'image' : 'text',
       caption: caption ? String(caption) : null,
       hashtags: extractHashtags(String(caption || '')),
       platformHint: String(staged.payload.platform || input.platform || '') || null,

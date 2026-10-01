@@ -7,7 +7,7 @@ import { createCipheriv, createDecipheriv, randomBytes } from 'crypto';
 import type { ResultSetHeader, RowDataPacket } from 'mysql2/promise';
 import { openSql } from './db';
 
-export type DistributionContentType = 'video' | 'text';
+export type DistributionContentType = 'video' | 'text' | 'image';
 
 export type DistributionWebhookRow = {
   id: number;
@@ -97,7 +97,7 @@ export function maskSecret(secret: string): string {
 function normalizeContentTypes(
   raw: unknown
 ): DistributionContentType[] {
-  const allowed = new Set<DistributionContentType>(['video', 'text']);
+  const allowed = new Set<DistributionContentType>(['video', 'text', 'image']);
   let arr: unknown[] = [];
   if (Array.isArray(raw)) arr = raw;
   else if (typeof raw === 'string') {
