@@ -104,6 +104,10 @@ async function detectCompletedStages(userId: number): Promise<WorkflowStageId[]>
   return Array.from(new Set(completed));
 }
 
+function stageIndex(stage: WorkflowStageId): number {
+  return WORKFLOW_STAGES.indexOf(stage);
+}
+
 export const WorkflowRepo = {
   async getProgress(userId: number): Promise<WorkflowProgress> {
     const db = await openSql();
@@ -121,7 +125,23 @@ export const WorkflowRepo = {
     const completedStages = Array.from(
       new Set<WorkflowStageId>([...storedCompleted, ...detected])
     );
-    const recommendedNext = firstIncomplete(completedStages);
+    let recommendedNext = firstIncomplete(completedStages);
+
+    // Analytics → content drafts: prefer Spread over earlier incomplete stages
+    // (fixes "Next: Know" after a finished analysis that produced drafts).
+    try {
+      const draftCount = await safeDraftCount(userId);
+      if (
+        draftCount > 0 &&
+        stageIndex(recommendedNext) >= 0 &&
+        stageIndex(recommendedNext) < stageIndex('spread')
+      ) {
+        recommendedNext = 'spread';
+      }
+    } catch {
+      /* ignore */
+    }
+
     const currentStage = (rows[0]?.current_stage as WorkflowStageId) || recommendedNext;
 
     // Upsert so progress stays fresh without blocking UX
@@ -143,4 +163,49 @@ export const WorkflowRepo = {
       updatedAt: rows[0]?.updated_at ? String(rows[0].updated_at) : null,
     };
   },
+
+  /** After analysis → content drafts: mark Understand done and nudge Spread. */
+  async nudgeAfterAnalysisContent(userId: number): Promise<WorkflowProgress> {
+    const db = await openSql();
+    const progress = await this.getProgress(userId);
+    const completed = Array.from(
+      new Set<WorkflowStageId>([...progress.completedStages, 'understand'])
+    );
+    const recommendedNext: WorkflowStageId =
+      stageIndex(firstIncomplete(completed)) < stageIndex('spread')
+        ? 'spread'
+        : firstIncomplete(completed);
+
+    await db.execute<ResultSetHeader>(
+      `INSERT INTO user_workflow_progress (user_id, current_stage, completed_stages)
+       VALUES (?, ?, ?)
+       ON DUPLICATE KEY UPDATE
+         current_stage = VALUES(current_stage),
+         completed_stages = VALUES(completed_stages),
+         updated_at = CURRENT_TIMESTAMP`,
+      [userId, recommendedNext, JSON.stringify(completed)]
+    );
+
+    return {
+      userId,
+      currentStage: recommendedNext,
+      completedStages: completed,
+      recommendedNext,
+      updatedAt: new Date().toISOString(),
+    };
+  },
 };
+
+async function safeDraftCount(userId: number): Promise<number> {
+  try {
+    const db = await openSql();
+    const [rows] = await db.execute<RowDataPacket[]>(
+      `SELECT COUNT(*) AS cnt FROM analytics_content_drafts
+        WHERE user_id = ? AND status != 'dismissed'`,
+      [userId]
+    );
+    return Number(rows[0]?.cnt || 0);
+  } catch {
+    return 0;
+  }
+}

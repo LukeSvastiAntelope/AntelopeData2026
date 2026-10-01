@@ -7,6 +7,10 @@ import { cn } from '@/lib/utils';
 import ReactMarkdown from 'react-markdown';
 import { useState } from 'react';
 import { ChartActions, type ChartActionFigure } from './ChartActions';
+import {
+  TurnIntoContentCard,
+  type ContentDraftSummary,
+} from './TurnIntoContentCard';
 import { resolveFigureSrc } from '../utils/persist-figure';
 
 interface AnalysisMessage {
@@ -41,7 +45,10 @@ interface AnalysisMessage {
     stepId?: string;
     caption?: string;
     n?: number;
-    code?: string;
+    /** S3 — drafts attached to the synthesis assistant message */
+    contentDrafts?: ContentDraftSummary[];
+    contentDraftsLoading?: boolean;
+    contentDraftsError?: string | null;
   };
 }
 
@@ -52,6 +59,8 @@ interface ConversationViewProps {
   onQuickAction?: (action: string) => void;
   onAddFigureToReport?: (figure: ChartActionFigure) => void;
   onMakePostFromFigure?: (figure: ChartActionFigure) => void;
+  onTurnIntoContentFromFigure?: (figure: ChartActionFigure) => void;
+  onOpenChartPostDraft?: (draft: ContentDraftSummary) => void;
 }
 
 export function ConversationView({
@@ -61,6 +70,8 @@ export function ConversationView({
   onQuickAction,
   onAddFigureToReport,
   onMakePostFromFigure,
+  onTurnIntoContentFromFigure,
+  onOpenChartPostDraft,
 }: ConversationViewProps) {
   const [expandedMessages, setExpandedMessages] = useState<Set<string>>(new Set());
   const [regeneratingSteps, setRegeneratingSteps] = useState<Set<string>>(new Set());
@@ -359,6 +370,7 @@ export function ConversationView({
                         figure={figure}
                         onAddToReport={onAddFigureToReport}
                         onMakePost={onMakePostFromFigure}
+                        onTurnIntoContent={onTurnIntoContentFromFigure}
                       />
                     </div>
                   );
@@ -492,6 +504,21 @@ export function ConversationView({
                     {action.text}
                   </button>
                 ))}
+              </div>
+            )}
+
+            {/* S3 — Turn this into content (ends the synthesis assistant message) */}
+            {(message.metadata?.contentDraftsLoading ||
+              message.metadata?.contentDraftsError ||
+              (message.metadata?.contentDrafts &&
+                message.metadata.contentDrafts.length > 0)) && (
+              <div className="mt-3">
+                <TurnIntoContentCard
+                  drafts={message.metadata.contentDrafts || []}
+                  loading={!!message.metadata.contentDraftsLoading}
+                  error={message.metadata.contentDraftsError || null}
+                  onOpenChartPost={onOpenChartPostDraft}
+                />
               </div>
             )}
 

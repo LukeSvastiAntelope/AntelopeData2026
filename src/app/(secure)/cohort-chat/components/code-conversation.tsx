@@ -16,6 +16,7 @@ import {
 } from '../../python-analysis/utils/persist-figure';
 import type { ChartActionFigure } from '../../python-analysis/components/ChartActions';
 import { SocialCardComposer } from '../../python-analysis/components/SocialCardComposer';
+import type { ContentDraftSummary } from '../../python-analysis/components/TurnIntoContentCard';
 
 interface CodeConversationProps {
   surveyId: number | null;
@@ -68,7 +69,36 @@ interface AnalysisMessage {
     stepId?: string;
     caption?: string;
     n?: number;
-    code?: string;
+    contentDrafts?: ContentDraftSummary[];
+    contentDraftsLoading?: boolean;
+    contentDraftsError?: string | null;
+  };
+}
+
+function mapApiDraft(raw: Record<string, unknown>): ContentDraftSummary {
+  return {
+    id: Number(raw.id),
+    draftKind: raw.draftKind as ContentDraftSummary['draftKind'],
+    title: String(raw.title || ''),
+    claim: String(raw.claim || ''),
+    honestCaveat: raw.honestCaveat != null ? String(raw.honestCaveat) : null,
+    suggestedAngle:
+      raw.suggestedAngle != null ? String(raw.suggestedAngle) : null,
+    flag: (raw.flag as ContentDraftSummary['flag']) || 'directional_only',
+    caption: raw.caption != null ? String(raw.caption) : null,
+    blurb: raw.blurb != null ? String(raw.blurb) : null,
+    figureStorageKey:
+      raw.figureStorageKey != null ? String(raw.figureStorageKey) : null,
+    figureMediaUrl:
+      raw.figureMediaUrl != null ? String(raw.figureMediaUrl) : null,
+    figureCaption:
+      raw.figureCaption != null ? String(raw.figureCaption) : null,
+    sampleN: raw.sampleN != null ? Number(raw.sampleN) : null,
+    sourceLine: raw.sourceLine != null ? String(raw.sourceLine) : null,
+    scriptJson:
+      raw.scriptJson && typeof raw.scriptJson === 'object'
+        ? (raw.scriptJson as Record<string, unknown>)
+        : null,
   };
 }
 
@@ -91,6 +121,12 @@ export function CodeConversation({
   const [socialCardOpen, setSocialCardOpen] = useState(false);
   const [socialCardFigure, setSocialCardFigure] = useState<ChartActionFigure | null>(null);
   const [socialCardCode, setSocialCardCode] = useState<string | null>(null);
+  const [socialCardClaim, setSocialCardClaim] = useState<string | null>(null);
+  const [socialCardCaption, setSocialCardCaption] = useState<string | null>(null);
+  const [socialCardCaveat, setSocialCardCaveat] = useState<string | null>(null);
+  const contentDraftsInflightRef = useRef(false);
+  const lastContentDraftsRef = useRef<ContentDraftSummary[]>([]);
+  const lastSynthesisMsgIdRef = useRef<string | null>(null);
   
   // Helper function to add messages
   const addMessage = (newMessage: AnalysisMessage) => {
@@ -115,6 +151,8 @@ export function CodeConversation({
   const processedStepsRef = useRef<Set<string>>(new Set());
   const lastStatusRef = useRef<string>('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesRef = useRef(messages);
+  messagesRef.current = messages;
   
   const { pyodide, isLoading: pyodideLoading, error: pyodideError } = usePyodide();
   const { 
@@ -233,9 +271,291 @@ export function CodeConversation({
       }
       setSocialCardFigure(figure);
       setSocialCardCode(code);
+      setSocialCardClaim(figure.caption || null);
+      setSocialCardCaption(null);
+      setSocialCardCaveat(null);
       setSocialCardOpen(true);
     },
     [messages]
+  );
+
+  const collectPersistedFigures = useCallback(() => {
+    return messagesRef.current
+      .filter(
+        (m) =>
+          m.type === 'result' &&
+          (m.metadata?.storageKey ||
+            m.metadata?.mediaUrl ||
+            (typeof m.content === 'string' && m.content.startsWith('data:image/')))
+      )
+      .map((m) => ({
+        storageKey: m.metadata?.storageKey || null,
+        mediaUrl: m.metadata?.mediaUrl || null,
+        caption: m.metadata?.caption || null,
+        stepId: m.metadata?.stepId || m.id,
+        n: m.metadata?.n ?? sampleN,
+        src:
+          typeof m.content === 'string' && m.content.startsWith('data:image/')
+            ? m.content
+            : m.metadata?.mediaUrl || null,
+      }));
+  }, [sampleN]);
+
+  const patchSynthesisDraftMeta = useCallback(
+    (
+      synthesisMsgId: string,
+      patch: {
+        contentDrafts?: ContentDraftSummary[];
+        contentDraftsLoading?: boolean;
+        contentDraftsError?: string | null;
+      }
+    ) => {
+      updateMessages((prev) =>
+        prev.map((m) =>
+          m.id === synthesisMsgId
+            ? {
+                ...m,
+                metadata: {
+                  ...(m.metadata || {}),
+                  ...patch,
+                },
+              }
+            : m
+        )
+      );
+    },
+    []
+  );
+
+  const generateContentDrafts = useCallback(
+    async (opts: {
+      synthesisText: string;
+      synthesisMsgId: string;
+      openChartAfter?: ChartActionFigure | null;
+    }): Promise<ContentDraftSummary[]> => {
+      if (contentDraftsInflightRef.current) {
+        return lastContentDraftsRef.current;
+      }
+      contentDraftsInflightRef.current = true;
+      lastSynthesisMsgIdRef.current = opts.synthesisMsgId;
+      patchSynthesisDraftMeta(opts.synthesisMsgId, {
+        contentDraftsLoading: true,
+        contentDraftsError: null,
+      });
+      try {
+        // Give plot uploads a moment to finish so drafts get storage keys
+        await new Promise((r) => setTimeout(r, 800));
+        const figures = collectPersistedFigures();
+        const res = await fetch('/api/analytics/to-content', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            synthesis: opts.synthesisText,
+            figures,
+            conversationId: conversationId || null,
+            surveyId,
+            surveyTitle: surveyTitle || null,
+            sampleN,
+          }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(data.error || 'Failed to generate content drafts');
+        }
+        const drafts = Array.isArray(data.drafts)
+          ? data.drafts.map((d: Record<string, unknown>) => mapApiDraft(d))
+          : [];
+        lastContentDraftsRef.current = drafts;
+        patchSynthesisDraftMeta(opts.synthesisMsgId, {
+          contentDrafts: drafts,
+          contentDraftsLoading: false,
+          contentDraftsError: null,
+        });
+
+        if (opts.openChartAfter && drafts.length) {
+          const chartDraft = drafts.find((d) => d.draftKind === 'chart_post');
+          const fig = opts.openChartAfter;
+          let code = fig.code || null;
+          if (!code) {
+            const liveMessages = messagesRef.current;
+            const idx = liveMessages.findIndex(
+              (m) =>
+                m.id === fig.stepId ||
+                m.metadata?.stepId === fig.stepId ||
+                m.metadata?.storageKey === fig.storageKey
+            );
+            if (idx >= 0) {
+              for (let i = idx - 1; i >= 0; i--) {
+                if (liveMessages[i].type === 'code') {
+                  code = liveMessages[i].content;
+                  break;
+                }
+              }
+            }
+          }
+          setSocialCardFigure({
+            ...fig,
+            n: fig.n ?? chartDraft?.sampleN ?? sampleN,
+            storageKey: fig.storageKey || chartDraft?.figureStorageKey || null,
+          });
+          setSocialCardCode(code);
+          setSocialCardClaim(chartDraft?.claim || fig.caption || null);
+          setSocialCardCaption(chartDraft?.caption || null);
+          setSocialCardCaveat(chartDraft?.honestCaveat || null);
+          setSocialCardOpen(true);
+        }
+        return drafts;
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Content draft failed';
+        patchSynthesisDraftMeta(opts.synthesisMsgId, {
+          contentDraftsLoading: false,
+          contentDraftsError: msg,
+        });
+        return [];
+      } finally {
+        contentDraftsInflightRef.current = false;
+      }
+    },
+    [
+      collectPersistedFigures,
+      conversationId,
+      patchSynthesisDraftMeta,
+      sampleN,
+      surveyId,
+      surveyTitle,
+    ]
+  );
+
+  const findLatestSynthesis = useCallback(() => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const m = messages[i];
+      if (
+        m.type === 'assistant' &&
+        typeof m.content === 'string' &&
+        m.content.includes('Analysis Complete')
+      ) {
+        return m;
+      }
+    }
+    return null;
+  }, [messages]);
+
+  const handleOpenChartPostDraft = useCallback(
+    (draft: ContentDraftSummary) => {
+      const figureFromDraft: ChartActionFigure = {
+        src:
+          draft.figureMediaUrl ||
+          (draft.figureStorageKey
+            ? `/api/media/${draft.figureStorageKey}`
+            : '') ||
+          '',
+        label: draft.figureCaption || draft.title,
+        caption: draft.figureCaption || draft.claim,
+        n: draft.sampleN ?? sampleN,
+        storageKey: draft.figureStorageKey,
+        stepId: null,
+        code: null,
+      };
+      // Prefer a live message figure matching the draft storage key
+      const live = messages.find(
+        (m) =>
+          m.type === 'result' &&
+          ((draft.figureStorageKey &&
+            m.metadata?.storageKey === draft.figureStorageKey) ||
+            (draft.figureMediaUrl && m.metadata?.mediaUrl === draft.figureMediaUrl))
+      );
+      let figure = figureFromDraft;
+      let code: string | null = null;
+      if (live) {
+        const src =
+          (typeof live.content === 'string' && live.content.startsWith('data:image/')
+            ? live.content
+            : null) ||
+          live.metadata?.mediaUrl ||
+          figureFromDraft.src;
+        figure = {
+          src,
+          label: live.metadata?.caption || figureFromDraft.label,
+          caption: live.metadata?.caption || draft.claim,
+          n: live.metadata?.n ?? draft.sampleN ?? sampleN,
+          storageKey: live.metadata?.storageKey || draft.figureStorageKey,
+          stepId: live.metadata?.stepId || live.id,
+          code: live.metadata?.code || null,
+        };
+        const idx = messages.indexOf(live);
+        for (let i = idx - 1; i >= 0; i--) {
+          if (messages[i].type === 'code') {
+            code = messages[i].content;
+            break;
+          }
+        }
+      }
+      if (!figure.src) {
+        setExportHint('Chart image not available yet — re-run the plot step');
+        setTimeout(() => setExportHint(null), 2500);
+        return;
+      }
+      setSocialCardFigure(figure);
+      setSocialCardCode(code);
+      setSocialCardClaim(draft.claim);
+      setSocialCardCaption(draft.caption || draft.claim);
+      setSocialCardCaveat(draft.honestCaveat || null);
+      setSocialCardOpen(true);
+    },
+    [messages, sampleN]
+  );
+
+  const handleTurnIntoContentFromFigure = useCallback(
+    async (figure: ChartActionFigure) => {
+      const existing = lastContentDraftsRef.current;
+      if (existing.length > 0) {
+        const chartDraft = existing.find((d) => d.draftKind === 'chart_post');
+        if (chartDraft) {
+          handleOpenChartPostDraft({
+            ...chartDraft,
+            figureStorageKey:
+              figure.storageKey || chartDraft.figureStorageKey,
+            figureMediaUrl:
+              figure.src.startsWith('/api/media') || figure.src.startsWith('http')
+                ? figure.src
+                : chartDraft.figureMediaUrl,
+            figureCaption: figure.caption || chartDraft.figureCaption,
+            sampleN: figure.n ?? chartDraft.sampleN,
+          });
+          return;
+        }
+      }
+
+      const synthesisMsg = findLatestSynthesis();
+      const synthesisText =
+        synthesisMsg?.content ||
+        figure.caption ||
+        'Key finding from this survey analysis';
+      const synthesisMsgId =
+        synthesisMsg?.id || `synthesis-content-${Date.now()}`;
+
+      if (!synthesisMsg) {
+        // No completed synthesis yet — insert a placeholder card host
+        updateMessages((prev) => [
+          ...prev,
+          {
+            id: synthesisMsgId,
+            type: 'assistant' as const,
+            content:
+              'Turning this chart into content drafts…',
+            timestamp: new Date(),
+            metadata: { contentDraftsLoading: true },
+          },
+        ]);
+      }
+
+      await generateContentDrafts({
+        synthesisText,
+        synthesisMsgId,
+        openChartAfter: figure,
+      });
+    },
+    [findLatestSynthesis, generateContentDrafts, handleOpenChartPostDraft]
   );
 
   const collectExportableFigures = useCallback(async (): Promise<ExportableFigure[]> => {
@@ -742,28 +1062,40 @@ Ready for intelligent survey analysis!`,
           if (updatedState.status === 'completed') {
             console.log('🎯 Analysis completed, checking for synthesis...');
             const finalSynthesis = updatedState.context.key_findings.find(f => f.startsWith('FINAL SYNTHESIS:'));
+            const synthesisMsgId = `synthesis-${Date.now()}`;
+            let synthesisPlain = '';
             
             if (finalSynthesis) {
               console.log('✅ Found synthesis, displaying...');
+              synthesisPlain = finalSynthesis.replace('FINAL SYNTHESIS: ', '');
               const synthesisMessage: AnalysisMessage = {
-                id: `synthesis-${Date.now()}`,
+                id: synthesisMsgId,
                 type: 'assistant',
-                content: `🎯 **Analysis Complete**\n\n${finalSynthesis.replace('FINAL SYNTHESIS: ', '')}\n\n**📊 Summary:**\n- Total Steps Executed: ${updatedState.executed_steps.length}\n- Key Insights Found: ${updatedState.context.key_findings.length - 1}\n- Analysis Duration: ${Math.round((Date.now() - updatedState.start_time.getTime()) / 1000)}s`,
-                timestamp: new Date()
+                content: `🎯 **Analysis Complete**\n\n${synthesisPlain}\n\n**📊 Summary:**\n- Total Steps Executed: ${updatedState.executed_steps.length}\n- Key Insights Found: ${updatedState.context.key_findings.length - 1}\n- Analysis Duration: ${Math.round((Date.now() - updatedState.start_time.getTime()) / 1000)}s`,
+                timestamp: new Date(),
+                metadata: { contentDraftsLoading: true },
               };
               updateMessages(prev => [...prev, synthesisMessage]);
             } else {
               console.log('⚠️ No synthesis found, showing summary of insights...');
               // Fallback: show insights summary if no synthesis was generated
               const nonSynthesisFindings = updatedState.context.key_findings.filter(f => !f.startsWith('FINAL SYNTHESIS:'));
+              synthesisPlain = nonSynthesisFindings.slice(0, 8).join('\n');
               const synthesisMessage: AnalysisMessage = {
-                id: `synthesis-${Date.now()}`,
+                id: synthesisMsgId,
                 type: 'assistant',
                 content: `🎯 **Analysis Complete**\n\n**Key Findings:**\n${nonSynthesisFindings.slice(0, 5).map((finding, i) => `${i + 1}. ${finding}`).join('\n')}\n\n**📊 Summary:**\n- Total Steps Executed: ${updatedState.executed_steps.length}\n- Key Insights Found: ${nonSynthesisFindings.length}\n- Analysis Duration: ${Math.round((Date.now() - updatedState.start_time.getTime()) / 1000)}s`,
-                timestamp: new Date()
+                timestamp: new Date(),
+                metadata: { contentDraftsLoading: true },
               };
               updateMessages(prev => [...prev, synthesisMessage]);
             }
+
+            // S3 — Turn this into content (chart post / explainer / candidate clip)
+            void generateContentDrafts({
+              synthesisText: synthesisPlain || 'Analysis completed',
+              synthesisMsgId,
+            });
           }
         }, initialState);
                  console.log('✅ runAutonomousAnalysis completed');
@@ -1168,6 +1500,10 @@ Error: ${err.message}
             messagesEndRef={messagesEndRef}
             onAddFigureToReport={handleAddFigureToReport}
             onMakePostFromFigure={handleMakePostFromFigure}
+            onTurnIntoContentFromFigure={(figure) => {
+              void handleTurnIntoContentFromFigure(figure);
+            }}
+            onOpenChartPostDraft={handleOpenChartPostDraft}
             onQuickAction={(action) => {
               if (action === 'python-analysis') {
                 const lastUserMessage = messages.findLast(m => m.type === 'user');
@@ -1204,7 +1540,9 @@ Error: ${err.message}
             pyodide={pyodide}
             datasetColumns={currentDataset?.columns || []}
             surveyTitle={surveyTitle}
-            findingClaim={socialCardFigure?.caption || null}
+            findingClaim={socialCardClaim}
+            initialCaption={socialCardCaption}
+            initialCaveat={socialCardCaveat}
           />
         </>
       )}

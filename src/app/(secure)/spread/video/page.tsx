@@ -1,12 +1,36 @@
 'use client';
 
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
+import { Suspense, useMemo } from 'react';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { Badge } from '@/components/ui/badge';
 import { Clapperboard } from 'lucide-react';
-import { VideoStudio } from '@/components/spread/video-studio';
+import {
+  VideoStudio,
+  type VideoStudioPrefill,
+} from '@/components/spread/video-studio';
 
-export default function SpreadVideoPage() {
+function SpreadVideoInner() {
+  const searchParams = useSearchParams();
+  const prefill = useMemo<VideoStudioPrefill>(() => {
+    const draftRaw = searchParams.get('prefillDraft');
+    const draftId = draftRaw ? Number(draftRaw) : null;
+    const kindRaw = searchParams.get('kind');
+    const tabRaw = searchParams.get('tab');
+    return {
+      draftId:
+        draftId != null && Number.isFinite(draftId) && draftId > 0
+          ? draftId
+          : null,
+      kind:
+        kindRaw === 'clip' || kindRaw === 'explainer'
+          ? kindRaw
+          : null,
+      tab: tabRaw === 'clip' ? 'clip' : 'generate',
+    };
+  }, [searchParams]);
+
   return (
     <div className="flex-1 p-2 w-full bg-background">
       <div className="mx-auto rounded-lg bg-card text-card-foreground shadow-lg">
@@ -31,9 +55,23 @@ export default function SpreadVideoPage() {
         </div>
         <div className="border-b border-border" />
         <div className="p-6">
-          <VideoStudio />
+          <VideoStudio prefill={prefill} />
         </div>
       </div>
     </div>
+  );
+}
+
+export default function SpreadVideoPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex-1 p-6 text-sm text-muted-foreground">
+          Loading video studio…
+        </div>
+      }
+    >
+      <SpreadVideoInner />
+    </Suspense>
   );
 }

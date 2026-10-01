@@ -6,6 +6,7 @@ import {
   Download,
   FilePlus2,
   Megaphone,
+  Sparkles,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -33,6 +34,8 @@ interface ChartActionsProps {
   onAddToReport?: (figure: ChartActionFigure) => void;
   /** S2 wires the social-card composer; optional no-op until then */
   onMakePost?: (figure: ChartActionFigure) => void;
+  /** Open S3 content drafts for this chart / finding */
+  onTurnIntoContent?: (figure: ChartActionFigure) => void;
   className?: string;
   /** When true, actions stay visible (mobile / always-on contexts) */
   alwaysVisible?: boolean;
@@ -46,6 +49,7 @@ export function ChartActions({
   figure,
   onAddToReport,
   onMakePost,
+  onTurnIntoContent,
   className,
   alwaysVisible = false,
 }: ChartActionsProps) {
@@ -142,6 +146,18 @@ export function ChartActions({
         >
           <Megaphone className="w-3 h-3 mr-1" />
           Make a post
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="h-7 text-xs px-2"
+          disabled={busy !== null || !onTurnIntoContent}
+          onClick={() => onTurnIntoContent?.(figure)}
+          title="Turn this finding into content drafts"
+        >
+          <Sparkles className="w-3 h-3 mr-1" />
+          Content
         </Button>
         <Button
           type="button"

@@ -56,6 +56,8 @@ export type SocialCardComposerProps = {
   campaignName?: string | null;
   findingClaim?: string | null;
   initialCaveat?: string | null;
+  /** When set (e.g. from S3 chart_post draft), skip AI headline rewrite */
+  initialCaption?: string | null;
 };
 
 function buildSourceLine(surveyTitle: string | null | undefined, n: number | null | undefined) {
@@ -87,6 +89,7 @@ export function SocialCardComposer({
   campaignName,
   findingClaim,
   initialCaveat,
+  initialCaption,
 }: SocialCardComposerProps) {
   const [formatId, setFormatId] = useState<SocialCardFormatId>('linkedin_square');
   const [headline, setHeadline] = useState('');
@@ -153,17 +156,21 @@ export function SocialCardComposer({
       findingClaim ||
       figure.caption ||
       'Key finding from our survey';
-    setHeadline(claim.slice(0, 90));
-    setCaption(claim);
+    const captionSeed = initialCaption?.trim() || claim;
+    setHeadline(captionSeed.slice(0, 90));
+    setCaption(captionSeed);
     const required = caveatRequiredForN(figure.n);
     setIncludeCaveat(true);
     setCaveat(
       initialCaveat?.trim() ||
         (required ? SMALL_SAMPLE_DISCLAIMER : '')
     );
-    void draftHeadline(claim, sourceLine, required ? SMALL_SAMPLE_DISCLAIMER : '');
+    // Prefill from analytics draft — don't overwrite with a fresh headline
+    if (!initialCaption?.trim()) {
+      void draftHeadline(claim, sourceLine, required ? SMALL_SAMPLE_DISCLAIMER : '');
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, figure?.src, figure?.stepId]);
+  }, [open, figure?.src, figure?.stepId, initialCaption, findingClaim]);
 
   const draftHeadline = async (
     claim: string,

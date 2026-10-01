@@ -59,7 +59,17 @@ type LibraryAsset = {
   name: string;
 };
 
-export function ClipStudioPanel() {
+export function ClipStudioPanel({
+  analyticsPrefill,
+}: {
+  analyticsPrefill?: {
+    script?: string;
+    talkingPoints?: string[];
+    blurb?: string;
+    claim?: string;
+    caveat?: string;
+  } | null;
+} = {}) {
   const [providers, setProviders] = useState<ClipProviderCap[]>([]);
   const [defaultProvider, setDefaultProvider] = useState('mock');
   const [provider, setProvider] = useState('mock');
@@ -76,6 +86,7 @@ export function ClipStudioPanel() {
   const [stageBusy, setStageBusy] = useState<number | null>(null);
   const [includeAiDisclosure, setIncludeAiDisclosure] = useState(true);
   const [captionDraft, setCaptionDraft] = useState('');
+  const prefillCaptionApplied = useRef(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -102,6 +113,15 @@ export function ClipStudioPanel() {
       if (pollRef.current) clearInterval(pollRef.current);
     };
   }, [loadMeta, loadAssets]);
+
+  useEffect(() => {
+    if (!analyticsPrefill || prefillCaptionApplied.current) return;
+    prefillCaptionApplied.current = true;
+    const blurb =
+      analyticsPrefill.blurb ||
+      [analyticsPrefill.claim, analyticsPrefill.caveat].filter(Boolean).join(' — ');
+    if (blurb) setCaptionDraft(blurb);
+  }, [analyticsPrefill]);
 
   const onUpload = async (file: File) => {
     setBusyUpload(true);
@@ -293,6 +313,35 @@ export function ClipStudioPanel() {
             Clipping is private; posting stays behind the human gate.
           </p>
         </div>
+
+        {analyticsPrefill && (analyticsPrefill.script || analyticsPrefill.claim) && (
+          <div className="rounded-md border border-border bg-muted/20 p-3 space-y-2 text-sm">
+            <p className="font-medium text-xs uppercase tracking-wide text-muted-foreground">
+              Record to camera · then upload
+            </p>
+            {analyticsPrefill.claim && (
+              <p className="text-sm">{analyticsPrefill.claim}</p>
+            )}
+            {analyticsPrefill.talkingPoints &&
+              analyticsPrefill.talkingPoints.length > 0 && (
+                <ul className="list-disc pl-4 text-xs text-muted-foreground space-y-1">
+                  {analyticsPrefill.talkingPoints.map((tp, i) => (
+                    <li key={i}>{tp}</li>
+                  ))}
+                </ul>
+              )}
+            {analyticsPrefill.script && (
+              <pre className="text-xs whitespace-pre-wrap font-sans text-muted-foreground border-t border-border/60 pt-2">
+                {analyticsPrefill.script}
+              </pre>
+            )}
+            {analyticsPrefill.blurb && (
+              <p className="text-xs text-muted-foreground border-t border-border/60 pt-2">
+                Press / newsletter: {analyticsPrefill.blurb}
+              </p>
+            )}
+          </div>
+        )}
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="space-y-1.5">

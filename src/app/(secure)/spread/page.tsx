@@ -5,6 +5,7 @@ import { SidebarTrigger } from '@/components/ui/sidebar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Clapperboard, Megaphone, Webhook } from 'lucide-react';
+import { AnalyticsDraftsInbox } from './components/AnalyticsDraftsInbox';
 
 export default function SpreadPage() {
   return (
@@ -25,10 +26,12 @@ export default function SpreadPage() {
           <div className="space-y-2">
             <h2 className="text-2xl font-semibold">Distribution hub</h2>
             <p className="text-muted-foreground">
-              Reach voters with video, channels, and partner webhooks. Video generation is live;
-              clipping plugins land next.
+              Turn analytics findings into posts, video, and clips — then send
+              through your approval queue and Zapier/Make destinations.
             </p>
           </div>
+
+          <AnalyticsDraftsInbox />
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="rounded-lg border border-border p-4 space-y-3">

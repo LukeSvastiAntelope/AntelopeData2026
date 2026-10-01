@@ -79,7 +79,16 @@ type Job = {
 
 const ASPECTS = ['9:16', '16:9', '1:1'] as const;
 
-export function VideoStudio() {
+export type VideoStudioPrefill = {
+  draftId?: number | null;
+  kind?: 'explainer' | 'clip' | null;
+  tab?: 'generate' | 'clip';
+};
+
+export function VideoStudio({ prefill }: { prefill?: VideoStudioPrefill } = {}) {
+  const initialTab =
+    prefill?.tab === 'clip' || prefill?.kind === 'clip' ? 'clip' : 'generate';
+  const [tab, setTab] = useState<'generate' | 'clip'>(initialTab);
   const [providers, setProviders] = useState<ProviderCap[]>([]);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [defaultProvider, setDefaultProvider] = useState('mock');
@@ -105,8 +114,17 @@ export function VideoStudio() {
   const [staged, setStaged] = useState<StagedActionCardModel | null>(null);
   const [stageBusy, setStageBusy] = useState<number | null>(null);
   const [includeAiDisclosure, setIncludeAiDisclosure] = useState(true);
+  const [analyticsBanner, setAnalyticsBanner] = useState<string | null>(null);
+  const [clipPrefill, setClipPrefill] = useState<{
+    script?: string;
+    talkingPoints?: string[];
+    blurb?: string;
+    claim?: string;
+    caveat?: string;
+  } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const prefillAppliedRef = useRef(false);
 
   const selectedCaps = useMemo(
     () => providers.find((p) => p.id === provider),
@@ -145,10 +163,91 @@ export function VideoStudio() {
     };
   }, [loadMeta, loadAssets]);
 
+  // S3/S4 stub — prefill from analytics content draft
   useEffect(() => {
+    if (!prefill?.draftId || prefillAppliedRef.current) return;
+    prefillAppliedRef.current = true;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(
+          `/api/analytics/to-content?id=${encodeURIComponent(String(prefill.draftId))}`
+        );
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.draft || cancelled) return;
+        const d = data.draft as {
+          draftKind: string;
+          claim?: string;
+          caption?: string;
+          blurb?: string;
+          honestCaveat?: string;
+          scriptJson?: Record<string, unknown> | null;
+          figureMediaUrl?: string | null;
+        };
+        const scriptJson = d.scriptJson || {};
+        if (d.draftKind === 'candidate_clip' || prefill.kind === 'clip') {
+          setTab('clip');
+          setClipPrefill({
+            script: String(scriptJson.script || ''),
+            talkingPoints: Array.isArray(scriptJson.talkingPoints)
+              ? scriptJson.talkingPoints.map((s) => String(s))
+              : [],
+            blurb: d.blurb || d.caption || '',
+            claim: d.claim || '',
+            caveat: d.honestCaveat || '',
+          });
+          setAnalyticsBanner(
+            'Prefill from analytics · record to camera, then upload for Opus/Klap'
+          );
+        } else {
+          setTab('generate');
+          const hook = String(scriptJson.hook || '');
+          const finding = String(scriptJson.findingBeat || d.claim || '');
+          const meaning = String(scriptJson.meaningBeat || '');
+          const cta = String(scriptJson.cta || '');
+          const storyboard = Array.isArray(scriptJson.storyboard)
+            ? scriptJson.storyboard.map((s) => String(s)).join(' → ')
+            : '';
+          const script = String(scriptJson.script || '');
+          setTemplateId('issue_explainer');
+          setPlain(
+            [
+              '15–30s explainer from survey finding.',
+              hook && `Hook (generative b-roll): ${hook}`,
+              finding && `Data beat (real chart on screen): ${finding}`,
+              meaning && `Meaning: ${meaning}`,
+              cta && `CTA (generative b-roll): ${cta}`,
+              storyboard && `Storyboard: ${storyboard}`,
+              script && `Script:\n${script}`,
+            ]
+              .filter(Boolean)
+              .join('\n')
+          );
+          setCaption([d.claim, d.honestCaveat].filter(Boolean).join(' — '));
+          if (d.figureMediaUrl) {
+            setReferenceUrl(d.figureMediaUrl);
+            setReferenceKind('image');
+            setMode('i2v');
+          }
+          setAnalyticsBanner(
+            'Prefill from analytics · generative b-roll for hook/CTA; chart card for the data beat'
+          );
+        }
+      } catch {
+        /* keep defaults */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [prefill?.draftId, prefill?.kind]);
+
+  useEffect(() => {
+    // Don't clobber analytics prefill with template starter
+    if (prefill?.draftId) return;
     const t = templates.find((x) => x.id === templateId);
     if (t?.starterPrompt) setPlain(t.starterPrompt);
-  }, [templateId, templates]);
+  }, [templateId, templates, prefill?.draftId]);
 
   const onUpload = async (file: File) => {
     setBusyUpload(true);
@@ -393,7 +492,11 @@ export function VideoStudio() {
   };
 
   return (
-    <Tabs defaultValue="generate" className="w-full">
+    <Tabs
+      value={tab}
+      onValueChange={(v) => setTab(v === 'clip' ? 'clip' : 'generate')}
+      className="w-full"
+    >
       <TabsList className="mb-4">
         <TabsTrigger value="generate" className="gap-1.5">
           <Clapperboard className="h-3.5 w-3.5" />
@@ -404,6 +507,12 @@ export function VideoStudio() {
           Clip a long video
         </TabsTrigger>
       </TabsList>
+
+      {analyticsBanner && (
+        <div className="mb-4 rounded-md border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+          {analyticsBanner}
+        </div>
+      )}
 
       <TabsContent value="generate">
     <div className="grid grid-cols-1 xl:grid-cols-5 gap-6">
@@ -750,7 +859,7 @@ export function VideoStudio() {
       </TabsContent>
 
       <TabsContent value="clip">
-        <ClipStudioPanel />
+        <ClipStudioPanel analyticsPrefill={clipPrefill} />
       </TabsContent>
     </Tabs>
   );
