@@ -6,6 +6,8 @@ import { Code, Terminal, User, Bot, AlertCircle, CheckCircle, Clock, FileSpreads
 import { cn } from '@/lib/utils';
 import ReactMarkdown from 'react-markdown';
 import { useState } from 'react';
+import { ChartActions, type ChartActionFigure } from './ChartActions';
+import { resolveFigureSrc } from '../utils/persist-figure';
 
 interface AnalysisMessage {
   id: string;
@@ -31,6 +33,14 @@ interface AnalysisMessage {
     // Recipe-based regeneration properties
     recipeType?: 'code' | 'plot' | 'large_output' | 'step_summary';
     needsRegeneration?: boolean;
+    plotStripped?: boolean;
+    // Persisted figure (S1) — reload without regenerating
+    storageKey?: string;
+    mediaUrl?: string;
+    conversationId?: string;
+    stepId?: string;
+    caption?: string;
+    n?: number;
   };
 }
 
@@ -39,11 +49,37 @@ interface ConversationViewProps {
   isLoading: boolean;
   messagesEndRef: React.RefObject<HTMLDivElement>;
   onQuickAction?: (action: string) => void;
+  onAddFigureToReport?: (figure: ChartActionFigure) => void;
+  onMakePostFromFigure?: (figure: ChartActionFigure) => void;
 }
 
-export function ConversationView({ messages, isLoading, messagesEndRef, onQuickAction }: ConversationViewProps) {
+export function ConversationView({
+  messages,
+  isLoading,
+  messagesEndRef,
+  onQuickAction,
+  onAddFigureToReport,
+  onMakePostFromFigure,
+}: ConversationViewProps) {
   const [expandedMessages, setExpandedMessages] = useState<Set<string>>(new Set());
   const [regeneratingSteps, setRegeneratingSteps] = useState<Set<string>>(new Set());
+
+  const figureFromMessage = (message: AnalysisMessage): ChartActionFigure | null => {
+    const src = resolveFigureSrc({
+      content: message.content,
+      storageKey: message.metadata?.storageKey,
+      mediaUrl: message.metadata?.mediaUrl,
+    });
+    if (!src) return null;
+    return {
+      src,
+      label: message.metadata?.caption || message.metadata?.stepId || `chart-${message.id}`,
+      caption: message.metadata?.caption,
+      n: message.metadata?.n ?? null,
+      storageKey: message.metadata?.storageKey,
+      stepId: message.metadata?.stepId || message.id,
+    };
+  };
 
   const toggleExpanded = (messageId: string) => {
     const newExpanded = new Set(expandedMessages);
@@ -305,50 +341,66 @@ export function ConversationView({ messages, isLoading, messagesEndRef, onQuickA
                 )}
               </div>
             ) : isResult ? (
-              // Check if this needs regeneration (saved as recipe)
-              message.metadata?.needsRegeneration ? (
-                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded p-3">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2 text-blue-700 dark:text-blue-300">
-                      <RefreshCw className="h-4 w-4" />
-                      <span className="text-sm font-medium">
-                        {message.metadata.recipeType === 'plot' ? 'Plot Available' : 'Full Output Available'}
-                      </span>
+              // Persisted figure takes priority over recipe placeholder
+              (() => {
+                const figure = figureFromMessage(message);
+                if (figure) {
+                  return (
+                    <div className="max-w-full group/chart">
+                      <img
+                        src={figure.src}
+                        alt={figure.caption || 'Analysis plot'}
+                        className="max-w-full h-auto rounded border shadow-sm"
+                        style={{ maxHeight: '400px', objectFit: 'contain' }}
+                      />
+                      <ChartActions
+                        figure={figure}
+                        onAddToReport={onAddFigureToReport}
+                        onMakePost={onMakePostFromFigure}
+                      />
                     </div>
-                    <button
-                      onClick={() => handleRegenerateStep(message.id, '')}
-                      disabled={regeneratingSteps.has(message.id)}
-                      className="text-xs bg-blue-100 hover:bg-blue-200 dark:bg-blue-800 dark:hover:bg-blue-700 text-blue-700 dark:text-blue-300 px-2 py-1 rounded border border-blue-300 dark:border-blue-600 disabled:opacity-50"
-                    >
-                      {regeneratingSteps.has(message.id) ? 'Regenerating...' : 'Show Full Result'}
-                    </button>
-                  </div>
-                  <div className="text-sm text-blue-600 dark:text-blue-400">
+                  );
+                }
+                if (message.metadata?.needsRegeneration) {
+                  return (
+                    <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded p-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2 text-blue-700 dark:text-blue-300">
+                          <RefreshCw className="h-4 w-4" />
+                          <span className="text-sm font-medium">
+                            {message.metadata.recipeType === 'plot' ? 'Plot Available' : 'Full Output Available'}
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => handleRegenerateStep(message.id, '')}
+                          disabled={regeneratingSteps.has(message.id)}
+                          className="text-xs bg-blue-100 hover:bg-blue-200 dark:bg-blue-800 dark:hover:bg-blue-700 text-blue-700 dark:text-blue-300 px-2 py-1 rounded border border-blue-300 dark:border-blue-600 disabled:opacity-50"
+                        >
+                          {regeneratingSteps.has(message.id) ? 'Regenerating...' : 'Show Full Result'}
+                        </button>
+                      </div>
+                      <div className="text-sm text-blue-600 dark:text-blue-400">
+                        {message.content}
+                      </div>
+                    </div>
+                  );
+                }
+                if (message.metadata?.collapsible) {
+                  return (
+                    <CollapsibleContent
+                      content={message.content}
+                      messageId={message.id}
+                      previewLines={message.metadata.previewLines || 4}
+                      isCode={false}
+                    />
+                  );
+                }
+                return (
+                  <pre className="text-sm font-mono break-ultra-long bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-200 p-2 rounded border border-green-200 dark:border-green-700">
                     {message.content}
-                  </div>
-                </div>
-              ) : // Check if this is an image result (base64 data URL)
-              message.content.startsWith('data:image/') ? (
-                <div className="max-w-full">
-                  <img 
-                    src={message.content} 
-                    alt="Analysis plot" 
-                    className="max-w-full h-auto rounded border shadow-sm"
-                    style={{ maxHeight: '400px', objectFit: 'contain' }}
-                  />
-                </div>
-              ) : message.metadata?.collapsible ? (
-                <CollapsibleContent 
-                  content={message.content}
-                  messageId={message.id}
-                  previewLines={message.metadata.previewLines || 4}
-                  isCode={false}
-                />
-              ) : (
-                <pre className="text-sm font-mono break-ultra-long bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-200 p-2 rounded border border-green-200 dark:border-green-700">
-                  {message.content}
-                </pre>
-              )
+                  </pre>
+                );
+              })()
             ) : (
               <div>
                 {/* Only show text content if it exists */}

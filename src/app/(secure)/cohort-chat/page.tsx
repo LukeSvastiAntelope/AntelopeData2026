@@ -1581,6 +1581,7 @@ FORMATTING REQUIREMENTS:
                           surveyTitle={surveys.find(s => s.id === selectedSurveyId)?.title}
                           environmentInitialized={pythonEnvironmentInitialized}
                           onEnvironmentReady={() => setPythonEnvironmentInitialized(true)}
+                          conversationId={currentConversationId}
                           messages={codeMessages}
                           onMessagesChange={(updater) => {
                             if (typeof updater === 'function') {

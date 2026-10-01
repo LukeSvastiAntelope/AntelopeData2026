@@ -20,6 +20,24 @@ function createSaveTraceId() {
   return `convsave_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
+/** Keep plot messages lean once they've been uploaded to media storage. */
+function slimPlotMessage(m: any): any {
+  const meta = m?.metadata || {};
+  if (meta.storageKey && typeof m.content === 'string' && m.content.startsWith('data:image/')) {
+    return {
+      ...m,
+      content: meta.caption || '📊 Chart',
+      metadata: {
+        ...meta,
+        recipeType: 'plot',
+        needsRegeneration: false,
+        plotStripped: false,
+      },
+    };
+  }
+  return m;
+}
+
 export function useSaveConversation({
   currentConversationType,
   selectedSurveyId,
@@ -43,46 +61,98 @@ export function useSaveConversation({
         : requestedContext;
 
     const processedMessages = messages.map((m) => {
-      const meta = (m as any).metadata || {};
+      const meta = { ...((m as any).metadata || {}) };
+      if (!meta.conversationId) meta.conversationId = conversationId;
       const content = m.content;
       const messageType = (m as any).type;
 
       if (messageType === 'code') {
-        return { ...m, content, metadata: { ...meta, recipeType: 'code' } } as any;
+        return slimPlotMessage({ ...m, content, metadata: { ...meta, recipeType: 'code' } } as any);
       }
       if (messageType === 'result') {
+        if (meta.storageKey) {
+          // Persisted figure — keep key/url, drop base64 body
+          return {
+            ...m,
+            content:
+              typeof content === 'string' && content.startsWith('data:image/')
+                ? meta.caption || '📊 Chart'
+                : content,
+            metadata: {
+              ...meta,
+              recipeType: 'plot',
+              needsRegeneration: false,
+              plotStripped: false,
+              conversationId,
+            },
+          } as any;
+        }
         if (typeof content === 'string' && content.startsWith('data:image/')) {
-          return { ...m, content, metadata: { ...meta, recipeType: 'plot' } } as any;
+          return {
+            ...m,
+            content,
+            metadata: { ...meta, recipeType: 'plot', conversationId },
+          } as any;
         }
         if (typeof content === 'string' && content.length > 5000) {
           const summary = content.substring(0, 500) + '...';
           return {
             ...m,
             content: `📊 **Analysis Output Summary:**\n${summary}\n\n🔄 [Full output will be regenerated on load]`,
-            metadata: { ...meta, recipeType: 'large_output', needsRegeneration: true },
+            metadata: {
+              ...meta,
+              recipeType: 'large_output',
+              needsRegeneration: true,
+              conversationId,
+            },
           } as any;
         }
-        return { ...m, content, metadata: meta } as any;
+        return { ...m, content, metadata: { ...meta, conversationId } } as any;
       }
       if (messageType === 'assistant' && typeof content === 'string' && content.includes('Step ')) {
-        return { ...m, content, metadata: { ...meta, recipeType: 'step_summary' } } as any;
+        return {
+          ...m,
+          content,
+          metadata: { ...meta, recipeType: 'step_summary', conversationId },
+        } as any;
       }
-      return { ...m, content, metadata: meta } as any;
+      return { ...m, content, metadata: { ...meta, conversationId } } as any;
     });
 
     // Safety net: code conversations can carry many base64 chart images and
-    // grow into multiple MB. If the payload is too large to reliably persist,
-    // drop the heavy image data (keeping all text/code/steps/insights) so the
-    // conversation history still saves instead of silently failing.
+    // grow into multiple MB. Prefer storageKey when present; otherwise strip
+    // heavy image data so history still saves.
     const MAX_SAVE_BYTES = 2_500_000;
     let safeMessages: any[] = processedMessages;
     try {
       if (JSON.stringify(processedMessages).length > MAX_SAVE_BYTES) {
-        safeMessages = processedMessages.map((m: any) =>
-          typeof m.content === 'string' && m.content.startsWith('data:image/')
-            ? { ...m, content: '📊 [Chart generated — re-run the analysis to view it]', metadata: { ...(m.metadata || {}), recipeType: 'plot', plotStripped: true } }
-            : m
-        );
+        safeMessages = processedMessages.map((m: any) => {
+          if (typeof m.content === 'string' && m.content.startsWith('data:image/')) {
+            if (m.metadata?.storageKey) {
+              return {
+                ...m,
+                content: m.metadata.caption || '📊 Chart',
+                metadata: {
+                  ...m.metadata,
+                  recipeType: 'plot',
+                  needsRegeneration: false,
+                  plotStripped: false,
+                },
+              };
+            }
+            return {
+              ...m,
+              content: '📊 [Chart generated — re-run the analysis to view it]',
+              metadata: {
+                ...(m.metadata || {}),
+                recipeType: 'plot',
+                plotStripped: true,
+                needsRegeneration: true,
+              },
+            };
+          }
+          return m;
+        });
       }
     } catch { /* fall back to original */ }
 
@@ -100,7 +170,7 @@ export function useSaveConversation({
         body: JSON.stringify({
           id: conversationId,
           title: finalTitle,
-          messages: processedMessages,
+          messages: safeMessages,
           surveyId: effectiveContext.surveyId,
           cohortId: effectiveContext.cohortId,
           type: effectiveContext.type,
@@ -117,7 +187,7 @@ export function useSaveConversation({
         const updated: Conversation = {
           id: conversationId,
           title: finalTitle,
-          messages: processedMessages as any,
+          messages: safeMessages as any,
           createdAt: existing?.createdAt || new Date().toISOString(),
           updatedAt: new Date().toISOString(),
           surveyId: effectiveContext.surveyId,
@@ -136,6 +206,3 @@ export function useSaveConversation({
 
   return { saveConversation };
 }
-
-
-

@@ -1,10 +1,20 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
+import { FileText } from 'lucide-react';
 import { ConversationView } from '../../python-analysis/components/ConversationView';
 import { ChatInput } from '../../python-analysis/components/ChatInput';
 import { usePyodide } from '../../python-analysis/hooks/usePyodide';
 import { useAnalysisContext } from '../../python-analysis/hooks/useAnalysisContext';
 import { useAnalysisAgent } from '../../python-analysis/hooks/useAnalysisAgent';
+import {
+  exportCombinedReportPdf,
+  type ExportableFigure,
+} from '../../python-analysis/utils/export-pdf';
+import {
+  fetchImageAsDataUrl,
+  uploadChartPng,
+} from '../../python-analysis/utils/persist-figure';
+import type { ChartActionFigure } from '../../python-analysis/components/ChartActions';
 
 interface CodeConversationProps {
   surveyId: number | null;
@@ -13,6 +23,7 @@ interface CodeConversationProps {
   onEnvironmentReady?: () => void;
   messages: AnalysisMessage[];
   onMessagesChange: (messages: AnalysisMessage[] | ((prev: AnalysisMessage[]) => AnalysisMessage[])) => void;
+  conversationId?: string | null;
 }
 
 interface AnalysisMessage {
@@ -47,6 +58,15 @@ interface AnalysisMessage {
       totalSteps?: number;
       findingsCount?: number;
     };
+    recipeType?: 'code' | 'plot' | 'large_output' | 'step_summary';
+    needsRegeneration?: boolean;
+    plotStripped?: boolean;
+    storageKey?: string;
+    mediaUrl?: string;
+    conversationId?: string;
+    stepId?: string;
+    caption?: string;
+    n?: number;
   };
 }
 
@@ -56,11 +76,16 @@ export function CodeConversation({
   environmentInitialized = false, 
   onEnvironmentReady,
   messages,
-  onMessagesChange
+  onMessagesChange,
+  conversationId = null,
 }: CodeConversationProps) {
   
   console.log('🔍 CodeConversation render - surveyId:', surveyId, 'messagesCount:', messages.length, 'title:', surveyTitle);
   const [input, setInput] = useState('');
+  const [reportFigures, setReportFigures] = useState<ChartActionFigure[]>([]);
+  const [exportingReport, setExportingReport] = useState(false);
+  const [exportHint, setExportHint] = useState<string | null>(null);
+  const persistingRef = useRef<Set<string>>(new Set());
   
   // Helper function to add messages
   const addMessage = (newMessage: AnalysisMessage) => {
@@ -113,6 +138,141 @@ export function CodeConversation({
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  const sampleN = currentDataset?.shape?.[0] ?? null;
+
+  /** Upload fresh plot data-URLs to media storage and patch message metadata. */
+  const persistPlotMessages = useCallback(
+    async (
+      plotMsgs: Array<{
+        id: string;
+        content: string;
+        stepId?: string;
+        caption?: string;
+      }>
+    ) => {
+      for (const plot of plotMsgs) {
+        if (!plot.content?.startsWith('data:image/')) continue;
+        if (persistingRef.current.has(plot.id)) continue;
+        persistingRef.current.add(plot.id);
+        try {
+          const uploaded = await uploadChartPng(plot.content, {
+            filename: `chart-${plot.id}.png`,
+          });
+          updateMessages((prev) =>
+            prev.map((m) =>
+              m.id === plot.id
+                ? {
+                    ...m,
+                    // Keep data URL for immediate display; save path will slim it
+                    content: m.content,
+                    metadata: {
+                      ...(m.metadata || {}),
+                      recipeType: 'plot',
+                      storageKey: uploaded.storageKey,
+                      mediaUrl: uploaded.url,
+                      conversationId: conversationId || undefined,
+                      stepId: plot.stepId || plot.id,
+                      caption: plot.caption,
+                      n: sampleN ?? undefined,
+                      needsRegeneration: false,
+                    },
+                  }
+                : m
+            )
+          );
+        } catch (err) {
+          console.warn('[code-conversation] chart persist failed:', err);
+        } finally {
+          persistingRef.current.delete(plot.id);
+        }
+      }
+    },
+    [conversationId, sampleN]
+  );
+
+  const handleAddFigureToReport = useCallback((figure: ChartActionFigure) => {
+    setReportFigures((prev) => {
+      if (prev.some((f) => f.src === figure.src && f.stepId === figure.stepId)) {
+        return prev;
+      }
+      return [...prev, figure];
+    });
+    setExportHint('Added to report');
+    setTimeout(() => setExportHint(null), 1500);
+  }, []);
+
+  const collectExportableFigures = useCallback(async (): Promise<ExportableFigure[]> => {
+    const source =
+      reportFigures.length > 0
+        ? reportFigures
+        : messages
+            .filter(
+              (m) =>
+                m.type === 'result' &&
+                (m.content?.startsWith('data:image/') ||
+                  m.metadata?.storageKey ||
+                  m.metadata?.mediaUrl)
+            )
+            .map((m) => ({
+              src:
+                m.metadata?.mediaUrl ||
+                (m.metadata?.storageKey
+                  ? `/api/media/${m.metadata.storageKey}`
+                  : m.content),
+              label: m.metadata?.caption || m.metadata?.stepId || m.id,
+              caption: m.metadata?.caption,
+              n: m.metadata?.n,
+              storageKey: m.metadata?.storageKey,
+              stepId: m.metadata?.stepId || m.id,
+            }));
+
+    const figures: ExportableFigure[] = [];
+    for (let i = 0; i < source.length; i++) {
+      const fig = source[i];
+      try {
+        const pngBase64 = await fetchImageAsDataUrl(fig.src);
+        figures.push({
+          pngBase64,
+          label: fig.label || `Chart ${i + 1}`,
+          kind: 'chart',
+        });
+      } catch (err) {
+        console.warn('[code-conversation] skip figure for export:', err);
+      }
+    }
+    return figures;
+  }, [messages, reportFigures]);
+
+  const handleExportReport = useCallback(async () => {
+    setExportingReport(true);
+    setExportHint(null);
+    try {
+      const figures = await collectExportableFigures();
+      if (!figures.length) {
+        setExportHint('No charts to export yet');
+        return;
+      }
+      const synthesis =
+        messages
+          .filter((m) => m.type === 'assistant')
+          .slice(-4)
+          .map((m) => m.content)
+          .join('\n\n')
+          .slice(0, 6000) ||
+        surveyTitle ||
+        'Cohort analysis report';
+      await exportCombinedReportPdf(figures, synthesis);
+      setExportHint(
+        `Exported ${figures.length} chart${figures.length === 1 ? '' : 's'}`
+      );
+    } catch (e) {
+      setExportHint(e instanceof Error ? e.message : 'Export failed');
+    } finally {
+      setExportingReport(false);
+      setTimeout(() => setExportHint(null), 2500);
+    }
+  }, [collectExportableFigures, messages, surveyTitle]);
 
   // Notify parent when Pyodide is ready
   useEffect(() => {
@@ -497,22 +657,48 @@ Ready for intelligent survey analysis!`,
             // Add plot messages if any plots were generated
             if (latestStep.success && (latestStep as any).plots && (latestStep as any).plots.length > 0) {
               const plots = (latestStep as any).plots as string[];
+              const plotMsgs: AnalysisMessage[] = [];
               plots.forEach((plotData, index) => {
-                stepMessages.push({
+                plotMsgs.push({
                   id: `step-plot-${latestStep.id}-${index}-${timestamp}`,
                   type: 'result',
                   content: plotData,
                   timestamp: new Date(),
                   metadata: {
-                    executionTime: latestStep.execution_time_ms
+                    executionTime: latestStep.execution_time_ms,
+                    recipeType: 'plot',
+                    stepId: latestStep.id,
+                    caption: latestStep.step?.description
+                      ? `${latestStep.step.description}${plots.length > 1 ? ` (${index + 1})` : ''}`
+                      : undefined,
+                    n: sampleN ?? undefined,
+                    conversationId: conversationId || undefined,
                   }
                 });
               });
+              stepMessages.push(...plotMsgs);
             }
 
             // Use callback pattern to ensure we get the latest messages state
             updateMessages(prev => [...prev, ...stepMessages]);
             processedStepsRef.current.add(latestStep.id);
+
+            const plotsToPersist = stepMessages.filter(
+              (m) =>
+                m.type === 'result' &&
+                typeof m.content === 'string' &&
+                m.content.startsWith('data:image/')
+            );
+            if (plotsToPersist.length) {
+              void persistPlotMessages(
+                plotsToPersist.map((p) => ({
+                  id: p.id,
+                  content: p.content,
+                  stepId: p.metadata?.stepId,
+                  caption: p.metadata?.caption,
+                }))
+              );
+            }
           }
 
           // Final synthesis - always show when completed, even if synthesis failed
@@ -778,7 +964,7 @@ Error: ${err.message}
           for fig_num in plt.get_fignums():
             fig = plt.figure(fig_num)
             buffer = BytesIO()
-            fig.savefig(buffer, format='png', bbox_inches='tight', dpi=100)
+            fig.savefig(buffer, format='png', bbox_inches='tight', dpi=200)
             buffer.seek(0)
             img_data = base64.b64encode(buffer.getvalue()).decode()
             plots.append(f"data:image/png;base64,{img_data}")
@@ -787,18 +973,32 @@ Error: ${err.message}
       `);
 
       if (plotResults && plotResults.length > 0) {
+        const plotMsgs: AnalysisMessage[] = [];
         plotResults.forEach((plotData: string, index: number) => {
-          const plotMessage: AnalysisMessage = {
+          plotMsgs.push({
             id: `plot-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 9)}`,
             type: 'result',
             content: plotData,
             timestamp: new Date(),
             metadata: {
-              model: 'matplotlib'
+              model: 'matplotlib',
+              recipeType: 'plot',
+              stepId: `manual-${Date.now()}-${index}`,
+              caption: `Manual plot ${index + 1}`,
+              n: sampleN ?? undefined,
+              conversationId: conversationId || undefined,
             }
-          };
-          addMessage(plotMessage);
+          });
         });
+        plotMsgs.forEach((m) => addMessage(m));
+        void persistPlotMessages(
+          plotMsgs.map((p) => ({
+            id: p.id,
+            content: p.content,
+            stepId: p.metadata?.stepId,
+            caption: p.metadata?.caption,
+          }))
+        );
       }
 
       // Add success message
@@ -885,23 +1085,60 @@ Error: ${err.message}
         </div>
       ) : (
         <>
-
+          {/* Chart report toolbar */}
+          <div className="flex items-center justify-between gap-2 px-3 py-1.5 border-b bg-muted/20 shrink-0">
+            <div className="text-xs text-muted-foreground truncate">
+              {surveyTitle || 'Code analysis'}
+              {typeof sampleN === 'number' ? ` · N=${sampleN}` : ''}
+              {reportFigures.length > 0
+                ? ` · ${reportFigures.length} in report`
+                : ''}
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              {exportHint && (
+                <span className="text-[11px] text-muted-foreground">{exportHint}</span>
+              )}
+              {reportFigures.length > 0 && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 text-xs"
+                  onClick={() => setReportFigures([])}
+                >
+                  Clear report
+                </Button>
+              )}
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-7 text-xs"
+                disabled={exportingReport}
+                onClick={() => void handleExportReport()}
+                title="Export charts + synthesis as a PDF report"
+              >
+                <FileText className="h-3.5 w-3.5 mr-1" />
+                {exportingReport ? 'Exporting…' : 'Export report'}
+              </Button>
+            </div>
+          </div>
 
           {/* Conversation Area */}
           <ConversationView 
             messages={messages}
             isLoading={isLoading}
             messagesEndRef={messagesEndRef}
+            onAddFigureToReport={handleAddFigureToReport}
             onQuickAction={(action) => {
               if (action === 'python-analysis') {
                 const lastUserMessage = messages.findLast(m => m.type === 'user');
                 if (lastUserMessage) {
                   handleAutonomousAnalysis(lastUserMessage.content);
                 }
-              } else if (action.startsWith('execute: ')) {
-                // Handle code regeneration
-                const codeToExecute = action.replace('execute: ', '');
-                handleCodeExecution(codeToExecute);
+              } else if (action.startsWith('execute:')) {
+                const codeToExecute = action.replace(/^execute:\s*/, '');
+                void handleCodeExecution(codeToExecute);
               } else {
                 setInput(action);
                 handleSendMessage(action);
