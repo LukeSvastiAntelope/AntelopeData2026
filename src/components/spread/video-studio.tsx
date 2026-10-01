@@ -31,6 +31,13 @@ import { StagedActionCard, type StagedActionCardModel } from '@/components/consu
 import { ClipStudioPanel } from '@/components/spread/clip-studio';
 import { cn } from '@/lib/utils';
 import { AI_DISCLOSURE_DEFAULT } from '@/app/utils/services/video/guardrails';
+import {
+  assembleExplainerVideo,
+  aspectPixelSize,
+  uploadAssembledVideo,
+  type ExplainerSegment,
+  type VideoAspect,
+} from '@/components/spread/assemble-explainer-video';
 
 type ProviderCap = {
   id: string;
@@ -77,6 +84,22 @@ type Job = {
   provider?: string;
 };
 
+type LockedChartFrame = {
+  url: string;
+  caption: string;
+  caveat?: string | null;
+  claim?: string | null;
+  storageKey?: string | null;
+};
+
+type ExplainerBeats = {
+  hook: string;
+  finding: string;
+  meaning: string;
+  cta: string;
+  script: string;
+};
+
 const ASPECTS = ['9:16', '16:9', '1:1'] as const;
 
 export type VideoStudioPrefill = {
@@ -115,6 +138,9 @@ export function VideoStudio({ prefill }: { prefill?: VideoStudioPrefill } = {}) 
   const [stageBusy, setStageBusy] = useState<number | null>(null);
   const [includeAiDisclosure, setIncludeAiDisclosure] = useState(true);
   const [analyticsBanner, setAnalyticsBanner] = useState<string | null>(null);
+  const [lockedChart, setLockedChart] = useState<LockedChartFrame | null>(null);
+  const [explainerBeats, setExplainerBeats] = useState<ExplainerBeats | null>(null);
+  const [assembleLabel, setAssembleLabel] = useState<string | null>(null);
   const [clipPrefill, setClipPrefill] = useState<{
     script?: string;
     talkingPoints?: string[];
@@ -163,7 +189,7 @@ export function VideoStudio({ prefill }: { prefill?: VideoStudioPrefill } = {}) 
     };
   }, [loadMeta, loadAssets]);
 
-  // S3/S4 stub — prefill from analytics content draft
+  // S4 — prefill from analytics content draft (?draft=)
   useEffect(() => {
     if (!prefill?.draftId || prefillAppliedRef.current) return;
     prefillAppliedRef.current = true;
@@ -181,8 +207,11 @@ export function VideoStudio({ prefill }: { prefill?: VideoStudioPrefill } = {}) 
           caption?: string;
           blurb?: string;
           honestCaveat?: string;
+          sourceLine?: string | null;
           scriptJson?: Record<string, unknown> | null;
           figureMediaUrl?: string | null;
+          figureStorageKey?: string | null;
+          figureCaption?: string | null;
         };
         const scriptJson = d.scriptJson || {};
         if (d.draftKind === 'candidate_clip' || prefill.kind === 'clip') {
@@ -201,36 +230,54 @@ export function VideoStudio({ prefill }: { prefill?: VideoStudioPrefill } = {}) 
           );
         } else {
           setTab('generate');
-          const hook = String(scriptJson.hook || '');
+          const hook = String(scriptJson.hook || 'Here is what voters just told us.');
           const finding = String(scriptJson.findingBeat || d.claim || '');
-          const meaning = String(scriptJson.meaningBeat || '');
-          const cta = String(scriptJson.cta || '');
-          const storyboard = Array.isArray(scriptJson.storyboard)
-            ? scriptJson.storyboard.map((s) => String(s)).join(' → ')
-            : '';
+          const meaning = String(
+            scriptJson.meaningBeat || 'Here is what that means for our campaign.'
+          );
+          const cta = String(
+            scriptJson.cta || 'Share this with your neighbors — and join us.'
+          );
           const script = String(scriptJson.script || '');
           setTemplateId('issue_explainer');
+          setAspectRatio('9:16');
+          setMode('t2v');
+          // Never feed the chart to i2v — lock it as the data frame only
+          setReferenceUrl(null);
+          setReferenceKind(null);
+          setExplainerBeats({ hook, finding, meaning, cta, script });
           setPlain(
             [
-              '15–30s explainer from survey finding.',
-              hook && `Hook (generative b-roll): ${hook}`,
-              finding && `Data beat (real chart on screen): ${finding}`,
-              meaning && `Meaning: ${meaning}`,
-              cta && `CTA (generative b-roll): ${cta}`,
-              storyboard && `Storyboard: ${storyboard}`,
-              script && `Script:\n${script}`,
+              'Hook b-roll (generative, no numbers):',
+              hook,
+              '',
+              'Data beat uses the locked real chart card (not generated).',
+              finding,
+              '',
+              'CTA b-roll / card:',
+              cta,
+              script ? `\nFull script:\n${script}` : '',
             ]
-              .filter(Boolean)
+              .filter((l) => l !== undefined)
               .join('\n')
           );
-          setCaption([d.claim, d.honestCaveat].filter(Boolean).join(' — '));
-          if (d.figureMediaUrl) {
-            setReferenceUrl(d.figureMediaUrl);
-            setReferenceKind('image');
-            setMode('i2v');
+          setCaption(
+            [d.claim, d.honestCaveat, d.sourceLine].filter(Boolean).join(' — ')
+          );
+          const chartUrl =
+            d.figureMediaUrl ||
+            (d.figureStorageKey ? `/api/media/${d.figureStorageKey}` : null);
+          if (chartUrl) {
+            setLockedChart({
+              url: chartUrl,
+              caption: finding || d.claim || d.figureCaption || 'Survey finding',
+              caveat: d.honestCaveat || null,
+              claim: d.claim || null,
+              storageKey: d.figureStorageKey || null,
+            });
           }
           setAnalyticsBanner(
-            'Prefill from analytics · generative b-roll for hook/CTA; chart card for the data beat'
+            'Analytics explainer · generative hook/CTA only; real chart locked as data frame (never i2v)'
           );
         }
       } catch {
@@ -346,7 +393,161 @@ export function VideoStudio({ prefill }: { prefill?: VideoStudioPrefill } = {}) 
     }, 1500);
   };
 
+  /** Await a generate job without hijacking the main preview UI mid-assembly. */
+  const waitForJobUrl = async (
+    jobId: string,
+    onTick?: (j: Job) => void
+  ): Promise<string> => {
+    const started = Date.now();
+    while (Date.now() - started < 180_000) {
+      const res = await fetch(`/api/video/jobs/${jobId}`);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Status failed');
+      const j = data.job as Job;
+      onTick?.(j);
+      setJob(j);
+      if (j.status === 'succeeded') {
+        const url = j.localAssetUrl || j.assetUrl;
+        if (!url) throw new Error('Job succeeded without asset URL');
+        return url;
+      }
+      if (j.status === 'failed' || j.status === 'canceled') {
+        throw new Error(j.error || `Job ${j.status}`);
+      }
+      await new Promise((r) => setTimeout(r, 1200));
+    }
+    throw new Error('Video generation timed out');
+  };
+
+  const startT2vClip = async (prompt: string, durationSeconds = 4): Promise<string> => {
+    const res = await fetch('/api/video/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        prompt,
+        modelPrompt: prompt,
+        provider,
+        mode: 't2v',
+        aspectRatio,
+        durationSeconds,
+        // Explicitly omit referenceImage — chart must never go to i2v
+        referenceImage: null,
+        referenceVideo: null,
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Generate failed');
+    return waitForJobUrl(data.job.jobId);
+  };
+
+  const runExplainerAssemble = async () => {
+    if (!lockedChart) {
+      setError('Locked chart frame required for explainer assembly');
+      return;
+    }
+    setBusyGenerate(true);
+    setError(null);
+    setPreviewUrl(null);
+    setStaged(null);
+    setAssembleLabel('Generating hook b-roll…');
+    try {
+      const beats = explainerBeats || {
+        hook: plain.slice(0, 160) || 'Voters just shared something important.',
+        finding: lockedChart.caption,
+        meaning: '',
+        cta: 'Join us — share this with your neighbors.',
+        script: plain,
+      };
+      const size = aspectPixelSize(aspectRatio as VideoAspect);
+
+      const hookPrompt = [
+        'Cinematic b-roll only. No text, no charts, no numbers, no statistics on screen.',
+        beats.hook,
+        'Natural light, handheld energy, suitable for a political campaign explainer hook.',
+      ].join(' ');
+
+      setJob({ jobId: 'hook', status: 'running', progress: 10 });
+      const hookUrl = await startT2vClip(hookPrompt, 4);
+
+      setAssembleLabel('Generating CTA b-roll…');
+      setJob({ jobId: 'cta', status: 'running', progress: 40 });
+      let ctaUrl: string | null = null;
+      try {
+        const ctaPrompt = [
+          'Short hopeful closing b-roll. No text overlays, no charts, no numbers.',
+          beats.cta,
+          'Warm community energy for a campaign call to action.',
+        ].join(' ');
+        ctaUrl = await startT2vClip(ctaPrompt, 3);
+      } catch (ctaErr) {
+        console.warn('[video-studio] CTA generate failed; using plain card', ctaErr);
+        ctaUrl = null;
+      }
+
+      setAssembleLabel('Inserting real chart card + assembling…');
+      setJob({ jobId: 'assemble', status: 'running', progress: 70 });
+
+      const segments: ExplainerSegment[] = [
+        { kind: 'video', url: hookUrl },
+        {
+          kind: 'chart',
+          chartUrl: lockedChart.url,
+          caption: lockedChart.caption,
+          caveat: lockedChart.caveat,
+          durationMs: 4000,
+        },
+      ];
+      if (ctaUrl) {
+        segments.push({ kind: 'video', url: ctaUrl });
+      } else {
+        segments.push({
+          kind: 'cta_card',
+          title: beats.cta.slice(0, 90) || 'Join us',
+          body: beats.meaning || undefined,
+          durationMs: 3000,
+        });
+      }
+
+      const blob = await assembleExplainerVideo({
+        segments,
+        width: size.width,
+        height: size.height,
+        onProgress: (label, pct) => {
+          setAssembleLabel(label);
+          setJob({ jobId: 'assemble', status: 'running', progress: pct });
+        },
+      });
+
+      setAssembleLabel('Uploading assembled explainer…');
+      const uploaded = await uploadAssembledVideo(blob, `explainer-${Date.now()}.webm`);
+      setPreviewUrl(uploaded.url);
+      setJob({
+        jobId: 'assemble',
+        status: 'succeeded',
+        progress: 100,
+        localAssetUrl: uploaded.url,
+      });
+      if (!caption.trim()) {
+        setCaption(
+          [lockedChart.claim || lockedChart.caption, lockedChart.caveat]
+            .filter(Boolean)
+            .join(' — ')
+        );
+      }
+      setAssembleLabel(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Explainer assemble failed');
+      setAssembleLabel(null);
+    } finally {
+      setBusyGenerate(false);
+    }
+  };
+
   const runGenerate = async () => {
+    if (lockedChart) {
+      await runExplainerAssemble();
+      return;
+    }
     setBusyGenerate(true);
     setError(null);
     setPreviewUrl(null);
@@ -357,6 +558,10 @@ export function VideoStudio({ prefill }: { prefill?: VideoStudioPrefill } = {}) 
       if (!promptToUse) {
         throw new Error('Add a short description before generating');
       }
+      // Hard rule: never send a chart/data image to i2v
+      const safeMode = mode;
+      const safeRefImage =
+        safeMode !== 't2v' && referenceKind === 'image' ? referenceUrl : null;
       const res = await fetch('/api/video/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -364,12 +569,13 @@ export function VideoStudio({ prefill }: { prefill?: VideoStudioPrefill } = {}) 
           prompt: plain,
           modelPrompt: promptToUse,
           provider,
-          mode,
+          mode: safeMode,
           aspectRatio,
           durationSeconds: assisted?.durationSeconds || 5,
           negativePrompt: assisted?.negativePrompt,
-          referenceImage: mode !== 't2v' && referenceKind === 'image' ? referenceUrl : null,
-          referenceVideo: mode === 'v2v' && referenceKind === 'video' ? referenceUrl : null,
+          referenceImage: safeRefImage,
+          referenceVideo:
+            safeMode === 'v2v' && referenceKind === 'video' ? referenceUrl : null,
         }),
       });
       const data = await res.json();
@@ -586,11 +792,53 @@ export function VideoStudio({ prefill }: { prefill?: VideoStudioPrefill } = {}) 
           <Textarea
             value={plain}
             onChange={(e) => setPlain(e.target.value)}
-            rows={3}
+            rows={lockedChart ? 6 : 3}
             placeholder="30-sec clip on our housing plan, upbeat, city backdrop"
           />
         </div>
 
+        {lockedChart && (
+          <div className="rounded-md border border-primary/30 bg-muted/20 p-3 space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-sm font-medium">Locked data frame (real chart)</p>
+              <Badge variant="secondary">Not sent to i2v</Badge>
+            </div>
+            <div className="flex items-start gap-3">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={lockedChart.url}
+                alt="Locked chart"
+                className="h-24 w-16 object-cover rounded border border-border shrink-0"
+              />
+              <div className="text-xs text-muted-foreground space-y-1 min-w-0">
+                <p className="text-foreground font-medium line-clamp-3">
+                  {lockedChart.caption}
+                </p>
+                {lockedChart.caveat && (
+                  <p className="line-clamp-2 text-amber-800 dark:text-amber-200/90">
+                    {lockedChart.caveat}
+                  </p>
+                )}
+                <p>
+                  Assembled as: generative hook → this chart (3–5s, caption burned
+                  in) → generative or plain CTA. Numbers stay pixel-perfect.
+                </p>
+              </div>
+            </div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-7 text-xs"
+              onClick={() => setLockedChart(null)}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              Unlock / use freeform generate
+            </Button>
+          </div>
+        )}
+
+        {!lockedChart && (
         <div className="space-y-2">
           <div className="flex items-center justify-between gap-2">
             <Label>Reference asset (optional)</Label>
@@ -612,6 +860,7 @@ export function VideoStudio({ prefill }: { prefill?: VideoStudioPrefill } = {}) 
           <p className="text-xs text-muted-foreground">
             Mode options come from this provider&apos;s capabilities
             {selectedCaps?.notes ? ` — ${selectedCaps.notes}` : '.'}
+            {' '}Do not use survey charts as i2v references — models warp the numbers.
           </p>
           <div className="flex flex-wrap gap-2">
             <Button
@@ -709,23 +958,30 @@ export function VideoStudio({ prefill }: { prefill?: VideoStudioPrefill } = {}) 
             </div>
           )}
         </div>
+        )}
 
         <div className="flex flex-wrap gap-2">
-          <Button type="button" variant="secondary" disabled={busyAssist} onClick={() => void runAssist()}>
-            {busyAssist ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Sparkles className="h-4 w-4" />
-            )}
-            Expand prompt
-          </Button>
-          <Button type="button" disabled={busyGenerate || !plain.trim()} onClick={() => void runGenerate()}>
+          {!lockedChart && (
+            <Button type="button" variant="secondary" disabled={busyAssist} onClick={() => void runAssist()}>
+              {busyAssist ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Sparkles className="h-4 w-4" />
+              )}
+              Expand prompt
+            </Button>
+          )}
+          <Button
+            type="button"
+            disabled={busyGenerate || (!plain.trim() && !lockedChart)}
+            onClick={() => void runGenerate()}
+          >
             {busyGenerate ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
               <Film className="h-4 w-4" />
             )}
-            Generate
+            {lockedChart ? 'Assemble explainer' : 'Generate'}
           </Button>
         </div>
 
@@ -772,7 +1028,8 @@ export function VideoStudio({ prefill }: { prefill?: VideoStudioPrefill } = {}) 
             <div className="space-y-2">
               <Progress value={job?.progress || 15} />
               <p className="text-xs text-muted-foreground">
-                Generating with {provider}… this can take a minute.
+                {assembleLabel ||
+                  `Generating with ${provider}… this can take a minute.`}
               </p>
             </div>
           )}

@@ -104,9 +104,9 @@ export function TurnIntoContentCard({
           const Icon = meta.icon;
           const videoHref =
             draft.draftKind === 'explainer_video'
-              ? `/spread/video?prefillDraft=${draft.id}&kind=explainer`
+              ? `/spread/video?draft=${draft.id}&kind=explainer`
               : draft.draftKind === 'candidate_clip'
-                ? `/spread/video?tab=clip&prefillDraft=${draft.id}&kind=clip`
+                ? `/spread/video?tab=clip&draft=${draft.id}&kind=clip`
                 : null;
 
           return (

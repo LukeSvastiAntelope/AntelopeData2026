@@ -88,8 +88,8 @@ export function AnalyticsDraftsInbox() {
             d.draftKind === 'chart_post'
               ? '/cohort-chat/chat'
               : d.draftKind === 'explainer_video'
-                ? `/spread/video?prefillDraft=${d.id}&kind=explainer`
-                : `/spread/video?tab=clip&prefillDraft=${d.id}&kind=clip`;
+                ? `/spread/video?draft=${d.id}&kind=explainer`
+                : `/spread/video?tab=clip&draft=${d.id}&kind=clip`;
           return (
             <div
               key={d.id}

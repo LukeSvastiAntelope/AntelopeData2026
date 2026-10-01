@@ -14,7 +14,8 @@ import {
 function SpreadVideoInner() {
   const searchParams = useSearchParams();
   const prefill = useMemo<VideoStudioPrefill>(() => {
-    const draftRaw = searchParams.get('prefillDraft');
+    const draftRaw =
+      searchParams.get('draft') || searchParams.get('prefillDraft');
     const draftId = draftRaw ? Number(draftRaw) : null;
     const kindRaw = searchParams.get('kind');
     const tabRaw = searchParams.get('tab');
