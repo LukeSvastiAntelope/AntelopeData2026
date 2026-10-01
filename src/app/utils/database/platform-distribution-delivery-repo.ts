@@ -129,6 +129,27 @@ export const PlatformDistributionDeliveryRepo = {
     return rows.map(mapRow);
   },
 
+  /** Load specific delivery rows by id (post-approval first attempt). */
+  listByIds: async (ids: number[]): Promise<PlatformDeliveryRow[]> => {
+    const clean = [
+      ...new Set(
+        (ids || [])
+          .map((n) => Number(n))
+          .filter((n) => Number.isFinite(n) && n > 0)
+      ),
+    ];
+    if (!clean.length) return [];
+    const db = await openSql();
+    const placeholders = clean.map(() => '?').join(',');
+    const [rows] = await db.execute<RowDataPacket[]>(
+      `SELECT * FROM platform_distribution_deliveries
+       WHERE id IN (${placeholders})
+       ORDER BY id ASC`,
+      clean
+    );
+    return rows.map(mapRow);
+  },
+
   markAttempt: async (input: {
     id: number;
     ok: boolean;

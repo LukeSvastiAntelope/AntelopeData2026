@@ -6,6 +6,7 @@
 
 import { createHmac, timingSafeEqual } from 'crypto';
 import dns from 'dns/promises';
+import { after } from 'next/server';
 import {
   DistributionWebhookRepo,
   type DistributionContentType,
@@ -15,7 +16,10 @@ import {
   DistributionDeliveryRepo,
   type DistributionDeliveryRow,
 } from '@/app/utils/database/distribution-delivery-repo';
-import { resolvePublicMediaUrl } from '@/app/utils/services/distribution-media-token';
+import {
+  refreshDeliveryPayloadMedia,
+  resolvePublicMediaUrl,
+} from '@/app/utils/services/distribution-media-token';
 import { AI_DISCLOSURE_DEFAULT } from '@/app/utils/services/video/guardrails';
 import { openSql } from '@/app/utils/database/db';
 import type { RowDataPacket } from 'mysql2/promise';
@@ -80,12 +84,38 @@ export type DistributionQueueSummary = {
 
 const FETCH_TIMEOUT_MS = 10_000;
 
-/** Backoff after failed attempts 1→2, 2→3, 3→exhausted: 1m / 10m / 1h */
+/** Backoff after failed attempts 1→2, 2→3, 3→exhausted: 1m / 10m / 1h.
+ * Kept for when cron cadence improves; Vercel Hobby currently runs daily. */
 export const DISTRIBUTION_RETRY_BACKOFF_MS = [
   60_000,
   10 * 60_000,
   60 * 60_000,
 ] as const;
+
+/** Honest UI copy while retries are daily (Hobby cron). */
+export const DISTRIBUTION_FAILED_LABEL =
+  'Delivery failed — will retry at the next daily run, or Retry now';
+export const DISTRIBUTION_PARTIAL_LABEL =
+  'Partial delivery — will retry at the next daily run, or Retry now';
+
+/**
+ * Schedule work after the HTTP response (Next.js after()).
+ * Falls back to fire-and-forget outside a request context (tests/scripts).
+ */
+export function scheduleDistributionWork(work: () => Promise<void>): void {
+  const run = () =>
+    work().catch((err) =>
+      console.warn(
+        '[distribution] scheduled work failed',
+        err instanceof Error ? err.message : err
+      )
+    );
+  try {
+    after(run);
+  } catch {
+    void run();
+  }
+}
 
 const BLOCKED_HOSTNAMES = new Set([
   'localhost',
@@ -354,7 +384,9 @@ async function processDeliveryRow(
     };
   }
 
-  const payload = (row.payload || {}) as DistributionWebhookPayload;
+  const payload = refreshDeliveryPayloadMedia(
+    (row.payload || {}) as Record<string, unknown>
+  ) as DistributionWebhookPayload;
   const result = await postOnce(webhook, payload);
   const nextAttempt = row.attempt + 1; // after this markAttempt increments
 
@@ -619,10 +651,10 @@ export function summarizeDeliveries(
     label = 'Sent to Zapier ✓';
   } else if (anyFailed && !anyPending && !rows.some((r) => r.status === 'success')) {
     status = 'failed';
-    label = 'Delivery failed — Retry';
+    label = DISTRIBUTION_FAILED_LABEL;
   } else if (anyFailed && rows.some((r) => r.status === 'success')) {
     status = 'partial';
-    label = 'Partial delivery — Retry failed';
+    label = DISTRIBUTION_PARTIAL_LABEL;
   } else if (anyPending) {
     status = 'queued';
     label = 'Sending to Zapier…';
@@ -696,7 +728,10 @@ export async function queueDistributionOnApproval(params: {
       loadUserEmail(params.userId),
     ]);
 
-    const payload: ApprovedContentPayload = {
+    const payload: ApprovedContentPayload & {
+      _media_source?: string | null;
+      _thumbnail_source?: string | null;
+    } = {
       event: 'content.approved',
       id: `staged-${params.staged.id}`,
       organization: { id: params.organizationId, name: orgName },
@@ -710,6 +745,9 @@ export async function queueDistributionOnApproval(params: {
       thumbnail_url: thumb.mediaUrl,
       approved_by: { user_id: params.userId, email },
       approved_at: new Date().toISOString(),
+      // Private sources kept for re-sign on retry (stripped before POST)
+      _media_source: content.mediaUrl,
+      _thumbnail_source: content.thumbnailUrl,
     };
 
     const deliveryIds: number[] = [];
@@ -724,16 +762,10 @@ export async function queueDistributionOnApproval(params: {
       deliveryIds.push(row.id);
     }
 
-    // Fire first attempts without blocking the approval response
-    void processDueDeliveries({
-      stagedActionId: params.staged.id,
-      limit: deliveryIds.length,
-    }).catch((err) =>
-      console.warn(
-        '[distribution-webhook] async first attempt failed',
-        err instanceof Error ? err.message : err
-      )
-    );
+    // Process exactly these ids after the response (not listDue+filter)
+    scheduleDistributionWork(async () => {
+      await processDueDeliveries({ deliveryIds });
+    });
 
     return {
       queued: true,
@@ -757,14 +789,26 @@ export async function queueDistributionOnApproval(params: {
   }
 }
 
-/** Process due delivery rows (cron + post-approve kick). */
+/** Process due delivery rows (cron + post-approve kick by explicit ids). */
 export async function processDueDeliveries(opts?: {
   stagedActionId?: number;
+  deliveryIds?: number[];
   limit?: number;
 }): Promise<{ processed: number; succeeded: number; failed: number }> {
-  let rows = await DistributionDeliveryRepo.listDue(opts?.limit ?? 50);
-  if (opts?.stagedActionId) {
-    rows = rows.filter((r) => r.stagedActionId === opts.stagedActionId);
+  let rows: DistributionDeliveryRow[];
+  if (opts?.deliveryIds?.length) {
+    rows = await DistributionDeliveryRepo.listByIds(opts.deliveryIds);
+    // Only attempt rows that are still pending/failed and under max attempts
+    rows = rows.filter(
+      (r) =>
+        (r.status === 'pending' || r.status === 'failed') &&
+        r.attempt < r.maxAttempts
+    );
+  } else {
+    rows = await DistributionDeliveryRepo.listDue(opts?.limit ?? 50);
+    if (opts?.stagedActionId) {
+      rows = rows.filter((r) => r.stagedActionId === opts.stagedActionId);
+    }
   }
   let succeeded = 0;
   let failed = 0;
@@ -798,14 +842,15 @@ export async function manualRetryDelivery(params: {
     return r.status === 'failed' || r.status === 'exhausted';
   });
 
+  const retryIds: number[] = [];
   for (const row of targets) {
-    await DistributionDeliveryRepo.resetForManualRetry(row.id);
+    const reset = await DistributionDeliveryRepo.resetForManualRetry(row.id);
+    if (reset) retryIds.push(reset.id);
   }
 
-  await processDueDeliveries({
-    stagedActionId: params.stagedActionId,
-    limit: Math.max(10, targets.length),
-  });
+  if (retryIds.length) {
+    await processDueDeliveries({ deliveryIds: retryIds });
+  }
 
   return getDistributionStatusForStaged(params.stagedActionId);
 }

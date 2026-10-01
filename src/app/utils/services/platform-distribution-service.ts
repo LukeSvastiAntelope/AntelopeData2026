@@ -7,6 +7,9 @@ import {
   assertSafeHttpsWebhookUrl,
   signDistributionPayload,
   DISTRIBUTION_RETRY_BACKOFF_MS,
+  DISTRIBUTION_FAILED_LABEL,
+  DISTRIBUTION_PARTIAL_LABEL,
+  scheduleDistributionWork,
   type ApprovedContentPayload,
   type DistributionDeliveryResult,
   type DistributionQueueSummary,
@@ -182,10 +185,10 @@ function summarizePlatform(
     label = 'Sent to Zapier ✓';
   } else if (anyFailed && !anyPending && !rows.some((r) => r.status === 'success')) {
     status = 'failed';
-    label = 'Delivery failed — Retry';
+    label = DISTRIBUTION_FAILED_LABEL;
   } else if (anyFailed && rows.some((r) => r.status === 'success')) {
     status = 'partial';
-    label = 'Partial delivery — Retry failed';
+    label = DISTRIBUTION_PARTIAL_LABEL;
   } else if (anyPending) {
     status = 'queued';
     label = 'Sending to Zapier…';
@@ -263,15 +266,9 @@ export async function queuePlatformGrowthOnApproval(params: {
       deliveryIds.push(row.id);
     }
 
-    void processDuePlatformDeliveries({
-      marketingDraftId: params.draft.id,
-      limit: deliveryIds.length,
-    }).catch((err) =>
-      console.warn(
-        '[platform-distribution] async first attempt failed',
-        err instanceof Error ? err.message : err
-      )
-    );
+    scheduleDistributionWork(async () => {
+      await processDuePlatformDeliveries({ deliveryIds });
+    });
 
     return {
       queued: true,
@@ -297,13 +294,24 @@ export async function queuePlatformGrowthOnApproval(params: {
 
 export async function processDuePlatformDeliveries(opts?: {
   marketingDraftId?: number;
+  deliveryIds?: number[];
   limit?: number;
 }): Promise<{ processed: number; succeeded: number; failed: number }> {
-  let rows = await PlatformDistributionDeliveryRepo.listDue(opts?.limit ?? 50);
-  if (opts?.marketingDraftId) {
+  let rows: PlatformDeliveryRow[];
+  if (opts?.deliveryIds?.length) {
+    rows = await PlatformDistributionDeliveryRepo.listByIds(opts.deliveryIds);
     rows = rows.filter(
-      (r) => r.marketingDraftId === opts.marketingDraftId
+      (r) =>
+        (r.status === 'pending' || r.status === 'failed') &&
+        r.attempt < r.maxAttempts
     );
+  } else {
+    rows = await PlatformDistributionDeliveryRepo.listDue(opts?.limit ?? 50);
+    if (opts?.marketingDraftId) {
+      rows = rows.filter(
+        (r) => r.marketingDraftId === opts.marketingDraftId
+      );
+    }
   }
   let succeeded = 0;
   let failed = 0;

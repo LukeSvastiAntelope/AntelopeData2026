@@ -187,7 +187,7 @@ export function StagedActionCard({
                   ) : (
                     <RefreshCw className="h-3 w-3 mr-1" />
                   )}
-                  Retry
+                  Retry now
                 </Button>
               )}
             </div>

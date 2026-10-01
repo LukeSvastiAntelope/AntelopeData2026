@@ -66,6 +66,19 @@ export function issueDistributionMediaToken(
 export function verifyDistributionMediaToken(
   token: string | null | undefined
 ): DistributionMediaClaims | null {
+  const parsed = peekDistributionMediaClaims(token);
+  if (!parsed) return null;
+  if (parsed.exp * 1000 <= Date.now()) return null;
+  return parsed;
+}
+
+/**
+ * Verify HMAC and parse claims even when expired — used to re-issue signed
+ * media URLs on delivery retry after the 72h window.
+ */
+export function peekDistributionMediaClaims(
+  token: string | null | undefined
+): DistributionMediaClaims | null {
   if (!token) return null;
   const raw = String(token).trim();
   const i = raw.lastIndexOf('.');
@@ -94,7 +107,6 @@ export function verifyDistributionMediaToken(
     ) {
       return null;
     }
-    if (parsed.exp * 1000 <= Date.now()) return null;
     return parsed;
   } catch {
     return null;
@@ -119,6 +131,20 @@ export function resolvePublicMediaUrl(params: {
     if (/^https?:\/\//i.test(raw)) {
       const u = new URL(raw);
       if (!u.pathname.startsWith('/api/media/')) {
+        // Existing signed distribution-media URL — re-issue from claims/key
+        if (u.pathname.startsWith('/api/public/distribution-media')) {
+          const token = u.searchParams.get('token');
+          const claims = peekDistributionMediaClaims(token);
+          if (claims?.key) {
+            const issued = issueDistributionMediaToken({
+              key: claims.key,
+              userId: params.userId || claims.userId,
+              organizationId: params.organizationId || claims.organizationId,
+              ttlSeconds: params.ttlSeconds,
+            });
+            return { mediaUrl: issued.url, expiresAt: issued.expiresAt };
+          }
+        }
         return { mediaUrl: raw, expiresAt: null };
       }
       const key = u.pathname.replace(/^\/api\/media\//, '');
@@ -158,4 +184,52 @@ export function resolvePublicMediaUrl(params: {
   }
 
   return { mediaUrl: raw, expiresAt: null };
+}
+
+/**
+ * Re-sign media_url / thumbnail_url for an outbound delivery payload.
+ * Prefers `_media_source` / `_thumbnail_source` (stored at queue time); falls
+ * back to peeking claims from an existing signed URL.
+ */
+export function refreshDeliveryPayloadMedia(
+  payload: Record<string, unknown>
+): Record<string, unknown> {
+  const orgId = Number(
+    (payload.organization as { id?: number } | undefined)?.id ??
+      payload.organization_id ??
+      0
+  );
+  const userId = Number(
+    (payload.approved_by as { user_id?: number } | undefined)?.user_id ?? 0
+  );
+  const mediaSource =
+    (payload._media_source as string | null | undefined) ||
+    (payload.media_url as string | null | undefined);
+  const thumbSource =
+    (payload._thumbnail_source as string | null | undefined) ||
+    (payload.thumbnail_url as string | null | undefined);
+
+  const media = resolvePublicMediaUrl({
+    mediaUrl: mediaSource,
+    userId,
+    organizationId: orgId,
+  });
+  const thumb = resolvePublicMediaUrl({
+    mediaUrl: thumbSource,
+    userId,
+    organizationId: orgId,
+  });
+
+  const next: Record<string, unknown> = { ...payload };
+  if (media.mediaUrl != null) {
+    next.media_url = media.mediaUrl;
+    next.media_expires_at = media.expiresAt;
+  }
+  if (thumb.mediaUrl != null) {
+    next.thumbnail_url = thumb.mediaUrl;
+  }
+  // Never send internal source keys to Zapier/Make
+  delete next._media_source;
+  delete next._thumbnail_source;
+  return next;
 }
