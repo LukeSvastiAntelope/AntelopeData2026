@@ -821,7 +821,7 @@ export class AIAnalyticsOrchestrator {
         reliability: 'Limited — insight model fallback',
         limitations: ['Insight model unavailable; chart takeaways use deterministic templates'],
       },
-      nextSteps: ['Force-regenerate insights when Anthropic/OpenAI is reachable'],
+      nextSteps: ['Force-regenerate insights when Anthropic is reachable'],
       chartInsights: successfulResults.slice(0, 12).map((qr, idx) => {
         const id = `chart_${qr.id || qr.queryId || idx}`;
         const templated = this.generateDataInsight(qr.data || [], qr.analysisType || 'distribution');

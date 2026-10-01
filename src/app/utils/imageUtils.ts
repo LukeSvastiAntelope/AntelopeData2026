@@ -20,9 +20,8 @@ export async function downloadAndSaveImage(imageUrl: string, userId: string | nu
             return imageUrl;
         }
 
-        // Only process DALL-E URLs and other temporary URLs
+        // Only process known temporary blob URLs and data URLs
         if (!imageUrl.includes('oaidalleapiprodscus.blob.core.windows.net') && 
-            !imageUrl.includes('openai.com') && 
             !imageUrl.startsWith('data:')) {
             return imageUrl;
         }

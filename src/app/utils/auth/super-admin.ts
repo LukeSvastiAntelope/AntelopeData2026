@@ -1,22 +1,17 @@
 /**
  * Platform super-admin identity — email-pinned allowlist.
  *
- * Super-admin is NOT users.role / org admin. It is the verified email
- * lukesvasti@antelope.org (configurable via SUPERADMIN_EMAILS, with that
- * address always present as the built-in default). Edge-safe — no DB.
+ * Super-admin is NOT users.role / org admin. It is exactly one verified
+ * email: lukesvasti@antelope.org. SUPERADMIN_EMAILS is ignored and cannot
+ * widen (or shrink) this set — Vercel env access must not grant super-admin.
+ * Edge-safe — no DB.
  */
 
 export const DEFAULT_SUPERADMIN_EMAIL = 'lukesvasti@antelope.org';
 
-/** Canonical allowlist: env SUPERADMIN_EMAILS (comma-separated) + built-in default. */
+/** Canonical allowlist: always exactly the locked super-admin email. */
 export function getSuperAdminEmails(): string[] {
-  const fromEnv = String(process.env.SUPERADMIN_EMAILS || '')
-    .split(',')
-    .map((e) => e.trim().toLowerCase())
-    .filter(Boolean);
-  const set = new Set<string>(fromEnv);
-  set.add(DEFAULT_SUPERADMIN_EMAIL.toLowerCase());
-  return [...set];
+  return [DEFAULT_SUPERADMIN_EMAIL.toLowerCase()];
 }
 
 export function isSuperAdminEmail(

@@ -4,7 +4,7 @@ import { isSuperAdminEmail } from '@/app/utils/auth/super-admin'
 
 /**
  * Server-enforced admin gate. UI-only checks are insufficient —
- * email must match SUPERADMIN_EMAILS / lukesvasti@antelope.org.
+ * email must be lukesvasti@antelope.org (locked allowlist).
  */
 export default async function AdminLayout({
   children,

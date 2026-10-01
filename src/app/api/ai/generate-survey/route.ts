@@ -33,30 +33,6 @@ function safeErrorMeta(err: any) {
     return { status, code, name, message };
 }
 
-/** How long OpenAI asked us to wait on 429 (retry-after-ms / Retry-After), else a safe default. */
-function openAi429WaitMs(err: any): number {
-    const raw = err?.headers;
-    if (!raw) return 12_000;
-    const get = (key: string): string | undefined => {
-        if (typeof raw.get === 'function') {
-            return raw.get(key) ?? raw.get(key.toLowerCase()) ?? undefined;
-        }
-        const rec = raw as Record<string, string | undefined>;
-        return rec[key] ?? rec[key.toLowerCase()];
-    };
-    const msHdr = get('retry-after-ms');
-    if (msHdr) {
-        const n = Number.parseFloat(msHdr);
-        if (!Number.isNaN(n) && n >= 500) return Math.min(Math.floor(n), 120_000);
-    }
-    const secHdr = get('retry-after');
-    if (secHdr) {
-        const n = Number.parseFloat(secHdr);
-        if (!Number.isNaN(n) && n >= 0.25) return Math.min(Math.floor(n * 1000), 120_000);
-    }
-    return 12_000;
-}
-
 function classifyUpstreamError(err: any): {
     httpStatus: number;
     clientMessage: string;
@@ -70,7 +46,6 @@ function classifyUpstreamError(err: any): {
         msg.includes('timed out') ||
         meta.code === 'ETIMEDOUT';
 
-    // OpenAI-compatible SDKs generally set `.status`
     if (meta.status === 401 || meta.status === 403) {
         return {
             httpStatus: 503,
@@ -180,97 +155,6 @@ function normalizeGeneratedSurveyShape(raw: any, prompt: string, mode?: string) 
     }
 
     return data;
-}
-
-function getOpenAiSurveyJsonSchema(mode?: string) {
-    if (mode === 'quiz') {
-        return {
-            name: 'quiz',
-            schema: {
-                type: 'object',
-                additionalProperties: false,
-                // OpenAI Structured Outputs (strict) expects `required` to include every key in `properties`.
-                // Keep fields "optional" by allowing empty values, not by omitting them from `required`.
-                required: ['title', 'description', 'questions'],
-                properties: {
-                    title: { type: 'string' },
-                    description: { type: 'string' },
-                    questions: {
-                        type: 'array',
-                        minItems: 1,
-                        items: {
-                            type: 'object',
-                            additionalProperties: false,
-                            // Must include all keys from `properties` when using strict json_schema.
-                            required: ['type', 'prompt', 'options', 'correctOptionIds', 'explanation', 'isRequired', 'points'],
-                            properties: {
-                                type: {
-                                    type: 'string',
-                                    enum: ['single-choice', 'multiple-choice', 'true-false', 'text'],
-                                },
-                                prompt: { type: 'string' },
-                                options: {
-                                    type: 'array',
-                                    items: { type: 'string' },
-                                    // Allow empty for "text" questions, etc.
-                                    minItems: 0,
-                                },
-                                correctOptionIds: {
-                                    type: 'array',
-                                    items: { type: 'integer' },
-                                    minItems: 0,
-                                },
-                                explanation: { type: 'string' },
-                                isRequired: { type: 'boolean' },
-                                points: { type: 'integer' },
-                            },
-                        },
-                    },
-                },
-            },
-        };
-    }
-
-    return {
-        name: 'survey',
-        schema: {
-            type: 'object',
-            additionalProperties: false,
-            // OpenAI Structured Outputs (strict) expects `required` to include every key in `properties`.
-            required: ['title', 'description', 'purpose', 'targetAudience', 'questions'],
-            properties: {
-                title: { type: 'string' },
-                description: { type: 'string' },
-                purpose: { type: 'string' },
-                targetAudience: { type: 'string' },
-                questions: {
-                    type: 'array',
-                    minItems: 1,
-                    items: {
-                        type: 'object',
-                        additionalProperties: false,
-                        // Must include all keys from `properties` when using strict json_schema.
-                        required: ['type', 'prompt', 'options', 'isRequired', 'reasoning'],
-                        properties: {
-                            type: {
-                                type: 'string',
-                                enum: ['text', 'single-choice', 'multiple-choice', 'rating', 'yes-no'],
-                            },
-                            prompt: { type: 'string' },
-                            options: {
-                                type: 'array',
-                                items: { type: 'string' },
-                                // Allow empty for question types that don't use choices (e.g. "text").
-                                minItems: 0,
-                            },
-                            isRequired: { type: 'boolean' },
-                            reasoning: { type: 'string' },
-                        },
-                    },
-                },
-            },
-        },
-    };
 }
 
 // POST /api/ai/generate-survey - Generate survey using AI
@@ -451,22 +335,7 @@ Guidelines:
         }
 
         if (!aiResponse) {
-            const isReasoningOverall = (
-                modelConfig.model.includes('o1') ||
-                modelConfig.model.includes('o3') ||
-                modelConfig.model.includes('o4') ||
-                modelConfig.model.includes('gpt-5')
-            );
             console.error('[gen-survey] No aiResponse', { elapsedMs: Date.now() - t0, model: modelConfig.model });
-            if (isReasoningOverall) {
-                // Return a non-fatal response so UI can show raw/fallback content instead of a 500
-                return NextResponse.json({
-                    status: true,
-                    modelUsed: modelConfig.label,
-                    surveyRaw: '',
-                    note: 'Model returned empty content; please retry or switch model. UI may parse raw output when available.'
-                });
-            }
             return NextResponse.json({ 
                 status: false,
                 errorId: requestId,

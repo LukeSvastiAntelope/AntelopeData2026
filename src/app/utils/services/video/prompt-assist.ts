@@ -131,7 +131,7 @@ export async function assistVideoPrompt(params: {
     return {
       ...fallback,
       explanation:
-        'Expanded with local templates (no Anthropic/OpenAI key configured). Edit freely before generating.',
+        'Expanded with local templates (no Anthropic key configured). Edit freely before generating.',
       referenceGuidance:
         params.mode === 't2v'
           ? undefined
