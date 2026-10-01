@@ -133,6 +133,8 @@ export interface AIStreamingCompletionResponse {
   model: string;
   tier: ModelTier;
   usedFallback: boolean;
+  /** Anthropic stop_reason (e.g. end_turn, max_tokens). Set when the stream finishes. */
+  stopReason?: string;
   usage?: {
     promptTokens: number;
     completionTokens: number;
@@ -495,15 +497,28 @@ export async function aiCompleteStream(
   let outputTokens = 0;
   let streamedChars = 0;
 
-  const readableStream = new ReadableStream({
+  const response: AIStreamingCompletionResponse = {
+    stream: undefined as unknown as ReadableStream<Uint8Array>,
+    model: servedModel,
+    tier: servedTier,
+    usedFallback: servedFallback,
+  };
+
+  response.stream = new ReadableStream({
     async start(controller) {
       try {
+        let stopReason: string | undefined;
         for await (const chunk of stream as any) {
           if (chunk.type === 'message_start' && chunk.message?.usage) {
             inputTokens = Number(chunk.message.usage.input_tokens) || 0;
           }
-          if (chunk.type === 'message_delta' && chunk.usage) {
-            outputTokens = Number(chunk.usage.output_tokens) || outputTokens;
+          if (chunk.type === 'message_delta') {
+            if (chunk.usage) {
+              outputTokens = Number(chunk.usage.output_tokens) || outputTokens;
+            }
+            if (chunk.delta?.stop_reason) {
+              stopReason = String(chunk.delta.stop_reason);
+            }
           }
           if (
             chunk.type === 'content_block_delta' &&
@@ -520,6 +535,8 @@ export async function aiCompleteStream(
             }
           }
         }
+        // Expose stop_reason to callers before the stream closes
+        response.stopReason = stopReason;
         if (!outputTokens && streamedChars > 0) {
           outputTokens = Math.max(1, Math.ceil(streamedChars / 4));
         }
@@ -539,12 +556,7 @@ export async function aiCompleteStream(
     },
   });
 
-  return {
-    stream: readableStream,
-    model: servedModel,
-    tier: servedTier,
-    usedFallback: servedFallback,
-  };
+  return response;
 }
 
 // ---------------------------------------------------------------------------

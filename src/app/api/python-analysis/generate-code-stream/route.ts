@@ -165,6 +165,40 @@ export async function POST(req: NextRequest) {
       })
     );
 
+    const encoder = new TextEncoder();
+    const decoder = new TextDecoder();
+
+    // Inject { truncated: true } before [DONE] when Anthropic hit max_tokens,
+    // so clients can auto-regenerate (mirrors non-stream generate-code).
+    const stream = new ReadableStream<Uint8Array>({
+      async start(controller) {
+        const reader = streamingResponse.stream.getReader();
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            const text = decoder.decode(value, { stream: true });
+            if (text.includes('data: [DONE]')) {
+              if (streamingResponse.stopReason === 'max_tokens') {
+                console.warn(
+                  '[PYTHON-ANALYSIS-STREAM] truncated (stop_reason=max_tokens); signaling client'
+                );
+                controller.enqueue(
+                  encoder.encode(
+                    `data: ${JSON.stringify({ truncated: true })}\n\n`
+                  )
+                );
+              }
+            }
+            controller.enqueue(value);
+          }
+          controller.close();
+        } catch (err) {
+          controller.error(err);
+        }
+      },
+    });
+
     const headers = new Headers({
       'Content-Type': 'text/plain; charset=utf-8',
       'Cache-Control': 'no-cache',
@@ -173,7 +207,7 @@ export async function POST(req: NextRequest) {
       'X-Model-Used': selectedModel
     });
 
-    return new Response(streamingResponse.stream, { headers });
+    return new Response(stream, { headers });
 
   } catch (error) {
     console.error('[PYTHON-ANALYSIS-STREAM] Code generation error:', error);

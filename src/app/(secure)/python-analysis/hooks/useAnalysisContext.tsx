@@ -273,7 +273,8 @@ export function useAnalysisContext() {
   const executeCode = useCallback(async (
     code: string,
     pyodide: any,
-    frames?: import('../utils/named-datasets').AnalysisFrame[]
+    frames?: import('../utils/named-datasets').AnalysisFrame[],
+    regenerateCode?: () => Promise<string>
   ) => {
     if (!currentDataset && !(frames && frames.length)) {
       setExecutionState(prev => ({
@@ -283,12 +284,14 @@ export function useAnalysisContext() {
       return;
     }
 
+    let workingCode = code;
+
     try {
       setExecutionState(prev => ({
         ...prev,
         isExecuting: true,
         error: null,
-        currentCode: code
+        currentCode: workingCode
       }));
 
       // Multi-frame path: load all named dataframes (primary → df)
@@ -408,23 +411,45 @@ export function useAnalysisContext() {
         
         // Execute the user's code with intelligent error handling
         try {
-          result = pyodide.runPython(code);
+          result = pyodide.runPython(workingCode);
         } catch (execError) {
           console.warn('Code execution failed, attempting automatic fixes:', execError);
 
-          // Truncated / incomplete Python cannot be patched — signal regenerate
+          // Truncated / incomplete Python cannot be patched — regenerate once (mirror agent)
           if (isIncompleteCodeError(execError)) {
-            console.warn(
-              '[analysis-context] incomplete code SyntaxError; skipping fix-code (regenerate required)'
-            );
-            throw new Error(
-              `Incomplete generated code (${String(execError)}). Please regenerate.`
-            );
-          }
+            if (regenerateCode) {
+              try {
+                console.warn(
+                  '[analysis-context] incomplete code SyntaxError; regenerating once'
+                );
+                workingCode = await regenerateCode();
+                setExecutionState((prev) => ({
+                  ...prev,
+                  currentCode: workingCode,
+                }));
+                result = pyodide.runPython(workingCode);
+              } catch (regenErr) {
+                console.warn(
+                  '[analysis-context] regenerate failed after incomplete SyntaxError:',
+                  regenErr
+                );
+                throw new Error(
+                  `Incomplete generated code (${String(execError)}). Please regenerate.`
+                );
+              }
+            } else {
+              console.warn(
+                '[analysis-context] incomplete code SyntaxError; skipping fix-code (regenerate required)'
+              );
+              throw new Error(
+                `Incomplete generated code (${String(execError)}). Please regenerate.`
+              );
+            }
+          } else {
           
           // Try to diagnose and fix common issues
           const errorMessage = String(execError);
-          let fixedCode = code;
+          let fixedCode = workingCode;
           
           // Fix 1: Missing imports
           if (errorMessage.includes('not defined') || errorMessage.includes('NameError')) {
@@ -437,7 +462,7 @@ try:
 except ImportError:
     print("Note: scipy not available")
 
-${code}
+${workingCode}
             `;
           }
           
@@ -445,7 +470,7 @@ ${code}
           else if (errorMessage.includes('KeyError') || errorMessage.includes('not in index')) {
             fixedCode = `
 try:
-    ${code}
+    ${workingCode}
 except KeyError as e:
     print(f"Variable not found: {e}")
     print("Available columns:", df.columns.tolist())
@@ -470,7 +495,7 @@ except KeyError as e:
           
           // Fix 3: Plotting issues
           else if (errorMessage.includes('plot') || errorMessage.includes('matplotlib')) {
-            fixedCode = code.replace('plt.show()', `
+            fixedCode = workingCode.replace('plt.show()', `
 try:
     plt.show()
 except Exception as plot_error:
@@ -483,7 +508,7 @@ except Exception as plot_error:
           else if (errorMessage.includes('dtype') || errorMessage.includes('astype')) {
             fixedCode = `
 try:
-    ${code}
+    ${workingCode}
 except Exception as dtype_error:
     print(f"Data type error: {dtype_error}")
     print("Trying with basic data exploration instead...")
@@ -498,7 +523,7 @@ except Exception as dtype_error:
           else {
             fixedCode = `
 try:
-    ${code}
+    ${workingCode}
 except Exception as e:
     print(f"Execution error: {str(e)}")
     print("\\nLet me try a simpler approach...")
@@ -526,7 +551,7 @@ except Exception as e:
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                  originalCode: code,
+                  originalCode: workingCode,
                   errorMessage: String(finalError),
                   dataSchema: {
                     columns: currentDataset.columns,
@@ -538,15 +563,26 @@ except Exception as e:
               
               const fixResult = await fixResponse.json().catch(() => ({}));
               if (fixResult?.truncated || isIncompleteCodeError(String(finalError))) {
-                console.warn(
-                  '[analysis-context] fix-code truncated or incomplete; regenerating required'
-                );
-                throw new Error(
-                  fixResult?.error ||
-                    'Fixed code was truncated; please regenerate'
-                );
-              }
-              if (fixResponse.ok && fixResult?.fixedCode) {
+                if (regenerateCode) {
+                  console.warn(
+                    '[analysis-context] fix-code truncated or incomplete; regenerating once'
+                  );
+                  workingCode = await regenerateCode();
+                  setExecutionState((prev) => ({
+                    ...prev,
+                    currentCode: workingCode,
+                  }));
+                  result = pyodide.runPython(workingCode);
+                } else {
+                  console.warn(
+                    '[analysis-context] fix-code truncated or incomplete; regenerating required'
+                  );
+                  throw new Error(
+                    fixResult?.error ||
+                      'Fixed code was truncated; please regenerate'
+                  );
+                }
+              } else if (fixResponse.ok && fixResult?.fixedCode) {
                 console.log('AI suggested fix:', fixResult.fixedCode);
                 result = pyodide.runPython(fixResult.fixedCode);
               } else {
@@ -572,6 +608,7 @@ print("\\nSuggestion: Try a simpler question or check if the variables exist in 
               `);
             }
           }
+          } // end else (not incomplete-code)
         }
         
         // Get captured output and plots
