@@ -134,13 +134,24 @@ Always set showPins and applyChoropleth to false (no dataset). Other fields null
       'custom_map_chat',
       () => createCompletion({
       tier: 'cheap',
-      maxTokens: 800,
+      maxTokens: 2000,
+      expandOnTruncation: true,
       messages: [
         { role: 'system', content: 'You output only compact JSON. No markdown fences.' },
         { role: 'user', content: prompt },
       ],
     })
     );
+
+    if (completion.stopReason === 'max_tokens') {
+      return NextResponse.json(
+        {
+          error:
+            'Map chat response was truncated after expand; please retry with a shorter request',
+        },
+        { status: 502 }
+      )
+    }
 
     const text = completion.content?.trim() ?? '{}'
     let parsed: Record<string, unknown>

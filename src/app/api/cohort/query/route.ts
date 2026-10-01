@@ -441,8 +441,15 @@ Do not repeat the exact percentages already shown above - instead interpret what
         { role: 'user', content: prompt }
       ],
       temperature: 0.3, // Balanced temperature for insightful but consistent analysis
-      maxTokens: 800
+      maxTokens: 2000,
+      expandOnTruncation: true,
     });
+
+    if (completion.stopReason === 'max_tokens') {
+      throw new Error(
+        'Cohort analysis response was truncated after expand; please retry'
+      );
+    }
 
     return completion.content || 'Analysis could not be generated at this time.';
 
@@ -1034,10 +1041,16 @@ Only suggest auto-selection if there's a clear, unambiguous match with high conf
             tier: 'cheap',
             messages: [{ role: 'user', content: autoSelectionPrompt }],
             temperature: 0.2,
-            maxTokens: 200
+            maxTokens: 600,
+            expandOnTruncation: true,
           });
 
           try {
+            if (autoSelectionResult.stopReason === 'max_tokens') {
+              throw new Error(
+                'Survey auto-selection response was truncated after expand; please retry'
+              );
+            }
             const autoSelection = JSON.parse(autoSelectionResult.content);
             
             if (autoSelection.shouldAutoSelect && autoSelection.surveyId && autoSelection.confidence > 0.8) {

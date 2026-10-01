@@ -155,10 +155,17 @@ Do not repeat the exact percentages already shown above - instead interpret what
         { role: "user", content: prompt }
       ],
       temperature: 0.3,
-      maxTokens: 800,
+      maxTokens: 2000,
+      expandOnTruncation: true,
       frequencyPenalty: 0.2,
       presencePenalty: 0.2
     });
+
+    if (completion.stopReason === 'max_tokens') {
+      throw new Error(
+        'Quantitative analysis response was truncated after expand; please retry'
+      );
+    }
 
     return completion.content || 'Analysis could not be generated.';
   } catch (error) {

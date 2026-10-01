@@ -63,8 +63,14 @@ async function runNewsAgent(task: AgentTaskEnvelope): Promise<AgentResult> {
     model: task.model,
     messages: [{ role: 'user', content: prompt }],
     temperature: 0.2,
-    maxTokens: 700,
+    maxTokens: 2000,
+    expandOnTruncation: true,
   });
+  if (result.stopReason === 'max_tokens') {
+    throw new Error(
+      'News agent response was truncated after expand; please retry'
+    );
+  }
   const content = String(result.content || '').trim();
   const evidenceRefs = extractUrls(content);
   return {
@@ -107,8 +113,14 @@ async function runCampaignManagerAgent(task: AgentTaskEnvelope): Promise<AgentRe
     model: task.model,
     messages: [{ role: 'user', content: prompt }],
     temperature: 0.25,
-    maxTokens: 800,
+    maxTokens: 2000,
+    expandOnTruncation: true,
   });
+  if (result.stopReason === 'max_tokens') {
+    throw new Error(
+      'Campaign manager agent response was truncated after expand; please retry'
+    );
+  }
   const content = String(result.content || '').trim();
   const evidenceRefs = extractUrls(content);
   return {
@@ -239,8 +251,15 @@ export async function orchestrateWithPlanner(input: OrchestrateAgentsInput): Pro
     model: input.model,
     messages: [{ role: 'user', content: mergePrompt }],
     temperature: 0.2,
-    maxTokens: 1200,
+    maxTokens: 2000,
+    expandOnTruncation: true,
   });
+
+  if (merged.stopReason === 'max_tokens') {
+    throw new Error(
+      'Multi-agent merge response was truncated after expand; please retry'
+    );
+  }
 
   const finalAnswerText = String(merged.content || '').trim();
   const finalAnswer =

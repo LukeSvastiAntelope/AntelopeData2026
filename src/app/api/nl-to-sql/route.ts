@@ -62,13 +62,24 @@ export async function POST(req: NextRequest) {
       () =>
         createCompletion({
           tier: 'cheap',
-          maxTokens: 400,
+          maxTokens: 1200,
+          expandOnTruncation: true,
           messages: [
             { role: 'system', content: systemPrompt },
             { role: 'user', content: userPrompt },
           ],
         })
     );
+
+    if (completion.stopReason === 'max_tokens') {
+      return NextResponse.json(
+        {
+          message: 'Generated SQL was truncated after expand; please retry with a simpler query.',
+          status: false,
+        },
+        { status: 502 }
+      );
+    }
 
     let generatedSql = (completion.content || "").trim();
     // Strip markdown fences if present

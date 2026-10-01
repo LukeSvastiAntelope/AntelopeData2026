@@ -144,7 +144,15 @@ Format your response as JSON:
               { role: 'user', content: prompt }
             ],
             temperature: 0.7,
+            maxTokens: 2000,
+            expandOnTruncation: true,
           });
+
+          if (completion.stopReason === 'max_tokens') {
+            throw new Error(
+              'Message-test response was truncated after expand; please retry'
+            );
+          }
 
           const responseText = completion.content || '';
           

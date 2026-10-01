@@ -285,7 +285,7 @@ async function callAnthropicOnce(params: {
   const split = splitSystem(params.messages, params.system);
   const requestParams: Record<string, unknown> = {
     model: params.model,
-    max_tokens: params.maxTokens || 500,
+    max_tokens: params.maxTokens || 1024,
     messages: split.messages,
   };
   if (split.system) requestParams.system = split.system;
@@ -328,7 +328,7 @@ export async function aiComplete(
   const primaryModel = getModelForTier(tier);
   const messages = params.messages || [];
   const meta = resolveUsageMeta(params.usage);
-  let maxTokens = params.maxTokens || 500;
+  let maxTokens = params.maxTokens || 1024;
 
   const gate = await assertAiUsageAllowed(meta.organizationId);
   const usageWarning = gate.warn
@@ -464,7 +464,7 @@ export async function aiCompleteStream(
   const startStream = async (modelId: string) => {
     const requestParams: Record<string, unknown> = {
       model: modelId,
-      max_tokens: params.maxTokens || 500,
+      max_tokens: params.maxTokens || 1024,
       messages: split.messages,
       stream: true,
     };

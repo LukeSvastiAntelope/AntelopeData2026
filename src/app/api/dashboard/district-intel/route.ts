@@ -171,7 +171,8 @@ ${deepResult.content}`
         'district_intel',
         () => createCompletion({
           tier: 'cheap',
-          maxTokens: 800,
+          maxTokens: 2500,
+          expandOnTruncation: true,
           messages: [
             { role: 'system', content: 'You return only valid JSON. No markdown.' },
             { role: 'user', content: summaryPrompt },
@@ -179,6 +180,11 @@ ${deepResult.content}`
         }),
         organizationId > 0 ? organizationId : null
       )
+      if (completion.stopReason === 'max_tokens') {
+        throw new Error(
+          'District intel summary was truncated after expand; please retry'
+        )
+      }
       const text = (completion.content || '{}').replace(/```json\n?|\n?```/g, '').trim() || '{}'
       parsed = JSON.parse(text)
     } catch {

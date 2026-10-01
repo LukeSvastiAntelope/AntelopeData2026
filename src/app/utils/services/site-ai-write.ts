@@ -106,12 +106,19 @@ ${SLOT_INSTRUCTIONS[slotPath]}`;
 
   const result = await createCompletion({
     tier: 'workhorse',
-    maxTokens: 1200,
+    maxTokens: 3000,
+    expandOnTruncation: true,
     messages: [
       { role: 'system', content: system },
       { role: 'user', content: user },
     ],
   });
+
+  if (result.stopReason === 'max_tokens') {
+    throw new Error(
+      'Site AI write response was truncated after expand; please retry'
+    );
+  }
 
   const parsed = extractJson(result.content) as Record<string, unknown>;
 

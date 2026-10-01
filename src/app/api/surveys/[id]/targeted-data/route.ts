@@ -270,10 +270,17 @@ Relevant questions:`;
       'targeted_data',
       () => createCompletion({
       tier: 'workhorse',
-      maxTokens: 1000,
+      maxTokens: 2500,
+      expandOnTruncation: true,
       messages: [{ role: 'user', content: prompt }],
     })
     );
+
+    if (completion.stopReason === 'max_tokens') {
+      throw new Error(
+        'Targeted data question selection was truncated after expand; please retry'
+      );
+    }
 
     const llmResponse = (completion.content || '').trim();
     
