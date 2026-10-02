@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { runConsultantMessage } from '@/app/utils/services/consultant-agent';
 import { withUserOrgAiUsage } from '@/app/utils/services/with-org-ai-usage';
+import { resolveActiveOrgForUser } from '@/app/utils/auth/resolve-active-org';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -34,10 +35,13 @@ export async function POST(request: NextRequest) {
       body?.conversationId !== undefined && Number.isFinite(Number(body.conversationId))
         ? Number(body.conversationId)
         : undefined;
-    const organizationId =
-      body?.organizationId !== undefined && Number.isFinite(Number(body.organizationId))
-        ? Number(body.organizationId)
-        : null;
+
+    const organizationId = await resolveActiveOrgForUser(
+      request,
+      userId,
+      body?.organizationId
+    );
+    if (organizationId instanceof NextResponse) return organizationId;
 
     const result = await withUserOrgAiUsage(
       userId,

@@ -10,6 +10,7 @@ import {
   getPrimaryOrganizationId,
   hasWebsiteAddon,
 } from '@/app/utils/services/org-entitlements';
+import { resolveActiveOrgForUser } from '@/app/utils/auth/resolve-active-org';
 
 export async function GET(req: NextRequest) {
   try {
@@ -48,17 +49,12 @@ export async function POST(req: NextRequest) {
     const userId = Number(auth);
 
     const body = await req.json().catch(() => ({}));
-    const organizationId =
-      body?.organizationId != null
-        ? Number(body.organizationId)
-        : await getPrimaryOrganizationId(auth);
-
-    if (!organizationId || !Number.isFinite(organizationId)) {
-      return NextResponse.json(
-        { status: false, message: 'organizationId required' },
-        { status: 400 }
-      );
-    }
+    const organizationId = await resolveActiveOrgForUser(
+      req,
+      userId,
+      body?.organizationId
+    );
+    if (organizationId instanceof NextResponse) return organizationId;
 
     // TODO(stripe): create Checkout Session for $20/mo website add-on;
     // enable entitlement from webhook on invoice.paid / checkout.session.completed.

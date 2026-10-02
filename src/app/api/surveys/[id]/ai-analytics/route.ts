@@ -5,6 +5,7 @@ import { AIAnalyticsOrchestrator, AIAnalyticsConfig } from '@/app/utils/services
 import { withUserOrgAiUsage } from '@/app/utils/services/with-org-ai-usage';
 import { getAllModels } from '@/app/utils/models';
 import { openSql } from '@/app/utils/database/db';
+import { resolveActiveOrgForUser } from '@/app/utils/auth/resolve-active-org';
 
 // GET /api/surveys/[id]/ai-analytics - Get existing analytics or status
 export async function GET(
@@ -163,12 +164,21 @@ export async function POST(
     const auth = requireUserId(request);
     if (typeof auth === 'string' && Number.isFinite(Number(auth))) {
       config.userId = Number(auth);
+    } else {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-    if (body.organizationId !== undefined && Number.isFinite(Number(body.organizationId))) {
-      config.organizationId = Number(body.organizationId);
-    } else if (config.campaignId) {
-      config.organizationId = config.campaignId;
-    }
+
+    const organizationId = await resolveActiveOrgForUser(
+      request,
+      config.userId,
+      body.organizationId !== undefined
+        ? body.organizationId
+        : body.campaignId !== undefined
+          ? body.campaignId
+          : null
+    );
+    if (organizationId instanceof NextResponse) return organizationId;
+    config.organizationId = organizationId;
 
     // Validate models are available
     const availableModels = getAllModels().map(m => m.id);

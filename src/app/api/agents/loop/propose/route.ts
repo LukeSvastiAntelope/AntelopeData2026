@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireUserId } from '@/app/utils/auth/require-user';
 import { auth } from '@/auth';
 import { runProposerPass } from '@/app/utils/services/loop/proposer';
+import { resolveActiveOrgForUser } from '@/app/utils/auth/resolve-active-org';
 
 /**
  * POST /api/agents/loop/propose
@@ -24,13 +25,12 @@ export async function POST(req: NextRequest) {
       : Number(headerUserId);
 
     const body = await req.json().catch(() => ({}));
-    const orgId = Number(body.orgId ?? body.organizationId);
-    if (!Number.isFinite(orgId) || orgId <= 0) {
-      return NextResponse.json(
-        { error: 'orgId is required' },
-        { status: 400 }
-      );
-    }
+    const orgId = await resolveActiveOrgForUser(
+      req,
+      effectiveUserId,
+      body.orgId ?? body.organizationId
+    );
+    if (orgId instanceof NextResponse) return orgId;
 
     const result = await runProposerPass({
       orgId,

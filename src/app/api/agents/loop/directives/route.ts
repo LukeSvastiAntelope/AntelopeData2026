@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireUserId } from '@/app/utils/auth/require-user';
 import { auth } from '@/auth';
 import { AgentSituationService } from '@/app/utils/services/agent-situation-service';
+import { resolveActiveOrgForUser } from '@/app/utils/auth/resolve-active-org';
 
 /**
  * POST /api/agents/loop/directives
@@ -21,11 +22,13 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json().catch(() => ({}));
-    const orgId = Number(body.orgId ?? body.organizationId);
+    const orgId = await resolveActiveOrgForUser(
+      req,
+      userId,
+      body.orgId ?? body.organizationId
+    );
+    if (orgId instanceof NextResponse) return orgId;
     const text = String(body.text || body.directive || '').trim();
-    if (!Number.isFinite(orgId) || orgId <= 0) {
-      return NextResponse.json({ error: 'orgId is required' }, { status: 400 });
-    }
     if (!text) {
       return NextResponse.json({ error: 'text is required' }, { status: 400 });
     }

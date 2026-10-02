@@ -7,6 +7,7 @@ import {
   AI_DISCLOSURE_DEFAULT,
   assertOwnAssetUse,
 } from '@/app/utils/services/video/guardrails';
+import { resolveActiveOrgForUser } from '@/app/utils/auth/resolve-active-org';
 
 /**
  * Stage a generated/clipped video for the human post gate (generate_and_post_video).
@@ -39,10 +40,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: guard.reason }, { status: 400 });
     }
 
-    const orgId =
-      body.organizationId != null && Number.isFinite(Number(body.organizationId))
-        ? Number(body.organizationId)
-        : null;
+    const orgId = await resolveActiveOrgForUser(
+      req,
+      userId,
+      body.organizationId
+    );
+    if (orgId instanceof NextResponse) return orgId;
 
     const includeAiDisclosure =
       body.includeAiDisclosure === undefined ? true : Boolean(body.includeAiDisclosure);

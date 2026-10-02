@@ -5,6 +5,7 @@ import { withUserOrgAiUsage } from '@/app/utils/services/with-org-ai-usage';
 import { generateAnalysisContentDrafts } from '@/app/utils/services/analysis-content-service';
 import { AnalyticsContentDraftRepo } from '@/app/utils/database/analytics-content-draft-repo';
 import { WorkflowRepo } from '@/app/utils/database/workflow-repo';
+import { resolveActiveOrgForUser } from '@/app/utils/auth/resolve-active-org';
 
 /**
  * POST /api/analytics/to-content — synthesis + figures → 3 Spread drafts
@@ -70,10 +71,12 @@ export async function POST(req: NextRequest) {
     }
 
     const figures = Array.isArray(body.figures) ? body.figures : [];
-    const organizationId =
-      body.organizationId != null && Number.isFinite(Number(body.organizationId))
-        ? Number(body.organizationId)
-        : null;
+    const organizationId = await resolveActiveOrgForUser(
+      req,
+      userId,
+      body.organizationId
+    );
+    if (organizationId instanceof NextResponse) return organizationId;
 
     const result = await withUserOrgAiUsage(
       userId,

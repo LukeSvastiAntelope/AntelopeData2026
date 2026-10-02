@@ -4,6 +4,7 @@ import { auth } from '@/auth';
 import { ConsultantRepo } from '@/app/utils/database/consultant-repo';
 import { executeTool } from '@/app/utils/services/tools/executor';
 import { SMALL_SAMPLE_DISCLAIMER } from '@/app/utils/services/autotrigger-outputs';
+import { resolveActiveOrgForUser } from '@/app/utils/auth/resolve-active-org';
 
 /**
  * Stage a social card image for the human post gate (post_social_card).
@@ -41,10 +42,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const orgId =
-      body.organizationId != null && Number.isFinite(Number(body.organizationId))
-        ? Number(body.organizationId)
-        : null;
+    const orgId = await resolveActiveOrgForUser(
+      req,
+      userId,
+      body.organizationId
+    );
+    if (orgId instanceof NextResponse) return orgId;
 
     const caveat = String(body.caveat || '').trim() || null;
     let caption = String(body.caption || body.headline || '').trim();
