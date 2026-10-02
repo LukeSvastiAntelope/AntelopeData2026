@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS analytics_content_drafts (
   figure_caption VARCHAR(512) NULL,
   sample_n INT NULL,
   source_line VARCHAR(512) NULL,
-  status ENUM('ready', 'opened', 'staged', 'dismissed') NOT NULL DEFAULT 'ready',
+  status ENUM('ready', 'opened', 'staged', 'used', 'dismissed') NOT NULL DEFAULT 'ready',
   payload JSON NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,

@@ -196,12 +196,13 @@ export const WorkflowRepo = {
   },
 };
 
+/** Only untouched ready drafts keep Campaign Flow on "Next: Spread". */
 async function safeDraftCount(userId: number): Promise<number> {
   try {
     const db = await openSql();
     const [rows] = await db.execute<RowDataPacket[]>(
       `SELECT COUNT(*) AS cnt FROM analytics_content_drafts
-        WHERE user_id = ? AND status != 'dismissed'`,
+        WHERE user_id = ? AND status = 'ready'`,
       [userId]
     );
     return Number(rows[0]?.cnt || 0);

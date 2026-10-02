@@ -24,6 +24,8 @@ export type ChartActionFigure = {
   n?: number | null;
   /** Optional p-value for the finding (caveat gate) */
   pValue?: number | null;
+  /** Statistical test name (e.g. chi-square, t-test) */
+  testName?: string | null;
   storageKey?: string | null;
   stepId?: string | null;
   /** Preceding step Python for social-card re-render */

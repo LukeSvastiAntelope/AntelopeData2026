@@ -1,17 +1,24 @@
 /**
  * Analysis → content drafts (chart post, explainer video, candidate clip).
  * Numbers come from synthesis/stats/figures — Claude only phrases claims.
+ * Publishability is gated by n + corrected p (postable-insight floors) — never keywords.
  * Metered as analytics.to_content (workhorse).
  */
 
 import { createCompletion } from '@/app/utils/services/ai-service';
 import { SMALL_SAMPLE_DISCLAIMER } from '@/app/utils/services/autotrigger-outputs';
-import { POSTABLE_INSIGHT_THRESHOLDS } from '@/app/utils/services/postable-insight-service';
+import {
+  POSTABLE_INSIGHT_THRESHOLDS,
+  benjaminiHochberg,
+} from '@/app/utils/services/postable-insight-service';
 import {
   AnalyticsContentDraftRepo,
   type AnalyticsContentDraftRow,
   type AnalyticsDraftFlag,
 } from '@/app/utils/database/analytics-content-draft-repo';
+import { openSql } from '@/app/utils/database/db';
+import type { RowDataPacket } from 'mysql2/promise';
+import { coalesceFindingStats } from '@/app/utils/analysis/extract-finding-stats';
 
 export type AnalysisFigureInput = {
   storageKey?: string | null;
@@ -20,6 +27,8 @@ export type AnalysisFigureInput = {
   stepId?: string | null;
   n?: number | null;
   src?: string | null;
+  pValue?: number | null;
+  testName?: string | null;
 };
 
 export type AnalysisContentInput = {
@@ -30,9 +39,13 @@ export type AnalysisContentInput = {
   surveyTitle?: string | null;
   synthesis: string;
   figures: AnalysisFigureInput[];
-  /** Optional stats from the run */
+  /**
+   * Client-supplied N is ignored for the publish gate.
+   * Server recomputes from stored figure metadata / survey responses.
+   */
   sampleN?: number | null;
   testName?: string | null;
+  /** Prefer BH-corrected p when multiple tests were run. */
   pValue?: number | null;
 };
 
@@ -78,41 +91,163 @@ function buildSourceLine(
     .join(', ');
 }
 
-function inferFlag(params: {
-  sampleN?: number | null;
-  pValue?: number | null;
+function finitePositive(n: unknown): number | null {
+  if (n == null) return null;
+  const v = Number(n);
+  if (!Number.isFinite(v) || v <= 0) return null;
+  return v;
+}
+
+/**
+ * Recompute sample N from stored conversation figure metadata and/or survey
+ * response counts. Do not trust a top-level client sampleN.
+ */
+export async function resolveSampleNFromStoredMetadata(params: {
+  userId: number;
+  conversationId?: string | null;
+  surveyId?: number | null;
+  figures: AnalysisFigureInput[];
+}): Promise<number | null> {
+  const keys = new Set(
+    params.figures
+      .map((f) => (f.storageKey ? String(f.storageKey) : null))
+      .filter((k): k is string => !!k)
+  );
+
+  try {
+    const db = await openSql();
+
+    if (params.conversationId) {
+      const [rows] = await db.execute<RowDataPacket[]>(
+        `SELECT messages FROM chat_conversations
+          WHERE id = ? AND user_id = ? LIMIT 1`,
+        [params.conversationId, params.userId]
+      );
+      if (rows[0]?.messages != null) {
+        let messages: unknown[] = [];
+        try {
+          messages =
+            typeof rows[0].messages === 'string'
+              ? JSON.parse(rows[0].messages)
+              : rows[0].messages;
+        } catch {
+          messages = [];
+        }
+        if (Array.isArray(messages)) {
+          const ns: number[] = [];
+          for (const raw of messages) {
+            if (!raw || typeof raw !== 'object') continue;
+            const meta = (raw as { metadata?: Record<string, unknown> }).metadata;
+            if (!meta) continue;
+            const key =
+              meta.storageKey != null ? String(meta.storageKey) : null;
+            // Prefer matching uploaded figures; otherwise any plot with n
+            if (keys.size > 0 && key && !keys.has(key)) continue;
+            const n = finitePositive(meta.n);
+            if (n != null) ns.push(n);
+          }
+          if (ns.length) return Math.max(...ns);
+        }
+      }
+    }
+
+    if (params.surveyId != null && Number.isFinite(params.surveyId)) {
+      const [countRows] = await db.execute<RowDataPacket[]>(
+        `SELECT COUNT(*) AS cnt FROM survey_responses WHERE survey_id = ?`,
+        [params.surveyId]
+      );
+      const cnt = finitePositive(countRows[0]?.cnt);
+      if (cnt != null) return cnt;
+    }
+  } catch (e) {
+    console.warn(
+      '[analysis-content] resolveSampleN failed',
+      e instanceof Error ? e.message : e
+    );
+  }
+
+  // Last resort: figure payload metadata (still not top-level body.sampleN)
+  const fromFigures = params.figures
+    .map((f) => finitePositive(f.n))
+    .filter((n): n is number => n != null);
+  if (fromFigures.length) return Math.max(...fromFigures);
+
+  return null;
+}
+
+/**
+ * Resolve p + test for the finding. When multiple figure p-values arrive,
+ * apply BH correction (same family as postable-insight) and use the min corrected.
+ */
+export function resolveFindingStats(input: {
   synthesis: string;
+  figures: AnalysisFigureInput[];
+  pValue?: number | null;
+  testName?: string | null;
+}): { pValue: number | null; testName: string | null; pCorrected: number | null } {
+  const fromBody = coalesceFindingStats([
+    { pValue: input.pValue, testName: input.testName, text: input.synthesis },
+    ...input.figures.map((f) => ({
+      pValue: f.pValue,
+      testName: f.testName,
+      text: f.caption,
+    })),
+  ]);
+
+  const rawPs = input.figures
+    .map((f) => finitePositive(f.pValue))
+    .filter((p): p is number => p != null && p <= 1);
+  if (
+    input.pValue != null &&
+    Number.isFinite(input.pValue) &&
+    input.pValue > 0 &&
+    input.pValue <= 1
+  ) {
+    rawPs.push(Number(input.pValue));
+  }
+
+  let pCorrected: number | null = fromBody.pValue;
+  if (rawPs.length > 1) {
+    const corrected = benjaminiHochberg(rawPs);
+    pCorrected = Math.min(...corrected);
+  } else if (rawPs.length === 1) {
+    pCorrected = rawPs[0];
+  }
+
+  return {
+    pValue: fromBody.pValue,
+    testName: fromBody.testName,
+    pCorrected,
+  };
+}
+
+/**
+ * Publishable only when n clears postable floors AND corrected p < alpha.
+ * Missing p/test → directional. Never infer from summary keywords.
+ */
+export function inferPublishableFlag(params: {
+  sampleN?: number | null;
+  pCorrected?: number | null;
+  testName?: string | null;
 }): AnalyticsDraftFlag {
+  const thresholds = POSTABLE_INSIGHT_THRESHOLDS;
   const n = params.sampleN;
-  if (
-    n != null &&
-    (n < POSTABLE_INSIGHT_THRESHOLDS.minCellSize ||
-      n < POSTABLE_INSIGHT_THRESHOLDS.minTotalResponses)
-  ) {
+  const p = params.pCorrected;
+  const testOk = !!(params.testName && String(params.testName).trim());
+
+  if (n == null || !Number.isFinite(n)) return 'directional_only';
+  if (n < thresholds.minTotalResponses || n < thresholds.minCellSize) {
     return 'directional_only';
   }
-  if (params.pValue != null && params.pValue > POSTABLE_INSIGHT_THRESHOLDS.alpha) {
-    return 'directional_only';
-  }
-  const syn = params.synthesis.toLowerCase();
-  if (
-    syn.includes('directional') ||
-    syn.includes('small sample') ||
-    syn.includes('not significant') ||
-    syn.includes('limited n')
-  ) {
-    return 'directional_only';
-  }
-  // Without a hard statistical gate survivor, treat as directional unless n is healthy
-  if (n != null && n >= POSTABLE_INSIGHT_THRESHOLDS.minTotalResponses) {
-    return 'publishable';
-  }
-  return 'directional_only';
+  if (p == null || !Number.isFinite(p) || !testOk) return 'directional_only';
+  if (p >= thresholds.alpha) return 'directional_only';
+  return 'publishable';
 }
 
 function fallbackBundle(
   input: AnalysisContentInput,
-  flag: AnalyticsDraftFlag
+  flag: AnalyticsDraftFlag,
+  sampleN: number | null
 ): ContentDraftBundle {
   const claim =
     input.synthesis
@@ -124,7 +259,7 @@ function fallbackBundle(
   const caveat =
     flag === 'directional_only'
       ? SMALL_SAMPLE_DISCLAIMER
-      : `Based on ${input.sampleN != null ? `N=${input.sampleN}` : 'this sample'}; interpret with normal sampling uncertainty.`;
+      : `Based on ${sampleN != null ? `N=${sampleN}` : 'this sample'}; interpret with normal sampling uncertainty.`;
   const angle =
     flag === 'publishable'
       ? 'Lead with the chart and one clear number'
@@ -181,13 +316,17 @@ function fallbackBundle(
 
 async function draftWithModel(
   input: AnalysisContentInput,
-  flag: AnalyticsDraftFlag
+  flag: AnalyticsDraftFlag,
+  sampleN: number | null,
+  stats: { pCorrected: number | null; testName: string | null }
 ): Promise<ContentDraftBundle> {
   const figureNotes = input.figures
     .slice(0, 6)
     .map(
       (f, i) =>
-        `${i}: ${f.caption || f.stepId || 'chart'}${f.storageKey ? ` [key=${f.storageKey}]` : ''}`
+        `${i}: ${f.caption || f.stepId || 'chart'}${f.storageKey ? ` [key=${f.storageKey}]` : ''}${
+          f.pValue != null ? ` p=${f.pValue}` : ''
+        }${f.testName ? ` (${f.testName})` : ''}`
     )
     .join('\n');
 
@@ -200,9 +339,9 @@ HARD RULES:
 - Video data beat must use the real chart (not generative numbers).
 
 Survey: ${input.surveyTitle || '(untitled)'}
-Sample N: ${input.sampleN ?? 'unknown'}
-Test: ${input.testName || 'n/a'}
-p: ${input.pValue ?? 'n/a'}
+Sample N: ${sampleN ?? 'unknown'}
+Test: ${stats.testName || 'n/a'}
+p (corrected): ${stats.pCorrected ?? 'n/a'}
 Flag: ${flag}
 
 Synthesis:
@@ -253,7 +392,7 @@ Return ONLY JSON:
 
   if (completion.stopReason === 'max_tokens') {
     console.warn('[analysis-content] truncated; using fallback bundle');
-    return fallbackBundle(input, flag);
+    return fallbackBundle(input, flag, sampleN);
   }
 
   try {
@@ -263,7 +402,7 @@ Return ONLY JSON:
       .trim();
     const match = cleaned.match(/\{[\s\S]*\}/);
     const parsed = JSON.parse(match ? match[0] : cleaned);
-    const base = fallbackBundle(input, flag);
+    const base = fallbackBundle(input, flag, sampleN);
     const figureIndex = Math.max(
       0,
       Math.min(
@@ -339,7 +478,7 @@ Return ONLY JSON:
       },
     };
   } catch {
-    return fallbackBundle(input, flag);
+    return fallbackBundle(input, flag, sampleN);
   }
 }
 
@@ -348,14 +487,31 @@ export async function generateAnalysisContentDrafts(
 ): Promise<{
   bundle: ContentDraftBundle;
   drafts: AnalyticsContentDraftRow[];
+  sampleN: number | null;
+  stats: { pValue: number | null; pCorrected: number | null; testName: string | null };
 }> {
-  const flag = inferFlag({
-    sampleN: input.sampleN,
-    pValue: input.pValue,
-    synthesis: input.synthesis,
+  const sampleN = await resolveSampleNFromStoredMetadata({
+    userId: input.userId,
+    conversationId: input.conversationId,
+    surveyId: input.surveyId,
+    figures: input.figures,
   });
-  const bundle = await draftWithModel(input, flag);
-  const sourceLine = buildSourceLine(input.surveyTitle, input.sampleN);
+  const stats = resolveFindingStats({
+    synthesis: input.synthesis,
+    figures: input.figures,
+    pValue: input.pValue,
+    testName: input.testName,
+  });
+  const flag = inferPublishableFlag({
+    sampleN,
+    pCorrected: stats.pCorrected,
+    testName: stats.testName,
+  });
+  const bundle = await draftWithModel(input, flag, sampleN, {
+    pCorrected: stats.pCorrected,
+    testName: stats.testName,
+  });
+  const sourceLine = buildSourceLine(input.surveyTitle, sampleN);
   const figure =
     input.figures[bundle.chartPost.figureIndex] || input.figures[0] || null;
 
@@ -371,7 +527,7 @@ export async function generateAnalysisContentDrafts(
     figureStorageKey: figure?.storageKey ?? null,
     figureMediaUrl: figure?.mediaUrl ?? null,
     figureCaption: figure?.caption ?? null,
-    sampleN: input.sampleN ?? figure?.n ?? null,
+    sampleN,
     sourceLine,
   };
 
@@ -387,6 +543,9 @@ export async function generateAnalysisContentDrafts(
         kind: 'chart_post',
         figureIndex: bundle.chartPost.figureIndex,
         openComposer: true,
+        pValue: stats.pValue,
+        pCorrected: stats.pCorrected,
+        testName: stats.testName,
       },
     })
   );
@@ -410,6 +569,9 @@ export async function generateAnalysisContentDrafts(
       payload: {
         kind: 'explainer_video',
         openVideoStudio: true,
+        pValue: stats.pValue,
+        pCorrected: stats.pCorrected,
+        testName: stats.testName,
       },
     })
   );
@@ -429,9 +591,12 @@ export async function generateAnalysisContentDrafts(
       payload: {
         kind: 'candidate_clip',
         openClipStudio: true,
+        pValue: stats.pValue,
+        pCorrected: stats.pCorrected,
+        testName: stats.testName,
       },
     })
   );
 
-  return { bundle, drafts };
+  return { bundle, drafts, sampleN, stats };
 }

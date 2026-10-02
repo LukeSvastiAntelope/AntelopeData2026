@@ -32,11 +32,14 @@ export type AnalyticsContentDraftRow = {
   figureCaption: string | null;
   sampleN: number | null;
   sourceLine: string | null;
-  status: 'ready' | 'opened' | 'staged' | 'dismissed';
+  status: 'ready' | 'opened' | 'staged' | 'used' | 'dismissed';
   payload: Record<string, unknown> | null;
   createdAt: string;
   updatedAt: string;
 };
+
+export type AnalyticsDraftLifecycleStatus =
+  AnalyticsContentDraftRow['status'];
 
 function decodeRow(row: RowDataPacket): AnalyticsContentDraftRow {
   const parseJson = (raw: unknown) => {
@@ -152,7 +155,7 @@ export const AnalyticsContentDraftRepo = {
 
   async listForUser(
     userId: number,
-    opts?: { limit?: number; status?: string }
+    opts?: { limit?: number; status?: string; includeTerminal?: boolean }
   ): Promise<AnalyticsContentDraftRow[]> {
     const db = await openSql();
     const limit = Math.min(Math.max(opts?.limit || 40, 1), 100);
@@ -164,23 +167,39 @@ export const AnalyticsContentDraftRepo = {
             ORDER BY created_at DESC LIMIT ${limit}`,
           [userId, status]
         )
-      : await db.execute<RowDataPacket[]>(
-          `SELECT * FROM analytics_content_drafts
-            WHERE user_id = ? AND status != 'dismissed'
-            ORDER BY created_at DESC LIMIT ${limit}`,
-          [userId]
-        );
+      : opts?.includeTerminal
+        ? await db.execute<RowDataPacket[]>(
+            `SELECT * FROM analytics_content_drafts
+              WHERE user_id = ?
+              ORDER BY created_at DESC LIMIT ${limit}`,
+            [userId]
+          )
+        : await db.execute<RowDataPacket[]>(
+            `SELECT * FROM analytics_content_drafts
+              WHERE user_id = ? AND status NOT IN ('dismissed', 'used')
+              ORDER BY created_at DESC LIMIT ${limit}`,
+            [userId]
+          );
     return rows.map(decodeRow);
   },
 
-  async countForUser(userId: number): Promise<number> {
+  /**
+   * Campaign Flow "Next: Spread" only cares about untouched ready drafts.
+   * Opened / staged / used / dismissed must not keep the nudge sticky.
+   */
+  async countReadyForUser(userId: number): Promise<number> {
     const db = await openSql();
     const [rows] = await db.execute<RowDataPacket[]>(
       `SELECT COUNT(*) AS cnt FROM analytics_content_drafts
-        WHERE user_id = ? AND status != 'dismissed'`,
+        WHERE user_id = ? AND status = 'ready'`,
       [userId]
     );
     return Number(rows[0]?.cnt || 0);
+  },
+
+  /** @deprecated Prefer countReadyForUser for flow nudges. */
+  async countForUser(userId: number): Promise<number> {
+    return this.countReadyForUser(userId);
   },
 
   async markOpened(id: number, userId: number): Promise<void> {
@@ -190,5 +209,49 @@ export const AnalyticsContentDraftRepo = {
         WHERE id = ? AND user_id = ? AND status = 'ready'`,
       [id, userId]
     );
+  },
+
+  /** Mark draft consumed so Campaign Flow stops nudging Spread. */
+  async markUsed(id: number, userId: number): Promise<void> {
+    const db = await openSql();
+    await db.execute(
+      `UPDATE analytics_content_drafts SET status = 'used'
+        WHERE id = ? AND user_id = ?
+          AND status IN ('ready', 'opened', 'staged')`,
+      [id, userId]
+    );
+  },
+
+  async markDismissed(id: number, userId: number): Promise<void> {
+    const db = await openSql();
+    await db.execute(
+      `UPDATE analytics_content_drafts SET status = 'dismissed'
+        WHERE id = ? AND user_id = ?
+          AND status IN ('ready', 'opened', 'staged', 'used')`,
+      [id, userId]
+    );
+  },
+
+  async markStaged(id: number, userId: number): Promise<void> {
+    const db = await openSql();
+    await db.execute(
+      `UPDATE analytics_content_drafts SET status = 'staged'
+        WHERE id = ? AND user_id = ?
+          AND status IN ('ready', 'opened')`,
+      [id, userId]
+    );
+  },
+
+  async setStatus(
+    id: number,
+    userId: number,
+    status: AnalyticsDraftLifecycleStatus
+  ): Promise<AnalyticsContentDraftRow | null> {
+    if (status === 'used') await this.markUsed(id, userId);
+    else if (status === 'dismissed') await this.markDismissed(id, userId);
+    else if (status === 'staged') await this.markStaged(id, userId);
+    else if (status === 'opened') await this.markOpened(id, userId);
+    else return this.getById(id, userId);
+    return this.getById(id, userId);
   },
 };

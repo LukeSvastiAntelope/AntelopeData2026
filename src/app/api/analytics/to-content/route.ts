@@ -10,15 +10,21 @@ import { resolveActiveOrgForUser } from '@/app/utils/auth/resolve-active-org';
 /**
  * POST /api/analytics/to-content — synthesis + figures → 3 Spread drafts
  * GET  /api/analytics/to-content — list drafts for Spread inbox
+ * PATCH /api/analytics/to-content — mark draft used / dismissed / staged
  */
+async function resolveUserId(req: NextRequest): Promise<number> {
+  const session = await auth();
+  let userId = session?.user?.id ? Number(session.user.id) : NaN;
+  if (!Number.isFinite(userId)) {
+    const authResult = requireUserId(req);
+    userId = typeof authResult === 'string' ? Number(authResult) : NaN;
+  }
+  return userId;
+}
+
 export async function GET(req: NextRequest) {
   try {
-    const session = await auth();
-    let userId = session?.user?.id ? Number(session.user.id) : NaN;
-    if (!Number.isFinite(userId)) {
-      const authResult = requireUserId(req);
-      userId = typeof authResult === 'string' ? Number(authResult) : NaN;
-    }
+    const userId = await resolveUserId(req);
     if (!Number.isFinite(userId) || userId <= 0) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -33,11 +39,14 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ error: 'Not found' }, { status: 404 });
       }
       try {
-        await AnalyticsContentDraftRepo.markOpened(id, userId);
+        // Opening a draft consumes it for Campaign Flow (used), while still
+        // returning the payload for Video Studio / composer prefill.
+        await AnalyticsContentDraftRepo.markUsed(id, userId);
       } catch {
         /* non-fatal */
       }
-      return NextResponse.json({ status: true, draft });
+      const refreshed = await AnalyticsContentDraftRepo.getById(id, userId);
+      return NextResponse.json({ status: true, draft: refreshed || draft });
     }
     const drafts = await AnalyticsContentDraftRepo.listForUser(userId, {
       limit: 50,
@@ -52,14 +61,46 @@ export async function GET(req: NextRequest) {
   }
 }
 
+export async function PATCH(req: NextRequest) {
+  try {
+    const userId = await resolveUserId(req);
+    if (!Number.isFinite(userId) || userId <= 0) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    const body = await req.json().catch(() => ({}));
+    const id = Number(body.id);
+    if (!Number.isFinite(id) || id <= 0) {
+      return NextResponse.json({ error: 'id is required' }, { status: 400 });
+    }
+    const status = String(body.status || '').trim();
+    if (!['used', 'dismissed', 'staged', 'opened'].includes(status)) {
+      return NextResponse.json(
+        { error: 'status must be used | dismissed | staged | opened' },
+        { status: 400 }
+      );
+    }
+    const existing = await AnalyticsContentDraftRepo.getById(id, userId);
+    if (!existing) {
+      return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    }
+    const draft = await AnalyticsContentDraftRepo.setStatus(
+      id,
+      userId,
+      status as 'used' | 'dismissed' | 'staged' | 'opened'
+    );
+    return NextResponse.json({ status: true, draft });
+  } catch (error) {
+    console.error('[analytics/to-content PATCH]', error);
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Update failed' },
+      { status: 500 }
+    );
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
-    const session = await auth();
-    let userId = session?.user?.id ? Number(session.user.id) : NaN;
-    if (!Number.isFinite(userId)) {
-      const authResult = requireUserId(req);
-      userId = typeof authResult === 'string' ? Number(authResult) : NaN;
-    }
+    const userId = await resolveUserId(req);
     if (!Number.isFinite(userId) || userId <= 0) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -93,10 +134,7 @@ export async function POST(req: NextRequest) {
           surveyTitle: body.surveyTitle ? String(body.surveyTitle) : null,
           synthesis,
           figures,
-          sampleN:
-            body.sampleN != null && Number.isFinite(Number(body.sampleN))
-              ? Number(body.sampleN)
-              : null,
+          // sampleN from client is intentionally ignored — server recomputes
           testName: body.testName ? String(body.testName) : null,
           pValue:
             body.pValue != null && Number.isFinite(Number(body.pValue))
@@ -120,6 +158,8 @@ export async function POST(req: NextRequest) {
       status: true,
       bundle: result.bundle,
       drafts: result.drafts,
+      sampleN: result.sampleN,
+      stats: result.stats,
     });
   } catch (error) {
     console.error('[analytics/to-content POST]', error);

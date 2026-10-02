@@ -18,6 +18,7 @@ import type { ChartActionFigure } from '../../python-analysis/components/ChartAc
 import { SocialCardComposer } from '../../python-analysis/components/SocialCardComposer';
 import type { ContentDraftSummary } from '../../python-analysis/components/TurnIntoContentCard';
 import { extractSourceColumnsFromCode } from '../../python-analysis/utils/aggregate-only-guard';
+import { coalesceFindingStats } from '@/app/utils/analysis/extract-finding-stats';
 
 interface CodeConversationProps {
   surveyId: number | null;
@@ -71,6 +72,7 @@ interface AnalysisMessage {
     caption?: string;
     n?: number;
     pValue?: number;
+    testName?: string;
     sourceColumns?: string[];
     contentDrafts?: ContentDraftSummary[];
     contentDraftsLoading?: boolean;
@@ -195,6 +197,8 @@ export function CodeConversation({
         content: string;
         stepId?: string;
         caption?: string;
+        pValue?: number | null;
+        testName?: string | null;
       }>
     ) => {
       for (const plot of plotMsgs) {
@@ -221,6 +225,8 @@ export function CodeConversation({
                       stepId: plot.stepId || plot.id,
                       caption: plot.caption,
                       n: sampleN ?? undefined,
+                      pValue: plot.pValue ?? m.metadata?.pValue,
+                      testName: plot.testName ?? m.metadata?.testName,
                       sourceColumns:
                         m.metadata?.sourceColumns ||
                         extractSourceColumnsFromCode(
@@ -289,7 +295,8 @@ export function CodeConversation({
   );
 
   const collectPersistedFigures = useCallback(() => {
-    return messagesRef.current
+    const msgs = messagesRef.current;
+    return msgs
       .filter(
         (m) =>
           m.type === 'result' &&
@@ -297,18 +304,39 @@ export function CodeConversation({
             m.metadata?.mediaUrl ||
             (typeof m.content === 'string' && m.content.startsWith('data:image/')))
       )
-      .map((m) => ({
-        storageKey: m.metadata?.storageKey || null,
-        mediaUrl: m.metadata?.mediaUrl || null,
-        caption: m.metadata?.caption || null,
-        stepId: m.metadata?.stepId || m.id,
-        n: m.metadata?.n ?? sampleN,
-        src:
-          typeof m.content === 'string' && m.content.startsWith('data:image/')
+      .map((m) => {
+        const nearbyText = [
+          m.metadata?.caption,
+          typeof m.content === 'string' && !m.content.startsWith('data:image/')
             ? m.content
-            : m.metadata?.mediaUrl || null,
-      }));
-  }, [sampleN]);
+            : null,
+          m.metadata?.code,
+        ]
+          .filter(Boolean)
+          .join('\n');
+        const fromMeta = coalesceFindingStats([
+          {
+            pValue: m.metadata?.pValue,
+            testName: m.metadata?.testName,
+            text: nearbyText,
+          },
+        ]);
+        return {
+          storageKey: m.metadata?.storageKey || null,
+          mediaUrl: m.metadata?.mediaUrl || null,
+          caption: m.metadata?.caption || null,
+          stepId: m.metadata?.stepId || m.id,
+          // Server recomputes N from stored metadata; include figure n as metadata only
+          n: m.metadata?.n ?? null,
+          pValue: fromMeta.pValue,
+          testName: fromMeta.testName,
+          src:
+            typeof m.content === 'string' && m.content.startsWith('data:image/')
+              ? m.content
+              : m.metadata?.mediaUrl || null,
+        };
+      });
+  }, []);
 
   const patchSynthesisDraftMeta = useCallback(
     (
@@ -355,6 +383,25 @@ export function CodeConversation({
         // Give plot uploads a moment to finish so drafts get storage keys
         await new Promise((r) => setTimeout(r, 800));
         const figures = collectPersistedFigures();
+        const findingStats = coalesceFindingStats([
+          { text: opts.synthesisText },
+          ...figures.map((f) => ({
+            pValue: f.pValue,
+            testName: f.testName,
+            text: f.caption,
+          })),
+          ...messagesRef.current
+            .filter((m) => m.type === 'result' || m.type === 'assistant')
+            .slice(-12)
+            .map((m) => ({
+              pValue: m.metadata?.pValue,
+              testName: m.metadata?.testName,
+              text:
+                typeof m.content === 'string' && !m.content.startsWith('data:image/')
+                  ? m.content
+                  : m.metadata?.caption || null,
+            })),
+        ]);
         const res = await fetch('/api/analytics/to-content', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -364,7 +411,9 @@ export function CodeConversation({
             conversationId: conversationId || null,
             surveyId,
             surveyTitle: surveyTitle || null,
-            sampleN,
+            // Real p + test required for publishable; server ignores client sampleN
+            pValue: findingStats.pValue,
+            testName: findingStats.testName,
           }),
         });
         const data = await res.json().catch(() => ({}));
@@ -429,7 +478,6 @@ export function CodeConversation({
       collectPersistedFigures,
       conversationId,
       patchSynthesisDraftMeta,
-      sampleN,
       surveyId,
       surveyTitle,
     ]
@@ -449,8 +497,21 @@ export function CodeConversation({
     return null;
   }, [messages]);
 
+  const markDraftUsed = useCallback(async (draftId: number) => {
+    try {
+      await fetch('/api/analytics/to-content', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: draftId, status: 'used' }),
+      });
+    } catch {
+      /* non-fatal */
+    }
+  }, []);
+
   const handleOpenChartPostDraft = useCallback(
     (draft: ContentDraftSummary) => {
+      void markDraftUsed(draft.id);
       const figureFromDraft: ChartActionFigure = {
         src:
           draft.figureMediaUrl ||
@@ -511,7 +572,7 @@ export function CodeConversation({
       setSocialCardCaveat(draft.honestCaveat || null);
       setSocialCardOpen(true);
     },
-    [messages, sampleN]
+    [messages, sampleN, markDraftUsed]
   );
 
   const handleTurnIntoContentFromFigure = useCallback(
@@ -1023,6 +1084,17 @@ Ready for intelligent survey analysis!`,
             if (latestStep.success && (latestStep as any).plots && (latestStep as any).plots.length > 0) {
               const plots = (latestStep as any).plots as string[];
               const plotMsgs: AnalysisMessage[] = [];
+              const stepStats = coalesceFindingStats([
+                {
+                  text: [
+                    latestStep.step?.description,
+                    latestStep.output,
+                    ...(latestStep.insights || []),
+                  ]
+                    .filter(Boolean)
+                    .join('\n'),
+                },
+              ]);
               plots.forEach((plotData, index) => {
                 plotMsgs.push({
                   id: `step-plot-${latestStep.id}-${index}-${timestamp}`,
@@ -1038,6 +1110,8 @@ Ready for intelligent survey analysis!`,
                       ? `${latestStep.step.description}${plots.length > 1 ? ` (${index + 1})` : ''}`
                       : undefined,
                     n: sampleN ?? undefined,
+                    pValue: stepStats.pValue ?? undefined,
+                    testName: stepStats.testName ?? undefined,
                     conversationId: conversationId || undefined,
                     sourceColumns: extractSourceColumnsFromCode(
                       latestStep.code,
@@ -1066,6 +1140,8 @@ Ready for intelligent survey analysis!`,
                   content: p.content,
                   stepId: p.metadata?.stepId,
                   caption: p.metadata?.caption,
+                  pValue: p.metadata?.pValue,
+                  testName: p.metadata?.testName,
                 }))
               );
             }

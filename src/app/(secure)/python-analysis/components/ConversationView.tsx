@@ -46,6 +46,7 @@ interface AnalysisMessage {
     caption?: string;
     n?: number;
     pValue?: number;
+    testName?: string;
     sourceColumns?: string[];
     /** S3 — drafts attached to the synthesis assistant message */
     contentDrafts?: ContentDraftSummary[];
@@ -91,6 +92,7 @@ export function ConversationView({
       caption: message.metadata?.caption,
       n: message.metadata?.n ?? null,
       pValue: message.metadata?.pValue ?? null,
+      testName: message.metadata?.testName ?? null,
       storageKey: message.metadata?.storageKey,
       stepId: message.metadata?.stepId || message.id,
       code: message.metadata?.code || null,

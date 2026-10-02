@@ -8,6 +8,7 @@ import {
   Loader2,
   Mic,
   Sparkles,
+  X,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -29,6 +30,7 @@ export function AnalyticsDraftsInbox() {
   const [drafts, setDrafts] = useState<ContentDraftSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -54,6 +56,29 @@ export function AnalyticsDraftsInbox() {
     };
   }, []);
 
+  const setDraftStatus = async (
+    id: number,
+    status: 'dismissed' | 'used'
+  ) => {
+    setBusyId(id);
+    try {
+      const res = await fetch('/api/analytics/to-content', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, status }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Update failed');
+      }
+      setDrafts((prev) => prev.filter((d) => d.id !== id));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Update failed');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   return (
     <div className="rounded-lg border border-border p-4 space-y-3">
       <div className="flex items-center gap-2">
@@ -64,7 +89,8 @@ export function AnalyticsDraftsInbox() {
       <p className="text-sm text-muted-foreground">
         Chart posts, explainer videos, and candidate talking points generated
         from finished analyses. Open one to continue in the right tool —
-        nothing posts without approval.
+        nothing posts without approval. Dismissed or opened drafts stop the
+        Campaign Flow “Next: Spread” nudge.
       </p>
 
       {loading && (
@@ -114,9 +140,36 @@ export function AnalyticsDraftsInbox() {
                   {d.claim}
                 </p>
               </div>
-              <Button asChild size="sm" variant="outline" className="shrink-0">
-                <Link href={href}>Open</Link>
-              </Button>
+              <div className="flex items-center gap-1 shrink-0">
+                <Button asChild size="sm" variant="outline">
+                  <Link
+                    href={href}
+                    onClick={() => {
+                      // Video Studio GET ?id= also marks used; chart_post needs PATCH.
+                      if (d.draftKind === 'chart_post') {
+                        void setDraftStatus(d.id, 'used');
+                      }
+                    }}
+                  >
+                    Open
+                  </Link>
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  className="h-8 w-8 p-0"
+                  disabled={busyId === d.id}
+                  title="Dismiss draft"
+                  onClick={() => void setDraftStatus(d.id, 'dismissed')}
+                >
+                  {busyId === d.id ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <X className="h-3.5 w-3.5" />
+                  )}
+                </Button>
+              </div>
             </div>
           );
         })}
