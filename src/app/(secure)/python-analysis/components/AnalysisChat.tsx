@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { Send, MessageSquare, Sparkles, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -95,7 +95,6 @@ export function AnalysisChat({
     null
   );
   const [error, setError] = useState<string | null>(null);
-  const lastPayloadRef = useRef<GenerateCodePayload | null>(null);
 
   const generateCode = async (userQuery: string) => {
     if (!dataset) {
@@ -113,7 +112,6 @@ export function AnalysisChat({
         analysisHistory,
         analyticsContextPrompt
       );
-      lastPayloadRef.current = payload;
 
       // Stream route (F4 truncated signal) with regenerate-on-truncation
       const result = await requestGeneratedCodeStream(payload, {
