@@ -502,16 +502,17 @@ export default function FrontLanding() {
 
               {/* Demo Video */}
               <div className="w-full max-w-4xl mx-auto mt-10">
-                <video
-                  className="w-full rounded-lg border border-border shadow-lg"
-                  controls
-                  preload="metadata"
-                  poster="/videos/antelope-demo-poster.jpg"
-                >
-                  <source src="/videos/antelope-demo.mp4" type="video/mp4" />
-                  Your browser does not support embedded video.{' '}
-                  <a href="/videos/antelope-demo.mp4">Download the demo video</a>.
-                </video>
+                <div className="relative w-full overflow-hidden rounded-lg border border-border shadow-lg aspect-video bg-black">
+                  <iframe
+                    className="absolute inset-0 h-full w-full"
+                    src="https://www.youtube.com/embed/iEal92vx3-E?rel=0"
+                    title="Antelope demo"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                    allowFullScreen
+                    loading="lazy"
+                    referrerPolicy="strict-origin-when-cross-origin"
+                  />
+                </div>
               </div>
 
             </div>
