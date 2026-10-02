@@ -27,7 +27,8 @@ import {
 } from '../utils/social-card-formats';
 import {
   buildAntelopeSocialStylePython,
-  CAPTURE_SOCIAL_PLOTS_PYTHON,
+  buildForceSizeAndCapturePython,
+  RESET_SOCIAL_SESSION_PYTHON,
 } from '../utils/antelope-social-style';
 import { assertAggregateOnly, extractSourceColumnsFromCode } from '../utils/aggregate-only-guard';
 import { composeSocialCardPng } from '../utils/compose-social-card';
@@ -242,25 +243,45 @@ export function SocialCardComposer({
     }
     const fmt = getSocialCardFormat(formatId);
     if (pyodide && stepCode?.trim()) {
-      pyodide.runPython(buildAntelopeSocialStylePython(fmt.figsize));
       try {
-        pyodide.runPython(stepCode);
-      } catch (err) {
-        console.warn('[social-card] step re-run failed, using original chart', err);
-        return figure.src;
-      }
-      const plots = pyodide.runPython(CAPTURE_SOCIAL_PLOTS_PYTHON);
-      const list =
-        typeof plots?.toJs === 'function' ? plots.toJs() : plots;
-      if (Array.isArray(list) && list.length > 0 && typeof list[0] === 'string') {
-        return list[0] as string;
+        // Style + isolate df copy before step (df = df[...] won't touch analysis)
+        pyodide.runPython(buildAntelopeSocialStylePython(fmt.figsize));
+        try {
+          pyodide.runPython(stepCode);
+        } catch (err) {
+          console.warn(
+            '[social-card] step re-run failed, using original chart',
+            err
+          );
+          return figure.src;
+        }
+        // Force target size even when step code set an explicit figsize
+        const plots = pyodide.runPython(
+          buildForceSizeAndCapturePython(fmt.figsize)
+        );
+        const list =
+          typeof plots?.toJs === 'function' ? plots.toJs() : plots;
+        if (
+          Array.isArray(list) &&
+          list.length > 0 &&
+          typeof list[0] === 'string'
+        ) {
+          return list[0] as string;
+        }
+      } finally {
+        try {
+          pyodide.runPython(RESET_SOCIAL_SESSION_PYTHON);
+        } catch (resetErr) {
+          console.warn('[social-card] session reset failed', resetErr);
+        }
       }
     }
     return figure.src;
   }, [aggregateGuard, figure, formatId, pyodide, stepCode]);
 
-  const rebuildCard = useCallback(async () => {
-    if (!figure) return;
+  /** Compose card and return the PNG data-URL (avoids stale React state reads). */
+  const rebuildCard = useCallback(async (): Promise<string | null> => {
+    if (!figure) return null;
     setBusy('compose');
     setError(null);
     try {
@@ -288,8 +309,10 @@ export function SocialCardComposer({
       });
       setCardSrc(card);
       setHint('Card ready');
+      return card;
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Compose failed');
+      return null;
     } finally {
       setBusy(null);
       setTimeout(() => setHint(null), 2000);
@@ -321,10 +344,10 @@ export function SocialCardComposer({
   }, [open, formatId, figure?.src]);
 
   const handleDownload = async () => {
-    if (!cardSrc) {
-      await rebuildCard();
+    let src = cardSrc;
+    if (!src) {
+      src = await rebuildCard();
     }
-    const src = cardSrc;
     if (!src) return;
     setBusy('download');
     try {
@@ -361,29 +384,13 @@ export function SocialCardComposer({
     setBusy('stage');
     setError(null);
     try {
+      // Always use the returned PNG — never re-read stale cardSrc after rebuildCard
       let png = cardSrc;
       if (!png) {
-        await rebuildCard();
-        png = cardSrc;
+        png = await rebuildCard();
       }
-      // rebuildCard is async state — compose once more if needed
       if (!png) {
-        const rendered = (await reRenderChart()) || figure?.src;
-        if (!rendered) throw new Error('No chart');
-        const effectiveCaveat =
-          includeCaveat || caveatRequired
-            ? caveat.trim() || buildRequiredCaveat(n, pValue)
-            : null;
-        png = await composeSocialCardPng({
-          width: format.width,
-          height: format.height,
-          chartDataUrl: rendered,
-          headline: headline.trim() || 'Insight',
-          sourceLine,
-          caveat: effectiveCaveat,
-          campaignName: orgName,
-        });
-        setCardSrc(png);
+        throw new Error('No chart card to stage');
       }
       if (caveatRequired && !(caveat.trim() || buildRequiredCaveat(n, pValue))) {
         throw new Error('Caveat is required and cannot be removed');

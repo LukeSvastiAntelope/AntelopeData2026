@@ -57,7 +57,8 @@ export function applyAiDisclosure(params: {
     params.disclosureText || AI_DISCLOSURE_DEFAULT
   ).trim();
   if (!disclosure) return caption;
-  if (caption.toLowerCase().includes('ai-generated') || caption.includes(disclosure)) {
+  // Exact disclosure text only — don't skip when caption says "ai-generated" in another sense
+  if (caption.includes(disclosure)) {
     return caption;
   }
   return caption ? `${caption}\n\n${disclosure}` : disclosure;

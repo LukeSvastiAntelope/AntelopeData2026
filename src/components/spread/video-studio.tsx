@@ -34,6 +34,7 @@ import { AI_DISCLOSURE_DEFAULT } from '@/app/utils/services/video/guardrails';
 import {
   assembleExplainerVideo,
   aspectPixelSize,
+  resolvePlayableMediaUrl,
   uploadAssembledVideo,
   type ExplainerSegment,
   type VideoAspect,
@@ -141,6 +142,8 @@ export function VideoStudio({ prefill }: { prefill?: VideoStudioPrefill } = {}) 
   const [lockedChart, setLockedChart] = useState<LockedChartFrame | null>(null);
   const [explainerBeats, setExplainerBeats] = useState<ExplainerBeats | null>(null);
   const [assembleLabel, setAssembleLabel] = useState<string | null>(null);
+  const [soundtrackUrl, setSoundtrackUrl] = useState<string | null>(null);
+  const [busySoundtrack, setBusySoundtrack] = useState(false);
   const [clipPrefill, setClipPrefill] = useState<{
     script?: string;
     talkingPoints?: string[];
@@ -149,6 +152,7 @@ export function VideoStudio({ prefill }: { prefill?: VideoStudioPrefill } = {}) 
     caveat?: string;
   } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const audioRef = useRef<HTMLInputElement>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const prefillAppliedRef = useRef(false);
 
@@ -367,6 +371,14 @@ export function VideoStudio({ prefill }: { prefill?: VideoStudioPrefill } = {}) 
     }
   };
 
+  const playableJobUrl = (j: Job): string | null => {
+    try {
+      return resolvePlayableMediaUrl(j.assetUrl, j.localAssetUrl);
+    } catch {
+      return j.localAssetUrl || j.assetUrl || null;
+    }
+  };
+
   const pollJob = (jobId: string) => {
     if (pollRef.current) clearInterval(pollRef.current);
     pollRef.current = setInterval(async () => {
@@ -377,7 +389,7 @@ export function VideoStudio({ prefill }: { prefill?: VideoStudioPrefill } = {}) 
         const j = data.job as Job;
         setJob(j);
         if (j.status === 'succeeded') {
-          setPreviewUrl(j.localAssetUrl || j.assetUrl || null);
+          setPreviewUrl(playableJobUrl(j));
           setBusyGenerate(false);
           if (pollRef.current) clearInterval(pollRef.current);
         } else if (j.status === 'failed' || j.status === 'canceled') {
@@ -397,7 +409,7 @@ export function VideoStudio({ prefill }: { prefill?: VideoStudioPrefill } = {}) 
   const waitForJobUrl = async (
     jobId: string,
     onTick?: (j: Job) => void
-  ): Promise<string> => {
+  ): Promise<{ url: string; localAssetUrl?: string | null; assetUrl?: string | null }> => {
     const started = Date.now();
     while (Date.now() - started < 180_000) {
       const res = await fetch(`/api/video/jobs/${jobId}`);
@@ -407,9 +419,13 @@ export function VideoStudio({ prefill }: { prefill?: VideoStudioPrefill } = {}) 
       onTick?.(j);
       setJob(j);
       if (j.status === 'succeeded') {
-        const url = j.localAssetUrl || j.assetUrl;
+        const url = playableJobUrl(j);
         if (!url) throw new Error('Job succeeded without asset URL');
-        return url;
+        return {
+          url,
+          localAssetUrl: j.localAssetUrl,
+          assetUrl: j.assetUrl,
+        };
       }
       if (j.status === 'failed' || j.status === 'canceled') {
         throw new Error(j.error || `Job ${j.status}`);
@@ -419,7 +435,10 @@ export function VideoStudio({ prefill }: { prefill?: VideoStudioPrefill } = {}) 
     throw new Error('Video generation timed out');
   };
 
-  const startT2vClip = async (prompt: string, durationSeconds = 4): Promise<string> => {
+  const startT2vClip = async (
+    prompt: string,
+    durationSeconds = 4
+  ): Promise<{ url: string; localAssetUrl?: string | null; assetUrl?: string | null }> => {
     const res = await fetch('/api/video/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -467,38 +486,57 @@ export function VideoStudio({ prefill }: { prefill?: VideoStudioPrefill } = {}) 
       ].join(' ');
 
       setJob({ jobId: 'hook', status: 'running', progress: 10 });
-      const hookUrl = await startT2vClip(hookPrompt, 4);
+      const hookClip = await startT2vClip(hookPrompt, 4);
 
       setAssembleLabel('Generating CTA b-roll…');
       setJob({ jobId: 'cta', status: 'running', progress: 40 });
-      let ctaUrl: string | null = null;
+      let ctaClip: {
+        url: string;
+        localAssetUrl?: string | null;
+        assetUrl?: string | null;
+      } | null = null;
       try {
         const ctaPrompt = [
           'Short hopeful closing b-roll. No text overlays, no charts, no numbers.',
           beats.cta,
           'Warm community energy for a campaign call to action.',
         ].join(' ');
-        ctaUrl = await startT2vClip(ctaPrompt, 3);
+        ctaClip = await startT2vClip(ctaPrompt, 3);
       } catch (ctaErr) {
         console.warn('[video-studio] CTA generate failed; using plain card', ctaErr);
-        ctaUrl = null;
+        ctaClip = null;
       }
 
       setAssembleLabel('Inserting real chart card + assembling…');
       setJob({ jobId: 'assemble', status: 'running', progress: 70 });
 
+      const chartPlayable = resolvePlayableMediaUrl(
+        lockedChart.url,
+        lockedChart.storageKey
+          ? `/api/media/${lockedChart.storageKey}`
+          : null
+      );
+
       const segments: ExplainerSegment[] = [
-        { kind: 'video', url: hookUrl },
+        {
+          kind: 'video',
+          url: hookClip.assetUrl || hookClip.url,
+          localAssetUrl: hookClip.localAssetUrl || hookClip.url,
+        },
         {
           kind: 'chart',
-          chartUrl: lockedChart.url,
+          chartUrl: chartPlayable,
           caption: lockedChart.caption,
           caveat: lockedChart.caveat,
           durationMs: 4000,
         },
       ];
-      if (ctaUrl) {
-        segments.push({ kind: 'video', url: ctaUrl });
+      if (ctaClip) {
+        segments.push({
+          kind: 'video',
+          url: ctaClip.assetUrl || ctaClip.url,
+          localAssetUrl: ctaClip.localAssetUrl || ctaClip.url,
+        });
       } else {
         segments.push({
           kind: 'cta_card',
@@ -512,14 +550,18 @@ export function VideoStudio({ prefill }: { prefill?: VideoStudioPrefill } = {}) 
         segments,
         width: size.width,
         height: size.height,
+        audioUrl: soundtrackUrl,
         onProgress: (label, pct) => {
           setAssembleLabel(label);
           setJob({ jobId: 'assemble', status: 'running', progress: pct });
         },
       });
 
-      setAssembleLabel('Uploading assembled explainer…');
-      const uploaded = await uploadAssembledVideo(blob, `explainer-${Date.now()}.webm`);
+      setAssembleLabel('Uploading MP4 explainer…');
+      const uploaded = await uploadAssembledVideo(
+        blob,
+        `explainer-${Date.now()}.mp4`
+      );
       setPreviewUrl(uploaded.url);
       setJob({
         jobId: 'assemble',
@@ -590,7 +632,7 @@ export function VideoStudio({ prefill }: { prefill?: VideoStudioPrefill } = {}) 
             const j = firstData.job as Job;
             setJob(j);
             if (j.status === 'succeeded') {
-              setPreviewUrl(j.localAssetUrl || j.assetUrl || null);
+              setPreviewUrl(playableJobUrl(j));
               setBusyGenerate(false);
               return;
             }
@@ -835,6 +877,83 @@ export function VideoStudio({ prefill }: { prefill?: VideoStudioPrefill } = {}) 
               <Trash2 className="h-3.5 w-3.5" />
               Unlock / use freeform generate
             </Button>
+          </div>
+        )}
+
+        {lockedChart && (
+          <div className="space-y-1.5">
+            <Label>Optional music / voiceover</Label>
+            <p className="text-[11px] text-muted-foreground">
+              Looped under the explainer so Reels/LinkedIn posts aren&apos;t silent.
+              Upload an MP3/WAV/M4A from your device.
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <input
+                ref={audioRef}
+                type="file"
+                accept="audio/mpeg,audio/mp4,audio/wav,audio/x-m4a,audio/*"
+                className="hidden"
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  setBusySoundtrack(true);
+                  setError(null);
+                  try {
+                    const fd = new FormData();
+                    fd.append('file', file);
+                    const res = await fetch('/api/media/upload', {
+                      method: 'POST',
+                      body: fd,
+                    });
+                    const data = await res.json().catch(() => ({}));
+                    if (!res.ok || !data.status) {
+                      throw new Error(data.message || 'Audio upload failed');
+                    }
+                    setSoundtrackUrl(String(data.url));
+                  } catch (err) {
+                    setError(
+                      err instanceof Error ? err.message : 'Audio upload failed'
+                    );
+                  } finally {
+                    setBusySoundtrack(false);
+                    if (audioRef.current) audioRef.current.value = '';
+                  }
+                }}
+              />
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={busySoundtrack}
+                onClick={() => audioRef.current?.click()}
+              >
+                {busySoundtrack ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Upload className="h-3.5 w-3.5" />
+                )}
+                {soundtrackUrl ? 'Replace track' : 'Add track'}
+              </Button>
+              {soundtrackUrl && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setSoundtrackUrl(null)}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  Clear
+                </Button>
+              )}
+            </div>
+            {soundtrackUrl && (
+              <audio
+                src={soundtrackUrl}
+                controls
+                className="w-full max-w-md h-8"
+                preload="metadata"
+              />
+            )}
           </div>
         )}
 

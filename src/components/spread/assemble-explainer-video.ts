@@ -1,6 +1,7 @@
 /**
  * Client-side explainer assembly: hook clip → real chart card → CTA.
  * Chart numbers stay pixel-perfect (never sent to i2v).
+ * Prefers MP4 MediaRecorder (Safari); converts WebM→MP4 before staging.
  */
 
 export type VideoAspect = '9:16' | '16:9' | '1:1';
@@ -17,23 +18,76 @@ export function aspectPixelSize(aspect: VideoAspect): { width: number; height: n
   }
 }
 
-function pickRecorderMime(): string {
-  const candidates = [
+export type RecorderMime = { mimeType: string; container: 'mp4' | 'webm' };
+
+/** Prefer MP4 (Safari records MP4 only; Reels/LinkedIn reject WebM). */
+export function pickRecorderMime(): RecorderMime {
+  const mp4Candidates = [
+    'video/mp4;codecs=avc1.42E01E,mp4a.40.2',
+    'video/mp4;codecs=avc1.4D401E,mp4a.40.2',
+    'video/mp4;codecs=avc1,mp4a.40.2',
+    'video/mp4',
+  ];
+  const webmCandidates = [
     'video/webm;codecs=vp9,opus',
     'video/webm;codecs=vp8,opus',
     'video/webm;codecs=vp9',
     'video/webm;codecs=vp8',
     'video/webm',
   ];
-  for (const c of candidates) {
+  for (const c of mp4Candidates) {
     if (
       typeof MediaRecorder !== 'undefined' &&
       MediaRecorder.isTypeSupported(c)
     ) {
-      return c;
+      return { mimeType: c, container: 'mp4' };
     }
   }
-  return 'video/webm';
+  for (const c of webmCandidates) {
+    if (
+      typeof MediaRecorder !== 'undefined' &&
+      MediaRecorder.isTypeSupported(c)
+    ) {
+      return { mimeType: c, container: 'webm' };
+    }
+  }
+  return { mimeType: 'video/webm', container: 'webm' };
+}
+
+/**
+ * Prefer local /api/media URL; otherwise proxy remote fal.ai etc. so canvas
+ * recording never hits cross-origin taint errors.
+ */
+export function resolvePlayableMediaUrl(
+  url: string | null | undefined,
+  localAssetUrl?: string | null
+): string {
+  const local = (localAssetUrl || '').trim();
+  if (local) return local;
+  const raw = (url || '').trim();
+  if (!raw) throw new Error('Missing media URL');
+  if (
+    raw.startsWith('/api/media/') ||
+    raw.startsWith('/api/image-proxy') ||
+    raw.startsWith('data:') ||
+    raw.startsWith('blob:')
+  ) {
+    return raw;
+  }
+  // Same-origin relative paths are fine
+  if (raw.startsWith('/') && !raw.startsWith('//')) {
+    return raw;
+  }
+  // Absolute same-origin
+  try {
+    if (typeof window !== 'undefined') {
+      const u = new URL(raw, window.location.origin);
+      if (u.origin === window.location.origin) return u.pathname + u.search;
+    }
+  } catch {
+    /* fall through to proxy */
+  }
+  return `/api/image-proxy?url=${encodeURIComponent(raw)}`;
 }
 
 function loadImage(src: string): Promise<HTMLImageElement> {
@@ -55,7 +109,7 @@ function loadVideo(src: string): Promise<HTMLVideoElement> {
     video.playsInline = true;
     video.onloadeddata = () => resolve(video);
     video.onerror = () => reject(new Error('Failed to load video segment'));
-    video.src = src;
+    video.src = resolvePlayableMediaUrl(src);
   });
 }
 
@@ -166,9 +220,70 @@ function drawCtaCard(
   }
 }
 
+async function attachOptionalAudio(
+  videoStream: MediaStream,
+  audioUrl?: string | null
+): Promise<{ stream: MediaStream; cleanup: () => void }> {
+  if (!audioUrl?.trim()) {
+    return { stream: videoStream, cleanup: () => undefined };
+  }
+  try {
+    const audio = document.createElement('audio');
+    audio.crossOrigin = 'anonymous';
+    audio.preload = 'auto';
+    audio.src = resolvePlayableMediaUrl(audioUrl);
+    audio.loop = true;
+    await new Promise<void>((resolve, reject) => {
+      audio.oncanplaythrough = () => resolve();
+      audio.onerror = () => reject(new Error('Failed to load audio track'));
+      // Safari sometimes skips canplaythrough
+      setTimeout(() => resolve(), 2500);
+    });
+    const capture =
+      // @ts-expect-error captureStream exists in Chromium / Safari
+      typeof audio.captureStream === 'function'
+        ? // @ts-expect-error captureStream
+          (audio.captureStream() as MediaStream)
+        : // @ts-expect-error mozCaptureStream
+          typeof audio.mozCaptureStream === 'function'
+          ? // @ts-expect-error mozCaptureStream
+            (audio.mozCaptureStream() as MediaStream)
+          : null;
+    if (!capture?.getAudioTracks?.().length) {
+      return { stream: videoStream, cleanup: () => undefined };
+    }
+    await audio.play().catch(() => undefined);
+    const mixed = new MediaStream([
+      ...videoStream.getVideoTracks(),
+      ...capture.getAudioTracks(),
+    ]);
+    return {
+      stream: mixed,
+      cleanup: () => {
+        try {
+          audio.pause();
+          audio.src = '';
+        } catch {
+          /* ignore */
+        }
+        for (const t of capture.getTracks()) t.stop();
+      },
+    };
+  } catch (e) {
+    console.warn('[assemble] optional audio track skipped', e);
+    return { stream: videoStream, cleanup: () => undefined };
+  }
+}
+
 async function recordCanvas(
   drawFrame: (t: number, ctx: CanvasRenderingContext2D) => boolean | void,
-  opts: { width: number; height: number; durationMs: number; fps?: number }
+  opts: {
+    width: number;
+    height: number;
+    durationMs: number;
+    fps?: number;
+    audioUrl?: string | null;
+  }
 ): Promise<Blob> {
   const { width, height, durationMs } = opts;
   const fps = opts.fps ?? 30;
@@ -178,12 +293,25 @@ async function recordCanvas(
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('Canvas unavailable');
 
-  const stream = canvas.captureStream(fps);
-  const mime = pickRecorderMime();
-  const recorder = new MediaRecorder(stream, {
-    mimeType: mime,
-    videoBitsPerSecond: 4_000_000,
-  });
+  const videoStream = canvas.captureStream(fps);
+  const { stream, cleanup } = await attachOptionalAudio(
+    videoStream,
+    opts.audioUrl
+  );
+  const picked = pickRecorderMime();
+  let recorder: MediaRecorder;
+  try {
+    recorder = new MediaRecorder(stream, {
+      mimeType: picked.mimeType,
+      videoBitsPerSecond: 4_000_000,
+    });
+  } catch {
+    // Safari sometimes rejects codec string — retry bare type
+    recorder = new MediaRecorder(stream, {
+      mimeType: picked.container === 'mp4' ? 'video/mp4' : 'video/webm',
+      videoBitsPerSecond: 4_000_000,
+    });
+  }
   const chunks: BlobPart[] = [];
   recorder.ondataavailable = (e) => {
     if (e.data.size) chunks.push(e.data);
@@ -191,9 +319,16 @@ async function recordCanvas(
 
   const done = new Promise<Blob>((resolve, reject) => {
     recorder.onstop = () => {
-      resolve(new Blob(chunks, { type: mime.split(';')[0] || 'video/webm' }));
+      cleanup();
+      const type =
+        recorder.mimeType?.split(';')[0] ||
+        (picked.container === 'mp4' ? 'video/mp4' : 'video/webm');
+      resolve(new Blob(chunks, { type }));
     };
-    recorder.onerror = () => reject(new Error('MediaRecorder failed'));
+    recorder.onerror = () => {
+      cleanup();
+      reject(new Error('MediaRecorder failed'));
+    };
   });
 
   recorder.start(100);
@@ -206,7 +341,6 @@ async function recordCanvas(
       ctx.fillRect(0, 0, width, height);
       const stopEarly = drawFrame(t, ctx) === false;
       if (elapsed >= durationMs || stopEarly) {
-        // hold last frame briefly so encoder flushes
         setTimeout(() => {
           try {
             recorder.stop();
@@ -234,9 +368,10 @@ export async function renderChartCardClip(opts: {
   width: number;
   height: number;
   zoom?: 'in' | 'none';
+  audioUrl?: string | null;
 }): Promise<Blob> {
   const durationMs = Math.min(5000, Math.max(3000, opts.durationMs ?? 4000));
-  const img = await loadImage(opts.chartUrl);
+  const img = await loadImage(resolvePlayableMediaUrl(opts.chartUrl));
   const zoom = opts.zoom ?? 'in';
 
   return recordCanvas(
@@ -255,7 +390,12 @@ export async function renderChartCardClip(opts: {
       );
       drawCaptionBar(ctx, opts.width, opts.height, opts.caption, opts.caveat);
     },
-    { width: opts.width, height: opts.height, durationMs }
+    {
+      width: opts.width,
+      height: opts.height,
+      durationMs,
+      audioUrl: opts.audioUrl,
+    }
   );
 }
 
@@ -266,13 +406,19 @@ export async function renderCtaCardClip(opts: {
   durationMs?: number;
   width: number;
   height: number;
+  audioUrl?: string | null;
 }): Promise<Blob> {
   const durationMs = Math.min(4000, Math.max(2000, opts.durationMs ?? 3000));
   return recordCanvas(
     (_t, ctx) => {
       drawCtaCard(ctx, opts.width, opts.height, opts.title, opts.body);
     },
-    { width: opts.width, height: opts.height, durationMs }
+    {
+      width: opts.width,
+      height: opts.height,
+      durationMs,
+      audioUrl: opts.audioUrl,
+    }
   );
 }
 
@@ -315,7 +461,7 @@ async function playVideoOntoCanvas(
 }
 
 export type ExplainerSegment =
-  | { kind: 'video'; url: string }
+  | { kind: 'video'; url: string; localAssetUrl?: string | null }
   | {
       kind: 'chart';
       chartUrl: string;
@@ -326,15 +472,17 @@ export type ExplainerSegment =
   | { kind: 'cta_card'; title: string; body?: string; durationMs?: number };
 
 /**
- * Assemble hook → real chart → CTA into one WebM via canvas + MediaRecorder.
+ * Assemble hook → real chart → CTA into one MP4 (or WebM→MP4) via canvas + MediaRecorder.
  */
 export async function assembleExplainerVideo(opts: {
   segments: ExplainerSegment[];
   width: number;
   height: number;
   onProgress?: (label: string, pct: number) => void;
+  /** Optional music / voiceover under the explainer (looped for duration). */
+  audioUrl?: string | null;
 }): Promise<Blob> {
-  const { width, height, segments, onProgress } = opts;
+  const { width, height, segments, onProgress, audioUrl } = opts;
   if (!segments.length) throw new Error('No segments to assemble');
 
   const canvas = document.createElement('canvas');
@@ -343,12 +491,21 @@ export async function assembleExplainerVideo(opts: {
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('Canvas unavailable');
 
-  const stream = canvas.captureStream(30);
-  const mime = pickRecorderMime();
-  const recorder = new MediaRecorder(stream, {
-    mimeType: mime,
-    videoBitsPerSecond: 5_000_000,
-  });
+  const videoStream = canvas.captureStream(30);
+  const { stream, cleanup } = await attachOptionalAudio(videoStream, audioUrl);
+  const picked = pickRecorderMime();
+  let recorder: MediaRecorder;
+  try {
+    recorder = new MediaRecorder(stream, {
+      mimeType: picked.mimeType,
+      videoBitsPerSecond: 5_000_000,
+    });
+  } catch {
+    recorder = new MediaRecorder(stream, {
+      mimeType: picked.container === 'mp4' ? 'video/mp4' : 'video/webm',
+      videoBitsPerSecond: 5_000_000,
+    });
+  }
   const chunks: BlobPart[] = [];
   recorder.ondataavailable = (e) => {
     if (e.data.size) chunks.push(e.data);
@@ -356,9 +513,16 @@ export async function assembleExplainerVideo(opts: {
 
   const done = new Promise<Blob>((resolve, reject) => {
     recorder.onstop = () => {
-      resolve(new Blob(chunks, { type: mime.split(';')[0] || 'video/webm' }));
+      cleanup();
+      const type =
+        recorder.mimeType?.split(';')[0] ||
+        (picked.container === 'mp4' ? 'video/mp4' : 'video/webm');
+      resolve(new Blob(chunks, { type }));
     };
-    recorder.onerror = () => reject(new Error('Assembly MediaRecorder failed'));
+    recorder.onerror = () => {
+      cleanup();
+      reject(new Error('Assembly MediaRecorder failed'));
+    };
   });
 
   recorder.start(200);
@@ -369,11 +533,12 @@ export async function assembleExplainerVideo(opts: {
     const pct = Math.round(((i + 0.2) / segments.length) * 90);
     if (seg.kind === 'video') {
       onProgress?.(`Playing segment ${i + 1}…`, pct);
-      const video = await loadVideo(seg.url);
+      const playUrl = resolvePlayableMediaUrl(seg.url, seg.localAssetUrl);
+      const video = await loadVideo(playUrl);
       await playVideoOntoCanvas(video, ctx, width, height);
     } else if (seg.kind === 'chart') {
       onProgress?.('Inserting real chart card…', pct);
-      const img = await loadImage(seg.chartUrl);
+      const img = await loadImage(resolvePlayableMediaUrl(seg.chartUrl));
       const durationMs = Math.min(5000, Math.max(3000, seg.durationMs ?? 4000));
       const start = performance.now();
       await new Promise<void>((resolve) => {
@@ -431,16 +596,69 @@ export async function assembleExplainerVideo(opts: {
   return blob;
 }
 
-export async function uploadAssembledVideo(blob: Blob, filename = 'explainer.webm') {
+/** Upload assembled video; WebM is transcoded to MP4 server-side when needed. */
+export async function uploadAssembledVideo(
+  blob: Blob,
+  filename = 'explainer.mp4'
+) {
+  const isMp4 =
+    blob.type.includes('mp4') || filename.toLowerCase().endsWith('.mp4');
+  const formName = isMp4
+    ? filename.endsWith('.mp4')
+      ? filename
+      : `${filename.replace(/\.[^.]+$/, '')}.mp4`
+    : filename.endsWith('.webm')
+      ? filename
+      : `${filename.replace(/\.[^.]+$/, '')}.webm`;
+
+  // Prefer transcode endpoint so Zapier/Reels/LinkedIn always get H.264 MP4
+  if (!isMp4) {
+    const fd = new FormData();
+    fd.append('file', blob, formName);
+    const tx = await fetch('/api/video/transcode-mp4', {
+      method: 'POST',
+      body: fd,
+    });
+    const txData = await tx.json().catch(() => ({}));
+    if (tx.ok && txData.status && txData.url) {
+      return {
+        url: String(txData.url),
+        storageKey: txData.key ? String(txData.key) : null,
+        container: 'mp4' as const,
+      };
+    }
+    console.warn(
+      '[assemble] transcode-mp4 failed, uploading original',
+      txData.error
+    );
+  } else {
+    // Store MP4 via transcode route (pass-through) for consistent ownership keys
+    const fd = new FormData();
+    fd.append('file', blob, formName);
+    const tx = await fetch('/api/video/transcode-mp4', {
+      method: 'POST',
+      body: fd,
+    });
+    const txData = await tx.json().catch(() => ({}));
+    if (tx.ok && txData.status && txData.url) {
+      return {
+        url: String(txData.url),
+        storageKey: txData.key ? String(txData.key) : null,
+        container: 'mp4' as const,
+      };
+    }
+  }
+
   const fd = new FormData();
-  fd.append('file', blob, filename);
+  fd.append('file', blob, formName);
   const res = await fetch('/api/media/upload', { method: 'POST', body: fd });
   const data = await res.json().catch(() => ({}));
   if (!res.ok || !data.status) {
-    throw new Error(data.message || 'Failed to upload assembled video');
+    throw new Error(data.message || data.error || 'Failed to upload assembled video');
   }
   return {
     url: String(data.url),
     storageKey: data.key ? String(data.key) : null,
+    container: (isMp4 ? 'mp4' : 'webm') as 'mp4' | 'webm',
   };
 }

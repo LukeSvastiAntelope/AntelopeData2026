@@ -52,6 +52,14 @@ export async function POST(req: NextRequest) {
           'video/mp4',
           'video/webm',
           'video/quicktime',
+          'audio/mpeg',
+          'audio/mp3',
+          'audio/mp4',
+          'audio/wav',
+          'audio/x-wav',
+          'audio/webm',
+          'audio/aac',
+          'audio/x-m4a',
         ]
     const mime = file.type || ''
     if (!allowed.includes(mime)) {
@@ -61,11 +69,15 @@ export async function POST(req: NextRequest) {
     const size = file.size || 0
     const maxImageBytes = 10 * 1024 * 1024 // 10MB images
     const maxVideoBytes = 80 * 1024 * 1024 // 80MB reference clips for i2v/v2v
+    const maxAudioBytes = 20 * 1024 * 1024 // 20MB voiceover / music
     if (mime.startsWith('image/') && size > maxImageBytes) {
       return NextResponse.json({ status: false, message: 'Image too large (max 10MB)' }, { status: 413 })
     }
     if (mime.startsWith('video/') && size > maxVideoBytes) {
       return NextResponse.json({ status: false, message: 'Video too large (max 80MB)' }, { status: 413 })
+    }
+    if (mime.startsWith('audio/') && size > maxAudioBytes) {
+      return NextResponse.json({ status: false, message: 'Audio too large (max 20MB)' }, { status: 413 })
     }
 
     const original = file.name || 'upload'
@@ -86,7 +98,15 @@ export async function POST(req: NextRequest) {
                   ? '.webm'
                   : mime === 'video/quicktime'
                     ? '.mov'
-                    : '')
+                    : mime === 'audio/mpeg' || mime === 'audio/mp3'
+                      ? '.mp3'
+                      : mime === 'audio/wav' || mime === 'audio/x-wav'
+                        ? '.wav'
+                        : mime === 'audio/mp4' || mime === 'audio/x-m4a' || mime === 'audio/aac'
+                          ? '.m4a'
+                          : mime === 'audio/webm'
+                            ? '.webm'
+                            : '')
     const base = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
     const filename = `${base}${ext}`
 
