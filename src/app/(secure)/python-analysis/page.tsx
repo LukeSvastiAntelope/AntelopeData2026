@@ -11,6 +11,7 @@ import { SurveyLoader } from './components/SurveyLoader';
 import { CodebookUpload } from './components/CodebookUpload';
 import { DatasetTray } from './components/DatasetTray';
 import { AnalysisGeoMap } from './components/AnalysisGeoMap';
+import { AnalysisChat } from './components/AnalysisChat';
 import { usePyodide } from './hooks/usePyodide';
 import { useAnalysisContext } from './hooks/useAnalysisContext';
 import { useAnalysisAgent } from './hooks/useAnalysisAgent';
@@ -1092,6 +1093,77 @@ __antelope_csv
     }
   };
 
+  /** Single-shot AI code from AnalysisChat — execute with regenerate-on-truncation. */
+  const handleAnalysisChatCode = useCallback(
+    async (
+      code: string,
+      explanation: string,
+      meta: { regenerateCode: () => Promise<string> }
+    ) => {
+      if (!pyodide || !currentDataset) return;
+
+      const codeMessage: AnalysisMessage = {
+        id: `code-${Date.now()}`,
+        type: 'code',
+        content: code,
+        timestamp: new Date(),
+        metadata: {
+          explanation: explanation || undefined,
+          model: 'generate-code',
+        },
+      };
+      setMessages((prev) => [...prev, codeMessage]);
+
+      setIsLoading(true);
+      try {
+        const results = await executeCode(
+          code,
+          pyodide,
+          analysisFrames.length ? analysisFrames : undefined,
+          meta.regenerateCode
+        );
+        const resultList = Array.isArray(results) ? results : [];
+        for (const r of resultList) {
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: `result-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+              type: r.type === 'error' ? 'error' : 'result',
+              content: r.content,
+              timestamp: new Date(),
+            },
+          ]);
+        }
+        addAnalysis({
+          id: `analysis-${Date.now()}`,
+          query: explanation || 'AI-generated analysis',
+          code,
+          results: resultList,
+          timestamp: new Date(),
+        });
+      } catch (err) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `error-${Date.now()}`,
+            type: 'error',
+            content: err instanceof Error ? err.message : String(err),
+            timestamp: new Date(),
+          },
+        ]);
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [
+      pyodide,
+      currentDataset,
+      executeCode,
+      analysisFrames,
+      addAnalysis,
+    ]
+  );
+
   return (
     <div className="flex h-full w-full bg-background">
       {/* Main Content */}
@@ -1320,6 +1392,30 @@ __antelope_csv
                           🩺 Education & Healthcare Analysis
                         </Button>
                       </div>
+                    </div>
+                  )}
+
+                  {/* Single-shot AI code (wired regenerateCode → executeCode) */}
+                  {currentDataset && pyodide && !agentRunning && (
+                    <div className="mx-6 mb-3">
+                      <AnalysisChat
+                        dataset={currentDataset}
+                        analysisHistory={analysisHistory}
+                        analyticsContextPrompt={analyticsContextPrompt}
+                        disabled={isLoading || pyodideLoading}
+                        onQuerySubmit={async (q) => {
+                          setMessages((prev) => [
+                            ...prev,
+                            {
+                              id: `user-chat-${Date.now()}`,
+                              type: 'user',
+                              content: q,
+                              timestamp: new Date(),
+                            },
+                          ]);
+                        }}
+                        onCodeGenerated={handleAnalysisChatCode}
+                      />
                     </div>
                   )}
 

@@ -19,6 +19,10 @@ import { SocialCardComposer } from '../../python-analysis/components/SocialCardC
 import type { ContentDraftSummary } from '../../python-analysis/components/TurnIntoContentCard';
 import { extractSourceColumnsFromCode } from '../../python-analysis/utils/aggregate-only-guard';
 import { coalesceFindingStats } from '@/app/utils/analysis/extract-finding-stats';
+import {
+  makeRegenerateCode,
+  type GenerateCodePayload,
+} from '../../python-analysis/utils/request-generated-code';
 
 interface CodeConversationProps {
   surveyId: number | null;
@@ -1408,8 +1412,39 @@ Error: ${err.message}
       };
       addMessage(codeMessage);
 
-      // Execute the code using the same pattern as useAnalysisContext
-      await executeCode(code, pyodide);
+      // Re-POST generate-code when we have a recent user question (F4/H5 self-repair)
+      let regenerateCode: (() => Promise<string>) | undefined;
+      const lastUser = [...messages].reverse().find((m) => m.type === 'user');
+      if (lastUser?.content && currentDataset) {
+        const sampleRows =
+          currentDataset.sampleData?.length &&
+          currentDataset.sampleData[0] &&
+          !Array.isArray(currentDataset.sampleData[0])
+            ? currentDataset.sampleData.slice(0, 15)
+            : (currentDataset.data || []).slice(0, 15).map((row: any) => {
+                if (row && !Array.isArray(row) && typeof row === 'object')
+                  return row;
+                const obj: Record<string, unknown> = {};
+                (currentDataset.columns || []).forEach((c, i) => {
+                  obj[c] = Array.isArray(row) ? row[i] : undefined;
+                });
+                return obj;
+              });
+        const payload: GenerateCodePayload = {
+          query: lastUser.content,
+          dataSchema: {
+            columns: currentDataset.columns,
+            types: currentDataset.dtypes,
+            sampleData: sampleRows,
+            rowCount: currentDataset.shape?.[0] ?? currentDataset.data?.length,
+            codebookMappings: currentDataset.codebookMappings,
+          },
+          analysisType: 'auto',
+        };
+        regenerateCode = makeRegenerateCode(payload);
+      }
+
+      await executeCode(code, pyodide, undefined, regenerateCode);
       
       // Check if any plots were generated and add them as result messages
       const plotResults = await pyodide.runPython(`

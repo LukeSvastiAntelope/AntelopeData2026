@@ -499,20 +499,22 @@ exec_result
                   `[analysis-agent] incomplete code SyntaxError; regenerating (attempt ${attempt})`
                 );
                 code = await regenerateCode();
+                // Next loop executes regenerated code; if it fails for a
+                // non-truncation reason, the fix-code path below runs.
                 continue;
               } catch (regenError) {
                 console.warn('Regenerate failed:', regenError);
                 lastError = String(regenError);
+                continue;
               }
-            } else {
-              console.warn(
-                '[analysis-agent] incomplete code SyntaxError; no regenerate callback — skipping fix-code'
-              );
             }
+            console.warn(
+              '[analysis-agent] incomplete code SyntaxError; no regenerate callback — skipping fix-code'
+            );
             continue;
           }
 
-          // Runtime / logic errors: ask fix-code to rewrite
+          // Runtime / logic errors (incl. post-regen non-truncation): ask fix-code
           try {
             const fixResponse = await fetch('/api/python-analysis/fix-code', {
               method: 'POST',
@@ -534,8 +536,17 @@ exec_result
                 console.warn(
                   '[analysis-agent] fix-code truncated; regenerating step code'
                 );
-                code = await regenerateCode();
-                continue;
+                try {
+                  code = await regenerateCode();
+                  continue;
+                } catch (regenAfterFixErr) {
+                  console.warn(
+                    '[analysis-agent] regenerate after truncated fix failed:',
+                    regenAfterFixErr
+                  );
+                  lastError = String(regenAfterFixErr);
+                  continue;
+                }
               }
               console.warn('[analysis-agent] fix-code truncated; no regenerate callback');
             } else if (fixResponse.ok && fixResult?.fixedCode) {
