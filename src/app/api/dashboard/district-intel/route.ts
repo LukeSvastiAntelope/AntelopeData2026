@@ -150,7 +150,7 @@ export async function POST(request: NextRequest) {
         session.user.id,
         'district_intel',
         () => deepResearch({ question: researchQuestion, systemContext }),
-        organizationId > 0 ? organizationId : null
+        organizationId > 0 ? organizationId : undefined
       )
     } catch (error) {
       console.error('district-intel deepResearch error:', error)
@@ -178,7 +178,7 @@ ${deepResult.content}`
             { role: 'user', content: summaryPrompt },
           ],
         }),
-        organizationId > 0 ? organizationId : null
+        organizationId > 0 ? organizationId : undefined
       )
       if (completion.stopReason === 'max_tokens') {
         throw new Error(

@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
-import { ensurePrimaryOrgId } from '@/app/api/dashboard/persons/org';
 import { getOrgUsageSummary } from '@/app/utils/database/ai-usage-repo';
 import {
   AI_PLAN_ALLOWANCES,
@@ -8,13 +7,15 @@ import {
   defaultRateTable,
   isAiUsageHardEnforce,
 } from '@/app/utils/services/ai-usage-config';
+import { resolveActiveOrgForUser } from '@/app/utils/auth/resolve-active-org';
 
 export const dynamic = 'force-dynamic';
 
 /**
  * GET /api/ai/usage — current org AI credit meter for the signed-in campaign.
+ * Reads the same org requests are charged to (session/active via H1 helper).
  */
-export async function GET(_req: NextRequest) {
+export async function GET(req: NextRequest) {
   try {
     const session = await auth();
     if (!session?.user?.id) {
@@ -24,12 +25,15 @@ export async function GET(_req: NextRequest) {
       );
     }
 
-    const orgId = await ensurePrimaryOrgId(session.user.id);
+    const orgId = await resolveActiveOrgForUser(req, session.user.id);
+    if (orgId instanceof NextResponse) return orgId;
+
     const summary = await getOrgUsageSummary(orgId);
 
     return NextResponse.json({
       status: true,
       usage: summary,
+      organizationId: orgId,
       plans: AI_PLAN_ALLOWANCES,
       planLabels: AI_PLAN_LABELS,
       hardEnforce: isAiUsageHardEnforce(),

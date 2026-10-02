@@ -12,6 +12,7 @@ import {
   type Breakdown,
   type RevealMode,
 } from '@/app/utils/services/garrys-list';
+import { runWithAiUsageContextAsync } from '@/app/utils/services/ai-usage-context';
 
 export const runtime = 'nodejs';
 export const maxDuration = 45;
@@ -59,15 +60,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ status: false, message: 'Give the survey a short subject.' }, { status: 400 });
     }
 
-    const generated = await generateSurveyFromStory({
-      storyText,
-      topic,
-      numQuestions,
-      questionStyle,
-      breakdowns,
-      revealMode,
-      contextInstructions,
-    });
+    // Antelope-owned public pilot — meter as platform, not a campaign org
+    const generated = await runWithAiUsageContextAsync(
+      { organizationId: null, feature: 'platform.garrys_list' },
+      () =>
+        generateSurveyFromStory({
+          storyText,
+          topic,
+          numQuestions,
+          questionStyle,
+          breakdowns,
+          revealMode,
+          contextInstructions,
+        })
+    );
     if (generated.error || !generated.questions?.length) {
       return NextResponse.json(
         { status: false, message: generated.error || 'Could not generate a neutral survey for this story.' },
@@ -83,11 +89,15 @@ export async function POST(request: NextRequest) {
       }
     })();
 
-    const methodologyNote = await generateMethodologyNote({
-      publisherName,
-      storyTitle: title,
-      hasBreakdowns: breakdowns.length > 0,
-    });
+    const methodologyNote = await runWithAiUsageContextAsync(
+      { organizationId: null, feature: 'platform.garrys_list' },
+      () =>
+        generateMethodologyNote({
+          publisherName,
+          storyTitle: title,
+          hasBreakdowns: breakdowns.length > 0,
+        })
+    );
 
     const dbQuestionType = questionStyleToDbType(questionStyle);
     const questions = generated.questions.map((q, i) => ({

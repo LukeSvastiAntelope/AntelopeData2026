@@ -124,6 +124,7 @@
     "tailwind-merge": "^3.3.0",
     "tailwindcss-animate": "^1.0.7",
     "twilio": "^5.13.1",
+    "undici": "^6.28.1",
     "uuid": "^11.1.0",
     "xlsx": "^0.18.5"
   },

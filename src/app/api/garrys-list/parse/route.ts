@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { scrapeArticle, inferTopic } from '@/app/utils/services/garrys-list';
+import { runWithAiUsageContextAsync } from '@/app/utils/services/ai-usage-context';
 
 export const runtime = 'nodejs';
 export const maxDuration = 30;
@@ -22,7 +23,11 @@ export async function POST(request: NextRequest) {
     }
 
     const article = await scrapeArticle(url);
-    const { topic, suggestedTitle } = await inferTopic(article.text, article.title || 'Reader survey');
+    // Antelope-owned public pilot — meter as platform, not a campaign org
+    const { topic, suggestedTitle } = await runWithAiUsageContextAsync(
+      { organizationId: null, feature: 'platform.garrys_list' },
+      () => inferTopic(article.text, article.title || 'Reader survey')
+    );
 
     return NextResponse.json({
       status: true,
