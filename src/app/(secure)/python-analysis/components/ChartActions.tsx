@@ -22,10 +22,17 @@ export type ChartActionFigure = {
   label?: string;
   caption?: string;
   n?: number | null;
+  /** Optional p-value for the finding (caveat gate) */
+  pValue?: number | null;
   storageKey?: string | null;
   stepId?: string | null;
   /** Preceding step Python for social-card re-render */
   code?: string | null;
+  /**
+   * Columns referenced by the plot step (recorded at render).
+   * Aggregate-only guard uses these — not the whole dataset.
+   */
+  sourceColumns?: string[] | null;
 };
 
 interface ChartActionsProps {

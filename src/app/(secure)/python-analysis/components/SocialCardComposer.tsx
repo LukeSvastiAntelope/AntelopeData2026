@@ -29,20 +29,23 @@ import {
   buildAntelopeSocialStylePython,
   CAPTURE_SOCIAL_PLOTS_PYTHON,
 } from '../utils/antelope-social-style';
-import { assertAggregateOnly } from '../utils/aggregate-only-guard';
+import { assertAggregateOnly, extractSourceColumnsFromCode } from '../utils/aggregate-only-guard';
 import { composeSocialCardPng } from '../utils/compose-social-card';
 import {
   downloadPng,
   uploadChartPng,
 } from '../utils/persist-figure';
 
-/** Keep in sync with autotrigger-outputs SMALL_SAMPLE_DISCLAIMER (client-safe copy). */
+/** Keep in sync with autotrigger-outputs / social-card-guards (client-safe copy). */
 const SMALL_SAMPLE_DISCLAIMER =
   'Small-sample caveat: this finding is based on a limited number of responses and may not generalize. Treat it as directional, not definitive.';
+const NOT_SIGNIFICANT_DISCLAIMER =
+  'Not statistically significant at α=0.05 (or p unavailable): treat this as directional, not definitive.';
 
 /** Client-safe mirrors of POSTABLE_INSIGHT_THRESHOLDS defaults (gate for caveat lock). */
 const MIN_CELL_SIZE = 25;
 const MIN_TOTAL_RESPONSES = 80;
+const ALPHA = 0.05;
 
 export type SocialCardComposerProps = {
   open: boolean;
@@ -73,9 +76,31 @@ function buildSourceLine(surveyTitle: string | null | undefined, n: number | nul
   return parts.join(', ');
 }
 
-function caveatRequiredForN(n: number | null | undefined): boolean {
+function isSmallSample(n: number | null | undefined): boolean {
   if (n == null || !Number.isFinite(n)) return true;
   return n < MIN_CELL_SIZE || n < MIN_TOTAL_RESPONSES;
+}
+
+function isNotSignificant(p: number | null | undefined): boolean {
+  if (p == null || !Number.isFinite(p)) return true;
+  return p >= ALPHA;
+}
+
+function caveatRequiredForStats(
+  n: number | null | undefined,
+  p: number | null | undefined
+): boolean {
+  return isSmallSample(n) || isNotSignificant(p);
+}
+
+function buildRequiredCaveat(
+  n: number | null | undefined,
+  p: number | null | undefined
+): string {
+  const parts: string[] = [];
+  if (isSmallSample(n)) parts.push(SMALL_SAMPLE_DISCLAIMER);
+  if (isNotSignificant(p)) parts.push(NOT_SIGNIFICANT_DISCLAIMER);
+  return parts.join('\n\n') || SMALL_SAMPLE_DISCLAIMER;
 }
 
 export function SocialCardComposer({
@@ -105,15 +130,21 @@ export function SocialCardComposer({
 
   const format = useMemo(() => getSocialCardFormat(formatId), [formatId]);
   const n = figure?.n ?? null;
-  const caveatRequired = caveatRequiredForN(n);
+  const pValue = figure?.pValue ?? null;
+  const caveatRequired = caveatRequiredForStats(n, pValue);
   const sourceLine = useMemo(
     () => buildSourceLine(surveyTitle, n),
     [surveyTitle, n]
   );
 
+  const sourceColumns = useMemo(() => {
+    if (figure?.sourceColumns?.length) return figure.sourceColumns;
+    return extractSourceColumnsFromCode(stepCode || figure?.code, datasetColumns);
+  }, [figure?.sourceColumns, figure?.code, stepCode, datasetColumns]);
+
   const aggregateGuard = useMemo(
-    () => assertAggregateOnly(datasetColumns),
-    [datasetColumns]
+    () => assertAggregateOnly(sourceColumns),
+    [sourceColumns]
   );
 
   // Load campaign name once
@@ -159,15 +190,19 @@ export function SocialCardComposer({
     const captionSeed = initialCaption?.trim() || claim;
     setHeadline(captionSeed.slice(0, 90));
     setCaption(captionSeed);
-    const required = caveatRequiredForN(figure.n);
+    const required = caveatRequiredForStats(figure.n, figure.pValue);
     setIncludeCaveat(true);
     setCaveat(
       initialCaveat?.trim() ||
-        (required ? SMALL_SAMPLE_DISCLAIMER : '')
+        (required ? buildRequiredCaveat(figure.n, figure.pValue) : '')
     );
     // Prefill from analytics draft — don't overwrite with a fresh headline
     if (!initialCaption?.trim()) {
-      void draftHeadline(claim, sourceLine, required ? SMALL_SAMPLE_DISCLAIMER : '');
+      void draftHeadline(
+        claim,
+        sourceLine,
+        required ? buildRequiredCaveat(figure.n, figure.pValue) : ''
+      );
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, figure?.src, figure?.stepId, initialCaption, findingClaim]);
@@ -237,10 +272,10 @@ export function SocialCardComposer({
       setChartSrc(rendered);
       const effectiveCaveat =
         includeCaveat || caveatRequired
-          ? caveat.trim() || SMALL_SAMPLE_DISCLAIMER
+          ? caveat.trim() || buildRequiredCaveat(n, pValue)
           : null;
       if (caveatRequired && !effectiveCaveat) {
-        throw new Error('Caveat is required for this sample size');
+        throw new Error('Caveat is required for this finding');
       }
       const card = await composeSocialCardPng({
         width: format.width,
@@ -267,7 +302,9 @@ export function SocialCardComposer({
     format,
     headline,
     includeCaveat,
+    n,
     orgName,
+    pValue,
     reRenderChart,
     sourceLine,
   ]);
@@ -302,7 +339,7 @@ export function SocialCardComposer({
   const handleCopyCaption = async () => {
     const effectiveCaveat =
       includeCaveat || caveatRequired
-        ? caveat.trim() || SMALL_SAMPLE_DISCLAIMER
+        ? caveat.trim() || buildRequiredCaveat(n, pValue)
         : '';
     const text = [caption.trim() || headline.trim(), sourceLine, effectiveCaveat]
       .filter(Boolean)
@@ -335,7 +372,7 @@ export function SocialCardComposer({
         if (!rendered) throw new Error('No chart');
         const effectiveCaveat =
           includeCaveat || caveatRequired
-            ? caveat.trim() || SMALL_SAMPLE_DISCLAIMER
+            ? caveat.trim() || buildRequiredCaveat(n, pValue)
             : null;
         png = await composeSocialCardPng({
           width: format.width,
@@ -348,15 +385,20 @@ export function SocialCardComposer({
         });
         setCardSrc(png);
       }
-      if (caveatRequired && !(caveat.trim() || SMALL_SAMPLE_DISCLAIMER)) {
+      if (caveatRequired && !(caveat.trim() || buildRequiredCaveat(n, pValue))) {
         throw new Error('Caveat is required and cannot be removed');
+      }
+      if (!sourceColumns.length) {
+        throw new Error(
+          'This chart is missing recorded source columns — re-run the plot step before posting.'
+        );
       }
       const uploaded = await uploadChartPng(png, {
         filename: `social-card-${format.id}-${Date.now()}.png`,
       });
       const effectiveCaveat =
         includeCaveat || caveatRequired
-          ? caveat.trim() || SMALL_SAMPLE_DISCLAIMER
+          ? caveat.trim() || buildRequiredCaveat(n, pValue)
           : null;
       const platform =
         formatId.startsWith('linkedin')
@@ -368,15 +410,17 @@ export function SocialCardComposer({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          mediaUrl: uploaded.url,
           storageKey: uploaded.storageKey,
+          mediaUrl: uploaded.url,
           headline: headline.trim(),
           caption: caption.trim() || headline.trim(),
           caveat: effectiveCaveat,
-          caveatRequired,
           sourceLine,
           format: format.id,
           platform,
+          sampleN: n,
+          pValue,
+          sourceColumns,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -464,7 +508,13 @@ export function SocialCardComposer({
               <div className="flex items-center justify-between gap-2">
                 <Label htmlFor="sc-caveat" className="text-xs">
                   Caveat
-                  {caveatRequired ? ' (required)' : ''}
+                  {caveatRequired
+                    ? isSmallSample(n) && isNotSignificant(pValue)
+                      ? ' (required — small n + not significant)'
+                      : isSmallSample(n)
+                        ? ' (required — small n)'
+                        : ' (required — not significant)'
+                    : ''}
                 </Label>
                 {!caveatRequired && (
                   <label className="flex items-center gap-1.5 text-xs text-muted-foreground">

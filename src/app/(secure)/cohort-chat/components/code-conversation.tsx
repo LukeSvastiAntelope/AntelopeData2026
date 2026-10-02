@@ -17,6 +17,7 @@ import {
 import type { ChartActionFigure } from '../../python-analysis/components/ChartActions';
 import { SocialCardComposer } from '../../python-analysis/components/SocialCardComposer';
 import type { ContentDraftSummary } from '../../python-analysis/components/TurnIntoContentCard';
+import { extractSourceColumnsFromCode } from '../../python-analysis/utils/aggregate-only-guard';
 
 interface CodeConversationProps {
   surveyId: number | null;
@@ -69,6 +70,8 @@ interface AnalysisMessage {
     stepId?: string;
     caption?: string;
     n?: number;
+    pValue?: number;
+    sourceColumns?: string[];
     contentDrafts?: ContentDraftSummary[];
     contentDraftsLoading?: boolean;
     contentDraftsError?: string | null;
@@ -218,6 +221,12 @@ export function CodeConversation({
                       stepId: plot.stepId || plot.id,
                       caption: plot.caption,
                       n: sampleN ?? undefined,
+                      sourceColumns:
+                        m.metadata?.sourceColumns ||
+                        extractSourceColumnsFromCode(
+                          m.metadata?.code,
+                          currentDataset?.columns
+                        ),
                       needsRegeneration: false,
                     },
                   }
@@ -231,7 +240,7 @@ export function CodeConversation({
         }
       }
     },
-    [conversationId, sampleN]
+    [conversationId, sampleN, currentDataset?.columns]
   );
 
   const handleAddFigureToReport = useCallback((figure: ChartActionFigure) => {
@@ -1030,6 +1039,10 @@ Ready for intelligent survey analysis!`,
                       : undefined,
                     n: sampleN ?? undefined,
                     conversationId: conversationId || undefined,
+                    sourceColumns: extractSourceColumnsFromCode(
+                      latestStep.code,
+                      currentDataset?.columns
+                    ),
                   }
                 });
               });
@@ -1356,6 +1369,11 @@ Error: ${err.message}
               caption: `Manual plot ${index + 1}`,
               n: sampleN ?? undefined,
               conversationId: conversationId || undefined,
+              code,
+              sourceColumns: extractSourceColumnsFromCode(
+                code,
+                currentDataset?.columns
+              ),
             }
           });
         });

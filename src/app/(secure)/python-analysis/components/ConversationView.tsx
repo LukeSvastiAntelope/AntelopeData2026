@@ -45,6 +45,8 @@ interface AnalysisMessage {
     stepId?: string;
     caption?: string;
     n?: number;
+    pValue?: number;
+    sourceColumns?: string[];
     /** S3 — drafts attached to the synthesis assistant message */
     contentDrafts?: ContentDraftSummary[];
     contentDraftsLoading?: boolean;
@@ -88,9 +90,11 @@ export function ConversationView({
       label: message.metadata?.caption || message.metadata?.stepId || `chart-${message.id}`,
       caption: message.metadata?.caption,
       n: message.metadata?.n ?? null,
+      pValue: message.metadata?.pValue ?? null,
       storageKey: message.metadata?.storageKey,
       stepId: message.metadata?.stepId || message.id,
       code: message.metadata?.code || null,
+      sourceColumns: message.metadata?.sourceColumns || null,
     };
   };
 
