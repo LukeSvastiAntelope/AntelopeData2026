@@ -307,7 +307,7 @@ export function resolveOwnedSocialCardMediaOrThrow(opts: {
   mediaUrl?: string | null;
 }): { storageKey: string; mediaUrl: string } {
   const result = resolveOwnedSocialCardMedia(opts);
-  if (!result.ok) {
+  if (result.ok === false) {
     throw new Error(
       'storageKey is required and must be an owned media object. External mediaUrl is not allowed.'
     );
