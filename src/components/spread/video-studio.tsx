@@ -1104,7 +1104,9 @@ export function VideoStudio({ prefill }: { prefill?: VideoStudioPrefill } = {}) 
         )}
 
         <p className="text-xs text-muted-foreground">
-          Approve stages <code className="text-[11px]">generate_and_post_video</code> for
+          Analytics explainers assemble hook → real chart card → CTA client-side;
+          chart images are never sent to i2v. Approve stages{' '}
+          <code className="text-[11px]">generate_and_post_video</code> for
           review — same &quot;review before it goes out&quot; language as Auto-Post. Nothing
           publishes until you confirm on the card.{' '}
           <Link href="/agents/campaign-consultant" className="underline underline-offset-2">
